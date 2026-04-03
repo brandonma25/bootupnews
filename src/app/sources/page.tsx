@@ -1,0 +1,117 @@
+import { createSourceAction } from "@/app/actions";
+import { ExternalLink } from "lucide-react";
+
+import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Panel } from "@/components/ui/panel";
+import { getDashboardData } from "@/lib/data";
+import { isSupabaseConfigured } from "@/lib/env";
+
+export default async function SourcesPage() {
+  const data = await getDashboardData();
+
+  return (
+    <AppShell currentPath="/sources" mode={data.mode}>
+      <div className="space-y-6 py-2">
+        <PageHeader
+          eyebrow="Source management"
+          title="Track the feeds that matter"
+          description="Start with RSS for the MVP. The app is organized so you can add more source types later without rebuilding the core product."
+        />
+
+        <div className="grid gap-4">
+          {data.sources.map((source) => (
+            <Panel key={source.id} className="p-6">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-semibold text-[var(--foreground)]">{source.name}</h2>
+                    <Badge>{source.topicName ?? "Unassigned"}</Badge>
+                    <Badge className={source.status === "active" ? "text-[var(--accent)]" : ""}>
+                      {source.status}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1 text-sm text-[var(--muted)]">
+                    <p>{source.feedUrl}</p>
+                    {source.homepageUrl ? <p>{source.homepageUrl}</p> : null}
+                  </div>
+                </div>
+                {source.homepageUrl ? (
+                  <a
+                    href={source.homepageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm text-[var(--foreground)]"
+                  >
+                    Visit source
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                ) : null}
+              </div>
+            </Panel>
+          ))}
+        </div>
+
+        <Panel className="p-6">
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Add an RSS source</h2>
+          <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+            {isSupabaseConfigured
+              ? "Start with a small number of high-quality feeds. You can always add more later."
+              : "Connect Supabase in Settings to save sources. Until then, demo sources are shown."}
+          </p>
+          <form action={createSourceAction} className="mt-6 grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-[var(--foreground)]">Source name</span>
+              <input
+                name="name"
+                placeholder="Financial Times"
+                className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
+                disabled={!isSupabaseConfigured}
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-[var(--foreground)]">Topic</span>
+              <select
+                name="topicId"
+                className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
+                disabled={!isSupabaseConfigured}
+                defaultValue={data.topics[0]?.id}
+              >
+                {data.topics.map((topic) => (
+                  <option key={topic.id} value={topic.id}>
+                    {topic.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-[var(--foreground)]">RSS feed URL</span>
+              <input
+                name="feedUrl"
+                placeholder="https://example.com/feed.xml"
+                className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
+                disabled={!isSupabaseConfigured}
+              />
+            </label>
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-[var(--foreground)]">Homepage URL</span>
+              <input
+                name="homepageUrl"
+                placeholder="https://example.com"
+                className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
+                disabled={!isSupabaseConfigured}
+              />
+            </label>
+            <button
+              className="inline-flex items-center justify-center rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              disabled={!isSupabaseConfigured}
+            >
+              Save source
+            </button>
+          </form>
+        </Panel>
+      </div>
+    </AppShell>
+  );
+}
