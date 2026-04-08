@@ -132,40 +132,53 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
   }, [open]);
 
   return (
-    <div className="relative" onClick={(event) => event.stopPropagation()}>
+    <div className="relative w-full max-w-[280px]" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
         aria-label="Open account management"
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-3 rounded-full border px-2 py-2 shadow-[0_12px_28px_rgba(19,26,34,0.10)] backdrop-blur transition-colors",
+          "w-full rounded-[28px] border p-4 text-left shadow-[0_12px_28px_rgba(19,26,34,0.10)] backdrop-blur transition-colors lg:p-5",
           signedIn
             ? "border-[rgba(31,79,70,0.14)] bg-[rgba(255,255,255,0.92)]"
             : "border-[rgba(19,26,34,0.10)] bg-[rgba(231,233,236,0.92)]",
         )}
         onClick={() => setOpen((value) => !value)}
       >
-        <span
-          className={cn(
-            "flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold",
-            signedIn ? "bg-[var(--foreground)] text-white" : "bg-[rgba(19,26,34,0.12)] text-[var(--foreground)]",
-          )}
-        >
-          {signedIn ? account?.initials : <UserRound className="h-4 w-4" />}
-        </span>
-        <span className="hidden min-w-0 text-left md:block">
-          <span className="block truncate text-sm font-semibold text-[var(--foreground)]">
-            {signedIn ? account?.displayName : "Account"}
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-4">
+            <Badge className={cn(!signedIn ? "bg-white/55" : "")}>
+              {signedIn ? "Account" : "Guest"}
+            </Badge>
+            <div className="flex items-center gap-3">
+              <span
+                className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold",
+                  signedIn
+                    ? "bg-[var(--foreground)] text-white"
+                    : "bg-[rgba(19,26,34,0.12)] text-[var(--foreground)]",
+                )}
+              >
+                {signedIn ? account?.initials : <UserRound className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-[var(--foreground)]">
+                  {signedIn ? account?.displayName : "Account access"}
+                </span>
+                <span className="block truncate text-xs leading-6 text-[var(--muted)]">
+                  {signedIn ? account?.email : "Sign in to save your briefings"}
+                </span>
+              </span>
+            </div>
+          </div>
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--line)] bg-white/60 text-[var(--foreground)]">
+            <ChevronDown className="h-4 w-4 text-[var(--muted)]" />
           </span>
-          <span className="block truncate text-xs text-[var(--muted)]">
-            {signedIn ? account?.email : "Sign in to save your briefings"}
-          </span>
-        </span>
-        <ChevronDown className="mr-2 h-4 w-4 text-[var(--muted)]" />
+        </div>
       </button>
 
       {open ? (
-        <Panel className="absolute right-0 top-[calc(100%+0.75rem)] w-[320px] p-5">
+        <Panel className="absolute right-0 top-[calc(100%+0.75rem)] w-full min-w-[320px] p-5">
           <div className="flex items-start gap-4">
             <span
               className={cn(
