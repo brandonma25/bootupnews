@@ -25,7 +25,15 @@ const features = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sent?: string; auth?: string }>;
+}) {
+  const params = await searchParams;
+  const sent = params.sent === "1";
+  const authRequired = params.auth === "1";
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-6 px-4 py-4 lg:px-6">
       <Panel className="overflow-hidden">
@@ -42,18 +50,32 @@ export default function HomePage() {
             </div>
 
             {isSupabaseConfigured ? (
-              <form action={requestMagicLinkAction} className="flex max-w-xl flex-col gap-3 sm:flex-row">
-                <input
-                  name="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  className="min-w-0 flex-1 rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm outline-none"
-                />
-                <Button className="gap-2 px-5 py-3 text-sm">
-                  Send sign-in link
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </form>
+              <div className="max-w-xl space-y-3">
+                <form action={requestMagicLinkAction} className="flex flex-col gap-3 sm:flex-row">
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    className="min-w-0 flex-1 rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm outline-none"
+                  />
+                  <Button className="gap-2 px-5 py-3 text-sm">
+                    Send sign-in link
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </form>
+
+                {sent ? (
+                  <div className="rounded-[24px] border border-[var(--line)] bg-[var(--accent-soft)] px-5 py-4 text-sm leading-7 text-[var(--foreground)]">
+                    Check your inbox for a secure sign-in link. Open the latest email we just sent and click the confirmation button to continue.
+                  </div>
+                ) : null}
+
+                {authRequired ? (
+                  <div className="rounded-[24px] border border-[var(--line)] bg-white/70 px-5 py-4 text-sm leading-7 text-[var(--foreground)]">
+                    Sign in with your email first, then you&apos;ll be redirected back into the app.
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="flex flex-wrap gap-3">
                 <Link href="/dashboard">
