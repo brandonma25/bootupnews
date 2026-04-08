@@ -8,6 +8,7 @@ The app includes:
 - a daily dashboard
 - topic management
 - source management
+- one-click starter imports for live news and newsletter RSS feeds
 - briefing history
 - settings for live integrations
 - RSS ingestion and summary service scaffolding
@@ -29,6 +30,7 @@ The app includes:
 - Demo data powers the product out of the box
 - The codebase is wired for real Supabase data
 - RSS ingestion and article clustering are implemented in the service layer
+- the Sources page includes curated starter feeds so live data setup is faster
 - AI summarization is implemented with a deterministic JSON response format and a safe heuristic fallback
 
 ## Before you start

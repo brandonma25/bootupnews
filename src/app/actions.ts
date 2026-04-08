@@ -95,14 +95,24 @@ export async function createSourceAction(formData: FormData) {
     topicId: formData.get("topicId"),
   });
 
-  await supabase.from("sources").insert({
-    user_id: user.id,
-    name: payload.name,
-    feed_url: payload.feedUrl,
-    homepage_url: payload.homepageUrl || null,
-    topic_id: payload.topicId,
-    status: "active",
-  });
+  const { data: existing } = await supabase
+    .from("sources")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("feed_url", payload.feedUrl)
+    .eq("topic_id", payload.topicId)
+    .maybeSingle();
+
+  if (!existing) {
+    await supabase.from("sources").insert({
+      user_id: user.id,
+      name: payload.name,
+      feed_url: payload.feedUrl,
+      homepage_url: payload.homepageUrl || null,
+      topic_id: payload.topicId,
+      status: "active",
+    });
+  }
 
   revalidatePath("/sources");
   revalidatePath("/dashboard");

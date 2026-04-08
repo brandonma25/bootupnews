@@ -41,9 +41,13 @@ export async function fetchFeedArticles(feedUrl: string, sourceName: string) {
 export function clusterArticles(
   articles: FeedArticle[],
 ): Array<{ representative: FeedArticle; sources: FeedArticle[] }> {
+  const sortedArticles = [...articles].sort(
+    (left, right) =>
+      new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime(),
+  );
   const clusters: Array<{ representative: FeedArticle; sources: FeedArticle[] }> = [];
 
-  for (const article of articles) {
+  for (const article of sortedArticles) {
     const normalized = normalize(article.title);
     const match = clusters.find((cluster) => similarity(normalized, normalize(cluster.representative.title)) >= 0.55);
 
@@ -54,7 +58,16 @@ export function clusterArticles(
     }
   }
 
-  return clusters;
+  return clusters.sort((left, right) => clusterScore(right) - clusterScore(left));
+}
+
+function clusterScore(cluster: { representative: FeedArticle; sources: FeedArticle[] }) {
+  const freshestPublishedAt = Math.max(
+    ...cluster.sources.map((article) => new Date(article.publishedAt).getTime()),
+  );
+
+  // Favor clusters that are both recent and corroborated by multiple sources.
+  return freshestPublishedAt + cluster.sources.length * 60 * 60 * 1000;
 }
 
 function normalize(value: string) {
