@@ -14,6 +14,7 @@ import {
   PanelTopOpen,
   Rss,
   Settings2,
+  UserRound,
   X,
 } from "lucide-react";
 
@@ -104,7 +105,7 @@ export function AppShell({
       </aside>
 
       <main className="min-w-0 flex-1 pt-16 lg:pt-0">
-        {account ? (
+        {mode !== "demo" ? (
           <div className="sticky top-4 z-30 mb-4 flex justify-end">
             <AccountMenu account={account} />
           </div>
@@ -115,8 +116,9 @@ export function AppShell({
   );
 }
 
-function AccountMenu({ account }: { account: ViewerAccount }) {
+function AccountMenu({ account }: { account?: ViewerAccount | null }) {
   const [open, setOpen] = useState(false);
+  const signedIn = Boolean(account);
 
   useEffect(() => {
     if (!open) return;
@@ -135,17 +137,29 @@ function AccountMenu({ account }: { account: ViewerAccount }) {
         type="button"
         aria-label="Open account management"
         aria-expanded={open}
-        className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-white/85 px-2 py-2 shadow-[0_12px_28px_rgba(19,26,34,0.10)] backdrop-blur"
+        className={cn(
+          "flex items-center gap-3 rounded-full border px-2 py-2 shadow-[0_12px_28px_rgba(19,26,34,0.10)] backdrop-blur transition-colors",
+          signedIn
+            ? "border-[rgba(31,79,70,0.14)] bg-[rgba(255,255,255,0.92)]"
+            : "border-[rgba(19,26,34,0.10)] bg-[rgba(231,233,236,0.92)]",
+        )}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--foreground)] text-sm font-semibold text-white">
-          {account.initials}
+        <span
+          className={cn(
+            "flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold",
+            signedIn ? "bg-[var(--foreground)] text-white" : "bg-[rgba(19,26,34,0.12)] text-[var(--foreground)]",
+          )}
+        >
+          {signedIn ? account?.initials : <UserRound className="h-4 w-4" />}
         </span>
         <span className="hidden min-w-0 text-left md:block">
           <span className="block truncate text-sm font-semibold text-[var(--foreground)]">
-            {account.displayName}
+            {signedIn ? account?.displayName : "Account"}
           </span>
-          <span className="block truncate text-xs text-[var(--muted)]">{account.email}</span>
+          <span className="block truncate text-xs text-[var(--muted)]">
+            {signedIn ? account?.email : "Sign in to save your briefings"}
+          </span>
         </span>
         <ChevronDown className="mr-2 h-4 w-4 text-[var(--muted)]" />
       </button>
@@ -153,47 +167,71 @@ function AccountMenu({ account }: { account: ViewerAccount }) {
       {open ? (
         <Panel className="absolute right-0 top-[calc(100%+0.75rem)] w-[320px] p-5">
           <div className="flex items-start gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] text-sm font-semibold text-white">
-              {account.initials}
+            <span
+              className={cn(
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+                signedIn ? "bg-[var(--foreground)] text-white" : "bg-[rgba(19,26,34,0.12)] text-[var(--foreground)]",
+              )}
+            >
+              {signedIn ? account?.initials : <UserRound className="h-5 w-5" />}
             </span>
             <div className="min-w-0">
               <p className="truncate text-base font-semibold text-[var(--foreground)]">
-                {account.displayName}
+                {signedIn ? account?.displayName : "Guest access"}
               </p>
-              <p className="truncate text-sm text-[var(--muted)]">{account.email}</p>
+              <p className="truncate text-sm text-[var(--muted)]">
+                {signedIn ? account?.email : "Sign in with email to unlock saved topics, sources, and account tools."}
+              </p>
             </div>
           </div>
 
           <div className="mt-5 space-y-3">
-            <Link
-              href="/settings#account-settings"
-              className="flex items-center justify-between rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
-              onClick={() => setOpen(false)}
-            >
-              <span>Account settings</span>
-              <PanelTopOpen className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/settings#account-management"
-              className="flex items-center justify-between rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
-              onClick={() => setOpen(false)}
-            >
-              <span>Account management</span>
-              <PanelTopOpen className="h-4 w-4" />
-            </Link>
+            {signedIn ? (
+              <>
+                <Link
+                  href="/settings#account-settings"
+                  className="flex items-center justify-between rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
+                  onClick={() => setOpen(false)}
+                >
+                  <span>Account settings</span>
+                  <PanelTopOpen className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/settings#account-management"
+                  className="flex items-center justify-between rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
+                  onClick={() => setOpen(false)}
+                >
+                  <span>Account management</span>
+                  <PanelTopOpen className="h-4 w-4" />
+                </Link>
+              </>
+            ) : (
+              <Link
+                href="/#email-access"
+                className="flex items-center justify-between rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
+                onClick={() => setOpen(false)}
+              >
+                <span>Sign in with email</span>
+                <PanelTopOpen className="h-4 w-4" />
+              </Link>
+            )}
             <div className="rounded-[20px] border border-[var(--line)] bg-[var(--panel)]/70 px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                Quick access
+                {signedIn ? "Quick access" : "New here?"}
               </p>
               <p className="mt-2 text-sm leading-7 text-[var(--foreground)]">
-                Open your personal preferences, account controls, and session tools from this menu.
+                {signedIn
+                  ? "Open your personal preferences, account controls, and session tools from this menu."
+                  : "Use the email prompt on the homepage to request a secure sign-in link and activate your account."}
               </p>
             </div>
-            <form action={signOutAction}>
-              <Button type="submit" variant="secondary" className="w-full">
-                Sign out
-              </Button>
-            </form>
+            {signedIn ? (
+              <form action={signOutAction}>
+                <Button type="submit" variant="secondary" className="w-full">
+                  Sign out
+                </Button>
+              </form>
+            ) : null}
           </div>
         </Panel>
       ) : null}

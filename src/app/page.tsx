@@ -53,7 +53,7 @@ export default async function HomePage({
             </div>
 
             {isSupabaseConfigured ? (
-              <div className="max-w-xl space-y-3">
+              <div id="email-access" className="max-w-xl scroll-mt-24 space-y-3">
                 <form action={requestMagicLinkAction} className="flex flex-col gap-3 sm:flex-row">
                   <input
                     name="email"
