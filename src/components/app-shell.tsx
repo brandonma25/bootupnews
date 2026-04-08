@@ -36,7 +36,7 @@ export function AppShell({
 }: {
   children: React.ReactNode;
   currentPath: string;
-  mode: "demo" | "live";
+  mode: "demo" | "live" | "public";
 }) {
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -109,7 +109,7 @@ function SidebarPanel({
   onToggleCollapse,
 }: {
   currentPath: string;
-  mode: "demo" | "live";
+  mode: "demo" | "live" | "public";
   collapsed: boolean;
   mobile?: boolean;
   onClose?: () => void;
@@ -215,13 +215,15 @@ function SidebarPanel({
         </p>
         {collapsed && !mobile ? (
           <p className="mt-2 text-center text-sm font-semibold text-[var(--foreground)]">
-            {mode === "demo" ? "Demo" : "Live"}
+            {mode === "demo" ? "Demo" : mode === "public" ? "Public" : "Live"}
           </p>
         ) : (
           <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
             {mode === "demo"
               ? "Demo mode is active. Connect Supabase and your AI key to save data and generate live briefings."
-              : "Live mode is active. Your saved topics, sources, and briefings are connected."}
+              : mode === "public"
+                ? "Public live mode is active. The app is pulling current tech and finance headlines from public feeds on a 15-minute refresh cycle."
+                : "Live mode is active. Your saved topics, sources, and briefings are connected."}
           </p>
         )}
       </div>

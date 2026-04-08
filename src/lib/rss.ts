@@ -14,7 +14,7 @@ const parser = new Parser();
 
 export async function fetchFeedArticles(feedUrl: string, sourceName: string) {
   const response = await fetch(feedUrl, {
-    next: { revalidate: 0 },
+    next: { revalidate: 900 },
     headers: {
       "User-Agent": "Daily-Intelligence-Aggregator/1.0",
     },

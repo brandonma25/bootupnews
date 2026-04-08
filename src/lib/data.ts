@@ -10,7 +10,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    return demoDashboardData;
+    return getPublicDashboardData();
   }
 
   const {
@@ -18,7 +18,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return demoDashboardData;
+    return getPublicDashboardData();
   }
 
   const [topicsResult, sourcesResult, briefingsResult] = await Promise.all([
@@ -66,6 +66,10 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const latest = briefingsResult.data;
 
+  if (!topics.length || !sources.some((source) => source.status === "active")) {
+    return getPublicDashboardData();
+  }
+
   if (!latest) {
     const generated = await generateDailyBriefing(topics, sources);
     return {
@@ -101,6 +105,17 @@ export async function getDashboardData(): Promise<DashboardData> {
           priority: item.priority,
         })) ?? [],
     },
+  };
+}
+
+async function getPublicDashboardData(): Promise<DashboardData> {
+  const briefing = await generateDailyBriefing(demoTopics, demoSources);
+
+  return {
+    mode: "public",
+    briefing,
+    topics: demoTopics,
+    sources: demoSources,
   };
 }
 

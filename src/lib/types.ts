@@ -54,7 +54,7 @@ export type DailyBriefing = {
 };
 
 export type DashboardData = {
-  mode: "demo" | "live";
+  mode: "demo" | "live" | "public";
   briefing: DailyBriefing;
   topics: Topic[];
   sources: Source[];
