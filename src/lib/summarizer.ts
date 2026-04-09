@@ -84,23 +84,41 @@ async function summarizeWithAi(
 
 function summarizeHeuristically(topicName: string, articles: FeedArticle[]): StorySummary {
   const lead = articles[0];
-  const backups = articles.slice(1, 4);
+  const second = articles[1];
+  const third = articles[2];
+
+  // Build a specific what-happened from the lead article
+  const whatHappened = firstSentence(
+    lead.summaryText,
+    `${lead.sourceName} is reporting a notable development in ${topicName.toLowerCase()}.`,
+  );
+
+  // Build three distinct, article-grounded key points
+  const points: [string, string, string] = [
+    // Point 1: lead story grounded
+    lead.summaryText
+      ? firstSentence(lead.summaryText, lead.title)
+      : lead.title,
+    // Point 2: second source if available, otherwise a count observation
+    second
+      ? `${second.sourceName} is covering the same story: ${firstSentence(second.summaryText, second.title).toLowerCase()}`
+      : `${lead.sourceName} is the primary source — no corroborating coverage from other tracked feeds yet.`,
+    // Point 3: third source or signal count
+    third
+      ? `${third.sourceName} adds: ${firstSentence(third.summaryText, third.title).toLowerCase()}`
+      : articles.length > 1
+        ? `${articles.length} sources across your ${topicName} feeds picked up this cluster, indicating broad relevance.`
+        : `Only one source has reported on this so far — treat as an early signal rather than confirmed news.`,
+  ];
+
+  // Build a specific why-it-matters using the topic and lead title
+  const whyItMatters = `${topicName} operators tracking this area should note it: the lead signal — "${lead.title}" — is the kind of development that tends to affect near-term priorities or assumptions. Connect an AI key in Settings to get analyst-quality analysis instead of this heuristic summary.`;
 
   return {
     headline: lead.title,
-    whatHappened: firstSentence(
-      lead.summaryText,
-      `${lead.sourceName} reports a notable development in ${topicName.toLowerCase()}.`,
-    ),
-    keyPoints: [
-      `Coverage appeared across ${articles.length} source${articles.length === 1 ? "" : "s"}, suggesting the story has broad relevance.`,
-      `The strongest signal in the reporting is ${firstSentence(lead.summaryText, lead.title).toLowerCase()}.`,
-      backups[0]
-        ? `${backups[0].sourceName} adds supporting context that sharpens the same underlying trend.`
-        : `This looks material enough to keep on the radar for the next briefing cycle.`,
-    ],
-    whyItMatters:
-      `For ${topicName.toLowerCase()}, this matters because it could change near-term priorities, operating assumptions, or market expectations. Treat it as a story to monitor rather than background noise.`,
+    whatHappened,
+    keyPoints: points,
+    whyItMatters,
     estimatedMinutes: Math.min(6, Math.max(3, Math.ceil(articles.length * 1.5))),
   };
 }
