@@ -394,3 +394,67 @@ export async function toggleReadAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/history");
 }
+
+export async function markAllReadAction(formData: FormData) {
+  if (!isSupabaseConfigured) {
+    redirect("/dashboard");
+  }
+
+  const briefingId = z.string().min(1).parse(formData.get("briefingId"));
+  if (briefingId.startsWith("generated-")) {
+    redirect("/dashboard");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/dashboard");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/?auth=1");
+
+  const { data: briefing } = await supabase
+    .from("daily_briefings")
+    .select("id")
+    .eq("id", briefingId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!briefing) redirect("/dashboard");
+
+  await supabase
+    .from("briefing_items")
+    .update({ is_read: true })
+    .eq("briefing_id", briefingId);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/history");
+  redirect("/dashboard?allread=1");
+}
+
+export async function deleteTopicAction(formData: FormData) {
+  if (!isSupabaseConfigured) {
+    redirect("/topics?demo=1");
+  }
+
+  const topicId = z.string().min(1).parse(formData.get("topicId"));
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/topics?demo=1");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/?auth=1");
+
+  await supabase
+    .from("topics")
+    .delete()
+    .eq("id", topicId)
+    .eq("user_id", user.id);
+
+  revalidatePath("/topics");
+  revalidatePath("/dashboard");
+  redirect("/topics");
+}

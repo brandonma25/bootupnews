@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   requestMagicLinkAction,
   signInWithPasswordAction,
@@ -5,6 +6,10 @@ import {
   signUpWithPasswordAction,
 } from "@/app/actions";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Daily Intelligence Aggregator — High-signal daily briefings",
+};
 import { ArrowRight, CheckCircle2, KeyRound, MailCheck, Sparkles, ShieldCheck, Rss } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
