@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import {
   requestMagicLinkAction,
   signInWithPasswordAction,
@@ -6,6 +8,10 @@ import {
 } from "@/app/actions";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, KeyRound, MailCheck, Sparkles, ShieldCheck, Rss } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Daily Intelligence Aggregator — High-signal daily briefings",
+};
 
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +48,11 @@ export default async function HomePage({
   const authState = params.auth;
   const authRequired = authState === "1";
   const viewer = await getViewerAccount();
+
+  // Signed-in users don't need the marketing/onboarding page — send them straight to their briefing
+  if (viewer && !authState) {
+    redirect("/dashboard");
+  }
 
   return (
     <AppShell currentPath="/" mode={isSupabaseConfigured ? "public" : "demo"} account={viewer}>
