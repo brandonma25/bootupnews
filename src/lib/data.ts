@@ -130,7 +130,6 @@ export async function getDashboardData(): Promise<DashboardData> {
       briefingDate: latest.briefing_date,
       title: latest.title,
       intro: latest.intro,
-      readingWindow: latest.reading_window,
       items:
         latest.briefing_items?.map((item) => ({
           id: item.id,
@@ -148,6 +147,10 @@ export async function getDashboardData(): Promise<DashboardData> {
           importanceLabel: undefined,
           rankingSignals: [],
         })) ?? [],
+      readingWindow: deriveReadingWindow(
+        latest.briefing_items?.map((item) => item.estimated_minutes) ?? [],
+        latest.reading_window,
+      ),
     },
   };
 }
@@ -188,7 +191,6 @@ export async function getHistory() {
       briefingDate: briefing.briefing_date,
       title: briefing.title,
       intro: briefing.intro,
-      readingWindow: briefing.reading_window,
       items:
         briefing.briefing_items?.map((item) => ({
           id: item.id,
@@ -206,6 +208,10 @@ export async function getHistory() {
           importanceLabel: undefined,
           rankingSignals: [],
         })) ?? [],
+      readingWindow: deriveReadingWindow(
+        briefing.briefing_items?.map((item) => item.estimated_minutes) ?? [],
+        briefing.reading_window,
+      ),
     }),
   );
 }
@@ -288,4 +294,9 @@ export async function generateDailyBriefing(
     readingWindow: `${totalMinutes} minutes`,
     items: validItems,
   };
+}
+
+function deriveReadingWindow(estimatedMinutes: number[], fallback: string) {
+  const totalMinutes = estimatedMinutes.reduce((sum, minutes) => sum + minutes, 0);
+  return totalMinutes > 0 ? `${totalMinutes} minutes` : fallback;
 }

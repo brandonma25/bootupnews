@@ -249,6 +249,30 @@ export default async function HomePage({
                 );
               })}
             </div>
+
+            <div className="rounded-[24px] border border-[var(--line)] bg-white/60 p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>Getting started</Badge>
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                  Recommended flow
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {[
+                  "1. Sign in or create an account.",
+                  "2. Review the live source library and import feeds.",
+                  "3. Add or refine your briefing topics.",
+                  "4. Generate a fresh briefing on Today.",
+                ].map((step) => (
+                  <div
+                    key={step}
+                    className="rounded-[20px] border border-[var(--line)] bg-white/70 px-4 py-4 text-sm leading-7 text-[var(--foreground)]"
+                  >
+                    {step}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="rounded-[32px] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(247,243,236,0.95))] p-6">
@@ -261,7 +285,7 @@ export default async function HomePage({
                   Executive scan
                 </h2>
               </div>
-              <Badge className="text-[var(--accent)]">34 minutes</Badge>
+              <Badge className="text-[var(--accent)]">15-20 min typical</Badge>
             </div>
 
             <div className="mt-8 space-y-4">

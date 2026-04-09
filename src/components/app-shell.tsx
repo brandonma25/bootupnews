@@ -26,12 +26,12 @@ import type { ViewerAccount } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Home", icon: House },
   { href: "/dashboard", label: "Today", icon: Newspaper },
   { href: "/topics", label: "Topics", icon: Layers3 },
   { href: "/sources", label: "Sources", icon: Rss },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings2 },
+  { href: "/", label: "Home", icon: House },
 ];
 
 const DESKTOP_SIDEBAR_KEY = "daily-intel-sidebar-collapsed";
@@ -64,31 +64,47 @@ export function AppShell({
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1440px] gap-4 px-4 py-4 lg:px-6">
-      <button
-        type="button"
-        aria-label="Open navigation"
-        className="fixed left-4 top-4 z-40 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--foreground)] shadow-[0_12px_32px_rgba(19,26,34,0.12)] lg:hidden"
-        onClick={() => setMobileOpen(true)}
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {mobileOpen ? (
-        <div
-          className="fixed inset-0 z-50 bg-[rgba(19,26,34,0.24)] backdrop-blur-[2px] lg:hidden"
-          onClick={() => setMobileOpen(false)}
+      <div className="fixed inset-x-4 top-4 z-50 flex items-center justify-between lg:hidden">
+        <button
+          type="button"
+          aria-label="Open navigation"
+          className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--foreground)] shadow-[0_12px_32px_rgba(19,26,34,0.12)]"
+          onClick={() => setMobileOpen(true)}
         >
-          <div className="flex h-full max-w-[320px] p-4" onClick={(event) => event.stopPropagation()}>
-            <SidebarPanel
-              currentPath={currentPath}
-              mode={mode}
-              collapsed={false}
-              mobile
-              onClose={() => setMobileOpen(false)}
-            />
-          </div>
+          <Menu className="h-5 w-5" />
+        </button>
+        <MobileAccountShortcut account={account} />
+      </div>
+
+      <div
+        className={cn(
+          "fixed inset-0 z-50 lg:hidden",
+          mobileOpen ? "pointer-events-auto" : "pointer-events-none",
+        )}
+        aria-hidden={!mobileOpen}
+      >
+        <div
+          className={cn(
+            "absolute inset-0 bg-[rgba(19,26,34,0.24)] backdrop-blur-[2px] transition-opacity duration-200",
+            mobileOpen ? "opacity-100" : "opacity-0",
+          )}
+          onClick={() => setMobileOpen(false)}
+        />
+        <div
+          className={cn(
+            "absolute left-0 top-0 h-full w-[320px] max-w-[85vw] p-4 transition-transform duration-200",
+            mobileOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          <SidebarPanel
+            currentPath={currentPath}
+            mode={mode}
+            collapsed={false}
+            mobile
+            onClose={() => setMobileOpen(false)}
+          />
         </div>
-      ) : null}
+      </div>
 
       <aside
         className={cn(
@@ -104,10 +120,10 @@ export function AppShell({
         />
       </aside>
 
-      <main className="min-w-0 flex-1 pt-16 lg:pt-0">
+      <main className="min-w-0 flex-1 pt-20 lg:pt-0">
         {mode !== "demo" ? (
           <div className="mb-4 space-y-3">
-            <div className="flex justify-end">
+            <div className="hidden justify-end lg:flex">
               <AccountMenu account={account} />
             </div>
             {!account ? <GuestCallout /> : null}
@@ -116,6 +132,29 @@ export function AppShell({
         {children}
       </main>
     </div>
+  );
+}
+
+function MobileAccountShortcut({ account }: { account?: ViewerAccount | null }) {
+  const signedIn = Boolean(account);
+
+  return (
+    <Link
+      href={signedIn ? "/settings#account-settings" : "/#email-access"}
+      aria-label={signedIn ? "Open account settings" : "Open sign in"}
+      className={cn(
+        "inline-flex h-12 w-12 items-center justify-center rounded-2xl border shadow-[0_12px_32px_rgba(19,26,34,0.12)]",
+        signedIn
+          ? "border-[rgba(31,79,70,0.14)] bg-white text-[var(--foreground)]"
+          : "border-[rgba(19,26,34,0.10)] bg-[rgba(239,240,242,0.96)] text-[var(--muted)]",
+      )}
+    >
+      {signedIn ? (
+        <span className="text-sm font-semibold">{account?.initials}</span>
+      ) : (
+        <UserRound className="h-5 w-5" />
+      )}
+    </Link>
   );
 }
 

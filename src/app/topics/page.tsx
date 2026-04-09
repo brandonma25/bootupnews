@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/env";
+import { formatBriefingDate } from "@/lib/utils";
 
 export default async function TopicsPage() {
   const data = await getDashboardData();
@@ -35,8 +36,14 @@ export default async function TopicsPage() {
                     <h2 className="text-xl font-semibold text-[var(--foreground)]">{topic.name}</h2>
                     <Badge>Topic</Badge>
                     <Badge>{data.sources.filter((source) => source.topicId === topic.id).length} sources</Badge>
+                    <Badge>
+                      {data.briefing.items.filter((item) => item.topicId === topic.id).length} stories today
+                    </Badge>
                   </div>
                   <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{topic.description}</p>
+                  <p className="mt-3 text-xs leading-6 text-[var(--muted)]">
+                    Last updated {formatBriefingDate(data.briefing.briefingDate)}
+                  </p>
                   <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
                     Accent color
                   </p>

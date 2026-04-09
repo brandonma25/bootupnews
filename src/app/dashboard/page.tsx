@@ -1,27 +1,38 @@
+import Link from "next/link";
+
 import { generateBriefingAction } from "@/app/actions";
-import { PageHeader } from "@/components/page-header";
-import { SubmitButton } from "@/components/submit-button";
-import { StoryCard } from "@/components/story-card";
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
+import { StoryCard } from "@/components/story-card";
+import { SubmitButton } from "@/components/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
-import { formatBriefingDate } from "@/lib/utils";
+import { cn, formatBriefingDate } from "@/lib/utils";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ generated?: string }>;
+  searchParams: Promise<{ generated?: string; topic?: string; view?: string }>;
 }) {
   const params = await searchParams;
   const data = await getDashboardData();
   const viewer = await getViewerAccount();
   const generated = params.generated === "1";
-  const topStories = data.briefing.items.filter((item) => item.priority === "top");
+  const activeTopicId = params.topic;
+  const unreadOnly = params.view === "unread";
+  const visibleItems = data.briefing.items.filter((item) => {
+    const topicMatch = !activeTopicId || item.topicId === activeTopicId;
+    const readMatch = !unreadOnly || !item.read;
+    return topicMatch && readMatch;
+  });
+  const topStories = visibleItems.filter((item) => item.priority === "top");
   const grouped = data.topics.map((topic) => ({
     topic,
-    items: data.briefing.items.filter((item) => item.topicId === topic.id),
+    items: visibleItems.filter((item) => item.topicId === topic.id && item.priority !== "top"),
+    totalCount: visibleItems.filter((item) => item.topicId === topic.id).length,
   }));
+  const activeTopic = data.topics.find((topic) => topic.id === activeTopicId);
 
   return (
     <AppShell currentPath="/dashboard" mode={data.mode} account={viewer}>
@@ -44,6 +55,9 @@ export default async function DashboardPage({
                 <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
                   {data.briefing.readingWindow}
                 </p>
+                <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+                  Estimated from story length and summary density for a fast executive scan.
+                </p>
               </div>
               <form action={generateBriefingAction}>
                 <SubmitButton
@@ -55,6 +69,69 @@ export default async function DashboardPage({
             </div>
           }
         />
+
+        <Panel className="p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                View controls
+              </p>
+              <p className="mt-2 text-sm leading-7 text-[var(--foreground)]">
+                {activeTopic
+                  ? `Filtering to ${activeTopic.name}${unreadOnly ? " and unread stories" : ""}.`
+                  : unreadOnly
+                    ? "Showing unread stories across all topics."
+                    : "Showing the full briefing across all topics."}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={unreadOnly ? "/dashboard?view=unread" : "/dashboard"}
+                className={cn(
+                  "inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium",
+                  !activeTopicId
+                    ? "border-[rgba(31,79,70,0.16)] bg-[var(--foreground)] text-white"
+                    : "border-[var(--line)] bg-white/70 text-[var(--foreground)]",
+                )}
+              >
+                All topics
+              </Link>
+              {data.topics.map((topic) => (
+                <Link
+                  key={topic.id}
+                  href={`/dashboard?topic=${topic.id}${unreadOnly ? "&view=unread" : ""}`}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium",
+                    activeTopicId === topic.id
+                      ? "border-[rgba(31,79,70,0.16)] bg-[var(--foreground)] text-white"
+                      : "border-[var(--line)] bg-white/70 text-[var(--foreground)]",
+                  )}
+                >
+                  {topic.name}
+                </Link>
+              ))}
+              <Link
+                href={
+                  unreadOnly
+                    ? activeTopicId
+                      ? `/dashboard?topic=${activeTopicId}`
+                      : "/dashboard"
+                    : activeTopicId
+                      ? `/dashboard?topic=${activeTopicId}&view=unread`
+                      : "/dashboard?view=unread"
+                }
+                className={cn(
+                  "inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium",
+                  unreadOnly
+                    ? "border-[rgba(31,79,70,0.16)] bg-[var(--foreground)] text-white"
+                    : "border-[var(--line)] bg-white/70 text-[var(--foreground)]",
+                )}
+              >
+                Unread only
+              </Link>
+            </div>
+          </div>
+        </Panel>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Panel className="p-6">
@@ -69,40 +146,45 @@ export default async function DashboardPage({
               </div>
               <Badge>{topStories.length} items</Badge>
             </div>
-            <div className="mt-6 grid gap-4">
-              {topStories.map((story) => (
-                <div
-                  key={story.id}
-                  className="rounded-[24px] border border-[var(--line)] bg-white/60 p-5"
-                >
-                  <div className="flex items-center gap-2">
-                    <Badge>{story.topicName}</Badge>
-                    <Badge className="text-[var(--accent)]">Top story</Badge>
-                    {story.importanceLabel ? <Badge>{story.importanceLabel}</Badge> : null}
-                  </div>
-                  <h3 className="mt-4 text-lg font-semibold text-[var(--foreground)]">
-                    {story.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-                    {story.whyItMatters}
-                  </p>
-                  {typeof story.importanceScore === "number" ? (
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                      Importance score {story.importanceScore}/100
+            {topStories.length ? (
+              <div className="mt-6 grid gap-4">
+                {topStories.map((story) => (
+                  <div
+                    key={story.id}
+                    className="rounded-[24px] border border-[var(--line)] bg-white/60 p-5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge>{story.topicName}</Badge>
+                      <Badge className="text-[var(--accent)]">Top</Badge>
+                      {story.importanceLabel ? <Badge>{story.importanceLabel}</Badge> : null}
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold text-[var(--foreground)]">
+                      {story.title}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+                      {story.whyItMatters}
                     </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--line)] bg-[var(--panel)]/55 p-5 text-sm leading-7 text-[var(--foreground)]">
+                No priority stories match the current filter. Clear the filters to view the full briefing.
+              </div>
+            )}
           </Panel>
 
           <Panel className="p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-              Coverage map
+              Coverage overview
             </p>
             <div className="mt-6 space-y-4">
-              {grouped.map(({ topic, items }) => (
-                <div key={topic.id} className="rounded-[22px] border border-[var(--line)] bg-white/60 p-4">
+              {grouped.map(({ topic, items, totalCount }) => (
+                <Link
+                  key={topic.id}
+                  href={`#topic-section-${topic.id}`}
+                  className="block rounded-[22px] border border-[var(--line)] bg-white/60 p-4 transition-colors hover:bg-white/75"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-base font-semibold text-[var(--foreground)]">
@@ -118,18 +200,23 @@ export default async function DashboardPage({
                     />
                   </div>
                   <p className="mt-4 text-sm font-medium text-[var(--foreground)]">
-                    {items.length} stor{items.length === 1 ? "y" : "ies"} in today&apos;s briefing
+                    {totalCount} {totalCount === 1 ? "story" : "stories"} in today&apos;s briefing
                   </p>
-                </div>
+                  {items.length === 0 && totalCount > 0 ? (
+                    <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
+                      The top-priority item for this topic is already covered in the priority scan above.
+                    </p>
+                  ) : null}
+                </Link>
               ))}
             </div>
           </Panel>
         </section>
 
         <section className="space-y-6">
-          {grouped.map(({ topic, items }) =>
-            items.length ? (
-              <div key={topic.id} className="space-y-4">
+          {grouped.map(({ topic, items, totalCount }) =>
+            totalCount ? (
+              <div key={topic.id} id={`topic-section-${topic.id}`} className="space-y-4 scroll-mt-24">
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
@@ -143,11 +230,17 @@ export default async function DashboardPage({
                     {topic.description}
                   </p>
                 </div>
-                <div className="grid gap-4">
-                  {items.map((item) => (
-                    <StoryCard key={item.id} item={item} />
-                  ))}
-                </div>
+                {items.length ? (
+                  <div className="grid gap-4">
+                    {items.map((item) => (
+                      <StoryCard key={item.id} item={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <Panel className="p-5 text-sm leading-7 text-[var(--foreground)]">
+                    The top-ranked story for this topic is already featured in the priority scan above.
+                  </Panel>
+                )}
               </div>
             ) : null,
           )}
