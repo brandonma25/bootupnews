@@ -118,10 +118,9 @@ export function AppShell({
       </aside>
 
       {/* Main content */}
-      <main className="min-w-0 flex-1 pt-16 lg:pt-0">
-        {/* Account menu — desktop/tablet only */}
+      <main className="min-w-0 flex-1">
         {mode !== "demo" ? (
-          <div className="sticky top-4 z-30 mb-4 hidden justify-end lg:flex">
+          <div className="mb-3 flex min-h-[3rem] items-start justify-end pl-14 lg:mb-4 lg:min-h-0 lg:pl-0">
             <AccountMenu account={account} />
           </div>
         ) : null}
@@ -178,7 +177,7 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
       </button>
 
       {open ? (
-        <Panel className="absolute right-0 top-[calc(100%+0.75rem)] w-[300px] p-5">
+        <Panel className="absolute right-0 top-[calc(100%+0.75rem)] z-40 w-[300px] p-5">
           <div className="flex items-start gap-3">
             <span
               className={cn(
