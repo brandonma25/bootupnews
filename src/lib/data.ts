@@ -60,7 +60,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     return getPublicDashboardData();
   }
 
-  const [topicsResult, sourcesResult, briefingsResult] = await withServerFallback(
+  const dashboardQueryResults = await withServerFallback(
     "dashboard queries",
     async () =>
       Promise.all([
@@ -82,13 +82,20 @@ export async function getDashboardData(): Promise<DashboardData> {
           .limit(1)
           .maybeSingle(),
       ]),
-    [
-      { data: null, error: new Error("topics query fallback") },
-      { data: null, error: new Error("sources query fallback") },
-      { data: null, error: new Error("briefings query fallback") },
-    ],
+    null,
     { route: "/dashboard", userId: user.id },
   );
+
+  if (!dashboardQueryResults) {
+    logServerEvent("warn", "Dashboard data degraded to public fallback", {
+      route: "/dashboard",
+      userId: user.id,
+      reason: "query bundle failed",
+    });
+    return getPublicDashboardData();
+  }
+
+  const [topicsResult, sourcesResult, briefingsResult] = dashboardQueryResults;
 
   if (topicsResult.error || sourcesResult.error || briefingsResult.error) {
     logServerEvent("warn", "Dashboard data degraded to public fallback", {
@@ -197,7 +204,7 @@ export async function getHistory() {
     return demoHistory;
   }
 
-  const { data, error } = await withServerFallback(
+  const historyResult = await withServerFallback(
     "history query",
     async () =>
       supabase
@@ -206,18 +213,20 @@ export async function getHistory() {
         .eq("user_id", user.id)
         .order("briefing_date", { ascending: false })
         .limit(14),
-    { data: null, error: new Error("history query fallback") },
+    null,
     { route: "/history", userId: user.id },
   );
 
-  if (error) {
+  if (!historyResult || historyResult.error) {
     logServerEvent("warn", "History data degraded to demo history", {
       route: "/history",
       userId: user.id,
-      errorMessage: error.message,
+      errorMessage: historyResult?.error?.message ?? "history query failed",
     });
     return demoHistory;
   }
+
+  const { data } = historyResult;
 
   if (!data?.length) return demoHistory;
 
