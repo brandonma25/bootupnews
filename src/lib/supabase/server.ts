@@ -16,9 +16,16 @@ export async function createSupabaseServerClient() {
         return cookieStore.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          cookieStore.set(name, value, options),
-        );
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
+        } catch {
+          // Server Components can read cookies during SSR, but writing refreshed auth
+          // cookies here can throw when the request is not in a mutable response context.
+          // In that case, we let the render continue and defer cookie updates to
+          // middleware, route handlers, or the next navigation.
+        }
       },
     },
   });

@@ -14,9 +14,14 @@ export async function getViewerAccount(): Promise<ViewerAccount | null> {
     return null;
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch (error) {
+    console.error("Failed to read Supabase user during SSR.", error);
+    return null;
+  }
 
   if (!user?.email) {
     return null;
@@ -54,9 +59,14 @@ export async function getDashboardData(): Promise<DashboardData> {
     return getPublicDashboardData();
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch (error) {
+    console.error("Failed to read Supabase session for dashboard SSR.", error);
+    return getPublicDashboardData();
+  }
 
   if (!user) {
     return getPublicDashboardData();
@@ -170,9 +180,14 @@ export async function getHistory() {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return demoHistory;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch (error) {
+    console.error("Failed to read Supabase session for history SSR.", error);
+    return demoHistory;
+  }
 
   if (!user) return demoHistory;
 
