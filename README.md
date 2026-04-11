@@ -116,6 +116,12 @@ After deployment, add your production URL as:
 NEXT_PUBLIC_APP_URL=https://your-vercel-domain.vercel.app
 ```
 
+Use your canonical production alias here so auth callbacks and environment checks point at the correct live site. For this deployment, the canonical URL is:
+
+```bash
+NEXT_PUBLIC_APP_URL=https://daily-intelligence-aggregator-ybs9.vercel.app
+```
+
 ## What accounts or keys you need
 
 - Supabase account
