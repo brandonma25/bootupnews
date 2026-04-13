@@ -58,6 +58,15 @@ export default async function TopicsPage({
             to save topics.
           </div>
         ) : null}
+        {isSupabaseConfigured && !viewer ? (
+          <div className="rounded-[20px] border border-[var(--line)] bg-white/70 px-5 py-4 text-sm text-[var(--foreground)]">
+            Sign in from{" "}
+            <Link href="/?auth=1#email-access" className="font-semibold underline underline-offset-2">
+              the home page
+            </Link>{" "}
+            before creating topics. Topic saves require an authenticated session.
+          </div>
+        ) : null}
 
         {/* Existing topics */}
         {data.topics.length > 0 ? (
@@ -121,66 +130,72 @@ export default async function TopicsPage({
                 : "Topic creation is available here, but saving still depends on Supabase being loaded in the current server process."}
             </p>
           </div>
-          <form action={createTopicAction} className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-1.5">
-              <span className="text-sm font-medium text-[var(--foreground)]">
-                Topic name <span className="text-[var(--muted)]">*</span>
-              </span>
-              <input
-                name="name"
-                placeholder="e.g. AI, Markets, Geopolitics"
-                required
-                minLength={2}
-                maxLength={40}
-                className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] focus:ring-0 disabled:opacity-50"
-                              />
-            </label>
+          {viewer ? (
+            <form action={createTopicAction} className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="text-sm font-medium text-[var(--foreground)]">
+                  Topic name <span className="text-[var(--muted)]">*</span>
+                </span>
+                <input
+                  name="name"
+                  placeholder="e.g. AI, Markets, Geopolitics"
+                  required
+                  minLength={2}
+                  maxLength={40}
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] focus:ring-0 disabled:opacity-50"
+                />
+              </label>
 
-            <div className="space-y-1.5">
-              <span className="text-sm font-medium text-[var(--foreground)]">
-                Colour <span className="text-[var(--muted)]">*</span>
-              </span>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {TOPIC_COLORS.map((color, index) => (
-                  <label key={color.value} title={color.label} className="cursor-pointer">
-                    <input
-                      type="radio"
-                      name="color"
-                      value={color.value}
-                      defaultChecked={index === 0}
-                      required
-                      className="sr-only peer"
-                    />
-                    <span
-                      className="block h-8 w-8 rounded-full ring-offset-2 ring-offset-[var(--background)] transition-all hover:scale-110 peer-checked:ring-2 peer-checked:ring-[var(--foreground)] peer-disabled:opacity-40"
-                      style={{ backgroundColor: color.value }}
-                    />
-                  </label>
-                ))}
+              <div className="space-y-1.5">
+                <span className="text-sm font-medium text-[var(--foreground)]">
+                  Colour <span className="text-[var(--muted)]">*</span>
+                </span>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {TOPIC_COLORS.map((color, index) => (
+                    <label key={color.value} title={color.label} className="cursor-pointer">
+                      <input
+                        type="radio"
+                        name="color"
+                        value={color.value}
+                        defaultChecked={index === 0}
+                        required
+                        className="sr-only peer"
+                      />
+                      <span
+                        className="block h-8 w-8 rounded-full ring-offset-2 ring-offset-[var(--background)] transition-all hover:scale-110 peer-checked:ring-2 peer-checked:ring-[var(--foreground)] peer-disabled:opacity-40"
+                        style={{ backgroundColor: color.value }}
+                      />
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <label className="space-y-1.5 md:col-span-2">
-              <span className="text-sm font-medium text-[var(--foreground)]">
-                Description <span className="text-[var(--muted)]">*</span>
-              </span>
-              <textarea
-                name="description"
-                rows={3}
-                required
-                minLength={10}
-                maxLength={200}
-                placeholder="Describe what this topic covers — e.g. model launches, enterprise adoption, regulatory shifts."
-                className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] disabled:opacity-50"
-                              />
-            </label>
+              <label className="space-y-1.5 md:col-span-2">
+                <span className="text-sm font-medium text-[var(--foreground)]">
+                  Description <span className="text-[var(--muted)]">*</span>
+                </span>
+                <textarea
+                  name="description"
+                  rows={3}
+                  required
+                  minLength={10}
+                  maxLength={200}
+                  placeholder="Describe what this topic covers — e.g. model launches, enterprise adoption, regulatory shifts."
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] disabled:opacity-50"
+                />
+              </label>
 
-            <div className="md:col-span-2">
-              <Button type="submit" className="px-6">
-                Save topic
-              </Button>
+              <div className="md:col-span-2">
+                <Button type="submit" className="px-6">
+                  Save topic
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="rounded-[18px] border border-[var(--line)] bg-white/60 px-4 py-4 text-sm leading-7 text-[var(--foreground)]">
+              Topic creation is available after sign-in so the topic can be saved to your account.
             </div>
-          </form>
+          )}
         </Panel>
 
         {/* How it works */}
