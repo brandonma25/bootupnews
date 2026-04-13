@@ -5,7 +5,6 @@ import { Trash2 } from "lucide-react";
 import { createTopicAction, deleteTopicAction } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
@@ -119,7 +118,7 @@ export default async function TopicsPage({
             <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
               {isSupabaseConfigured
                 ? "Use broad categories — AI, markets, geopolitics — to keep your briefing scannable."
-                : "Connect Supabase in Settings to save topics. Demo topics are shown above."}
+                : "Topic creation is available here, but saving still depends on Supabase being loaded in the current server process."}
             </p>
           </div>
           <form action={createTopicAction} className="grid gap-4 md:grid-cols-2">
@@ -134,8 +133,7 @@ export default async function TopicsPage({
                 minLength={2}
                 maxLength={40}
                 className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] focus:ring-0 disabled:opacity-50"
-                disabled={!isSupabaseConfigured}
-              />
+                              />
             </label>
 
             <div className="space-y-1.5">
@@ -151,7 +149,6 @@ export default async function TopicsPage({
                       value={color.value}
                       defaultChecked={index === 0}
                       required
-                      disabled={!isSupabaseConfigured}
                       className="sr-only peer"
                     />
                     <span
@@ -175,16 +172,11 @@ export default async function TopicsPage({
                 maxLength={200}
                 placeholder="Describe what this topic covers — e.g. model launches, enterprise adoption, regulatory shifts."
                 className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] disabled:opacity-50"
-                disabled={!isSupabaseConfigured}
-              />
+                              />
             </label>
 
             <div className="md:col-span-2">
-              <Button
-                type="submit"
-                disabled={!isSupabaseConfigured}
-                className="px-6"
-              >
+              <Button type="submit" className="px-6">
                 Save topic
               </Button>
             </div>

@@ -9,6 +9,20 @@ import { summarizeCluster } from "@/lib/summarizer";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
 import type { DailyBriefing, DashboardData, Source, Topic, ViewerAccount } from "@/lib/types";
 
+type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+
+function createEmptyBriefing(): DailyBriefing {
+  return {
+    id: `generated-empty-${Date.now()}`,
+    briefingDate: formatISO(new Date()),
+    title: "Live briefing is ready to ingest",
+    intro:
+      "Add at least one active source, then refresh the dashboard to fetch, cluster, and store live articles.",
+    readingWindow: "0 minutes",
+    items: [],
+  };
+}
+
 export async function getViewerAccount(): Promise<ViewerAccount | null> {
   const { user, sessionCookiePresent } = await safeGetUser("/");
 
@@ -133,9 +147,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const latest = briefingsResult.data;
 
-  if (!topics.length || !sources.some((source) => source.status === "active")) {
-    return getPublicDashboardData();
-  }
+  await persistRawArticles(supabase, user.id, sources, "/dashboard");
 
   if (!latest) {
     const generated = await generateDailyBriefing(topics, sources);
@@ -326,7 +338,9 @@ export async function generateDailyBriefing(
     }));
 
   if (!validItems.length) {
-    return demoDashboardData.briefing;
+    return topics === demoTopics && sources === demoSources
+      ? demoDashboardData.briefing
+      : createEmptyBriefing();
   }
 
   const totalMinutes = validItems.reduce((sum, item) => sum + item.estimatedMinutes, 0);
@@ -340,6 +354,132 @@ export async function generateDailyBriefing(
     items: validItems,
   };
 }
+
+
+
+export async function persistRawArticles(
+  supabase: SupabaseServerClient,
+  userId: string,
+  sources: Source[],
+  route = "/dashboard",
+) {
+  const activeSources = sources.filter((source) => source.status === "active");
+
+  if (!activeSources.length) {
+    logServerEvent("info", "Skipping raw article persistence because no active sources exist", {
+      route,
+      userId,
+    });
+    return;
+  }
+
+  const fetchedResults = await Promise.allSettled(
+    activeSources.map(async (source) => {
+      const articles = await fetchFeedArticles(source.feedUrl, source.name);
+      return { source, articles };
+    }),
+  );
+
+  const failedFetches = fetchedResults.filter((result) => result.status === "rejected");
+  failedFetches.forEach((result, index) => {
+    logServerEvent("warn", "Source fetch failed during raw article persistence", {
+      route,
+      userId,
+      failureIndex: index,
+      errorMessage: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    });
+  });
+
+  const fetchedArticles = fetchedResults.flatMap((result) =>
+    result.status === "fulfilled"
+      ? result.value.articles.map((article) => ({
+          sourceId: result.value.source.id,
+          title: article.title,
+          url: article.url,
+          summaryText: article.summaryText,
+          publishedAt: article.publishedAt,
+          dedupeKey: `${result.value.source.id}::${article.url}`,
+        }))
+      : [],
+  );
+
+  if (!fetchedArticles.length) {
+    logServerEvent("warn", "No raw articles were fetched from active sources", {
+      route,
+      userId,
+      activeSourceCount: activeSources.length,
+      failedSourceCount: failedFetches.length,
+    });
+    return;
+  }
+
+  console.log("Fetched raw articles:", fetchedArticles.length);
+
+  const dedupeKeys = [...new Set(fetchedArticles.map((article) => article.dedupeKey))];
+
+  const existingResult = await supabase
+    .from("articles")
+    .select("dedupe_key")
+    .eq("user_id", userId)
+    .in("dedupe_key", dedupeKeys);
+
+  if (existingResult.error) {
+    logServerEvent("warn", "Existing raw article lookup failed", {
+      route,
+      userId,
+      errorMessage: existingResult.error.message,
+      attemptedKeys: dedupeKeys.length,
+    });
+    return;
+  }
+
+  const existingKeys = new Set(
+    (existingResult.data ?? [])
+      .map((row) => row.dedupe_key)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  const rowsToInsert = fetchedArticles
+    .filter((article) => !existingKeys.has(article.dedupeKey))
+    .map((article) => ({
+      user_id: userId,
+      source_id: article.sourceId,
+      title: article.title,
+      url: article.url,
+      summary_text: article.summaryText,
+      published_at: article.publishedAt,
+      dedupe_key: article.dedupeKey,
+    }));
+
+  if (!rowsToInsert.length) {
+    logServerEvent("info", "No new raw articles to insert after dedupe", {
+      route,
+      userId,
+      fetchedRows: fetchedArticles.length,
+    });
+    return;
+  }
+
+  const insertResult = await supabase.from("articles").insert(rowsToInsert);
+  console.log("Inserted articles:", rowsToInsert.length);
+
+  if (insertResult.error) {
+    logServerEvent("warn", "Raw article persistence failed", {
+      route: "/dashboard",
+      userId,
+      errorMessage: insertResult.error.message,
+      attemptedRows: rowsToInsert.length,
+    });
+    return;
+  }
+
+  logServerEvent("info", "Stored raw articles", {
+    route,
+    userId,
+    insertedRows: rowsToInsert.length,
+  });
+}
+
 
 function deriveReadingWindow(estimatedMinutes: number[], fallback: string) {
   const totalMinutes = estimatedMinutes.reduce((sum, minutes) => sum + minutes, 0);

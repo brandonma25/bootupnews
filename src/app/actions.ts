@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { env, isSupabaseConfigured } from "@/lib/env";
-import { generateDailyBriefing } from "@/lib/data";
+import { generateDailyBriefing, persistRawArticles } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -19,7 +19,7 @@ const sourceSchema = z.object({
   name: z.string().min(2).max(60),
   feedUrl: z.url(),
   homepageUrl: z.string().optional(),
-  topicId: z.string().min(1),
+  topicId: z.string().optional(),
 });
 
 const credentialsSchema = z.object({
@@ -28,6 +28,8 @@ const credentialsSchema = z.object({
 });
 
 const oauthProviderSchema = z.enum(["google", "apple"]);
+
+type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
 async function syncUserProfile() {
   const supabase = await createSupabaseServerClient();
@@ -83,6 +85,44 @@ async function requireActionSession(unauthenticatedRedirect: string, route: stri
     });
     redirect("/?auth=callback-error");
   }
+}
+
+async function ensureDefaultTopic(
+  supabase: SupabaseServerClient,
+  userId: string,
+) {
+  const existingTopic = await supabase
+    .from("topics")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingTopic.error) {
+    throw existingTopic.error;
+  }
+
+  if (existingTopic.data?.id) {
+    return existingTopic.data.id;
+  }
+
+  const insertedTopic = await supabase
+    .from("topics")
+    .insert({
+      user_id: userId,
+      name: "General",
+      description: "Starter topic for newly imported sources.",
+      color: "#1f4f46",
+    })
+    .select("id")
+    .single();
+
+  if (insertedTopic.error || !insertedTopic.data?.id) {
+    throw insertedTopic.error ?? new Error("Default topic creation failed");
+  }
+
+  return insertedTopic.data.id;
 }
 
 export async function requestMagicLinkAction(formData: FormData) {
@@ -283,10 +323,13 @@ export async function createTopicAction(formData: FormData) {
   });
 
   try {
-    await supabase.from("topics").insert({
+    const topicInsert = await supabase.from("topics").insert({
       user_id: user.id,
       ...payload,
     });
+    if (topicInsert.error) {
+      throw topicInsert.error;
+    }
   } catch (error) {
     logServerEvent("error", "Topic creation failed", {
       route: "/topics",
@@ -312,8 +355,22 @@ export async function createSourceAction(formData: FormData) {
     name: formData.get("name"),
     feedUrl: formData.get("feedUrl"),
     homepageUrl: (formData.get("homepageUrl") || "").toString(),
-    topicId: formData.get("topicId"),
+    topicId: (formData.get("topicId") || "").toString() || undefined,
   });
+
+  let topicId = payload.topicId;
+  if (!topicId || topicId === "__auto__") {
+    try {
+      topicId = await ensureDefaultTopic(supabase, user.id);
+    } catch (error) {
+      logServerEvent("error", "Default topic resolution failed", {
+        route: "/sources",
+        userId: user.id,
+        ...errorContext(error),
+      });
+      redirect("/sources?error=1");
+    }
+  }
 
   let existing: { id: string } | null = null;
   try {
@@ -322,8 +379,11 @@ export async function createSourceAction(formData: FormData) {
       .select("id")
       .eq("user_id", user.id)
       .eq("feed_url", payload.feedUrl)
-      .eq("topic_id", payload.topicId)
+      .eq("topic_id", topicId)
       .maybeSingle();
+    if (sourceLookup.error) {
+      throw sourceLookup.error;
+    }
     existing = sourceLookup.data;
   } catch (error) {
     logServerEvent("error", "Source lookup failed", {
@@ -336,14 +396,17 @@ export async function createSourceAction(formData: FormData) {
 
   if (!existing) {
     try {
-      await supabase.from("sources").insert({
+      const sourceInsert = await supabase.from("sources").insert({
         user_id: user.id,
         name: payload.name,
         feed_url: payload.feedUrl,
         homepage_url: payload.homepageUrl || null,
-        topic_id: payload.topicId,
+        topic_id: topicId,
         status: "active",
       });
+      if (sourceInsert.error) {
+        throw sourceInsert.error;
+      }
     } catch (error) {
       logServerEvent("error", "Source creation failed", {
         route: "/sources",
@@ -386,6 +449,18 @@ export async function generateBriefingAction() {
   });
   const topics = topicResult.data ?? [];
   const sources = sourceResult.data ?? [];
+  const normalizedSources = sources.map((source) => ({
+    id: source.id,
+    userId: source.user_id,
+    name: source.name,
+    feedUrl: source.feed_url,
+    homepageUrl: source.homepage_url ?? undefined,
+    topicId: source.topic_id ?? undefined,
+    status: source.status,
+    createdAt: source.created_at,
+  }));
+
+  await persistRawArticles(supabase, user.id, normalizedSources, "/dashboard?action=generate");
 
   const briefing = await generateDailyBriefing(
     topics.map((topic) => ({
@@ -396,16 +471,7 @@ export async function generateBriefingAction() {
       color: topic.color,
       createdAt: topic.created_at,
     })),
-    sources.map((source) => ({
-      id: source.id,
-      userId: source.user_id,
-      name: source.name,
-      feedUrl: source.feed_url,
-      homepageUrl: source.homepage_url ?? undefined,
-      topicId: source.topic_id ?? undefined,
-      status: source.status,
-      createdAt: source.created_at,
-    })),
+    normalizedSources,
   );
 
   const briefingDate = briefing.briefingDate.slice(0, 10);
@@ -430,7 +496,7 @@ export async function generateBriefingAction() {
   let briefingId = existing?.id;
 
   if (!briefingId) {
-    const { data: inserted } = await supabase
+    const { data: inserted, error: briefingInsertError } = await supabase
       .from("daily_briefings")
       .insert({
         user_id: user.id,
@@ -442,9 +508,18 @@ export async function generateBriefingAction() {
       .select("id")
       .single();
 
+    if (briefingInsertError) {
+      logServerEvent("error", "Briefing insert failed", {
+        route: "/dashboard",
+        userId: user.id,
+        errorMessage: briefingInsertError.message,
+      });
+      redirect("/dashboard?error=1");
+    }
+
     briefingId = inserted?.id;
   } else {
-    await supabase
+    const briefingUpdate = await supabase
       .from("daily_briefings")
       .update({
         title: briefing.title,
@@ -452,12 +527,28 @@ export async function generateBriefingAction() {
         reading_window: briefing.readingWindow,
       })
       .eq("id", briefingId);
+    if (briefingUpdate.error) {
+      logServerEvent("error", "Briefing update failed", {
+        route: "/dashboard",
+        userId: user.id,
+        errorMessage: briefingUpdate.error.message,
+      });
+      redirect("/dashboard?error=1");
+    }
 
-    await supabase.from("briefing_items").delete().eq("briefing_id", briefingId);
+    const briefingItemDelete = await supabase.from("briefing_items").delete().eq("briefing_id", briefingId);
+    if (briefingItemDelete.error) {
+      logServerEvent("error", "Briefing item reset failed", {
+        route: "/dashboard",
+        userId: user.id,
+        errorMessage: briefingItemDelete.error.message,
+      });
+      redirect("/dashboard?error=1");
+    }
   }
 
   if (briefingId) {
-    await supabase.from("briefing_items").insert(
+    const briefingItemInsert = await supabase.from("briefing_items").insert(
       briefing.items.map((item) => ({
         briefing_id: briefingId,
         topic_id: item.topicId,
@@ -472,6 +563,15 @@ export async function generateBriefingAction() {
         is_read: item.read,
       })),
     );
+    if (briefingItemInsert.error) {
+      logServerEvent("error", "Briefing item insert failed", {
+        route: "/dashboard",
+        userId: user.id,
+        errorMessage: briefingItemInsert.error.message,
+        attemptedItems: briefing.items.length,
+      });
+      redirect("/dashboard?error=1");
+    }
   }
 
   revalidatePath("/dashboard");

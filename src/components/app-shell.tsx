@@ -119,11 +119,17 @@ export function AppShell({
 
       {/* Main content */}
       <main className="min-w-0 flex-1">
-        {mode !== "demo" ? (
-          <div className="mb-3 flex min-h-[3rem] items-start justify-end pl-14 lg:mb-4 lg:min-h-0 lg:pl-0">
-            <AccountMenu account={account} />
+        <div className="mb-3 flex min-h-[3rem] items-start justify-end gap-3 pl-14 lg:mb-4 lg:min-h-0 lg:pl-0">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Badge className={account ? "text-[var(--accent)]" : ""}>
+              {account ? "Signed in" : "Guest mode"}
+            </Badge>
+            <Badge className={mode === "live" ? "text-[var(--accent)]" : ""}>
+              {mode === "live" ? "Live mode" : mode === "public" ? "Public mode" : "Demo mode"}
+            </Badge>
           </div>
-        ) : null}
+          {mode !== "demo" ? <AccountMenu account={account} /> : null}
+        </div>
         {children}
       </main>
     </div>

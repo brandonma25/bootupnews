@@ -27,6 +27,8 @@ export default async function SourcesPage({
 
   const activeSources = data.sources.filter((s) => s.status === "active");
   const pausedSources = data.sources.filter((s) => s.status === "paused");
+  const topicOptions =
+    data.topics.length > 0 ? data.topics : [{ id: "__auto__", name: "General (auto-create)" }];
 
   return (
     <AppShell currentPath="/sources" mode={data.mode} account={viewer}>
@@ -116,7 +118,7 @@ export default async function SourcesPage({
             <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
               {isSupabaseConfigured
                 ? "Paste any RSS feed URL. The source will be assigned to the topic you choose and included in your next briefing."
-                : "Connect Supabase in Settings to save custom sources."}
+                : "The form is available for setup, but saving still requires Supabase credentials to be loaded."}
             </p>
           </div>
           <form action={createSourceAction} className="grid gap-4 md:grid-cols-2">
@@ -127,23 +129,26 @@ export default async function SourcesPage({
                 placeholder="Financial Times"
                 required
                 className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] disabled:opacity-50"
-                disabled={!isSupabaseConfigured}
-              />
+                              />
             </label>
             <label className="space-y-1.5">
               <span className="text-sm font-medium text-[var(--foreground)]">Topic</span>
               <select
                 name="topicId"
                 className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none disabled:opacity-50"
-                disabled={!isSupabaseConfigured || data.topics.length === 0}
-                defaultValue={data.topics[0]?.id}
+                defaultValue={topicOptions[0]?.id}
               >
-                {data.topics.map((topic) => (
+                {topicOptions.map((topic) => (
                   <option key={topic.id} value={topic.id}>
                     {topic.name}
                   </option>
                 ))}
               </select>
+              {data.topics.length === 0 ? (
+                <p className="text-xs text-[var(--muted)]">
+                  Your first source will auto-create a starter topic so ingestion can begin immediately.
+                </p>
+              ) : null}
             </label>
             <label className="space-y-1.5 md:col-span-2">
               <span className="text-sm font-medium text-[var(--foreground)]">
@@ -158,8 +163,7 @@ export default async function SourcesPage({
                 placeholder="https://example.com/feed.xml"
                 required
                 className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] disabled:opacity-50"
-                disabled={!isSupabaseConfigured}
-              />
+                              />
             </label>
             <label className="space-y-1.5 md:col-span-2">
               <span className="text-sm font-medium text-[var(--foreground)]">
@@ -171,11 +175,10 @@ export default async function SourcesPage({
                 type="url"
                 placeholder="https://example.com"
                 className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-[var(--muted)]/60 focus:border-[var(--foreground)] disabled:opacity-50"
-                disabled={!isSupabaseConfigured}
-              />
+                              />
             </label>
             <div className="md:col-span-2">
-              <Button type="submit" disabled={!isSupabaseConfigured} className="px-6">
+              <Button type="submit" className="px-6">
                 Save source
               </Button>
             </div>
@@ -246,13 +249,12 @@ export default async function SourcesPage({
                         <select
                           name="topicId"
                           className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm outline-none disabled:opacity-40"
-                          disabled={!isSupabaseConfigured || data.topics.length === 0}
                           defaultValue={
                             data.topics.find((t) => t.name === source.topicLabel)?.id ??
-                            data.topics[0]?.id
+                            topicOptions[0]?.id
                           }
                         >
-                          {data.topics.map((topic) => (
+                          {topicOptions.map((topic) => (
                             <option key={topic.id} value={topic.id}>
                               {topic.name}
                             </option>
@@ -261,7 +263,6 @@ export default async function SourcesPage({
                         <Button
                           type="submit"
                           variant="secondary"
-                          disabled={!isSupabaseConfigured || data.topics.length === 0}
                           className="shrink-0 text-sm"
                         >
                           Import
