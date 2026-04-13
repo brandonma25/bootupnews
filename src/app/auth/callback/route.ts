@@ -7,8 +7,10 @@ import { errorContext, logServerEvent } from "@/lib/observability";
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const tokenHash = requestUrl.searchParams.get("token_hash");
+  const type = requestUrl.searchParams.get("type");
 
-  if (!isSupabaseConfigured || !code) {
+  if (!isSupabaseConfigured) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -28,7 +30,16 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    await supabase.auth.exchangeCodeForSession(code);
+    if (code) {
+      await supabase.auth.exchangeCodeForSession(code);
+    } else if (tokenHash && type) {
+      await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: type as "signup" | "recovery" | "invite" | "email_change" | "magiclink",
+      });
+    } else {
+      return NextResponse.redirect(new URL("/?auth=callback-error", request.url));
+    }
 
     const {
       data: { user },
@@ -47,6 +58,8 @@ export async function GET(request: NextRequest) {
     logServerEvent("error", "Auth callback failed", {
       route: "/auth/callback",
       hasCode: Boolean(code),
+      hasTokenHash: Boolean(tokenHash),
+      otpType: type,
       ...errorContext(error),
     });
 

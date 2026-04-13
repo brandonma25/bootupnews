@@ -1,10 +1,5 @@
 import type { Metadata } from "next";
-import {
-  requestMagicLinkAction,
-  signInWithPasswordAction,
-  signInWithProviderAction,
-  signUpWithPasswordAction,
-} from "@/app/actions";
+import { requestMagicLinkAction, signInWithProviderAction } from "@/app/actions";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, KeyRound, MailCheck, Sparkles, ShieldCheck, Rss } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -111,7 +106,8 @@ export default async function HomePage({
                   </div>
 
                   <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                    <form action={signUpWithPasswordAction} className="space-y-3 rounded-[24px] border border-[var(--line)] bg-white/75 p-4">
+                    <form action="/auth/password" method="post" className="space-y-3 rounded-[24px] border border-[var(--line)] bg-white/75 p-4">
+                      <input type="hidden" name="mode" value="signup" />
                       <div className="flex items-center gap-2">
                         <KeyRound className="h-4 w-4 text-[var(--accent)]" />
                         <p className="text-sm font-semibold text-[var(--foreground)]">Create account</p>
@@ -135,7 +131,8 @@ export default async function HomePage({
                       </Button>
                     </form>
 
-                    <form action={signInWithPasswordAction} className="space-y-3 rounded-[24px] border border-[var(--line)] bg-white/75 p-4">
+                    <form action="/auth/password" method="post" className="space-y-3 rounded-[24px] border border-[var(--line)] bg-white/75 p-4">
+                      <input type="hidden" name="mode" value="signin" />
                       <div className="flex items-center gap-2">
                         <KeyRound className="h-4 w-4 text-[var(--accent)]" />
                         <p className="text-sm font-semibold text-[var(--foreground)]">Sign in</p>
