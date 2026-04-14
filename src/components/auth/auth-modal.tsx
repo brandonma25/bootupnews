@@ -1,8 +1,8 @@
 "use client";
-
 import { useFormStatus } from "react-dom";
 
 import { signInWithProviderAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 type Props = {
   open: boolean;
@@ -15,12 +15,12 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-[var(--line-strong)] bg-[var(--surface)] p-6 shadow-2xl">
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--line-strong)] bg-[var(--surface)] p-6 shadow-2xl">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-[var(--foreground)]">Continue to Daily Intelligence</h2>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              Use Google to sign in or create your account. Existing onboarding will continue after auth.
+              Use Google for the fastest path, or continue with email and password. Existing onboarding will continue after auth.
             </p>
           </div>
 
@@ -44,6 +44,58 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           <input type="hidden" name="next" value="/dashboard" />
           <GoogleAuthButton />
         </form>
+
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-[var(--line)]" />
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Or continue with email</span>
+          <div className="h-px flex-1 bg-[var(--line)]" />
+        </div>
+
+        <form action="/auth/password" method="post" className="space-y-4" id="email-access">
+          <div className="space-y-2">
+            <label htmlFor="auth-email" className="text-sm font-medium text-[var(--foreground)]">
+              Email
+            </label>
+            <input
+              id="auth-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              className="w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--foreground)]"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="auth-password" className="text-sm font-medium text-[var(--foreground)]">
+              Password
+            </label>
+            <input
+              id="auth-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              minLength={8}
+              className="w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--foreground)]"
+              placeholder="At least 8 characters"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <EmailAuthButton mode="signin" idleLabel="Sign in with email" pendingLabel="Signing in..." />
+            <EmailAuthButton mode="signup" idleLabel="Create account" pendingLabel="Creating account..." />
+          </div>
+        </form>
+
+        <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
+          Password sign-up uses the same onboarding bootstrap as Google. If your project requires email confirmation, you may be asked to verify your inbox before the session is ready.
+        </p>
+
+        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+          Trouble signing in? Check the Google OAuth redirect settings in Supabase and make sure the current environment URL is allowed as a callback.
+        </p>
       </div>
     </div>
   );
@@ -61,6 +113,27 @@ function GoogleAuthButton() {
       <GoogleMark />
       <span>{pending ? "Redirecting to Google..." : "Continue with Google"}</span>
     </button>
+  );
+}
+
+function EmailAuthButton({
+  mode,
+  idleLabel,
+  pendingLabel,
+}: {
+  mode: "signin" | "signup";
+  idleLabel: string;
+  pendingLabel: string;
+}) {
+  return (
+    <SubmitButton
+      idleLabel={idleLabel}
+      pendingLabel={pendingLabel}
+      variant={mode === "signin" ? "secondary" : "primary"}
+      className="w-full rounded-xl px-4 py-3"
+      name="mode"
+      value={mode}
+    />
   );
 }
 
