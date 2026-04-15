@@ -62,7 +62,7 @@ function createData(items: BriefingItem[]): DashboardData {
 }
 
 describe("LandingHomepage", () => {
-  it("shows a polished empty state only when a category has no eligible events", () => {
+  it("frames the homepage as a sample briefing instead of the full product", () => {
     const data = createData([
       createItem({
         id: "tech-1",
@@ -77,11 +77,12 @@ describe("LandingHomepage", () => {
 
     render(<LandingHomepage data={data} viewer={null} />);
 
-    expect(screen.getByText("No Finance events yet")).toBeInTheDocument();
-    expect(screen.getAllByText("Top stories while this category fills in").length).toBeGreaterThan(0);
+    expect(screen.getByText(/A limited preview of today.?s ranked intelligence/i)).toBeInTheDocument();
+    expect(screen.getByText(/A sample, not the whole product/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Unlock full briefing/i).length).toBeGreaterThan(0);
   });
 
-  it("shows sparse-state messaging when only one category event exists", () => {
+  it("shows preview topics instead of full category rails", () => {
     const data = createData([
       createItem({
         id: "finance-1",
@@ -96,8 +97,10 @@ describe("LandingHomepage", () => {
 
     render(<LandingHomepage data={data} viewer={null} />);
 
-    expect(screen.getAllByText(/Coverage is still building here/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/More Finance coverage is on the way/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/A quick look at where the full briefing goes deeper/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Tech").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Finance").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Politics").length).toBeGreaterThan(0);
   });
 
   it("renders debug visibility for QA when enabled", () => {

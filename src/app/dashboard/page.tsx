@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CheckCheck, ExternalLink } from "lucide-react";
+import { CheckCheck } from "lucide-react";
 
 import { markAllReadAction } from "@/app/actions";
 import { PageHeader } from "@/components/page-header";
@@ -49,8 +49,8 @@ export default async function DashboardPage({
       <div className="space-y-5 py-2">
         <PageHeader
           eyebrow={formatBriefingDate(data.briefing.briefingDate)}
-          title={data.briefing.title}
-          description={data.briefing.intro}
+          title="Full briefing workspace"
+          description="This is the complete Daily Intelligence product experience: the full ranked briefing, deeper event cards, topic navigation, and the place where personalization-ready workflow lives."
           aside={
             <ManualRefreshTrigger
               readingWindow={data.briefing.readingWindow}
@@ -58,6 +58,25 @@ export default async function DashboardPage({
             />
           }
         />
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+          <Panel className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              Unlocked view
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
+              The full ranked briefing starts here
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+              Unlike the public homepage preview, the dashboard carries the complete ranked event stack, full cards, topic sections, and briefing utilities in one working environment.
+            </p>
+          </Panel>
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+            <MetricPanel label="Ranked events" value={String(data.briefing.items.length)} detail="Total events in this briefing run" />
+            <MetricPanel label="Top events" value={String(topEvents.length)} detail="Priority stories surfaced first" />
+            <MetricPanel label="Topics active" value={String(data.topics.length)} detail="Navigation and topic coverage" />
+          </div>
+        </section>
 
         {/* Feedback banners */}
         {params.generated === "1" ? (
@@ -80,8 +99,11 @@ export default async function DashboardPage({
                   Priority scan
                 </p>
                 <h2 className="mt-1.5 text-xl font-semibold text-[var(--foreground)]">
-                  Top events today
+                  Full top-event stack
                 </h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  These are the complete lead cards, not the trimmed public preview.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Badge>{topEvents.length} {topEvents.length === 1 ? "event" : "events"}</Badge>
@@ -99,50 +121,10 @@ export default async function DashboardPage({
                 ) : null}
               </div>
             </div>
-            <div className="mt-5 grid gap-3">
+            <div className="mt-5 grid gap-4">
               {topEvents.map((event) => {
-                const primarySourceUrl = event.sources.find((source) => isValidStoryUrl(source.url))?.url;
-                const sourceCount = event.sourceCount ?? event.sources.length;
-
                 return (
-                  <div
-                    key={event.id}
-                    className="rounded-[20px] border border-[var(--line)] bg-white/60 p-4"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{event.topicName}</Badge>
-                      <Badge className="text-[var(--accent)]">Top event</Badge>
-                      <Badge>{sourceCount} {sourceCount === 1 ? "source" : "sources"}</Badge>
-                    </div>
-                    {primarySourceUrl ? (
-                      <a
-                        href={primarySourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 inline-flex items-start gap-2 text-base font-semibold leading-snug text-[var(--foreground)] underline-offset-4 hover:underline"
-                      >
-                        <span>{event.title}</span>
-                        <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
-                      </a>
-                    ) : (
-                      <div className="mt-3">
-                        <h3 className="text-base font-semibold leading-snug text-[var(--foreground)]">
-                          {event.title}
-                        </h3>
-                        <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--muted)]">
-                          Source unavailable
-                        </p>
-                      </div>
-                    )}
-                    {event.matchedKeywords?.length ? (
-                      <p className="mt-2 text-sm font-medium text-[var(--accent)]">
-                        Matched on: {event.matchedKeywords.join(", ")}
-                      </p>
-                    ) : null}
-                    <p className="mt-2 text-sm leading-6 text-[var(--muted)] line-clamp-2">
-                      {event.whatHappened}
-                    </p>
-                  </div>
+                  <StoryCard key={event.id} item={event} />
                 );
               })}
             </div>
@@ -225,11 +207,22 @@ export default async function DashboardPage({
   );
 }
 
-function isValidStoryUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
+function MetricPanel({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <Panel className="p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p>
+      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{detail}</p>
+    </Panel>
+  );
 }

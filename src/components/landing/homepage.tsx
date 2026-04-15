@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowRight, ExternalLink, RefreshCcw } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 
 import AuthModal from "@/components/auth/auth-modal";
 import { isHomepageDebugConfigured } from "@/lib/env";
@@ -43,6 +43,7 @@ export default function LandingHomepage({
     () => buildHomepageViewModel(data),
     [data],
   );
+  const sampleEvents = topRanked.slice(1, 2);
 
   const authMessage = getHomepageAuthMessage(authState);
   const authStateRequestsModal = Boolean(
@@ -77,19 +78,18 @@ export default function LandingHomepage({
             briefingDate={data.briefing.briefingDate}
             mode={data.mode}
             featured={featured}
+            sampleCount={Math.min(topRanked.length, 2)}
             onPrimaryAction={() => setAuthModalManuallyOpen(true)}
             signedIn={signedIn}
           />
 
-          <TopRankedEventsSection events={topRanked} />
-
-          <section className="space-y-8 lg:space-y-10">
-            {categorySections.map((section) => (
-              <CategorySection key={section.key} section={section} />
-            ))}
-          </section>
-
-          <TrendingSection events={trending} />
+          <SampleBriefingSection lead={featured} followUps={sampleEvents} signedIn={signedIn} />
+          <PreviewTopicsSection sections={categorySections} />
+          <UpgradeMomentSection
+            signedIn={signedIn}
+            onOpenAuth={() => setAuthModalManuallyOpen(true)}
+            hiddenCount={Math.max(0, topRanked.length + trending.length - 2)}
+          />
 
           {showDebug ? <HomepageDebugPanel debug={debug} /> : null}
 
@@ -210,12 +210,14 @@ function HeroIntelligenceBlock({
   briefingDate,
   mode,
   featured,
+  sampleCount,
   onPrimaryAction,
   signedIn,
 }: {
   briefingDate: string;
   mode: DashboardData["mode"];
   featured: HomepageEvent | null;
+  sampleCount: number;
   onPrimaryAction: () => void;
   signedIn: boolean;
 }) {
@@ -232,31 +234,31 @@ function HeroIntelligenceBlock({
             <Badge>{formatBriefingDate(briefingDate)}</Badge>
           </div>
           <h1 className="display-font mt-6 max-w-3xl text-[2.35rem] leading-[1.04] text-[var(--foreground)] sm:text-[3rem] lg:text-[3.45rem]">
-            Understand what matters today and why.
+            Preview today&apos;s briefing before you unlock the full workspace.
           </h1>
           <p className="mt-5 max-w-xl text-[15px] leading-7 text-[var(--muted)] sm:text-[17px] sm:leading-8">
-            Daily Intelligence Aggregator ranks the most important developments, groups related coverage into events, and gives you the context needed to interpret impact fast.
+            Daily Intelligence Aggregator turns live coverage into ranked events, adds context, and helps you scan what matters fast. This homepage is a sample of that experience, not the full briefing.
           </p>
           <p className="mt-5 text-sm font-medium text-[var(--foreground)]/88">
-            Less article chasing. More signal, context, and meaning.
+            See the lead signal here. Use the dashboard for the fuller ranked workflow.
           </p>
           <div className="mt-8 grid gap-3 text-sm text-[var(--muted)] sm:grid-cols-3">
+            <SignalPill title="Preview sample" detail={`${sampleCount} sample ${sampleCount === 1 ? "event" : "events"} from the current briefing cycle.`} />
             <SignalPill title="Event-first" detail="Coverage is grouped into developments, not dumped as isolated links." />
-            <SignalPill title="Context-led" detail="Why it matters and why it ranked stay visible." />
-            <SignalPill title="Ranked by signal" detail="The homepage emphasizes importance, not just recency." />
+            <SignalPill title="Full dashboard" detail="Unlock the complete ranked briefing, deeper cards, and topic navigation." />
           </div>
           {!signedIn ? (
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button className="px-5" onClick={onPrimaryAction}>
-                Get Briefing
+                Unlock full briefing
               </Button>
               <p className="text-sm text-[var(--muted)]">
-                Browse the ranked briefing first. Save your own feed when you are ready.
+                Start with this public preview, then move into the full dashboard when you are ready.
               </p>
             </div>
           ) : (
             <div className="mt-8 text-sm text-[var(--muted)]">
-              Your homepage below is structured as ranked events with grouped supporting coverage.
+              You are viewing the public preview. Open the dashboard for the fuller working briefing.
             </div>
           )}
         </div>
@@ -294,7 +296,7 @@ function FeaturedEventCard({
           <EventCard
             event={event}
             variant="featured"
-            label="Most important now"
+            label="Sample lead event"
             showTimeline
             showRelatedArticles
           />
@@ -302,7 +304,7 @@ function FeaturedEventCard({
             <div>
               <p className="text-sm font-semibold text-[var(--foreground)]">Briefing flow</p>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Lead event first, ranked developments next, then secondary event coverage.
+                The homepage shows a sample of the briefing flow. The dashboard adds the full ranked stack and deeper topic-by-topic coverage.
               </p>
             </div>
             {signedIn ? (
@@ -310,12 +312,12 @@ function FeaturedEventCard({
                 href="/dashboard"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]"
               >
-                Open briefing
+                Open full dashboard
                 <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
               <Button variant="secondary" className="px-4" onClick={onOpenAuth}>
-                Get Briefing
+                Unlock full briefing
               </Button>
             )}
           </div>
@@ -330,37 +332,73 @@ function FeaturedEventCard({
   );
 }
 
-function TopRankedEventsSection({ events }: { events: HomepageEvent[] }) {
-  const noDataMessage = buildOverallNoDataMessage(events.length);
+function SampleBriefingSection({
+  lead,
+  followUps,
+  signedIn,
+}: {
+  lead: HomepageEvent | null;
+  followUps: HomepageEvent[];
+  signedIn: boolean;
+}) {
+  const noDataMessage = buildOverallNoDataMessage((lead ? 1 : 0) + followUps.length);
 
   return (
     <section id="top-events" className="space-y-5 lg:space-y-6">
       <SectionHeader
-        eyebrow="Top Ranked Events"
-        title="The developments most worth your attention right now"
-        description="This ranked layer favors importance over chronology, with grouped supporting coverage under each event."
+        eyebrow="Sample Briefing"
+        title="A limited preview of today&apos;s ranked intelligence"
+        description="You can scan the lead event and one follow-up here. The full dashboard expands this into the complete ranked briefing with topic navigation and deeper cards."
       />
-      {events.length ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-          {events.map((event, index) => (
-            <div key={event.id} className={cn(index === 0 ? "xl:col-span-7" : "xl:col-span-5")}>
-              <Panel
-                className={cn(
-                  "h-full border-[rgba(19,26,34,0.1)] bg-[rgba(255,255,255,0.76)] p-5 transition-transform duration-150 hover:-translate-y-0.5",
-                  index === 0 && "rounded-[30px] p-6 lg:p-7",
-                )}
-              >
+      {lead || followUps.length ? (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <div className="space-y-4">
+            {lead ? (
+              <Panel className="h-full rounded-[30px] border-[rgba(19,26,34,0.1)] bg-[rgba(255,255,255,0.76)] p-6 lg:p-7">
                 <EventCard
-                  event={event}
-                  rank={index + 1}
-                  variant={index === 0 ? "ranked-featured" : "ranked"}
-                  label="Ranked event"
-                  showTimeline={index === 0}
+                  event={lead}
+                  rank={1}
+                  variant="ranked-featured"
+                  label="Preview lead"
+                  showTimeline
                   showRelatedArticles
                 />
               </Panel>
-            </div>
-          ))}
+            ) : null}
+          </div>
+          <div className="space-y-4">
+            <Panel className="border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.64)] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                What unlocks next
+              </p>
+              <div className="mt-4 space-y-3">
+                {followUps.map((event, index) => (
+                  <div
+                    key={event.id}
+                    className={cn(
+                      "rounded-[20px] border border-[var(--line)] bg-white/70 p-4",
+                      index !== followUps.length - 1 && "mb-3",
+                    )}
+                  >
+                    <EventCard event={event} rank={index + 2} variant="ranked" label="Preview follow-up" />
+                  </div>
+                ))}
+                <PreviewPlaceholderCard />
+              </div>
+              <div className="mt-5 border-t border-[var(--line)] pt-4">
+                {signedIn ? (
+                  <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+                    Open the full dashboard
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <p className="text-sm text-[var(--muted)]">
+                    The dashboard continues from this sample with the full ranked stack, topic sections, and briefing workflow.
+                  </p>
+                )}
+              </div>
+            </Panel>
+          </div>
         </div>
       ) : (
         <StatusPanel title={noDataMessage.title} body={noDataMessage.body} />
@@ -369,69 +407,96 @@ function TopRankedEventsSection({ events }: { events: HomepageEvent[] }) {
   );
 }
 
-function CategorySection({ section }: { section: HomepageCategorySection }) {
+function PreviewTopicsSection({ sections }: { sections: HomepageCategorySection[] }) {
   return (
-    <section id={section.label.toLowerCase()} className="space-y-4">
+    <section className="space-y-4">
       <SectionHeader
-        eyebrow="Category"
-        title={section.label}
-        description={section.description}
+        eyebrow="Preview Topics"
+        title="A quick look at where the full briefing goes deeper"
+        description="The homepage only hints at topic coverage. The dashboard is where the complete event stack and topic-by-topic workflow live."
         compact
       />
-      {section.events.length ? (
-        <>
-          {section.state === "sparse" ? (
-            <p className="text-sm text-[var(--muted)]">
-              Coverage is still building here, so confirmed {section.label.toLowerCase()} events share space with clear placeholders.
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {sections.map((section) => (
+          <Panel
+            key={section.key}
+            className="border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.62)] p-5"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              {section.label}
             </p>
-          ) : null}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {section.events.map((event) => (
-              <Panel
-                key={event.id}
-                className="border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.62)] p-5 transition-transform duration-150 hover:-translate-y-0.5"
-              >
-                <EventCard event={event} variant="compact" label="Event" showRelatedArticles />
-              </Panel>
-            ))}
-            {Array.from({ length: section.placeholderCount }).map((_, index) => (
-              <CoverageBuildingCard key={`${section.key}-placeholder-${index}`} label={section.label} />
-            ))}
-          </div>
-        </>
-      ) : (
-        <EmptyCategoryState section={section} />
-      )}
+            <h3 className="mt-2 text-lg font-semibold text-[var(--foreground)]">
+              {section.events.length
+                ? `${section.events.length} preview ${section.events.length === 1 ? "event" : "events"} surfaced`
+                : "Coverage building"}
+            </h3>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+              {section.events.length
+                ? section.events[0]?.rankingSignals[0] ?? section.description
+                : section.emptyReason}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {section.events.slice(0, 2).map((event) => (
+                <Badge key={event.id}>{event.topicName}: {event.title.slice(0, 28)}{event.title.length > 28 ? "…" : ""}</Badge>
+              ))}
+              {!section.events.length ? <Badge>Preview only</Badge> : null}
+            </div>
+          </Panel>
+        ))}
+      </div>
     </section>
   );
 }
 
-function TrendingSection({ events }: { events: HomepageEvent[] }) {
+function UpgradeMomentSection({
+  signedIn,
+  onOpenAuth,
+  hiddenCount,
+}: {
+  signedIn: boolean;
+  onOpenAuth: () => void;
+  hiddenCount: number;
+}) {
   return (
-    <section className="space-y-4">
-      <SectionHeader
-        eyebrow="Trending / Important"
-        title="Other developments worth keeping in view"
-        description="A lower-priority tail section for breadth once the top-ranked events are clear."
-        compact
-      />
-      {events.length ? (
-        <Panel className="overflow-hidden border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.62)] p-0">
-          {events.map((event, index) => (
-            <div
-              key={event.id}
-              className={cn("px-5 py-5", index !== events.length - 1 && "border-b border-[var(--line)]")}
-            >
-              <EventCard event={event} variant="list" label="Event" showRelatedArticles />
-            </div>
-          ))}
-        </Panel>
-      ) : (
-        <StatusPanel
-          title="No additional developments yet"
-          body="Once more stories are available, lower-priority events will collect here in a compact scan."
-        />
-      )}
+    <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <Panel className="rounded-[30px] border-[rgba(19,26,34,0.1)] bg-[rgba(255,255,255,0.78)] p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          What you saw here
+        </p>
+        <h2 className="display-font mt-3 text-[1.9rem] leading-tight text-[var(--foreground)]">
+          A sample, not the whole product
+        </h2>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+          The homepage is intentionally limited to a public sample briefing. It shows how the product thinks, but not the full daily workflow.
+        </p>
+      </Panel>
+      <Panel className="rounded-[30px] border-[rgba(41,79,134,0.14)] bg-[linear-gradient(180deg,rgba(41,79,134,0.08),rgba(255,255,255,0.78))] p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#294f86]">
+          Full dashboard
+        </p>
+        <h2 className="display-font mt-3 text-[1.9rem] leading-tight text-[var(--foreground)]">
+          Unlock the complete ranked briefing
+        </h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <SignalPill title="More depth" detail="Full event cards, not just preview modules." />
+          <SignalPill title="More coverage" detail={`${hiddenCount} more ranked ${hiddenCount === 1 ? "event sits" : "events sit"} beyond this sample.`} />
+          <SignalPill title="More workflow" detail="Topic navigation, refresh controls, and the full briefing environment." />
+        </div>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          {signedIn ? (
+            <Link href="/dashboard">
+              <Button className="px-6">Open full dashboard</Button>
+            </Link>
+          ) : (
+            <Button className="px-6" onClick={onOpenAuth}>
+              Unlock full briefing
+            </Button>
+          )}
+          <p className="text-sm text-[var(--muted)]">
+            The dashboard is where the complete ranked briefing, deeper cards, and topic workflow live.
+          </p>
+        </div>
+      </Panel>
     </section>
   );
 }
@@ -727,67 +792,18 @@ function MetaPill({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CoverageBuildingCard({ label }: { label: string }) {
+function PreviewPlaceholderCard() {
   return (
-    <Panel className="border-dashed border-[rgba(19,26,34,0.12)] bg-[rgba(255,255,255,0.38)] p-5">
+    <div className="rounded-[20px] border border-dashed border-[rgba(19,26,34,0.12)] bg-[rgba(255,255,255,0.45)] p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-        Coverage Still Building
+        Dashboard-only depth
       </p>
-      <h3 className="mt-3 text-lg font-semibold text-[var(--foreground)]">
-        More {label} coverage is on the way
+      <h3 className="mt-2 text-base font-semibold text-[var(--foreground)]">
+        More ranked events continue in the full briefing
       </h3>
-      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-        This rail keeps its shape while we wait for more confirmed category-matched events.
+      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+        Topic sections, additional events, and the fuller workflow live in the dashboard rather than on the public homepage.
       </p>
-    </Panel>
-  );
-}
-
-function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
-  return (
-    <div className="space-y-4">
-      <Panel className="rounded-[28px] border-[rgba(19,26,34,0.1)] bg-[rgba(255,255,255,0.72)] p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-          Category status
-        </p>
-        <h3 className="mt-3 text-[1.4rem] font-semibold text-[var(--foreground)]">
-          No {section.label} events yet
-        </h3>
-        <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-          We&apos;re still building this section from live coverage. Refresh shortly or continue with the top briefing.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button variant="secondary" className="px-4" onClick={() => window.location.reload()}>
-            <RefreshCcw className="mr-2 h-4 w-4" />
-            Refresh briefing
-          </Button>
-          <a
-            href="#top-events"
-            className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm font-semibold text-[var(--foreground)]"
-          >
-            Top events
-          </a>
-        </div>
-        <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{section.emptyReason}</p>
-      </Panel>
-
-      {section.fallbackEvents.length ? (
-        <Panel className="rounded-[28px] border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.5)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-            Top stories while this category fills in
-          </p>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {section.fallbackEvents.map((event) => (
-              <Panel
-                key={`${section.key}-${event.id}`}
-                className="border-[rgba(19,26,34,0.08)] bg-white/70 p-4"
-              >
-                <EventCard event={event} variant="compact" label="Fallback story" showRelatedArticles />
-              </Panel>
-            ))}
-          </div>
-        </Panel>
-      ) : null}
     </div>
   );
 }
