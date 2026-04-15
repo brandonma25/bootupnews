@@ -122,10 +122,10 @@ export function AppShell({
         <div className="mb-3 flex min-h-[3rem] items-start justify-end gap-3 pl-14 lg:mb-4 lg:min-h-0 lg:pl-0">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge className={account ? "text-[var(--accent)]" : ""}>
-              {account ? "Signed in" : "Guest mode"}
+              {account ? "Signed in" : "Public briefing"}
             </Badge>
             <Badge className={mode === "live" ? "text-[var(--accent)]" : ""}>
-              {mode === "live" ? "Live mode" : mode === "public" ? "Public mode" : "Demo mode"}
+              {mode === "live" ? "Personalized" : mode === "public" ? "Live preview" : "Demo preview"}
             </Badge>
           </div>
           {mode !== "demo" ? <AccountMenu account={account} /> : null}
@@ -176,7 +176,7 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
             {signedIn ? account?.displayName : "Account"}
           </span>
           <span className="block truncate text-xs text-[var(--muted)]">
-            {signedIn ? account?.email : "Sign in to save your briefings"}
+            {signedIn ? account?.email : "Sign in to personalize your intelligence"}
           </span>
         </span>
         <ChevronDown className={cn("mr-1 h-4 w-4 text-[var(--muted)] transition-transform", open && "rotate-180")} />
@@ -195,10 +195,10 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                {signedIn ? account?.displayName : "Guest access"}
+                {signedIn ? account?.displayName : "You&apos;re viewing the public briefing"}
               </p>
               <p className="truncate text-xs text-[var(--muted)]">
-                {signedIn ? account?.email : "Sign in to unlock saved topics and briefings."}
+                {signedIn ? account?.email : "Sign in to personalize your intelligence."}
               </p>
             </div>
           </div>
@@ -230,12 +230,22 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
               </>
             ) : (
               <>
+                <div className="rounded-[18px] border border-[var(--line)] bg-[rgba(245,241,233,0.62)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                    Unlock with sign-in
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-[var(--foreground)]">
+                    <p>Personalized topics</p>
+                    <p>Saved history</p>
+                    <p>Custom alerts</p>
+                  </div>
+                </div>
                 <Link
                   href="/#email-access"
                   className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-white/70 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
                   onClick={() => setOpen(false)}
                 >
-                  <span>Sign in with email</span>
+                  <span>Sign in to personalize</span>
                   <PanelTopOpen className="h-4 w-4 text-[var(--muted)]" />
                 </Link>
                 <p className="px-1 pt-1 text-xs leading-5 text-[var(--muted)]">
@@ -269,7 +279,7 @@ function SidebarPanel({
 }) {
   const modeText = {
     demo: "Demo mode. Connect Supabase and your AI key in Settings to go live.",
-    public: "Public mode. Live feeds active — sign in to personalise your briefings.",
+    public: "Public briefing. Live feeds are active now, and signing in unlocks personalized topics, saved history, and custom alerts.",
     live: "Live mode. Your topics, sources, and briefings are connected.",
   }[mode];
 
@@ -382,17 +392,22 @@ function SidebarPanel({
                 </form>
               </div>
             ) : (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-[var(--foreground)]">Not signed in</p>
-                <p className="text-xs leading-5 text-[var(--muted)]">
-                  Sign in to save topics, sources, and your briefing history.
-                </p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-[var(--foreground)]">You&apos;re viewing the public briefing</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                    Sign in to personalize your intelligence.
+                  </p>
+                </div>
+                <div className="rounded-[16px] border border-dashed border-[rgba(19,26,34,0.12)] bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--foreground)]">
+                  Personalized topics, saved history, and custom alerts unlock when you sign in.
+                </div>
                 <Link
                   href="/#email-access"
                   className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] hover:underline"
                   onClick={onClose}
                 >
-                  Sign in →
+                  Sign in to personalize →
                 </Link>
               </div>
             )}

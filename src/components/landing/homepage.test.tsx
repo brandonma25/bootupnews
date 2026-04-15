@@ -120,6 +120,33 @@ describe("LandingHomepage", () => {
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
   });
 
+  it("shows public briefing value messaging to guests", () => {
+    render(<LandingHomepage data={createData([])} viewer={null} />);
+
+    expect(screen.getAllByText("You're viewing the public briefing").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sign in to personalize your intelligence").length).toBeGreaterThan(0);
+    expect(screen.getByText("Personalized topics")).toBeInTheDocument();
+    expect(screen.getByText("Saved history")).toBeInTheDocument();
+    expect(screen.getByText("Custom alerts")).toBeInTheDocument();
+  });
+
+  it("hides guest conversion messaging for signed-in viewers", () => {
+    render(
+      <LandingHomepage
+        data={createData([])}
+        viewer={{
+          id: "viewer-1",
+          email: "analyst@example.com",
+          displayName: "Alex Analyst",
+          initials: "AA",
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("You're viewing the public briefing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign in to personalize your intelligence")).not.toBeInTheDocument();
+  });
+
   it("renders no-data state when no ranked events are available", () => {
     render(<LandingHomepage data={createData([])} viewer={null} />);
 

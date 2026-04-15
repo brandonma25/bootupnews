@@ -3,6 +3,7 @@ import { CheckCheck, ExternalLink } from "lucide-react";
 
 import { markAllReadAction } from "@/app/actions";
 import { PageHeader } from "@/components/page-header";
+import { GuestValuePreview } from "@/components/guest-value-preview";
 import { StoryCard } from "@/components/story-card";
 import { AppShell } from "@/components/app-shell";
 import { ManualRefreshTrigger } from "@/components/dashboard/manual-refresh-trigger";
@@ -26,6 +27,7 @@ export default async function DashboardPage({
   const params = await searchParams;
   const data = await getDashboardData();
   const viewer = await getViewerAccount();
+  const isSignedIn = Boolean(viewer);
 
   // Deduplicate: top-priority items shown in priority scan, not repeated in topic sections
   const topEvents = data.briefing.items.filter((item) => item.priority === "top");
@@ -61,10 +63,15 @@ export default async function DashboardPage({
   return (
     <AppShell currentPath="/dashboard" mode={data.mode} account={viewer}>
       <div className="space-y-5 py-2">
+        {!isSignedIn ? <GuestValuePreview /> : null}
         <PageHeader
           eyebrow={formatBriefingDate(data.briefing.briefingDate)}
           title={data.briefing.title}
-          description={data.briefing.intro}
+          description={
+            isSignedIn
+              ? data.briefing.intro
+              : `${data.briefing.intro} You can preview the ranked public briefing below before you personalize it.`
+          }
           aside={
             <ManualRefreshTrigger
               readingWindow={data.briefing.readingWindow}

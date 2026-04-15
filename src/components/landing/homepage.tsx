@@ -5,6 +5,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowRight, ExternalLink, RefreshCcw } from "lucide-react";
 
 import AuthModal from "@/components/auth/auth-modal";
+import { GuestValuePreview } from "@/components/guest-value-preview";
 import { isHomepageDebugConfigured } from "@/lib/env";
 import {
   buildHomepageViewModel,
@@ -180,10 +181,15 @@ function HomepageNav({
               <p className="text-sm font-semibold text-[var(--foreground)]">{viewer.displayName}</p>
               <p className="text-xs text-[var(--muted)]">Signed in</p>
             </div>
-          ) : null}
+          ) : (
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-semibold text-[var(--foreground)]">You&apos;re viewing the public briefing</p>
+              <p className="text-xs text-[var(--muted)]">Sign in to personalize your intelligence</p>
+            </div>
+          )}
           {signedIn ? (
             <Link href="/dashboard">
-              <Button className="px-5">Get Briefing</Button>
+              <Button className="px-5">Open Briefing</Button>
             </Link>
           ) : (
             <>
@@ -195,7 +201,7 @@ function HomepageNav({
                 Sign in
               </button>
               <Button className="px-5" onClick={onSignIn}>
-                Get Briefing
+                Personalize briefing
               </Button>
             </>
           )}
@@ -227,7 +233,9 @@ function HeroIntelligenceBlock({
             <Badge className="border-[rgba(41,79,134,0.16)] bg-[rgba(41,79,134,0.08)] text-[#294f86]">
               Daily Intelligence Briefing
             </Badge>
-            <Badge>{mode === "live" ? "Live mode" : mode === "public" ? "Public mode" : "Demo mode"}</Badge>
+            <Badge>
+              {signedIn ? (mode === "live" ? "Personalized briefing" : "Briefing preview") : "Public briefing"}
+            </Badge>
             <Badge>{formatBriefingDate(briefingDate)}</Badge>
           </div>
           <h1 className="display-font mt-6 max-w-3xl text-[2.35rem] leading-[1.04] text-[var(--foreground)] sm:text-[3rem] lg:text-[3.45rem]">
@@ -245,12 +253,10 @@ function HeroIntelligenceBlock({
             <SignalPill title="Ranked by signal" detail="The homepage emphasizes importance, not just recency." />
           </div>
           {!signedIn ? (
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button className="px-5" onClick={onPrimaryAction}>
-                Get Briefing
-              </Button>
+            <div className="mt-8 space-y-4">
+              <GuestValuePreview compact ctaHref="#email-access" />
               <p className="text-sm text-[var(--muted)]">
-                Browse the ranked briefing first. Save your own feed when you are ready.
+                Keep reading below to preview the ranked public briefing before you decide to personalize it.
               </p>
             </div>
           ) : (
@@ -314,7 +320,7 @@ function FeaturedEventCard({
               </Link>
             ) : (
               <Button variant="secondary" className="px-4" onClick={onOpenAuth}>
-                Get Briefing
+                Sign in to personalize
               </Button>
             )}
           </div>
