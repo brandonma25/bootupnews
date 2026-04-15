@@ -76,7 +76,7 @@ export default async function TopicsPage({
             </p>
             <div className="grid gap-4 lg:grid-cols-2">
               {data.topics.map((topic) => {
-                const storyCount = data.briefing.items.filter(
+                const eventCount = data.briefing.items.filter(
                   (item) => item.topicId === topic.id,
                 ).length;
                 return (
@@ -112,7 +112,7 @@ export default async function TopicsPage({
                             </p>
                           ) : null}
                           <p className="mt-2 text-xs text-[var(--muted)]">
-                            {storyCount} {storyCount === 1 ? "story" : "stories"} in today&apos;s briefing
+                            {eventCount} {eventCount === 1 ? "event" : "events"} in today&apos;s briefing
                           </p>
                         </div>
                       </div>

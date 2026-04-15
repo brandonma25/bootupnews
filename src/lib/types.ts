@@ -32,6 +32,12 @@ export type Article = {
   topicIds: string[];
 };
 
+export type RelatedArticle = {
+  title: string;
+  url: string;
+  sourceName: string;
+};
+
 export type BriefingItem = {
   id: string;
   topicId: string;
@@ -47,6 +53,8 @@ export type BriefingItem = {
   matchedKeywords?: string[];
   matchScore?: number;
   publishedAt?: string;
+  sourceCount?: number;
+  relatedArticles?: RelatedArticle[];
   importanceScore?: number;
   importanceLabel?: "Critical" | "High" | "Watch";
   rankingSignals?: string[];

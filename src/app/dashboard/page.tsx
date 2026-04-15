@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { AlertCircle, CheckCheck, ExternalLink, RefreshCw } from "lucide-react";
+import { CheckCheck, ExternalLink } from "lucide-react";
 
-import { generateBriefingAction, markAllReadAction } from "@/app/actions";
+import { markAllReadAction } from "@/app/actions";
 import { PageHeader } from "@/components/page-header";
 import { StoryCard } from "@/components/story-card";
 import { AppShell } from "@/components/app-shell";
+import { ManualRefreshTrigger } from "@/components/dashboard/manual-refresh-trigger";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
 import { isAiConfigured } from "@/lib/env";
@@ -27,12 +26,12 @@ export default async function DashboardPage({
   const viewer = await getViewerAccount();
 
   // Deduplicate: top-priority items shown in priority scan, not repeated in topic sections
-  const topStories = data.briefing.items.filter((item) => item.priority === "top");
-  const topStoryIds = new Set(topStories.map((item) => item.id));
+  const topEvents = data.briefing.items.filter((item) => item.priority === "top");
+  const topEventIds = new Set(topEvents.map((item) => item.id));
   const grouped = data.topics.map((topic) => ({
     topic,
     items: data.briefing.items
-      .filter((item) => item.topicId === topic.id && !topStoryIds.has(item.id))
+      .filter((item) => item.topicId === topic.id && !topEventIds.has(item.id))
       .sort((left, right) => {
         const scoreDelta = (right.matchScore ?? 0) - (left.matchScore ?? 0);
         if (scoreDelta !== 0) return scoreDelta;
@@ -53,31 +52,10 @@ export default async function DashboardPage({
           title={data.briefing.title}
           description={data.briefing.intro}
           aside={
-            <div className="flex flex-col items-stretch gap-2 min-w-[168px]">
-              <div className="rounded-[22px] border border-[var(--line)] bg-white/70 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                  Reading window
-                </p>
-                <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">
-                  {data.briefing.readingWindow}
-                </p>
-              </div>
-              {isAiConfigured ? (
-                <form action={generateBriefingAction}>
-                  <Button className="w-full gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh briefing
-                  </Button>
-                </form>
-              ) : (
-                <Link href="/settings">
-                  <Button variant="secondary" className="w-full gap-2 text-xs">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    Connect AI key
-                  </Button>
-                </Link>
-              )}
-            </div>
+            <ManualRefreshTrigger
+              readingWindow={data.briefing.readingWindow}
+              isAiConfigured={isAiConfigured}
+            />
           }
         />
 
@@ -89,7 +67,7 @@ export default async function DashboardPage({
         ) : null}
         {params.allread === "1" ? (
           <div className="rounded-[22px] border border-[var(--line)] bg-white/70 px-5 py-4 text-sm font-medium text-[var(--foreground)]">
-            All stories marked as read.
+            All events marked as read.
           </div>
         ) : null}
 
@@ -102,11 +80,11 @@ export default async function DashboardPage({
                   Priority scan
                 </p>
                 <h2 className="mt-1.5 text-xl font-semibold text-[var(--foreground)]">
-                  Top stories today
+                  Top events today
                 </h2>
               </div>
               <div className="flex items-center gap-2">
-                <Badge>{topStories.length} items</Badge>
+                <Badge>{topEvents.length} {topEvents.length === 1 ? "event" : "events"}</Badge>
                 {isLiveBriefing && !allRead ? (
                   <form action={markAllReadAction}>
                     <input type="hidden" name="briefingId" value={data.briefing.id} />
@@ -122,17 +100,19 @@ export default async function DashboardPage({
               </div>
             </div>
             <div className="mt-5 grid gap-3">
-              {topStories.map((story) => {
-                const primarySourceUrl = story.sources.find((source) => isValidStoryUrl(source.url))?.url;
+              {topEvents.map((event) => {
+                const primarySourceUrl = event.sources.find((source) => isValidStoryUrl(source.url))?.url;
+                const sourceCount = event.sourceCount ?? event.sources.length;
 
                 return (
                   <div
-                    key={story.id}
+                    key={event.id}
                     className="rounded-[20px] border border-[var(--line)] bg-white/60 p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{story.topicName}</Badge>
-                      <Badge className="text-[var(--accent)]">Top story</Badge>
+                      <Badge>{event.topicName}</Badge>
+                      <Badge className="text-[var(--accent)]">Top event</Badge>
+                      <Badge>{sourceCount} {sourceCount === 1 ? "source" : "sources"}</Badge>
                     </div>
                     {primarySourceUrl ? (
                       <a
@@ -141,26 +121,26 @@ export default async function DashboardPage({
                         rel="noreferrer"
                         className="mt-3 inline-flex items-start gap-2 text-base font-semibold leading-snug text-[var(--foreground)] underline-offset-4 hover:underline"
                       >
-                        <span>{story.title}</span>
+                        <span>{event.title}</span>
                         <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
                       </a>
                     ) : (
                       <div className="mt-3">
                         <h3 className="text-base font-semibold leading-snug text-[var(--foreground)]">
-                          {story.title}
+                          {event.title}
                         </h3>
                         <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--muted)]">
                           Source unavailable
                         </p>
                       </div>
                     )}
-                    {story.matchedKeywords?.length ? (
+                    {event.matchedKeywords?.length ? (
                       <p className="mt-2 text-sm font-medium text-[var(--accent)]">
-                        Matched on: {story.matchedKeywords.join(", ")}
+                        Matched on: {event.matchedKeywords.join(", ")}
                       </p>
                     ) : null}
                     <p className="mt-2 text-sm leading-6 text-[var(--muted)] line-clamp-2">
-                      {story.whatHappened}
+                      {event.whatHappened}
                     </p>
                   </div>
                 );
@@ -175,10 +155,10 @@ export default async function DashboardPage({
                 Coverage map
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Stories by topic in today&apos;s briefing
+                Events by topic in today&apos;s briefing
               </p>
               <div className="mt-4 space-y-3">
-                {grouped.map(({ topic, items }) => {
+                {grouped.map(({ topic }) => {
                   const total = data.briefing.items.filter((i) => i.topicId === topic.id).length;
                   return (
                     <a
@@ -200,7 +180,7 @@ export default async function DashboardPage({
                           </p>
                         </div>
                       </div>
-                      <Badge>{total} {total === 1 ? "story" : "stories"}</Badge>
+                      <Badge>{total} {total === 1 ? "event" : "events"}</Badge>
                     </a>
                   );
                 })}
@@ -233,7 +213,7 @@ export default async function DashboardPage({
                 </div>
               ) : (
                 <Panel className="p-5 text-sm leading-7 text-[var(--muted)]">
-                  <p className="font-medium text-[var(--foreground)]">No matched stories yet for this topic.</p>
+                  <p className="font-medium text-[var(--foreground)]">No clustered events yet for this topic.</p>
                   <p>Try adjusting keywords or refreshing your briefing.</p>
                 </Panel>
               )}

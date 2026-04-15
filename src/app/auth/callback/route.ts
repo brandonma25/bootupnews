@@ -5,17 +5,32 @@ import { bootstrapUserDefaults } from "@/lib/default-topics";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { errorContext, logServerEvent } from "@/lib/observability";
 
+function safeRedirectPath(value: string | null, fallback = "/dashboard") {
+  if (!value) {
+    return fallback;
+  }
+
+  const normalized = value.trim();
+
+  if (!normalized.startsWith("/") || normalized.startsWith("//")) {
+    return fallback;
+  }
+
+  return normalized;
+}
+
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type");
+  const next = safeRedirectPath(requestUrl.searchParams.get("next"));
 
   if (!isSupabaseConfigured) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL(next, request.url));
   }
 
-  const response = NextResponse.redirect(new URL("/dashboard", request.url));
+  const response = NextResponse.redirect(new URL(next, request.url));
 
   const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
     cookies: {
@@ -32,12 +47,18 @@ export async function GET(request: NextRequest) {
 
   try {
     if (code) {
-      await supabase.auth.exchangeCodeForSession(code);
+      const exchangeResult = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeResult.error) {
+        throw exchangeResult.error;
+      }
     } else if (tokenHash && type) {
-      await supabase.auth.verifyOtp({
+      const verifyResult = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
         type: type as "signup" | "recovery" | "invite" | "email_change" | "magiclink",
       });
+      if (verifyResult.error) {
+        throw verifyResult.error;
+      }
     } else {
       return NextResponse.redirect(new URL("/?auth=callback-error", request.url));
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowRight, ExternalLink } from "lucide-react";
 
 import AuthModal from "@/components/auth/auth-modal";
@@ -14,6 +14,7 @@ import { cn, formatBriefingDate, minutesToLabel } from "@/lib/utils";
 type LandingHomepageProps = {
   data: DashboardData;
   viewer: ViewerAccount | null;
+  authState?: string;
 };
 
 type CategoryKey = "Tech" | "Finance" | "Politics";
@@ -72,26 +73,45 @@ const CATEGORY_CONFIG: Array<{
   },
 ];
 
-export default function LandingHomepage({ data, viewer }: LandingHomepageProps) {
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+export default function LandingHomepage({ data, viewer, authState }: LandingHomepageProps) {
+  const [authModalManuallyOpen, setAuthModalManuallyOpen] = useState(false);
+  const [dismissedAuthState, setDismissedAuthState] = useState<string | null>(null);
   const signedIn = Boolean(viewer);
+  const currentHash = useHashValue();
 
   const { featured, topRanked, categorySections, trending } = useMemo(
     () => organizeHomepageContent(data.briefing.items, data.sources),
     [data.briefing.items, data.sources],
   );
 
+  const authMessage = getHomepageAuthMessage(authState);
+  const authStateRequestsModal = Boolean(authState && authState !== "confirm" && !signedIn && dismissedAuthState !== authState);
+  const hashRequestsModal = !signedIn && currentHash === "#email-access";
+  const authModalOpen = authModalManuallyOpen || authStateRequestsModal || hashRequestsModal;
+
+  function handleCloseAuthModal() {
+    setAuthModalManuallyOpen(false);
+
+    if (authState && authState !== "confirm") {
+      setDismissedAuthState(authState);
+    }
+
+    if (typeof window !== "undefined" && window.location.hash === "#email-access") {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    }
+  }
+
   return (
     <>
       <main className="mx-auto min-h-screen w-full max-w-[1280px] px-4 pb-16 pt-4 sm:px-6 lg:px-8 lg:pb-24 lg:pt-6">
-        <HomepageNav signedIn={signedIn} viewer={viewer} onSignIn={() => setAuthModalOpen(true)} />
+        <HomepageNav signedIn={signedIn} viewer={viewer} onSignIn={() => setAuthModalManuallyOpen(true)} />
 
         <div className="mt-8 space-y-10 lg:mt-10 lg:space-y-14">
           <HeroIntelligenceBlock
             briefingDate={data.briefing.briefingDate}
             mode={data.mode}
             featured={featured}
-            onPrimaryAction={() => setAuthModalOpen(true)}
+            onPrimaryAction={() => setAuthModalManuallyOpen(true)}
             signedIn={signedIn}
           />
 
@@ -110,13 +130,45 @@ export default function LandingHomepage({ data, viewer }: LandingHomepageProps) 
 
           <TrendingSection events={trending} />
 
-          <DelayedCtaSection signedIn={signedIn} onOpenAuth={() => setAuthModalOpen(true)} />
+          <DelayedCtaSection signedIn={signedIn} onOpenAuth={() => setAuthModalManuallyOpen(true)} />
         </div>
       </main>
 
-      <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      <AuthModal open={authModalOpen} onClose={handleCloseAuthModal} errorMessage={authMessage} />
     </>
   );
+}
+
+function useHashValue() {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === "undefined") {
+        return () => undefined;
+      }
+
+      window.addEventListener("hashchange", onStoreChange);
+      return () => window.removeEventListener("hashchange", onStoreChange);
+    },
+    () => (typeof window === "undefined" ? "" : window.location.hash),
+    () => "",
+  );
+}
+
+function getHomepageAuthMessage(authState?: string) {
+  switch (authState) {
+    case "1":
+      return null;
+    case "oauth-error":
+      return "Google sign-in could not be started. Check that Google is enabled in Supabase Auth and that the redirect URL is configured correctly.";
+    case "callback-error":
+      return "The sign-in callback could not be completed. Try again, and if it persists, verify the Google OAuth redirect URL in Supabase.";
+    case "signup-error":
+      return "We could not finish account creation. Try Google sign-in again or confirm the current auth provider settings.";
+    case "invalid":
+      return "That sign-in attempt was not accepted. Try again.";
+    default:
+      return null;
+  }
 }
 
 function HomepageNav({
@@ -633,9 +685,6 @@ function organizeHomepageContent(items: BriefingItem[], sources: Source[]) {
 }
 
 function buildHomepageEvents(items: BriefingItem[], sources: Source[]): HomepageEvent[] {
-  // Temporary frontend adapter: this creates event-shaped homepage objects from the
-  // current briefing items until backend event clustering and ranking can supply
-  // richer grouped events, article sets, and historical timelines directly.
   return items
     .slice()
     .sort((left, right) => getRankScore(right) - getRankScore(left))
@@ -661,6 +710,15 @@ function buildHomepageEvents(items: BriefingItem[], sources: Source[]): Homepage
 }
 
 function buildRelatedArticles(item: BriefingItem, siblingItems: BriefingItem[], sources: Source[]) {
+  if (item.relatedArticles?.length) {
+    return item.relatedArticles.slice(0, 5).map((article) => ({
+      title: article.title,
+      url: article.url,
+      sourceName: article.sourceName,
+      note: "Primary coverage",
+    }));
+  }
+
   const supportCoverage = [
     ...item.sources.map((source) => ({
       title: source.title === item.title ? source.title : `${source.title} coverage`,

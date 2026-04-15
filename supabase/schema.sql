@@ -38,6 +38,7 @@ create table if not exists public.articles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
   source_id uuid references public.sources(id) on delete cascade,
+  event_id uuid,
   title text not null,
   url text not null,
   summary_text text,
@@ -45,6 +46,23 @@ create table if not exists public.articles (
   dedupe_key text,
   created_at timestamptz not null default now()
 );
+
+create table if not exists public.events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  topic_id uuid references public.topics(id) on delete set null,
+  title text not null,
+  summary text not null,
+  why_it_matters text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.articles
+  drop constraint if exists articles_event_id_fkey;
+
+alter table public.articles
+  add constraint articles_event_id_fkey
+  foreign key (event_id) references public.events(id) on delete set null;
 
 create table if not exists public.article_topics (
   id uuid primary key default gen_random_uuid(),
@@ -103,6 +121,7 @@ alter table public.user_profiles enable row level security;
 alter table public.topics enable row level security;
 alter table public.sources enable row level security;
 alter table public.articles enable row level security;
+alter table public.events enable row level security;
 alter table public.article_topics enable row level security;
 alter table public.daily_briefings enable row level security;
 alter table public.briefing_items enable row level security;
@@ -117,6 +136,9 @@ create policy "Users manage their own sources" on public.sources
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "Users manage their own articles" on public.articles
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Users manage their own events" on public.events
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "Users manage their own article-topic matches" on public.article_topics

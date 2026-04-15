@@ -30,7 +30,7 @@ export default async function HistoryPage() {
         <PageHeader
           eyebrow="Briefing history"
           title="Review previous daily briefings"
-          description="Go back to prior scans, revisit stories you skipped, and build a lightweight knowledge trail over time."
+          description="Go back to prior scans, revisit the events you skipped, and build a lightweight knowledge trail over time."
         />
 
         {/* Guest / demo context banners */}
@@ -96,7 +96,7 @@ export default async function HistoryPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    <Badge>{briefing.items.length} {briefing.items.length === 1 ? "story" : "stories"}</Badge>
+                    <Badge>{briefing.items.length} {briefing.items.length === 1 ? "event" : "events"}</Badge>
                     <Badge>{briefing.readingWindow}</Badge>
                   </div>
                 </div>

@@ -239,7 +239,7 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
                   <PanelTopOpen className="h-4 w-4 text-[var(--muted)]" />
                 </Link>
                 <p className="px-1 pt-1 text-xs leading-5 text-[var(--muted)]">
-                  Use the email prompt on the homepage to sign in with a magic link, password, Google, or Apple.
+                  Use the homepage sign-in flow to continue with Google or your existing email-based auth options.
                 </p>
               </>
             )}

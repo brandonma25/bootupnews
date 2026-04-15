@@ -9,6 +9,8 @@ import { minutesToLabel } from "@/lib/utils";
 
 export function StoryCard({ item }: { item: BriefingItem }) {
   const primarySourceUrl = item.sources.find((source) => isValidStoryUrl(source.url))?.url;
+  const sourceCount = item.sourceCount ?? item.sources.length;
+  const relatedCoverage = item.relatedArticles?.length ? item.relatedArticles : null;
 
   return (
     <Panel className={cn("p-6 transition-opacity", item.read && "opacity-50 hover:opacity-80")}>
@@ -18,8 +20,9 @@ export function StoryCard({ item }: { item: BriefingItem }) {
             <div className="flex flex-wrap gap-2">
               <Badge>{item.topicName}</Badge>
               {item.priority === "top" ? (
-                <Badge className="text-[var(--accent)]">Top story</Badge>
+                <Badge className="text-[var(--accent)]">Top event</Badge>
               ) : null}
+              <Badge>{sourceCount} {sourceCount === 1 ? "source" : "sources"}</Badge>
               {item.read ? (
                 <Badge className="text-[var(--muted)]">Read</Badge>
               ) : null}
@@ -117,27 +120,31 @@ export function StoryCard({ item }: { item: BriefingItem }) {
 
         <section className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-            Sources
+            Related coverage
           </p>
           <div className="flex flex-wrap gap-2">
-            {item.sources.map((source) =>
+            {(relatedCoverage ?? item.sources.map((source) => ({
+              title: source.title,
+              url: source.url,
+              sourceName: source.title,
+            }))).map((source) =>
               isValidStoryUrl(source.url) ? (
                 <a
-                  key={`${source.title}-${source.url}`}
+                  key={`${source.sourceName}-${source.title}-${source.url}`}
                   href={source.url}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/70 px-3 py-2 text-sm font-medium text-[var(--foreground)] underline-offset-2 transition-colors hover:bg-white hover:underline"
                 >
-                  {source.title}
+                  {source.sourceName}: {source.title}
                   <ExternalLink className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
                 </a>
               ) : (
                 <span
-                  key={`${source.title}-${source.url}`}
+                  key={`${source.sourceName}-${source.title}-${source.url}`}
                   className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/50 px-3 py-2 text-sm font-medium text-[var(--muted)]"
                 >
-                  {source.title}
+                  {source.sourceName}: {source.title}
                   <span className="text-xs uppercase tracking-[0.14em]">Unavailable</span>
                 </span>
               ),

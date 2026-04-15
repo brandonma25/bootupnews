@@ -4,12 +4,20 @@ import { formatISO } from "date-fns";
 import { demoDashboardData, demoHistory, demoSources, demoTopics } from "@/lib/demo-data";
 import { logServerEvent } from "@/lib/observability";
 import { rankNewsClusters } from "@/lib/ranking";
-import { clusterArticles, fetchFeedArticles } from "@/lib/rss";
+import { clusterArticles, fetchFeedArticles, type FeedArticle } from "@/lib/rss";
 import { withServerFallback } from "@/lib/server-safety";
 import { summarizeCluster } from "@/lib/summarizer";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
 import { matchTopicsForArticle } from "@/lib/topic-matching";
-import type { DailyBriefing, DashboardData, Source, Topic, ViewerAccount } from "@/lib/types";
+import type {
+  BriefingItem,
+  DailyBriefing,
+  DashboardData,
+  RelatedArticle,
+  Source,
+  Topic,
+  ViewerAccount,
+} from "@/lib/types";
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
@@ -20,6 +28,7 @@ type StoredArticle = {
   published_at: string | null;
   url: string;
   source_id: string | null;
+  event_id?: string | null;
 };
 
 type StoredArticleTopic = {
@@ -29,12 +38,34 @@ type StoredArticleTopic = {
   match_score: number | null;
 };
 
+type StoredEvent = {
+  id: string;
+  topic_id: string | null;
+  title: string;
+  summary: string;
+  why_it_matters: string;
+  created_at: string;
+};
+
+type EventSeedArticle = StoredArticle & {
+  topicId: string;
+  topicName: string;
+  sourceName: string;
+  matchedKeywords: string[];
+  matchScore: number;
+};
+
+type EventCluster = {
+  representative: EventSeedArticle;
+  sources: EventSeedArticle[];
+};
+
 function createEmptyBriefing(): DailyBriefing {
   return {
     id: `generated-empty-${Date.now()}`,
     briefingDate: formatISO(new Date()),
     title: "Today's Briefing",
-    intro: "No matched stories yet for your current topics. Try adjusting keywords or refreshing your briefing.",
+    intro: "No clustered events yet for your current topics. Try adjusting keywords or refreshing your briefing.",
     readingWindow: "0 minutes",
     items: [],
   };
@@ -158,6 +189,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   await persistRawArticles(supabase, user.id, sources, "/dashboard");
   await syncTopicMatches(supabase, user.id, topics);
+  await syncEventClusters(supabase, user.id, topics, sources);
 
   const briefing = await buildMatchedBriefing(supabase, user.id, topics, sources);
 
@@ -234,6 +266,7 @@ export async function getHistory() {
           keyPoints: item.key_points as [string, string, string],
           whyItMatters: item.why_it_matters,
           sources: (item.sources as Array<{ title: string; url: string }>) ?? [],
+          sourceCount: ((item.sources as Array<{ title: string; url: string }>) ?? []).length,
           estimatedMinutes: item.estimated_minutes,
           read: item.is_read,
           priority: item.priority,
@@ -291,6 +324,12 @@ export async function generateDailyBriefing(
               title: article.sourceName,
               url: article.url,
             })),
+            sourceCount: new Set(cluster.sources.map((article) => article.sourceName)).size,
+            relatedArticles: cluster.sources.slice(0, 5).map((article) => ({
+              title: article.title,
+              url: article.url,
+              sourceName: article.sourceName,
+            })),
             estimatedMinutes: summary.estimatedMinutes,
             read: false,
             priority: index < 2 ? ("top" as const) : ("normal" as const),
@@ -326,7 +365,7 @@ export async function generateDailyBriefing(
     id: `generated-${Date.now()}`,
     briefingDate: formatISO(new Date()),
     title: "Daily Executive Briefing",
-    intro: "A concise scan of the stories most likely to affect decisions today.",
+    intro: "A concise scan of the events most likely to affect decisions today.",
     readingWindow: `${totalMinutes} minutes`,
     items: validItems,
   };
@@ -406,16 +445,12 @@ export async function syncTopicMatches(
   }
 }
 
-export async function buildMatchedBriefing(
+export async function syncEventClusters(
   supabase: SupabaseServerClient,
   userId: string,
   topics: Topic[],
   sources: Source[],
-): Promise<DailyBriefing> {
-  if (!topics.length) {
-    return createEmptyBriefing();
-  }
-
+) {
   const [articleResult, matchResult] = await Promise.all([
     supabase
       .from("articles")
@@ -427,68 +462,266 @@ export async function buildMatchedBriefing(
   ]);
 
   if (articleResult.error || matchResult.error) {
+    logServerEvent("warn", "Event clustering prerequisites failed", {
+      route: "/dashboard",
+      userId,
+      articlesError: articleResult.error?.message,
+      matchesError: matchResult.error?.message,
+    });
+    return;
+  }
+
+  const articles = (articleResult.data ?? []) as StoredArticle[];
+  const matches = (matchResult.data ?? []) as StoredArticleTopic[];
+  const topicById = new Map(topics.map((topic) => [topic.id, topic]));
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
+  const primaryMatches = getPrimaryMatches(matches);
+
+  const seededArticles = articles
+    .map((article) => {
+      const match = primaryMatches.get(article.id);
+      const topic = match ? topicById.get(match.topic_id) : undefined;
+
+      if (!match || !topic) {
+        return null;
+      }
+
+      const sourceName =
+        (article.source_id ? sourceById.get(article.source_id)?.name : undefined) ?? topic.name;
+
+      return {
+        ...article,
+        topicId: topic.id,
+        topicName: topic.name,
+        sourceName,
+        matchedKeywords: (match.matched_keywords ?? []).filter(Boolean),
+        matchScore: match.match_score ?? 0,
+      } satisfies EventSeedArticle;
+    })
+    .filter((article): article is EventSeedArticle => Boolean(article));
+
+  const clearArticleEvents = await supabase
+    .from("articles")
+    .update({ event_id: null })
+    .eq("user_id", userId);
+
+  if (clearArticleEvents.error) {
+    logServerEvent("warn", "Event clustering could not clear article event links", {
+      route: "/dashboard",
+      userId,
+      errorMessage: clearArticleEvents.error.message,
+    });
+    return;
+  }
+
+  const deleteEvents = await supabase.from("events").delete().eq("user_id", userId);
+
+  if (deleteEvents.error) {
+    logServerEvent("warn", "Event clustering could not clear previous events", {
+      route: "/dashboard",
+      userId,
+      errorMessage: deleteEvents.error.message,
+    });
+    return;
+  }
+
+  if (!seededArticles.length) {
+    return;
+  }
+
+  const groupedByTopic = new Map<string, EventSeedArticle[]>();
+  seededArticles.forEach((article) => {
+    const group = groupedByTopic.get(article.topicId) ?? [];
+    group.push(article);
+    groupedByTopic.set(article.topicId, group);
+  });
+
+  for (const [topicId, topicArticles] of groupedByTopic.entries()) {
+    const topic = topicById.get(topicId);
+    if (!topic) continue;
+
+    const clusters = clusterEventSeedArticles(topicArticles);
+
+    for (const cluster of clusters) {
+      const feedArticles = cluster.sources.map(toFeedArticle);
+      const summary = await summarizeCluster(topic.name, feedArticles);
+      const insertEvent = await supabase
+        .from("events")
+        .insert({
+          user_id: userId,
+          topic_id: topic.id,
+          title: summary.headline,
+          summary: summary.whatHappened,
+          why_it_matters: summary.whyItMatters,
+        })
+        .select("id")
+        .single();
+
+      if (insertEvent.error || !insertEvent.data?.id) {
+        logServerEvent("warn", "Event insert failed during clustering", {
+          route: "/dashboard",
+          userId,
+          topicId: topic.id,
+          errorMessage: insertEvent.error?.message ?? "missing event id",
+          sourceCount: cluster.sources.length,
+        });
+        continue;
+      }
+
+      const eventId = insertEvent.data.id;
+      const articleIds = cluster.sources.map((article) => article.id);
+      const updateArticles = await supabase
+        .from("articles")
+        .update({ event_id: eventId })
+        .in("id", articleIds);
+
+      if (updateArticles.error) {
+        logServerEvent("warn", "Event-to-article assignment failed", {
+          route: "/dashboard",
+          userId,
+          topicId: topic.id,
+          eventId,
+          errorMessage: updateArticles.error.message,
+          articleCount: articleIds.length,
+        });
+      }
+    }
+  }
+}
+
+export async function buildMatchedBriefing(
+  supabase: SupabaseServerClient,
+  userId: string,
+  topics: Topic[],
+  sources: Source[],
+): Promise<DailyBriefing> {
+  if (!topics.length) {
+    return createEmptyBriefing();
+  }
+
+  const [articleResult, eventResult, matchResult] = await Promise.all([
+    supabase
+      .from("articles")
+      .select("id, title, summary_text, published_at, url, source_id, event_id")
+      .eq("user_id", userId),
+    supabase
+      .from("events")
+      .select("id, topic_id, title, summary, why_it_matters, created_at")
+      .eq("user_id", userId),
+    supabase
+      .from("article_topics")
+      .select("article_id, topic_id, matched_keywords, match_score"),
+  ]);
+
+  if (articleResult.error || eventResult.error || matchResult.error) {
     logServerEvent("warn", "Matched briefing query failed", {
       route: "/dashboard",
       userId,
       articlesError: articleResult.error?.message,
+      eventsError: eventResult.error?.message,
       matchesError: matchResult.error?.message,
     });
     return createEmptyBriefing();
   }
 
   const articles = (articleResult.data ?? []) as StoredArticle[];
+  const events = (eventResult.data ?? []) as StoredEvent[];
   const matches = (matchResult.data ?? []) as StoredArticleTopic[];
-
-  const articleById = new Map(articles.map((article) => [article.id, article]));
+  const eventById = new Map(events.map((event) => [event.id, event]));
   const sourceById = new Map(sources.map((source) => [source.id, source]));
   const topicById = new Map(topics.map((topic) => [topic.id, topic]));
+  const primaryMatches = getPrimaryMatches(matches);
+  const articlesByEvent = new Map<string, EventSeedArticle[]>();
 
-  const items = matches
-    .map((match) => {
-      const article = articleById.get(match.article_id);
-      const topic = topicById.get(match.topic_id);
+  articles.forEach((article) => {
+    if (!article.event_id) {
+      return;
+    }
 
-      if (!article || !topic) {
+    const match = primaryMatches.get(article.id);
+    const event = eventById.get(article.event_id);
+    const topic = (match ? topicById.get(match.topic_id) : undefined) ?? (event?.topic_id ? topicById.get(event.topic_id) : undefined);
+
+    if (!topic) {
+      return;
+    }
+
+    const sourceName =
+      (article.source_id ? sourceById.get(article.source_id)?.name : undefined) ?? topic.name;
+
+    const seeded: EventSeedArticle = {
+      ...article,
+      topicId: topic.id,
+      topicName: topic.name,
+      sourceName,
+      matchedKeywords: (match?.matched_keywords ?? []).filter(Boolean),
+      matchScore: match?.match_score ?? 0,
+    };
+
+    const bucket = articlesByEvent.get(article.event_id) ?? [];
+    bucket.push(seeded);
+    articlesByEvent.set(article.event_id, bucket);
+  });
+
+  const items = events
+    .map((event) => {
+      const eventArticles = (articlesByEvent.get(event.id) ?? []).sort(
+        (left, right) =>
+          new Date(right.published_at ?? 0).getTime() -
+          new Date(left.published_at ?? 0).getTime(),
+      );
+      const topic = event.topic_id ? topicById.get(event.topic_id) : undefined;
+
+      if (!topic || !eventArticles.length) {
         return null;
       }
 
-      const source = article.source_id ? sourceById.get(article.source_id) : undefined;
-      const matchedKeywords = (match.matched_keywords ?? []).filter(Boolean);
-      const sourceLabel = source?.name ?? topic.name;
-      const publishedLabel = formatPublishedLabel(article.published_at);
+      const feedArticles = eventArticles.map(toFeedArticle);
+      const rankedCluster = rankNewsClusters(topic.name, [
+        {
+          representative: feedArticles[0],
+          sources: feedArticles,
+        },
+      ])[0];
+      const matchedKeywords = [...new Set(eventArticles.flatMap((article) => article.matchedKeywords))];
+      const relatedArticles = buildRelatedArticles(eventArticles);
+      const sourceCount = new Set(eventArticles.map((article) => article.sourceName)).size;
+      const freshest = eventArticles[0];
 
       return {
-        id: `generated-${article.id}-${topic.id}`,
+        id: `generated-event-${event.id}`,
         topicId: topic.id,
         topicName: topic.name,
-        title: article.title,
-        whatHappened: article.summary_text?.trim() || article.title,
+        title: event.title,
+        whatHappened: event.summary,
         keyPoints: [
-          `Matched on: ${matchedKeywords.join(", ")}`,
-          `Source: ${sourceLabel}`,
-          `Published: ${publishedLabel}`,
+          `${sourceCount} ${sourceCount === 1 ? "source is" : "sources are"} tracking this event.`,
+          `Latest signal: ${freshest.sourceName} on ${formatPublishedLabel(freshest.published_at)}.`,
+          matchedKeywords.length
+            ? `Matched signals: ${matchedKeywords.join(", ")}.`
+            : "Clustered using title similarity across related coverage.",
         ] as [string, string, string],
-        whyItMatters:
-          matchedKeywords.length === 1
-            ? `Why this is in ${topic.name}: keyword "${matchedKeywords[0]}" matched the story text.`
-            : `Why this is in ${topic.name}: keyword matches included ${matchedKeywords.join(", ")}.`,
-        sources: [
-          {
-            title: sourceLabel,
-            url: article.url,
-          },
-        ],
-        estimatedMinutes: 3,
+        whyItMatters: event.why_it_matters,
+        sources: relatedArticles.map((article) => ({
+          title: article.sourceName,
+          url: article.url,
+        })),
+        relatedArticles,
+        sourceCount,
+        estimatedMinutes: Math.min(6, Math.max(3, Math.ceil(eventArticles.length * 1.5))),
         read: false,
         priority: "normal" as const,
         matchedKeywords,
-        matchScore: match.match_score ?? 0,
-        publishedAt: article.published_at ?? undefined,
-      };
+        matchScore: Math.max(...eventArticles.map((article) => article.matchScore), 0),
+        publishedAt: freshest.published_at ?? undefined,
+        importanceScore: rankedCluster?.importanceScore,
+        importanceLabel: rankedCluster?.importanceLabel,
+        rankingSignals: rankedCluster?.rankingSignals ?? [],
+      } satisfies BriefingItem;
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
     .sort((left, right) => {
-      const scoreDelta = (right.matchScore ?? 0) - (left.matchScore ?? 0);
+      const scoreDelta = (right.importanceScore ?? right.matchScore ?? 0) - (left.importanceScore ?? left.matchScore ?? 0);
       if (scoreDelta !== 0) return scoreDelta;
       const rightPublished = right.publishedAt ? new Date(right.publishedAt).getTime() : 0;
       const leftPublished = left.publishedAt ? new Date(left.publishedAt).getTime() : 0;
@@ -507,7 +740,7 @@ export async function buildMatchedBriefing(
     id: `generated-${Date.now()}`,
     briefingDate: formatISO(new Date()),
     title: "Today's Briefing",
-    intro: "Articles are now organized by deterministic topic matches from your saved keywords.",
+    intro: "Related reporting is clustered into events so you can scan developments instead of isolated articles.",
     readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
     items,
   };
@@ -665,6 +898,119 @@ export async function persistRawArticles(
     skippedCount,
     failedSourceCount: failedFetches.length,
   });
+}
+
+function getPrimaryMatches(matches: StoredArticleTopic[]) {
+  const primaryMatches = new Map<string, StoredArticleTopic>();
+
+  matches.forEach((match) => {
+    const existing = primaryMatches.get(match.article_id);
+    const matchScore = match.match_score ?? 0;
+    const existingScore = existing?.match_score ?? 0;
+    const matchKeywordCount = match.matched_keywords?.length ?? 0;
+    const existingKeywordCount = existing?.matched_keywords?.length ?? 0;
+
+    if (
+      !existing ||
+      matchScore > existingScore ||
+      (matchScore === existingScore && matchKeywordCount > existingKeywordCount)
+    ) {
+      primaryMatches.set(match.article_id, match);
+    }
+  });
+
+  return primaryMatches;
+}
+
+function clusterEventSeedArticles(articles: EventSeedArticle[]): EventCluster[] {
+  const sortedArticles = [...articles].sort(
+    (left, right) =>
+      new Date(right.published_at ?? 0).getTime() - new Date(left.published_at ?? 0).getTime(),
+  );
+  const clusters: EventCluster[] = [];
+
+  sortedArticles.forEach((article) => {
+    const match = clusters.find((cluster) => isSameEvent(article, cluster));
+
+    if (match) {
+      match.sources.push(article);
+      return;
+    }
+
+    clusters.push({
+      representative: article,
+      sources: [article],
+    });
+  });
+
+  return clusters.sort((left, right) => {
+    const sourceDelta = right.sources.length - left.sources.length;
+    if (sourceDelta !== 0) return sourceDelta;
+
+    return (
+      new Date(right.representative.published_at ?? 0).getTime() -
+      new Date(left.representative.published_at ?? 0).getTime()
+    );
+  });
+}
+
+function isSameEvent(article: EventSeedArticle, cluster: EventCluster) {
+  const titleSimilarity = jaccardSimilarity(
+    normalizeSignal(article.title),
+    normalizeSignal(cluster.representative.title),
+  );
+  const keywordSimilarity = jaccardSimilarity(
+    article.matchedKeywords.map(normalizeKeyword),
+    cluster.sources.flatMap((source) => source.matchedKeywords.map(normalizeKeyword)),
+  );
+
+  return titleSimilarity >= 0.55 || (titleSimilarity >= 0.35 && keywordSimilarity >= 0.2);
+}
+
+function toFeedArticle(article: EventSeedArticle): FeedArticle {
+  return {
+    title: article.title,
+    url: article.url,
+    summaryText: article.summary_text?.trim() || article.title,
+    contentText: article.summary_text?.trim() || article.title,
+    sourceName: article.sourceName,
+    publishedAt: article.published_at ?? new Date().toISOString(),
+  };
+}
+
+function buildRelatedArticles(articles: EventSeedArticle[]): RelatedArticle[] {
+  return articles
+    .slice()
+    .sort(
+      (left, right) =>
+        new Date(right.published_at ?? 0).getTime() - new Date(left.published_at ?? 0).getTime(),
+    )
+    .map((article) => ({
+      title: article.title,
+      url: article.url,
+      sourceName: article.sourceName,
+    }))
+    .slice(0, 5);
+}
+
+function normalizeSignal(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 2);
+}
+
+function normalizeKeyword(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function jaccardSimilarity(left: string[], right: string[]) {
+  const leftSet = new Set(left.filter(Boolean));
+  const rightSet = new Set(right.filter(Boolean));
+  const overlap = [...leftSet].filter((word) => rightSet.has(word)).length;
+  const union = new Set([...leftSet, ...rightSet]).size;
+  return union === 0 ? 0 : overlap / union;
 }
 
 function extractMatchedKeywords(keyPoints: string[]) {

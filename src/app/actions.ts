@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
-import { buildMatchedBriefing, persistRawArticles, syncTopicMatches } from "@/lib/data";
+import { buildMatchedBriefing, persistRawArticles, syncEventClusters, syncTopicMatches } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { parseKeywordList } from "@/lib/topic-matching";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -30,8 +30,6 @@ const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(72),
 });
-
-const oauthProviderSchema = z.enum(["google", "apple"]);
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
@@ -246,42 +244,6 @@ export async function signInWithPasswordAction(formData: FormData) {
   redirect("/dashboard");
 }
 
-export async function signInWithProviderAction(formData: FormData) {
-  const provider = oauthProviderSchema.parse(formData.get("provider"));
-
-  if (!isSupabaseConfigured) {
-    redirect("/?demo=1");
-  }
-
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    redirect("/?auth=oauth-error");
-  }
-
-  const result = await supabase.auth
-    .signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${env.appUrl}/auth/callback`,
-      },
-    })
-    .catch((error) => {
-      logServerEvent("error", "OAuth sign-in request failed", {
-        route: "/",
-        provider,
-        ...errorContext(error),
-      });
-      redirect("/?auth=oauth-error");
-    });
-  const { data, error } = result;
-
-  if (error || !data.url) {
-    redirect("/?auth=oauth-error");
-  }
-
-  redirect(data.url);
-}
-
 export async function signOutAction() {
   if (!isSupabaseConfigured) {
     redirect("/");
@@ -478,6 +440,7 @@ export async function generateBriefingAction() {
   }));
 
   await syncTopicMatches(supabase, user.id, normalizedTopics);
+  await syncEventClusters(supabase, user.id, normalizedTopics, normalizedSources);
 
   const briefing = await buildMatchedBriefing(supabase, user.id, normalizedTopics, normalizedSources);
 
