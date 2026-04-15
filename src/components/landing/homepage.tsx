@@ -103,6 +103,11 @@ export default function LandingHomepage({
           viewer={viewer}
           onSignIn={() => setAuthModalManuallyOpen(true)}
         />
+        <SessionStateBanner
+          signedIn={signedIn}
+          viewer={viewer}
+          onSignIn={() => setAuthModalManuallyOpen(true)}
+        />
 
         <div className="mt-8 space-y-10 lg:mt-10 lg:space-y-14">
           <HeroIntelligenceBlock
@@ -202,9 +207,57 @@ function getHomepageAuthMessage(authState?: string) {
       return "We could not finish account creation. Try Google sign-in again or confirm the current auth provider settings.";
     case "invalid":
       return "That sign-in attempt was not accepted. Try again.";
+    case "config-error":
+      return "Authentication is not configured for this environment yet. Add the public Supabase URL and anon key, then try again.";
     default:
       return null;
   }
+}
+
+function SessionStateBanner({
+  signedIn,
+  viewer,
+  onSignIn,
+}: {
+  signedIn: boolean;
+  viewer: ViewerAccount | null;
+  onSignIn: () => void;
+}) {
+  return (
+    <section className="mt-5">
+      <Panel className={cn("p-4 sm:p-5", signedIn ? "border-[rgba(31,79,70,0.18)]" : "border-[rgba(19,26,34,0.08)]")}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              Session state
+            </p>
+            <h2 className="mt-2 text-lg font-semibold text-[var(--foreground)]">
+              {signedIn ? `Signed in as ${viewer?.displayName}` : "Signed out in public briefing mode"}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+              {signedIn
+                ? "Your account session is active, and refreshes should keep you in the personalized workspace."
+                : "You can browse the public homepage, but topics, sources, history, and personalization stay behind sign-in."}
+            </p>
+          </div>
+          {signedIn ? (
+            <div className="flex flex-wrap gap-2">
+              <Link href="/dashboard">
+                <Button className="px-5">Open dashboard</Button>
+              </Link>
+              <Link href="/settings#account-settings">
+                <Button variant="secondary" className="px-5">Account settings</Button>
+              </Link>
+            </div>
+          ) : (
+            <Button className="px-5" onClick={onSignIn}>
+              Sign in to unlock your workspace
+            </Button>
+          )}
+        </div>
+      </Panel>
+    </section>
+  );
 }
 
 function HomepageNav({

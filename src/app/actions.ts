@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { buildAuthCallbackUrl, buildAuthConfigErrorPath } from "@/lib/auth";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
 import { buildMatchedBriefing, persistRawArticles, syncEventClusters, syncTopicMatches } from "@/lib/data";
@@ -69,7 +70,7 @@ async function requireActionSession(unauthenticatedRedirect: string, route: stri
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    redirect(unauthenticatedRedirect);
+    redirect(buildAuthConfigErrorPath());
   }
 
   try {
@@ -162,7 +163,7 @@ export async function requestMagicLinkAction(formData: FormData) {
   const email = z.string().email().parse(formData.get("email"));
 
   if (!isSupabaseConfigured) {
-    redirect("/?demo=1");
+    redirect(buildAuthConfigErrorPath());
   }
 
   const supabase = await createSupabaseServerClient();
@@ -171,7 +172,7 @@ export async function requestMagicLinkAction(formData: FormData) {
     await supabase?.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${env.appUrl}/auth/callback`,
+        emailRedirectTo: buildAuthCallbackUrl({ origin: env.appUrl }),
       },
     });
   } catch (error) {
@@ -193,7 +194,7 @@ export async function signUpWithPasswordAction(formData: FormData) {
   });
 
   if (!isSupabaseConfigured) {
-    redirect("/?demo=1");
+    redirect(buildAuthConfigErrorPath());
   }
 
   const supabase = await createSupabaseServerClient();
@@ -206,7 +207,7 @@ export async function signUpWithPasswordAction(formData: FormData) {
       email,
       password,
       options: {
-        emailRedirectTo: `${env.appUrl}/auth/callback`,
+        emailRedirectTo: buildAuthCallbackUrl({ origin: env.appUrl }),
       },
     })
     .catch((error) => {
@@ -243,7 +244,7 @@ export async function signInWithPasswordAction(formData: FormData) {
   });
 
   if (!isSupabaseConfigured) {
-    redirect("/?demo=1");
+    redirect(buildAuthConfigErrorPath());
   }
 
   const supabase = await createSupabaseServerClient();
@@ -279,7 +280,7 @@ export async function signInWithPasswordAction(formData: FormData) {
 
 export async function signOutAction() {
   if (!isSupabaseConfigured) {
-    redirect("/");
+    redirect(buildAuthConfigErrorPath());
   }
 
   const supabase = await createSupabaseServerClient();

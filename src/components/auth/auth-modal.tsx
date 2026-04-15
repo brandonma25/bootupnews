@@ -2,6 +2,8 @@
 import { useMemo, useState } from "react";
 
 import { SubmitButton } from "@/components/submit-button";
+import { buildAuthCallbackUrl } from "@/lib/auth";
+import { isSupabaseConfigured } from "@/lib/env";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -14,6 +16,10 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
   const [googlePending, setGooglePending] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const redirectTo = useMemo(() => getGoogleRedirectTo("/dashboard"), []);
+  const authConfigured = isSupabaseConfigured;
+  const configErrorMessage = authConfigured
+    ? null
+    : "Authentication is not configured for this environment yet. Add the public Supabase URL and anon key before using sign-in.";
   const visibleError = googleError ?? errorMessage ?? null;
 
   if (!open) return null;
@@ -29,7 +35,7 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
 
     if (!supabase) {
       const message =
-        "Google sign-in is not configured on this deployment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to the Vercel Preview environment, then redeploy.";
+        "Google sign-in is not configured on this deployment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then reload this environment.";
       console.error("[auth] Google OAuth cannot start because public Supabase env vars are missing", {
         redirectTo,
       });
@@ -133,8 +139,14 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           </div>
         ) : null}
 
+        {configErrorMessage ? (
+          <div className="mb-4 rounded-xl border border-[rgba(154,52,18,0.18)] bg-[rgba(154,52,18,0.08)] px-4 py-3 text-sm leading-6 text-[var(--foreground)]">
+            {configErrorMessage}
+          </div>
+        ) : null}
+
         <div className="space-y-3">
-          <GoogleAuthButton pending={googlePending} onClick={handleGoogleSignIn} />
+          <GoogleAuthButton pending={googlePending} onClick={handleGoogleSignIn} disabled={!authConfigured} />
           <p className="text-xs leading-5 text-[var(--muted)]">
             Google uses a full-page redirect flow. Redirect target for this page: <span className="font-medium text-[var(--foreground)]">{redirectTo}</span>
           </p>
@@ -157,6 +169,7 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
               type="email"
               autoComplete="email"
               required
+              disabled={!authConfigured}
               className="w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--foreground)]"
               placeholder="you@example.com"
             />
@@ -172,6 +185,7 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
               type="password"
               autoComplete="current-password"
               required
+              disabled={!authConfigured}
               minLength={8}
               className="w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--foreground)]"
               placeholder="At least 8 characters"
@@ -179,8 +193,8 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <EmailAuthButton mode="signin" idleLabel="Sign in with email" pendingLabel="Signing in..." />
-            <EmailAuthButton mode="signup" idleLabel="Create account" pendingLabel="Creating account..." />
+            <EmailAuthButton mode="signin" idleLabel="Sign in with email" pendingLabel="Signing in..." disabled={!authConfigured} />
+            <EmailAuthButton mode="signup" idleLabel="Create account" pendingLabel="Creating account..." disabled={!authConfigured} />
           </div>
         </form>
 
@@ -196,12 +210,20 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
   );
 }
 
-function GoogleAuthButton({ pending, onClick }: { pending: boolean; onClick: () => void }) {
+function GoogleAuthButton({
+  pending,
+  onClick,
+  disabled,
+}: {
+  pending: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={pending}
+      disabled={pending || disabled}
       className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--line-strong)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-medium text-[var(--foreground)] transition hover:translate-y-[-1px] disabled:translate-y-0 disabled:opacity-70"
     >
       <GoogleMark />
@@ -212,20 +234,22 @@ function GoogleAuthButton({ pending, onClick }: { pending: boolean; onClick: () 
 
 function getGoogleRedirectTo(next: string) {
   if (typeof window !== "undefined") {
-    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    return buildAuthCallbackUrl({ origin: window.location.origin, next });
   }
 
-  return `http://localhost:3000/auth/callback?next=${encodeURIComponent(next)}`;
+  return buildAuthCallbackUrl({ next });
 }
 
 function EmailAuthButton({
   mode,
   idleLabel,
   pendingLabel,
+  disabled = false,
 }: {
   mode: "signin" | "signup";
   idleLabel: string;
   pendingLabel: string;
+  disabled?: boolean;
 }) {
   return (
     <SubmitButton
@@ -235,6 +259,7 @@ function EmailAuthButton({
       className="w-full rounded-xl px-4 py-3"
       name="mode"
       value={mode}
+      disabled={disabled}
     />
   );
 }
