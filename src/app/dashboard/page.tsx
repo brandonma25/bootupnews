@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
 import { isAiConfigured } from "@/lib/env";
+import { compareBriefingItemsByRanking } from "@/lib/ranking";
 import { formatBriefingDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -24,21 +25,16 @@ export default async function DashboardPage({
   const params = await searchParams;
   const data = await getDashboardData();
   const viewer = await getViewerAccount();
+  const rankedItems = data.briefing.items.slice().sort(compareBriefingItemsByRanking);
 
-  // Deduplicate: top-priority items shown in priority scan, not repeated in topic sections
-  const topEvents = data.briefing.items.filter((item) => item.priority === "top");
+  // Keep dashboard ordering tied to the same ranking activation logic used by the homepage.
+  const topEvents = rankedItems.slice(0, 5);
   const topEventIds = new Set(topEvents.map((item) => item.id));
   const grouped = data.topics.map((topic) => ({
     topic,
-    items: data.briefing.items
+    items: rankedItems
       .filter((item) => item.topicId === topic.id && !topEventIds.has(item.id))
-      .sort((left, right) => {
-        const scoreDelta = (right.matchScore ?? 0) - (left.matchScore ?? 0);
-        if (scoreDelta !== 0) return scoreDelta;
-        const rightPublished = right.publishedAt ? new Date(right.publishedAt).getTime() : 0;
-        const leftPublished = left.publishedAt ? new Date(left.publishedAt).getTime() : 0;
-        return rightPublished - leftPublished;
-      }),
+      .sort(compareBriefingItemsByRanking),
   }));
 
   const allRead = data.briefing.items.length > 0 && data.briefing.items.every((item) => item.read);

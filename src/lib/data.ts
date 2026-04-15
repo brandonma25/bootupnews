@@ -6,7 +6,10 @@ import { buildEventIntelligence } from "@/lib/event-intelligence";
 import { countSourcesByHomepageCategory } from "@/lib/homepage-taxonomy";
 import { logServerEvent } from "@/lib/observability";
 import { selectRelatedCoverage } from "@/lib/related-coverage";
-import { rankNewsClusters } from "@/lib/ranking";
+import {
+  compareBriefingItemsByRanking,
+  rankNewsClusters,
+} from "@/lib/ranking";
 import { clusterArticles, fetchFeedArticles, type FeedArticle } from "@/lib/rss";
 import { withServerFallback } from "@/lib/server-safety";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
@@ -339,7 +342,8 @@ export async function generateDailyBriefing(
     .flat()
     .filter((item): item is NonNullable<typeof item> => item !== null)
     .filter((item) => item.eventIntelligence?.isHighSignal ?? true)
-    .sort((left, right) => (right.importanceScore ?? 0) - (left.importanceScore ?? 0))
+    // Keep public/demo briefing order aligned with the ranked event model used elsewhere.
+    .sort(compareBriefingItemsByRanking)
     .map((item, index) => ({
       ...item,
       priority: index < 5 ? ("top" as const) : ("normal" as const),
@@ -749,13 +753,8 @@ export async function buildMatchedBriefing(
       } satisfies BriefingItem;
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .sort((left, right) => {
-      const scoreDelta = (right.importanceScore ?? right.matchScore ?? 0) - (left.importanceScore ?? left.matchScore ?? 0);
-      if (scoreDelta !== 0) return scoreDelta;
-      const rightPublished = right.publishedAt ? new Date(right.publishedAt).getTime() : 0;
-      const leftPublished = left.publishedAt ? new Date(left.publishedAt).getTime() : 0;
-      return rightPublished - leftPublished;
-    })
+    // Product ordering should follow the same ranking activation rules everywhere.
+    .sort(compareBriefingItemsByRanking)
     .map((item, index) => ({
       ...item,
       priority: index < 5 ? ("top" as const) : ("normal" as const),
@@ -1098,9 +1097,10 @@ function buildKeyPoints(
 
 function buildSignalBreakdown(intelligence: NonNullable<BriefingItem["eventIntelligence"]>) {
   return [
-    `${intelligence.signals.articleCount} ${intelligence.signals.articleCount === 1 ? "article" : "articles"} in cluster.`,
-    `${intelligence.signals.sourceDiversity} ${intelligence.signals.sourceDiversity === 1 ? "source" : "sources"} confirmed.`,
-  ];
+    `Covered by ${intelligence.signals.articleCount} ${intelligence.signals.articleCount === 1 ? "article" : "articles"}.`,
+    `Seen across ${intelligence.signals.sourceDiversity} ${intelligence.signals.sourceDiversity === 1 ? "source" : "sources"}.`,
+    intelligence.signals.velocityScore >= 70 ? "Rapidly developing story." : null,
+  ].filter((value): value is string => Boolean(value));
 }
 
 function getImportanceLabel(score: number | undefined) {
