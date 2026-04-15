@@ -3,6 +3,7 @@ import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
 import { toggleReadAction } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
+import { getArticleRationale } from "@/lib/article-rationale";
 import type { BriefingItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { minutesToLabel } from "@/lib/utils";
@@ -11,6 +12,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
   const primarySourceUrl = item.sources.find((source) => isValidStoryUrl(source.url))?.url;
   const sourceCount = item.sourceCount ?? item.sources.length;
   const relatedCoverage = item.relatedArticles?.length ? item.relatedArticles : null;
+  const rationale = getArticleRationale(item);
 
   return (
     <Panel className={cn("p-6 transition-opacity", item.read && "opacity-50 hover:opacity-80")}>
@@ -59,11 +61,14 @@ export function StoryCard({ item }: { item: BriefingItem }) {
               <p className="mt-1.5 text-sm font-medium text-[var(--muted)]">
                 {minutesToLabel(item.estimatedMinutes)}
               </p>
-              {item.matchedKeywords?.length ? (
-                <p className="mt-2 text-sm font-medium text-[var(--accent)]">
-                  Matched on: {item.matchedKeywords.join(", ")}
-                </p>
-              ) : null}
+              <p
+                className={cn(
+                  "mt-2 text-sm font-medium",
+                  rationale.kind === "keyword" ? "text-[var(--accent)]" : "text-[var(--muted)]",
+                )}
+              >
+                {rationale.text}
+              </p>
             </div>
           </div>
 

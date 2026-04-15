@@ -8,6 +8,7 @@ import AuthModal from "@/components/auth/auth-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { getArticleRationale } from "@/lib/article-rationale";
 import type { BriefingItem, DashboardData, Source, ViewerAccount } from "@/lib/types";
 import { cn, formatBriefingDate, minutesToLabel } from "@/lib/utils";
 
@@ -470,6 +471,7 @@ function EventCard({
   const emphatic = variant === "featured" || variant === "ranked-featured";
   const compact = variant === "compact";
   const list = variant === "list";
+  const rationale = getArticleRationale(event);
 
   return (
     <div className="space-y-4">
@@ -510,6 +512,14 @@ function EventCard({
         </h3>
         <p className={cn("mt-3 text-[var(--muted)]", emphatic ? "text-sm leading-7 lg:text-[15px]" : "text-sm leading-6")}>
           {event.summary}
+        </p>
+        <p
+          className={cn(
+            "mt-2 text-sm font-medium",
+            rationale.kind === "keyword" ? "text-[#294f86]" : "text-[var(--muted)]",
+          )}
+        >
+          {rationale.text}
         </p>
       </div>
 
