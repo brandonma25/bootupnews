@@ -10,6 +10,7 @@ import {
 } from "@/lib/habit-loop";
 import { countSourcesByHomepageCategory } from "@/lib/homepage-taxonomy";
 import { logServerEvent } from "@/lib/observability";
+import { calculateReadingWindow, formatReadingWindow, parseReadingWindowMinutes } from "@/lib/reading-window";
 import { selectRelatedCoverage } from "@/lib/related-coverage";
 import { rankNewsClusters } from "@/lib/ranking";
 import { clusterArticles, fetchFeedArticles, type FeedArticle } from "@/lib/rss";
@@ -77,12 +78,14 @@ type UserEventStateRow = {
 };
 
 function createEmptyBriefing(): DailyBriefing {
+  const readingMetrics = calculateReadingWindow([]);
+
   return {
     id: `generated-empty-${Date.now()}`,
     briefingDate: formatISO(new Date()),
     title: "Today's Briefing",
     intro: "No clustered events yet for your current topics. Try adjusting keywords or refreshing your briefing.",
-    readingWindow: "0 minutes",
+    readingWindow: formatReadingWindow(readingMetrics.totalMinutes),
     items: [],
     sessionSummary: {
       reviewedCount: 0,
@@ -90,6 +93,7 @@ function createEmptyBriefing(): DailyBriefing {
       changedCount: 0,
       escalatedCount: 0,
     },
+    readingMetrics,
   };
 }
 
@@ -214,6 +218,9 @@ export async function getDashboardData(): Promise<DashboardData> {
   await syncEventClusters(supabase, user.id, topics, sources);
 
   const briefing = await buildMatchedBriefing(supabase, user.id, topics, sources);
+  const priorReadingWindow = await getPreviousReadingWindow(supabase, user.id, briefing.briefingDate);
+  briefing.readingMetrics = calculateReadingWindow(briefing.items, priorReadingWindow);
+  briefing.readingWindow = formatReadingWindow(briefing.readingMetrics.totalMinutes);
   const homepageDiagnostics = await buildHomepageDiagnostics(supabase, user.id, sources);
 
   return {
@@ -227,6 +234,12 @@ export async function getDashboardData(): Promise<DashboardData> {
 
 async function getPublicDashboardData(): Promise<DashboardData> {
   const briefing = await generateDailyBriefing(demoTopics, demoSources);
+  const yesterday = demoHistory.find((entry) => entry.id === "briefing-yesterday") ?? demoHistory[1];
+  briefing.readingMetrics = calculateReadingWindow(
+    briefing.items,
+    parseReadingWindowMinutes(yesterday?.readingWindow),
+  );
+  briefing.readingWindow = formatReadingWindow(briefing.readingMetrics.totalMinutes);
 
   return {
     mode: "public",
@@ -283,33 +296,38 @@ export async function getHistory() {
 
   return data.map(
     (briefing): DailyBriefing => ({
+      ...(function () {
+        const items =
+          briefing.briefing_items?.map((item) => ({
+            id: item.id,
+            topicId: item.topic_id,
+            topicName: item.topic_name,
+            title: item.title,
+            whatHappened: item.what_happened,
+            keyPoints: item.key_points as [string, string, string],
+            whyItMatters: item.why_it_matters,
+            sources: (item.sources as Array<{ title: string; url: string }>) ?? [],
+            sourceCount: ((item.sources as Array<{ title: string; url: string }>) ?? []).length,
+            estimatedMinutes: item.estimated_minutes,
+            read: item.is_read,
+            priority: item.priority,
+            matchedKeywords: extractMatchedKeywords(item.key_points as string[]),
+            importanceScore: undefined,
+            importanceLabel: undefined,
+            rankingSignals: [],
+          })) ?? [];
+        const readingMetrics = calculateReadingWindow(items);
+
+        return {
+          items,
+          readingMetrics,
+          readingWindow: formatReadingWindow(readingMetrics.totalMinutes),
+        };
+      })(),
       id: briefing.id,
       briefingDate: briefing.briefing_date,
       title: briefing.title,
       intro: briefing.intro,
-      items:
-        briefing.briefing_items?.map((item) => ({
-          id: item.id,
-          topicId: item.topic_id,
-          topicName: item.topic_name,
-          title: item.title,
-          whatHappened: item.what_happened,
-          keyPoints: item.key_points as [string, string, string],
-          whyItMatters: item.why_it_matters,
-          sources: (item.sources as Array<{ title: string; url: string }>) ?? [],
-          sourceCount: ((item.sources as Array<{ title: string; url: string }>) ?? []).length,
-          estimatedMinutes: item.estimated_minutes,
-          read: item.is_read,
-          priority: item.priority,
-          matchedKeywords: extractMatchedKeywords(item.key_points as string[]),
-          importanceScore: undefined,
-          importanceLabel: undefined,
-          rankingSignals: [],
-        })) ?? [],
-      readingWindow: deriveReadingWindow(
-        briefing.briefing_items?.map((item) => item.estimated_minutes) ?? [],
-        briefing.reading_window,
-      ),
     }),
   );
 }
@@ -390,15 +408,16 @@ export async function generateDailyBriefing(
       : createEmptyBriefing();
   }
 
-  const totalMinutes = validItems.reduce((sum, item) => sum + item.estimatedMinutes, 0);
+  const readingMetrics = calculateReadingWindow(validItems);
 
   return {
     id: `generated-${Date.now()}`,
     briefingDate: formatISO(new Date()),
     title: "Daily Executive Briefing",
     intro: "A concise scan of the events most likely to affect decisions today.",
-    readingWindow: `${totalMinutes} minutes`,
+    readingWindow: formatReadingWindow(readingMetrics.totalMinutes),
     items: validItems,
+    readingMetrics,
   };
 }
 
@@ -809,15 +828,46 @@ export async function buildMatchedBriefing(
     };
   });
 
+  const readingMetrics = calculateReadingWindow(items);
+
   return {
     id: `generated-${Date.now()}`,
     briefingDate: formatISO(new Date()),
     title: "Today's Briefing",
     intro: "Related reporting is clustered into events so you can scan developments instead of isolated articles.",
-    readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
+    readingWindow: formatReadingWindow(readingMetrics.totalMinutes),
     items,
     sessionSummary: summarizeSessionStates(items),
+    readingMetrics,
   };
+}
+
+async function getPreviousReadingWindow(
+  supabase: SupabaseServerClient,
+  userId: string,
+  briefingDate: string,
+) {
+  const currentDate = briefingDate.slice(0, 10);
+  const result = await supabase
+    .from("daily_briefings")
+    .select("reading_window, briefing_date")
+    .eq("user_id", userId)
+    .lt("briefing_date", currentDate)
+    .order("briefing_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (result.error) {
+    logServerEvent("warn", "Previous reading window lookup failed", {
+      route: "/dashboard",
+      userId,
+      briefingDate: currentDate,
+      errorMessage: result.error.message,
+    });
+    return null;
+  }
+
+  return parseReadingWindowMinutes(result.data?.reading_window);
 }
 
 export async function persistRawArticles(
@@ -1247,9 +1297,4 @@ function createArticleDedupeKey(title: string, url: string) {
   return createHash("sha256")
     .update(`${title.trim().toLowerCase()}::${url.trim().toLowerCase()}`)
     .digest("hex");
-}
-
-function deriveReadingWindow(estimatedMinutes: number[], fallback: string) {
-  const totalMinutes = estimatedMinutes.reduce((sum, minutes) => sum + minutes, 0);
-  return totalMinutes > 0 ? `${totalMinutes} minutes` : fallback;
 }

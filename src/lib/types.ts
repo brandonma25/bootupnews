@@ -79,6 +79,19 @@ export type DailyBriefing = {
     changedCount: number;
     escalatedCount: number;
   };
+  readingMetrics?: ReadingWindowMetrics;
+};
+
+export type ReadingWindowIntensity = "Light" | "Normal" | "Heavy";
+
+export type ReadingWindowMetrics = {
+  totalMinutes: number;
+  completedMinutes: number;
+  remainingMinutes: number;
+  progressRatio: number;
+  progressLabel: string;
+  deltaVsYesterday: number | null;
+  intensity: ReadingWindowIntensity;
 };
 
 export type DashboardData = {

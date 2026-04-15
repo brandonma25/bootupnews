@@ -11,6 +11,7 @@ import { Panel } from "@/components/ui/panel";
 import { getDisplayStateLabel, getDisplayStateTone } from "@/lib/habit-loop";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
 import { isAiConfigured } from "@/lib/env";
+import { formatReadingDelta, formatReadingWindow } from "@/lib/reading-window";
 import { formatBriefingDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -48,6 +49,7 @@ export default async function DashboardPage({
   const canTrackProgress = data.mode === "live" && trackableItems.length > 0;
   const isCaughtUp = canTrackProgress && trackableItems.every((item) => item.read);
   const sessionSummary = data.briefing.sessionSummary;
+  const readingMetrics = data.briefing.readingMetrics;
   const serializedEventStates = JSON.stringify(
     trackableItems.map((item) => ({
       eventKey: item.continuityKey,
@@ -66,6 +68,7 @@ export default async function DashboardPage({
           aside={
             <ManualRefreshTrigger
               readingWindow={data.briefing.readingWindow}
+              readingMetrics={readingMetrics}
               isAiConfigured={isAiConfigured}
             />
           }
@@ -81,6 +84,51 @@ export default async function DashboardPage({
           <div className="rounded-[22px] border border-[var(--line)] bg-white/70 px-5 py-4 text-sm font-medium text-[var(--foreground)]">
             All events marked as read.
           </div>
+        ) : null}
+
+        {readingMetrics ? (
+          <Panel className="p-5">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                  Reading window
+                </p>
+                <div className="mt-2 flex flex-wrap items-end gap-3">
+                  <h2 className="text-4xl font-semibold tracking-tight text-[var(--foreground)]">
+                    {formatReadingWindow(readingMetrics.totalMinutes)}
+                  </h2>
+                  <p className="pb-1 text-sm font-medium text-[var(--muted)]">
+                    today
+                  </p>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Badge>{formatReadingDelta(readingMetrics.deltaVsYesterday)}</Badge>
+                  <Badge>{readingMetrics.intensity} day</Badge>
+                </div>
+              </div>
+              <div className="min-w-0 xl:w-[360px]">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <p className="font-medium text-[var(--foreground)]">
+                    {readingMetrics.progressLabel}
+                  </p>
+                  <p className="text-[var(--muted)]">
+                    {Math.round(readingMetrics.progressRatio * 100)}%
+                  </p>
+                </div>
+                <div className="mt-3 h-3 overflow-hidden rounded-full bg-[rgba(31,79,70,0.08)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+                    style={{ width: `${Math.round(readingMetrics.progressRatio * 100)}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  {readingMetrics.remainingMinutes === 0
+                    ? "All reading minutes for today are complete."
+                    : `${readingMetrics.remainingMinutes} min remaining in today’s scan.`}
+                </p>
+              </div>
+            </div>
+          </Panel>
         ) : null}
 
         {sessionSummary ? (

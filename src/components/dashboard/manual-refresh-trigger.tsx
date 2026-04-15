@@ -6,13 +6,16 @@ import { useFormStatus } from "react-dom";
 
 import { generateBriefingAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
+import type { ReadingWindowMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function ManualRefreshTrigger({
   readingWindow,
+  readingMetrics,
   isAiConfigured,
 }: {
   readingWindow: string;
+  readingMetrics?: ReadingWindowMetrics;
   isAiConfigured: boolean;
 }) {
   return (
@@ -24,6 +27,11 @@ export function ManualRefreshTrigger({
         <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">
           {readingWindow}
         </p>
+        {readingMetrics ? (
+          <p className="mt-1 text-xs font-medium text-[var(--muted)]">
+            {readingMetrics.progressLabel}
+          </p>
+        ) : null}
       </div>
       {isAiConfigured ? (
         <form action={generateBriefingAction}>

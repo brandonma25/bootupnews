@@ -162,6 +162,38 @@ When updating this file:
 - Repository-wide `npm run lint` still reports pre-existing React hook lint errors in `src/components/app-shell.tsx` and `src/components/settings-preferences.tsx`, which are unrelated to this PRD work.
 - Public/demo mode still lacks a localStorage-backed continuity implementation; live/authenticated mode is the completed path in this branch.
 
+### [2026-04-16 00:11] — PRD 6 Reading Window Anchor
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- The dashboard showed a raw reading window string, but not as a behavioral anchor. Users could not clearly see daily load, completion progress, or how today compared with yesterday.
+
+**Root cause:**
+- Reading time existed only as per-item `estimatedMinutes` and a simple briefing-level string.
+- There was no shared metric layer converting PRD 5 read state into a progress-oriented reading window model.
+
+**Change made:**
+- Added a shared `reading-window` helper that deterministically computes per-event reading time from content length with a stable fallback, aggregates total/completed/remaining minutes, calculates progress ratio, parses prior reading-window history, and interprets day load as `Light`, `Normal`, or `Heavy` using configurable constants.
+- Wired the dashboard data layer to compute reading metrics from existing PRD 5 `read` state and compare the current briefing against the latest prior saved briefing without introducing any new tracking system.
+- Updated the dashboard UI so reading time is shown as a top anchor metric with total minutes, delta vs yesterday, day intensity, progress text, and a progress bar, while leaving PRD 5 completion messaging unchanged.
+- Extended the refresh card to echo progress in the compact reading-window module.
+- Added unit tests for deterministic time calculation, progress aggregation, delta formatting, parsing, and intensity thresholds.
+
+**Files modified:**
+- `src/lib/types.ts`
+- `src/lib/reading-window.ts`
+- `src/lib/reading-window.test.ts`
+- `src/lib/data.ts`
+- `src/app/dashboard/page.tsx`
+- `src/components/dashboard/manual-refresh-trigger.tsx`
+- `PROJECT.md`
+
+**Remaining risks / next steps:**
+- Public/demo mode compares against sample history only; live accuracy for day-over-day comparison still depends on users having at least one prior saved briefing.
+- Repository-wide `npm run lint` still includes unrelated pre-existing React hook lint errors outside this PRD scope.
+
 ---
 
 ## 8. NEXT ACTION (FOCUS)
