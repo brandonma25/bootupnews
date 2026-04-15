@@ -136,6 +136,26 @@ describe("buildHomepageViewModel", () => {
     expect(financeSection?.placeholderCount).toBe(1);
   });
 
+  it("borrows early signals when a category has no confirmed fallback coverage", () => {
+    const earlySignal = createItem({
+      id: "early-tech",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Single-source AI infrastructure update",
+      whatHappened: "A single source reported a new AI infrastructure buildout.",
+      whyItMatters: "It may influence platform capacity planning.",
+      sourceCount: 1,
+      sources: [{ title: "TechCrunch", url: "https://techcrunch.com/example" }],
+      matchedKeywords: ["ai", "infrastructure", "chips"],
+    });
+
+    const model = buildHomepageViewModel(createData([earlySignal]));
+    const financeSection = model.categorySections.find((section) => section.key === "finance");
+
+    expect(financeSection?.fallbackEvents.map((event) => event.id)).toContain("early-tech");
+    expect(financeSection?.emptyReason).toContain("best available ranked coverage");
+  });
+
   it("keeps single-source items out of the top-ranked event rail", () => {
     const earlySignal = createItem({
       id: "early-1",

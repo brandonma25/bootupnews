@@ -13,6 +13,15 @@ export type FeedArticle = {
 };
 
 const parser = new Parser();
+const DEFAULT_FEED_TIMEOUT_MS = 8_000;
+const DEFAULT_FEED_RETRY_COUNT = 1;
+
+type FeedRequestOptions = {
+  sourceName: string;
+  timeoutMs?: number;
+  retryCount?: number;
+  headers?: HeadersInit;
+};
 
 export async function fetchFeedArticles(feedUrl: string, sourceName: string) {
   if (feedUrl.startsWith("thenewsapi://")) {
@@ -23,19 +32,23 @@ export async function fetchFeedArticles(feedUrl: string, sourceName: string) {
     return fetchLegacyNewsApiArticles(feedUrl, sourceName);
   }
 
-  const response = await fetch(feedUrl, {
-    next: { revalidate: 900 },
+  const response = await requestFeed(feedUrl, {
+    sourceName,
     headers: {
       "User-Agent": "Daily-Intelligence-Aggregator/1.0",
     },
   });
 
-  if (!response.ok) {
-    throw new Error(`Feed request failed for ${sourceName}`);
-  }
-
   const xml = await response.text();
-  const feed = await parser.parseString(xml);
+  let feed;
+
+  try {
+    feed = await parser.parseString(xml);
+  } catch (error) {
+    throw new Error(
+      `Feed parsing failed for ${sourceName}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 
   return (feed.items ?? []).slice(0, 15).map<FeedArticle>((item, index) => ({
     title: item.title?.trim() || `Untitled article ${index + 1}`,
@@ -61,16 +74,12 @@ export async function fetchApiArticles(feedUrl: string, sourceName: string) {
   url.searchParams.set("language", url.searchParams.get("language") ?? "en");
   url.searchParams.set("limit", url.searchParams.get("limit") ?? "15");
 
-  const response = await fetch(url.toString(), {
-    next: { revalidate: 900 },
+  const response = await requestFeed(url.toString(), {
+    sourceName,
     headers: {
       "User-Agent": "Daily-Intelligence-Aggregator/1.0",
     },
   });
-
-  if (!response.ok) {
-    throw new Error(`TheNewsAPI request failed for ${sourceName}`);
-  }
 
   const payload = await response.json();
 
@@ -103,17 +112,13 @@ async function fetchLegacyNewsApiArticles(feedUrl: string, sourceName: string) {
   url.searchParams.set("pageSize", url.searchParams.get("pageSize") ?? "15");
   url.searchParams.set("language", url.searchParams.get("language") ?? "en");
 
-  const response = await fetch(url.toString(), {
-    next: { revalidate: 900 },
+  const response = await requestFeed(url.toString(), {
+    sourceName,
     headers: {
       "X-Api-Key": env.newsApiKey,
       "User-Agent": "Daily-Intelligence-Aggregator/1.0",
     },
   });
-
-  if (!response.ok) {
-    throw new Error(`NewsAPI request failed for ${sourceName}`);
-  }
 
   const payload = await response.json();
 
@@ -183,4 +188,87 @@ function similarity(left: string[], right: string[]) {
   const overlap = [...leftSet].filter((word) => rightSet.has(word)).length;
   const union = new Set([...leftSet, ...rightSet]).size;
   return union === 0 ? 0 : overlap / union;
+}
+
+async function requestFeed(url: string, options: FeedRequestOptions) {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_FEED_TIMEOUT_MS;
+  const retryCount = options.retryCount ?? DEFAULT_FEED_RETRY_COUNT;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        {
+          next: { revalidate: 900 },
+          headers: options.headers,
+        },
+        timeoutMs,
+      );
+
+      if (!response.ok) {
+        const error = new Error(
+          `Feed request failed for ${options.sourceName} with status ${response.status}`,
+        );
+
+        if (attempt < retryCount && isRetryableStatus(response.status)) {
+          lastError = error;
+          continue;
+        }
+
+        throw error;
+      }
+
+      return response;
+    } catch (error) {
+      const normalized = normalizeFeedRequestError(error, options.sourceName, timeoutMs);
+      lastError = normalized;
+
+      if (attempt < retryCount && isRetryableFetchError(error)) {
+        continue;
+      }
+
+      throw normalized;
+    }
+  }
+
+  throw lastError ?? new Error(`Feed request failed for ${options.sourceName}`);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function isRetryableStatus(status: number) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function isRetryableFetchError(error: unknown) {
+  if (error instanceof Error) {
+    return error.name === "AbortError" || /fetch failed/i.test(error.message);
+  }
+
+  return false;
+}
+
+function normalizeFeedRequestError(error: unknown, sourceName: string, timeoutMs: number) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return new Error(`Feed request timed out for ${sourceName} after ${timeoutMs}ms`);
+  }
+
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(`Feed request failed for ${sourceName}: ${String(error)}`);
 }

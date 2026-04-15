@@ -67,6 +67,32 @@ type EventCluster = {
   sources: EventSeedArticle[];
 };
 
+type SourceFetchAttempt = {
+  label: string;
+  feedUrl: string;
+  kind: "primary" | "fallback";
+};
+
+type SourceFetchFailure = SourceFetchAttempt & {
+  errorMessage: string;
+};
+
+type SourceFetchResult = {
+  source: Source;
+  articles: FeedArticle[];
+  failures: SourceFetchFailure[];
+  usedFallback: boolean;
+  successfulAttempt?: SourceFetchAttempt;
+};
+
+type IngestionRunSummary = {
+  activeSourceCount: number;
+  successfulSourceCount: number;
+  failedSourceCount: number;
+  fallbackSourceCount: number;
+  degradedSourceNames: string[];
+};
+
 function createEmptyBriefing(): DailyBriefing {
   return {
     id: `generated-empty-${Date.now()}`,
@@ -194,12 +220,17 @@ export async function getDashboardData(): Promise<DashboardData> {
       createdAt: source.created_at,
     })) ?? [];
 
-  await persistRawArticles(supabase, user.id, sources, "/dashboard");
+  const ingestionSummary = await persistRawArticles(supabase, user.id, sources, "/dashboard");
   await syncTopicMatches(supabase, user.id, topics);
   await syncEventClusters(supabase, user.id, topics, sources);
 
   const briefing = await buildMatchedBriefing(supabase, user.id, topics, sources);
-  const homepageDiagnostics = await buildHomepageDiagnostics(supabase, user.id, sources);
+  const homepageDiagnostics = await buildHomepageDiagnostics(
+    supabase,
+    user.id,
+    sources,
+    ingestionSummary,
+  );
 
   return {
     mode: "live",
@@ -223,6 +254,9 @@ async function getPublicDashboardData(): Promise<DashboardData> {
       totalCandidateEvents: briefing.items.length,
       lastSuccessfulFetchTime: briefing.briefingDate,
       lastRankingRunTime: briefing.briefingDate,
+      failedSourceCount: 0,
+      fallbackSourceCount: 0,
+      degradedSourceNames: [],
       sourceCountsByCategory: countSourcesByHomepageCategory(demoSources),
     },
   };
@@ -306,13 +340,10 @@ export async function generateDailyBriefing(
   const items = await Promise.all(
     topics.map(async (topic, index) => {
       const topicSources = sources.filter((source) => source.topicId === topic.id && source.status === "active");
-      const feedArticles = await Promise.allSettled(
-        topicSources.map((source) => fetchFeedArticles(source.feedUrl, source.name)),
+      const sourceResults = await Promise.all(
+        topicSources.map((source) => fetchSourceArticlesWithFallback(source)),
       );
-
-      const articles = feedArticles.flatMap((result) =>
-        result.status === "fulfilled" ? result.value : [],
-      );
+      const articles = sourceResults.flatMap((result) => result.articles);
 
       if (!articles.length) {
         return null;
@@ -387,20 +418,6 @@ export async function syncTopicMatches(
   }
 
   const articles = articleResult.data ?? [];
-  const articleIds = articles.map((article) => article.id);
-
-  if (articleIds.length) {
-    const deleteResult = await supabase.from("article_topics").delete().in("article_id", articleIds);
-    if (deleteResult.error) {
-      logServerEvent("warn", "Topic matching cleanup failed", {
-        route: "/dashboard",
-        userId,
-        errorMessage: deleteResult.error.message,
-      });
-      return;
-    }
-  }
-
   if (!articles.length || !topics.length) {
     return;
   }
@@ -427,7 +444,27 @@ export async function syncTopicMatches(
   );
 
   if (!rows.length) {
+    logServerEvent("warn", "Topic matching preserved previous matches because recompute returned no rows", {
+      route: "/dashboard",
+      userId,
+      articleCount: articles.length,
+      topicCount: topics.length,
+    });
     return;
+  }
+
+  const articleIds = articles.map((article) => article.id);
+
+  if (articleIds.length) {
+    const deleteResult = await supabase.from("article_topics").delete().in("article_id", articleIds);
+    if (deleteResult.error) {
+      logServerEvent("warn", "Topic matching cleanup failed", {
+        route: "/dashboard",
+        userId,
+        errorMessage: deleteResult.error.message,
+      });
+      return;
+    }
   }
 
   const insertResult = await supabase.from("article_topics").insert(rows);
@@ -496,6 +533,17 @@ export async function syncEventClusters(
     })
     .filter((article): article is EventSeedArticle => Boolean(article));
 
+  if (!seededArticles.length) {
+    logServerEvent("warn", "Event clustering preserved previous events because no seeded articles were available", {
+      route: "/dashboard",
+      userId,
+      articleCount: articles.length,
+      matchCount: matches.length,
+      topicCount: topics.length,
+    });
+    return;
+  }
+
   const clearArticleEvents = await supabase
     .from("articles")
     .update({ event_id: null })
@@ -520,11 +568,6 @@ export async function syncEventClusters(
     });
     return;
   }
-
-  if (!seededArticles.length) {
-    return;
-  }
-
   const groupedByTopic = new Map<string, EventSeedArticle[]>();
   seededArticles.forEach((article) => {
     const group = groupedByTopic.get(article.topicId) ?? [];
@@ -787,42 +830,62 @@ export async function persistRawArticles(
       route,
       userId,
     });
-    return;
+    return {
+      activeSourceCount: 0,
+      successfulSourceCount: 0,
+      failedSourceCount: 0,
+      fallbackSourceCount: 0,
+      degradedSourceNames: [],
+    } satisfies IngestionRunSummary;
   }
 
-  const fetchedResults = await Promise.allSettled(
-    activeSources.map(async (source) => {
-      const articles = await fetchFeedArticles(source.feedUrl, source.name);
-      return { source, articles };
-    }),
+  const fetchedResults = await Promise.all(
+    activeSources.map((source) => fetchSourceArticlesWithFallback(source)),
   );
 
-  const failedFetches = fetchedResults.filter((result) => result.status === "rejected");
-  failedFetches.forEach((result, index) => {
-    logServerEvent("warn", "Source fetch failed during raw article persistence", {
-      route,
-      userId,
-      failureIndex: index,
-      errorMessage: result.reason instanceof Error ? result.reason.message : String(result.reason),
+  fetchedResults.forEach((result) => {
+    result.failures.forEach((failure, index) => {
+      logServerEvent("warn", "Source fetch attempt failed during raw article persistence", {
+        route,
+        userId,
+        sourceName: result.source.name,
+        failureIndex: index,
+        feedLabel: failure.label,
+        feedKind: failure.kind,
+        feedUrl: failure.feedUrl,
+        errorMessage: failure.errorMessage,
+      });
     });
+
+    if (result.usedFallback && result.successfulAttempt) {
+      logServerEvent("info", "Fallback feed used during raw article persistence", {
+        route,
+        userId,
+        sourceName: result.source.name,
+        fallbackLabel: result.successfulAttempt.label,
+        fallbackFeedUrl: result.successfulAttempt.feedUrl,
+      });
+    }
   });
 
+  const failedSourceNames = fetchedResults
+    .filter((result) => result.articles.length === 0)
+    .map((result) => result.source.name);
+  const fallbackSourceCount = fetchedResults.filter((result) => result.usedFallback).length;
   const fetchedArticles = fetchedResults.flatMap((result) =>
-    result.status === "fulfilled"
-      ? result.value.articles.map((article) => {
-          const canonicalUrl = canonicalizeArticleUrl(article.url);
-          return {
-            sourceId: result.value.source.id,
-            sourceName: article.sourceName,
-            title: article.title,
-            url: canonicalUrl,
-            summaryText: article.summaryText,
-            contentText: article.contentText,
-            publishedAt: article.publishedAt,
-            dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
-          };
-        })
-      : [],
+    result.articles.map((article) => {
+      const canonicalUrl = canonicalizeArticleUrl(article.url);
+      return {
+        sourceId: result.source.id,
+        sourceName: article.sourceName,
+        title: article.title,
+        url: canonicalUrl,
+        summaryText: article.summaryText,
+        contentText: article.contentText,
+        publishedAt: article.publishedAt,
+        dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
+      };
+    }),
   );
 
   if (!fetchedArticles.length) {
@@ -830,13 +893,27 @@ export async function persistRawArticles(
       route,
       userId,
       activeSourceCount: activeSources.length,
-      failedSourceCount: failedFetches.length,
+      failedSourceCount: failedSourceNames.length,
+      degradedSourceNames: failedSourceNames,
     });
-    return;
+    return {
+      activeSourceCount: activeSources.length,
+      successfulSourceCount: 0,
+      failedSourceCount: failedSourceNames.length,
+      fallbackSourceCount,
+      degradedSourceNames: failedSourceNames,
+    } satisfies IngestionRunSummary;
   }
 
   const fetchedCount = fetchedArticles.length;
-  console.info("[ingestion] fetched_count=", fetchedCount, "failed_source_count=", failedFetches.length);
+  console.info(
+    "[ingestion] fetched_count=",
+    fetchedCount,
+    "failed_source_count=",
+    failedSourceNames.length,
+    "fallback_source_count=",
+    fallbackSourceCount,
+  );
 
   const dedupeKeys = [...new Set(fetchedArticles.map((article) => article.dedupeKey))];
 
@@ -853,7 +930,13 @@ export async function persistRawArticles(
       errorMessage: existingResult.error.message,
       attemptedKeys: dedupeKeys.length,
     });
-    return;
+    return {
+      activeSourceCount: activeSources.length,
+      successfulSourceCount: fetchedResults.length - failedSourceNames.length,
+      failedSourceCount: failedSourceNames.length,
+      fallbackSourceCount,
+      degradedSourceNames: failedSourceNames,
+    } satisfies IngestionRunSummary;
   }
 
   const existingKeys = new Set(
@@ -883,16 +966,25 @@ export async function persistRawArticles(
       "skipped_count=",
       skippedCount,
       "failed_source_count=",
-      failedFetches.length,
+      failedSourceNames.length,
+      "fallback_source_count=",
+      fallbackSourceCount,
     );
     logServerEvent("info", "No new raw articles to insert after dedupe", {
       route,
       userId,
       fetchedRows: fetchedCount,
       skippedCount,
-      failedSourceCount: failedFetches.length,
+      failedSourceCount: failedSourceNames.length,
+      fallbackSourceCount,
     });
-    return;
+    return {
+      activeSourceCount: activeSources.length,
+      successfulSourceCount: fetchedResults.length - failedSourceNames.length,
+      failedSourceCount: failedSourceNames.length,
+      fallbackSourceCount,
+      degradedSourceNames: failedSourceNames,
+    } satisfies IngestionRunSummary;
   }
 
   const insertResult = await supabase.from("articles").insert(rowsToInsert);
@@ -904,9 +996,16 @@ export async function persistRawArticles(
       errorMessage: insertResult.error.message,
       attemptedRows: rowsToInsert.length,
       skippedCount,
-      failedSourceCount: failedFetches.length,
+      failedSourceCount: failedSourceNames.length,
+      fallbackSourceCount,
     });
-    return;
+    return {
+      activeSourceCount: activeSources.length,
+      successfulSourceCount: fetchedResults.length - failedSourceNames.length,
+      failedSourceCount: failedSourceNames.length,
+      fallbackSourceCount,
+      degradedSourceNames: failedSourceNames,
+    } satisfies IngestionRunSummary;
   }
 
   console.info(
@@ -915,7 +1014,9 @@ export async function persistRawArticles(
     "skipped_count=",
     skippedCount,
     "failed_source_count=",
-    failedFetches.length,
+    failedSourceNames.length,
+    "fallback_source_count=",
+    fallbackSourceCount,
   );
 
   logServerEvent("info", "Stored raw articles", {
@@ -924,8 +1025,18 @@ export async function persistRawArticles(
     fetchedCount,
     insertedRows: rowsToInsert.length,
     skippedCount,
-    failedSourceCount: failedFetches.length,
+    failedSourceCount: failedSourceNames.length,
+    fallbackSourceCount,
+    degradedSourceNames: failedSourceNames,
   });
+
+  return {
+    activeSourceCount: activeSources.length,
+    successfulSourceCount: fetchedResults.length - failedSourceNames.length,
+    failedSourceCount: failedSourceNames.length,
+    fallbackSourceCount,
+    degradedSourceNames: failedSourceNames,
+  } satisfies IngestionRunSummary;
 }
 
 function getPrimaryMatches(matches: StoredArticleTopic[]) {
@@ -1145,6 +1256,7 @@ async function buildHomepageDiagnostics(
   supabase: SupabaseServerClient,
   userId: string,
   sources: Source[],
+  ingestionSummary?: IngestionRunSummary,
 ) {
   const [articleResult, eventResult] = await Promise.all([
     supabase
@@ -1168,6 +1280,9 @@ async function buildHomepageDiagnostics(
     return {
       totalArticlesFetched: null,
       totalCandidateEvents: null,
+      failedSourceCount: ingestionSummary?.failedSourceCount ?? 0,
+      fallbackSourceCount: ingestionSummary?.fallbackSourceCount ?? 0,
+      degradedSourceNames: ingestionSummary?.degradedSourceNames ?? [],
       sourceCountsByCategory: countSourcesByHomepageCategory(sources),
     };
   }
@@ -1180,8 +1295,107 @@ async function buildHomepageDiagnostics(
     totalCandidateEvents: events.length,
     lastSuccessfulFetchTime: latestCreatedAt(articles.map((article) => article.created_at)),
     lastRankingRunTime: latestCreatedAt(events.map((event) => event.created_at)),
+    failedSourceCount: ingestionSummary?.failedSourceCount ?? 0,
+    fallbackSourceCount: ingestionSummary?.fallbackSourceCount ?? 0,
+    degradedSourceNames: ingestionSummary?.degradedSourceNames ?? [],
     sourceCountsByCategory: countSourcesByHomepageCategory(sources),
   };
+}
+
+async function fetchSourceArticlesWithFallback(source: Source): Promise<SourceFetchResult> {
+  const attempts = buildSourceFetchAttempts(source);
+  const failures: SourceFetchFailure[] = [];
+
+  for (const attempt of attempts) {
+    try {
+      const articles = await fetchFeedArticles(attempt.feedUrl, source.name);
+
+      if (articles.length > 0) {
+        return {
+          source,
+          articles,
+          failures,
+          usedFallback: attempt.kind === "fallback",
+          successfulAttempt: attempt,
+        };
+      }
+
+      failures.push({
+        ...attempt,
+        errorMessage: "Feed returned zero articles",
+      });
+    } catch (error) {
+      failures.push({
+        ...attempt,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return {
+    source,
+    articles: [],
+    failures,
+    usedFallback: false,
+  };
+}
+
+function buildSourceFetchAttempts(source: Source): SourceFetchAttempt[] {
+  const attempts: SourceFetchAttempt[] = [
+    {
+      label: source.name,
+      feedUrl: source.feedUrl,
+      kind: "primary",
+    },
+  ];
+
+  if (!isGdeltSource(source)) {
+    return attempts;
+  }
+
+  const fallbackFeeds = getGdeltFallbackFeeds(source);
+  const seen = new Set([source.feedUrl]);
+
+  fallbackFeeds.forEach((fallback) => {
+    if (seen.has(fallback.feedUrl)) {
+      return;
+    }
+
+    seen.add(fallback.feedUrl);
+    attempts.push({
+      ...fallback,
+      kind: "fallback",
+    });
+  });
+
+  return attempts;
+}
+
+function isGdeltSource(source: Source) {
+  return /gdelt/i.test(source.name) || /api\.gdeltproject\.org/i.test(source.feedUrl);
+}
+
+function getGdeltFallbackFeeds(source: Source) {
+  const topic = (source.topicName ?? source.name).toLowerCase();
+
+  if (/finance|market|business/.test(topic)) {
+    return [
+      { label: "Reuters Business fallback", feedUrl: "https://feeds.reuters.com/reuters/businessNews" },
+      { label: "MarketWatch fallback", feedUrl: "https://www.marketwatch.com/rss/topstories" },
+    ];
+  }
+
+  if (/politic|geopolit|world/.test(topic)) {
+    return [
+      { label: "Reuters Top News fallback", feedUrl: "https://feeds.reuters.com/reuters/topNews" },
+      { label: "AP Top News fallback", feedUrl: "https://apnews.com/hub/apf-topnews?output=rss" },
+    ];
+  }
+
+  return [
+    { label: "Reuters Technology fallback", feedUrl: "https://feeds.reuters.com/reuters/technologyNews" },
+    { label: "TechCrunch fallback", feedUrl: "https://techcrunch.com/feed/" },
+  ];
 }
 
 function normalizeSignal(value: string) {

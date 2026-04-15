@@ -80,6 +80,9 @@ export type HomepageDebugModel = {
   sourceCountsByCategory: Record<HomepageCategoryKey, number>;
   lastSuccessfulFetchTime?: string;
   lastRankingRunTime?: string;
+  failedSourceCount: number;
+  fallbackSourceCount: number;
+  degradedSourceNames: string[];
   categoryEmptyReasons: Record<HomepageCategoryKey, string>;
   categoryExclusionReasons: Record<HomepageCategoryKey, string[]>;
 };
@@ -114,7 +117,7 @@ export function buildHomepageViewModel(
     const heldBackEvents = eligibleEvents.slice(CATEGORY_EVENT_LIMIT);
     const fallbackEvents =
       displayEvents.length === 0
-        ? confirmedEvents
+        ? events
             .filter((event) => event.classification.primaryCategory !== category.key)
             .slice(0, 2)
         : [];
@@ -175,6 +178,9 @@ export function buildHomepageViewModel(
       sourceCountsByCategory,
       lastSuccessfulFetchTime: data.homepageDiagnostics?.lastSuccessfulFetchTime,
       lastRankingRunTime: data.homepageDiagnostics?.lastRankingRunTime ?? data.briefing.briefingDate,
+      failedSourceCount: data.homepageDiagnostics?.failedSourceCount ?? 0,
+      fallbackSourceCount: data.homepageDiagnostics?.fallbackSourceCount ?? 0,
+      degradedSourceNames: data.homepageDiagnostics?.degradedSourceNames ?? [],
       categoryEmptyReasons: Object.fromEntries(
         categorySections.map((section) => [section.key, section.emptyReason]),
       ) as Record<HomepageCategoryKey, string>,
@@ -345,7 +351,7 @@ function getEmptyReason(categoryKey: HomepageCategoryKey, eligibleCount: number,
   }
 
   if (fallbackCount > 0) {
-    return `No ${label.toLowerCase()} events qualified yet, so the section borrows other confirmed multi-source events instead of falling back to loose article cards.`;
+    return `No ${label.toLowerCase()} events qualified yet, so the section borrows the best available ranked coverage instead of collapsing into an empty rail.`;
   }
 
   return `No eligible ${label.toLowerCase()} events qualified in the current ranked briefing.`;

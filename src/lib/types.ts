@@ -142,6 +142,9 @@ export type DashboardData = {
     totalCandidateEvents: number | null;
     lastSuccessfulFetchTime?: string;
     lastRankingRunTime?: string;
+    failedSourceCount?: number;
+    fallbackSourceCount?: number;
+    degradedSourceNames?: string[];
     sourceCountsByCategory: {
       tech: number;
       finance: number;

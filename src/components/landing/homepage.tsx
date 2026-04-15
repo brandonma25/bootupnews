@@ -937,7 +937,12 @@ function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
                 key={`${section.key}-${event.id}`}
                 className="border-[rgba(19,26,34,0.08)] bg-white/70 p-4"
               >
-                <EventCard event={event} variant="compact" label="Fallback story" showRelatedArticles />
+                <EventCard
+                  event={event}
+                  variant="compact"
+                  label={event.intelligence.isEarlySignal ? "Fallback signal" : "Fallback story"}
+                  showRelatedArticles
+                />
               </Panel>
             ))}
           </div>
@@ -983,6 +988,16 @@ function HomepageDebugPanel({ debug }: { debug: HomepageDebugModel }) {
             `Tech sources: ${debug.sourceCountsByCategory.tech}`,
             `Finance sources: ${debug.sourceCountsByCategory.finance}`,
             `Politics sources: ${debug.sourceCountsByCategory.politics}`,
+          ]}
+        />
+        <DebugList
+          title="Ingestion reliability"
+          rows={[
+            `Failed sources this run: ${debug.failedSourceCount}`,
+            `Fallback sources used: ${debug.fallbackSourceCount}`,
+            debug.degradedSourceNames.length
+              ? `Degraded sources: ${debug.degradedSourceNames.join(", ")}`
+              : "Degraded sources: none",
           ]}
         />
         <DebugList
