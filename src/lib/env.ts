@@ -4,6 +4,7 @@ function readEnv(name: string) {
 
 export const env = {
   appUrl: readEnv("NEXT_PUBLIC_APP_URL") || "http://localhost:3000",
+  homepageDebug: readEnv("NEXT_PUBLIC_HOMEPAGE_DEBUG") || readEnv("HOMEPAGE_DEBUG"),
   supabaseUrl: readEnv("NEXT_PUBLIC_SUPABASE_URL"),
   supabaseAnonKey:
     readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ||
@@ -22,3 +23,4 @@ export const isSupabaseServerConfigured = Boolean(
 );
 
 export const isAiConfigured = Boolean(env.openAiApiKey);
+export const isHomepageDebugConfigured = /^(1|true|yes|on)$/i.test(env.homepageDebug);

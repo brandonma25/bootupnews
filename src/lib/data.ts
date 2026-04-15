@@ -2,7 +2,9 @@ import { createHash } from "crypto";
 import { formatISO } from "date-fns";
 
 import { demoDashboardData, demoHistory, demoSources, demoTopics } from "@/lib/demo-data";
+import { countSourcesByHomepageCategory } from "@/lib/homepage-taxonomy";
 import { logServerEvent } from "@/lib/observability";
+import { selectRelatedCoverage } from "@/lib/related-coverage";
 import { rankNewsClusters } from "@/lib/ranking";
 import { clusterArticles, fetchFeedArticles, type FeedArticle } from "@/lib/rss";
 import { withServerFallback } from "@/lib/server-safety";
@@ -192,12 +194,14 @@ export async function getDashboardData(): Promise<DashboardData> {
   await syncEventClusters(supabase, user.id, topics, sources);
 
   const briefing = await buildMatchedBriefing(supabase, user.id, topics, sources);
+  const homepageDiagnostics = await buildHomepageDiagnostics(supabase, user.id, sources);
 
   return {
     mode: "live",
     topics,
     sources,
     briefing,
+    homepageDiagnostics,
   };
 }
 
@@ -209,6 +213,13 @@ async function getPublicDashboardData(): Promise<DashboardData> {
     briefing,
     topics: demoTopics,
     sources: demoSources,
+    homepageDiagnostics: {
+      totalArticlesFetched: null,
+      totalCandidateEvents: briefing.items.length,
+      lastSuccessfulFetchTime: briefing.briefingDate,
+      lastRankingRunTime: briefing.briefingDate,
+      sourceCountsByCategory: countSourcesByHomepageCategory(demoSources),
+    },
   };
 }
 
@@ -979,18 +990,78 @@ function toFeedArticle(article: EventSeedArticle): FeedArticle {
 }
 
 function buildRelatedArticles(articles: EventSeedArticle[]): RelatedArticle[] {
-  return articles
+  const sorted = articles
     .slice()
     .sort(
       (left, right) =>
         new Date(right.published_at ?? 0).getTime() - new Date(left.published_at ?? 0).getTime(),
-    )
-    .map((article) => ({
+    );
+
+  const lead = sorted[0];
+  if (!lead) {
+    return [];
+  }
+
+  return selectRelatedCoverage(
+    {
+      title: lead.title,
+      url: lead.url,
+      sourceName: lead.sourceName,
+      summaryText: lead.summary_text,
+      matchedKeywords: lead.matchedKeywords,
+    },
+    sorted.map((article) => ({
       title: article.title,
       url: article.url,
       sourceName: article.sourceName,
-    }))
-    .slice(0, 5);
+      summaryText: article.summary_text,
+      matchedKeywords: article.matchedKeywords,
+    })),
+    4,
+  );
+}
+
+async function buildHomepageDiagnostics(
+  supabase: SupabaseServerClient,
+  userId: string,
+  sources: Source[],
+) {
+  const [articleResult, eventResult] = await Promise.all([
+    supabase
+      .from("articles")
+      .select("id, created_at")
+      .eq("user_id", userId),
+    supabase
+      .from("events")
+      .select("id, created_at")
+      .eq("user_id", userId),
+  ]);
+
+  if (articleResult.error || eventResult.error) {
+    logServerEvent("warn", "Homepage diagnostics query failed", {
+      route: "/dashboard",
+      userId,
+      articlesError: articleResult.error?.message,
+      eventsError: eventResult.error?.message,
+    });
+
+    return {
+      totalArticlesFetched: null,
+      totalCandidateEvents: null,
+      sourceCountsByCategory: countSourcesByHomepageCategory(sources),
+    };
+  }
+
+  const articles = articleResult.data ?? [];
+  const events = eventResult.data ?? [];
+
+  return {
+    totalArticlesFetched: articles.length,
+    totalCandidateEvents: events.length,
+    lastSuccessfulFetchTime: latestCreatedAt(articles.map((article) => article.created_at)),
+    lastRankingRunTime: latestCreatedAt(events.map((event) => event.created_at)),
+    sourceCountsByCategory: countSourcesByHomepageCategory(sources),
+  };
 }
 
 function normalizeSignal(value: string) {
@@ -1037,6 +1108,18 @@ function formatPublishedLabel(value: string | null) {
     month: "short",
     day: "numeric",
   });
+}
+
+function latestCreatedAt(values: Array<string | null | undefined>) {
+  const timestamps = values
+    .map((value) => (value ? new Date(value).getTime() : Number.NaN))
+    .filter((value) => Number.isFinite(value));
+
+  if (!timestamps.length) {
+    return undefined;
+  }
+
+  return new Date(Math.max(...timestamps)).toISOString();
 }
 
 function canonicalizeArticleUrl(value: string) {

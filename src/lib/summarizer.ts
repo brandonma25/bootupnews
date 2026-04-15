@@ -1,4 +1,5 @@
 import { env, isAiConfigured } from "@/lib/env";
+import { classifyHomepageCategory, getHomepageCategoryLabel } from "@/lib/homepage-taxonomy";
 import type { FeedArticle } from "@/lib/rss";
 import { firstSentence } from "@/lib/utils";
 
@@ -82,37 +83,40 @@ async function summarizeWithAi(
   };
 }
 
-function summarizeHeuristically(topicName: string, articles: FeedArticle[]): StorySummary {
+export function summarizeHeuristically(topicName: string, articles: FeedArticle[]): StorySummary {
   const lead = articles[0];
   const second = articles[1];
   const third = articles[2];
+  const classification = classifyHomepageCategory({
+    topicName,
+    title: lead.title,
+    summary: articles.slice(0, 3).map((article) => article.summaryText).join(" "),
+    sourceNames: articles.map((article) => article.sourceName),
+  });
+  const primaryCategory = classification.primaryCategory
+    ? getHomepageCategoryLabel(classification.primaryCategory)
+    : topicName;
+  const sourceCount = new Set(articles.map((article) => article.sourceName)).size;
+  const leadSummary = firstSentence(lead.summaryText, lead.title);
 
-  // Build a specific what-happened from the lead article
   const whatHappened = firstSentence(
     lead.summaryText,
-    `${lead.sourceName} is reporting a notable development in ${topicName.toLowerCase()}.`,
+    `${lead.sourceName} is reporting a notable ${primaryCategory.toLowerCase()} development.`,
   );
 
-  // Build three distinct, article-grounded key points
   const points: [string, string, string] = [
-    // Point 1: lead story grounded
-    lead.summaryText
-      ? firstSentence(lead.summaryText, lead.title)
-      : lead.title,
-    // Point 2: second source if available, otherwise a count observation
+    leadSummary,
     second
-      ? `${second.sourceName} is covering the same story: ${firstSentence(second.summaryText, second.title).toLowerCase()}`
-      : `${lead.sourceName} is the primary source — no corroborating coverage from other tracked feeds yet.`,
-    // Point 3: third source or signal count
+      ? `${second.sourceName} corroborates the event with ${firstSentence(second.summaryText, second.title).toLowerCase()}`
+      : `${lead.sourceName} is still the only tracked outlet carrying this development.`,
     third
-      ? `${third.sourceName} adds: ${firstSentence(third.summaryText, third.title).toLowerCase()}`
+      ? `${third.sourceName} adds ${firstSentence(third.summaryText, third.title).toLowerCase()}`
       : articles.length > 1
-        ? `${articles.length} sources across your ${topicName} feeds picked up this cluster, indicating broad relevance.`
-        : `Only one source has reported on this so far — treat as an early signal rather than confirmed news.`,
+        ? `${sourceCount} sources have picked up the same event, which strengthens confidence.`
+        : `Treat this as an early signal until more independent sources confirm it.`,
   ];
 
-  // Build a specific why-it-matters using the topic and lead title
-  const whyItMatters = `${topicName} operators tracking this area should note it: the lead signal — "${lead.title}" — is the kind of development that tends to affect near-term priorities or assumptions. Connect an AI key in Settings to get analyst-quality analysis instead of this heuristic summary.`;
+  const whyItMatters = buildWhyItMatters(primaryCategory, lead.title, leadSummary, sourceCount);
 
   return {
     headline: lead.title,
@@ -121,4 +125,31 @@ function summarizeHeuristically(topicName: string, articles: FeedArticle[]): Sto
     whyItMatters,
     estimatedMinutes: Math.min(6, Math.max(3, Math.ceil(articles.length * 1.5))),
   };
+}
+
+function buildWhyItMatters(
+  primaryCategory: string,
+  title: string,
+  leadSummary: string,
+  sourceCount: number,
+) {
+  const normalizedTitle = title.toLowerCase();
+
+  if (/earnings|rates|inflation|fed|treasury|ipo|acquisition|merger|tariff|trade/i.test(normalizedTitle)) {
+    return `It can move market expectations quickly because it changes the outlook for pricing, policy, or company performance.`;
+  }
+
+  if (/regulation|senate|congress|election|white house|sanctions|executive order|policy/i.test(normalizedTitle)) {
+    return `It matters because policy shifts can change operating conditions faster than product or market cycles do.`;
+  }
+
+  if (/ai|chip|cloud|software|cyber|platform|developer|data center|device/i.test(normalizedTitle)) {
+    return `It matters because changes in ${primaryCategory.toLowerCase()} infrastructure or platform power can quickly reshape execution risk and competitive positioning.`;
+  }
+
+  if (sourceCount > 1) {
+    return `It matters because multiple outlets converged on the same ${primaryCategory.toLowerCase()} development, suggesting broader decision impact.`;
+  }
+
+  return `It matters because this shift could change near-term assumptions around ${leadSummary.toLowerCase()}.`;
 }

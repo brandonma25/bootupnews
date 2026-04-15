@@ -74,6 +74,17 @@ export type DashboardData = {
   briefing: DailyBriefing;
   topics: Topic[];
   sources: Source[];
+  homepageDiagnostics?: {
+    totalArticlesFetched: number | null;
+    totalCandidateEvents: number | null;
+    lastSuccessfulFetchTime?: string;
+    lastRankingRunTime?: string;
+    sourceCountsByCategory: {
+      tech: number;
+      finance: number;
+      politics: number;
+    };
+  };
 };
 
 export type ViewerAccount = {

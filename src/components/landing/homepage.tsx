@@ -2,91 +2,51 @@
 
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink, RefreshCcw } from "lucide-react";
 
 import AuthModal from "@/components/auth/auth-modal";
+import { isHomepageDebugConfigured } from "@/lib/env";
+import {
+  buildHomepageViewModel,
+  buildOverallNoDataMessage,
+  type HomepageCategorySection,
+  type HomepageDebugModel,
+  type HomepageEvent,
+} from "@/lib/homepage-model";
+import type { DashboardData, ViewerAccount } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { getArticleRationale } from "@/lib/article-rationale";
-import type { BriefingItem, DashboardData, Source, ViewerAccount } from "@/lib/types";
 import { cn, formatBriefingDate, minutesToLabel } from "@/lib/utils";
 
 type LandingHomepageProps = {
   data: DashboardData;
   viewer: ViewerAccount | null;
   authState?: string;
+  debugEnabled?: boolean;
 };
 
-type CategoryKey = "Tech" | "Finance" | "Politics";
-
-type EventArticle = {
-  title: string;
-  url: string;
-  sourceName: string;
-  note?: string;
-};
-
-type EventTimelineMilestone = {
-  label: string;
-  detail: string;
-};
-
-type HomepageEvent = {
-  id: string;
-  topicName: string;
-  title: string;
-  summary: string;
-  whyItMatters: string;
-  relatedArticles: EventArticle[];
-  timeline: EventTimelineMilestone[];
-  estimatedMinutes: number;
-  importanceLabel?: BriefingItem["importanceLabel"];
-  rankingSignals: string[];
-  matchedKeywords: string[];
-  priority: BriefingItem["priority"];
-  rankScore: number;
-};
-
-const CATEGORY_CONFIG: Array<{
-  key: CategoryKey;
-  label: string;
-  description: string;
-  keywords: string[];
-}> = [
-  {
-    key: "Tech",
-    label: "Tech",
-    description: "AI, platforms, chips, infrastructure, and software shifts worth tracking.",
-    keywords: ["tech", "ai", "chip", "chips", "nvidia", "software", "cloud", "model", "data center"],
-  },
-  {
-    key: "Finance",
-    label: "Finance",
-    description: "Markets, companies, macro moves, and business developments with decision impact.",
-    keywords: ["finance", "market", "markets", "fed", "stocks", "earnings", "economy", "business", "inflation"],
-  },
-  {
-    key: "Politics",
-    label: "Politics",
-    description: "Government, regulation, elections, and policy changes shaping the operating environment.",
-    keywords: ["politic", "policy", "government", "regulation", "election", "congress", "senate", "white house"],
-  },
-];
-
-export default function LandingHomepage({ data, viewer, authState }: LandingHomepageProps) {
+export default function LandingHomepage({
+  data,
+  viewer,
+  authState,
+  debugEnabled = false,
+}: LandingHomepageProps) {
   const [authModalManuallyOpen, setAuthModalManuallyOpen] = useState(false);
   const [dismissedAuthState, setDismissedAuthState] = useState<string | null>(null);
   const signedIn = Boolean(viewer);
   const currentHash = useHashValue();
+  const showDebug = debugEnabled || isHomepageDebugConfigured;
 
-  const { featured, topRanked, categorySections, trending } = useMemo(
-    () => organizeHomepageContent(data.briefing.items, data.sources),
-    [data.briefing.items, data.sources],
+  const { featured, topRanked, categorySections, trending, debug } = useMemo(
+    () => buildHomepageViewModel(data),
+    [data],
   );
 
   const authMessage = getHomepageAuthMessage(authState);
-  const authStateRequestsModal = Boolean(authState && authState !== "confirm" && !signedIn && dismissedAuthState !== authState);
+  const authStateRequestsModal = Boolean(
+    authState && authState !== "confirm" && !signedIn && dismissedAuthState !== authState,
+  );
   const hashRequestsModal = !signedIn && currentHash === "#email-access";
   const authModalOpen = authModalManuallyOpen || authStateRequestsModal || hashRequestsModal;
 
@@ -105,7 +65,11 @@ export default function LandingHomepage({ data, viewer, authState }: LandingHome
   return (
     <>
       <main className="mx-auto min-h-screen w-full max-w-[1280px] px-4 pb-16 pt-4 sm:px-6 lg:px-8 lg:pb-24 lg:pt-6">
-        <HomepageNav signedIn={signedIn} viewer={viewer} onSignIn={() => setAuthModalManuallyOpen(true)} />
+        <HomepageNav
+          signedIn={signedIn}
+          viewer={viewer}
+          onSignIn={() => setAuthModalManuallyOpen(true)}
+        />
 
         <div className="mt-8 space-y-10 lg:mt-10 lg:space-y-14">
           <HeroIntelligenceBlock
@@ -120,18 +84,18 @@ export default function LandingHomepage({ data, viewer, authState }: LandingHome
 
           <section className="space-y-8 lg:space-y-10">
             {categorySections.map((section) => (
-              <CategorySection
-                key={section.label}
-                label={section.label}
-                description={section.description}
-                events={section.events}
-              />
+              <CategorySection key={section.key} section={section} />
             ))}
           </section>
 
           <TrendingSection events={trending} />
 
-          <DelayedCtaSection signedIn={signedIn} onOpenAuth={() => setAuthModalManuallyOpen(true)} />
+          {showDebug ? <HomepageDebugPanel debug={debug} /> : null}
+
+          <DelayedCtaSection
+            signedIn={signedIn}
+            onOpenAuth={() => setAuthModalManuallyOpen(true)}
+          />
         </div>
       </main>
 
@@ -277,7 +241,7 @@ function HeroIntelligenceBlock({
           </p>
           <div className="mt-8 grid gap-3 text-sm text-[var(--muted)] sm:grid-cols-3">
             <SignalPill title="Event-first" detail="Coverage is grouped into developments, not dumped as isolated links." />
-            <SignalPill title="Context-led" detail="Why it matters and what led here stay visible." />
+            <SignalPill title="Context-led" detail="Why it matters and why it ranked stay visible." />
             <SignalPill title="Ranked by signal" detail="The homepage emphasizes importance, not just recency." />
           </div>
           {!signedIn ? (
@@ -285,10 +249,14 @@ function HeroIntelligenceBlock({
               <Button className="px-5" onClick={onPrimaryAction}>
                 Get Briefing
               </Button>
-              <p className="text-sm text-[var(--muted)]">Browse the ranked briefing first. Save your own feed when you are ready.</p>
+              <p className="text-sm text-[var(--muted)]">
+                Browse the ranked briefing first. Save your own feed when you are ready.
+              </p>
             </div>
           ) : (
-            <div className="mt-8 text-sm text-[var(--muted)]">Your homepage below is structured as ranked events with grouped supporting coverage.</div>
+            <div className="mt-8 text-sm text-[var(--muted)]">
+              Your homepage below is structured as ranked events with grouped supporting coverage.
+            </div>
           )}
         </div>
       </div>
@@ -301,7 +269,9 @@ function HeroIntelligenceBlock({
 function SignalPill({ title, detail }: { title: string; detail: string }) {
   return (
     <div className="rounded-[20px] border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.52)] px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--foreground)]/88">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--foreground)]/88">
+        {title}
+      </p>
       <p className="mt-2 leading-6 text-[var(--muted)]">{detail}</p>
     </div>
   );
@@ -330,10 +300,15 @@ function FeaturedEventCard({
           <div className="mt-8 flex items-center justify-between gap-4 border-t border-[var(--line)] pt-5">
             <div>
               <p className="text-sm font-semibold text-[var(--foreground)]">Briefing flow</p>
-              <p className="mt-1 text-sm text-[var(--muted)]">Lead event first, ranked developments next, then secondary event coverage.</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Lead event first, ranked developments next, then secondary event coverage.
+              </p>
             </div>
             {signedIn ? (
-              <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]"
+              >
                 Open briefing
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -345,19 +320,22 @@ function FeaturedEventCard({
           </div>
         </>
       ) : (
-        <div className="rounded-[24px] border border-[var(--line)] bg-white/55 p-5 text-sm leading-7 text-[var(--muted)]">
-          The lead event will appear here once feeds refresh and the ranking pass has enough coverage to surface a top development.
-        </div>
+        <StatusPanel
+          title="Coverage unavailable right now"
+          body="The lead event will appear here once feeds refresh and the ranking pass has enough coverage to surface a top development."
+        />
       )}
     </Panel>
   );
 }
 
 function TopRankedEventsSection({ events }: { events: HomepageEvent[] }) {
+  const noDataMessage = buildOverallNoDataMessage(events.length);
+
   return (
     <section id="top-events" className="space-y-5 lg:space-y-6">
       <SectionHeader
-        eyebrow="Top 5 Most Important Events Today"
+        eyebrow="Top Ranked Events"
         title="The developments most worth your attention right now"
         description="This ranked layer favors importance over chronology, with grouped supporting coverage under each event."
       />
@@ -384,38 +362,44 @@ function TopRankedEventsSection({ events }: { events: HomepageEvent[] }) {
           ))}
         </div>
       ) : (
-        <Panel className="p-5 text-sm leading-7 text-[var(--muted)]">
-          Ranked events will appear here as the briefing fills out.
-        </Panel>
+        <StatusPanel title={noDataMessage.title} body={noDataMessage.body} />
       )}
     </section>
   );
 }
 
-function CategorySection({
-  label,
-  description,
-  events,
-}: {
-  label: string;
-  description: string;
-  events: HomepageEvent[];
-}) {
+function CategorySection({ section }: { section: HomepageCategorySection }) {
   return (
-    <section id={label.toLowerCase()} className="space-y-4">
-      <SectionHeader eyebrow="Category" title={label} description={description} compact />
-      {events.length ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {events.map((event) => (
-            <Panel key={event.id} className="border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.62)] p-5 transition-transform duration-150 hover:-translate-y-0.5">
-              <EventCard event={event} variant="compact" label="Event" showRelatedArticles />
-            </Panel>
-          ))}
-        </div>
+    <section id={section.label.toLowerCase()} className="space-y-4">
+      <SectionHeader
+        eyebrow="Category"
+        title={section.label}
+        description={section.description}
+        compact
+      />
+      {section.events.length ? (
+        <>
+          {section.state === "sparse" ? (
+            <p className="text-sm text-[var(--muted)]">
+              Coverage is still building here, so confirmed {section.label.toLowerCase()} events share space with clear placeholders.
+            </p>
+          ) : null}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {section.events.map((event) => (
+              <Panel
+                key={event.id}
+                className="border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.62)] p-5 transition-transform duration-150 hover:-translate-y-0.5"
+              >
+                <EventCard event={event} variant="compact" label="Event" showRelatedArticles />
+              </Panel>
+            ))}
+            {Array.from({ length: section.placeholderCount }).map((_, index) => (
+              <CoverageBuildingCard key={`${section.key}-placeholder-${index}`} label={section.label} />
+            ))}
+          </div>
+        </>
       ) : (
-        <Panel className="p-5 text-sm leading-7 text-[var(--muted)]">
-          No ranked events are grouped here yet. This section stays ready as coverage expands.
-        </Panel>
+        <EmptyCategoryState section={section} />
       )}
     </section>
   );
@@ -435,19 +419,17 @@ function TrendingSection({ events }: { events: HomepageEvent[] }) {
           {events.map((event, index) => (
             <div
               key={event.id}
-              className={cn(
-                "px-5 py-5",
-                index !== events.length - 1 && "border-b border-[var(--line)]",
-              )}
+              className={cn("px-5 py-5", index !== events.length - 1 && "border-b border-[var(--line)]")}
             >
               <EventCard event={event} variant="list" label="Event" showRelatedArticles />
             </div>
           ))}
         </Panel>
       ) : (
-        <Panel className="p-5 text-sm leading-7 text-[var(--muted)]">
-          Once more stories are available, lower-priority events will collect here in a compact scan.
-        </Panel>
+        <StatusPanel
+          title="No additional developments yet"
+          body="Once more stories are available, lower-priority events will collect here in a compact scan."
+        />
       )}
     </section>
   );
@@ -471,7 +453,6 @@ function EventCard({
   const emphatic = variant === "featured" || variant === "ranked-featured";
   const compact = variant === "compact";
   const list = variant === "list";
-  const rationale = getArticleRationale(event);
 
   return (
     <div className="space-y-4">
@@ -483,7 +464,9 @@ function EventCard({
             </div>
           ) : null}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{label}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              {label}
+            </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge>{event.topicName}</Badge>
               {event.importanceLabel ? <Badge className="text-[#294f86]">{event.importanceLabel}</Badge> : null}
@@ -510,56 +493,83 @@ function EventCard({
         >
           {event.title}
         </h3>
-        <p className={cn("mt-3 text-[var(--muted)]", emphatic ? "text-sm leading-7 lg:text-[15px]" : "text-sm leading-6")}>
-          {event.summary}
-        </p>
         <p
           className={cn(
-            "mt-2 text-sm font-medium",
-            rationale.kind === "keyword" ? "text-[#294f86]" : "text-[var(--muted)]",
+            "mt-3 text-[var(--muted)]",
+            emphatic ? "text-sm leading-7 lg:text-[15px]" : "text-sm leading-6",
           )}
         >
-          {rationale.text}
+          {event.summary}
         </p>
       </div>
 
-      <WhyItMattersBlock text={event.whyItMatters} emphatic={emphatic} />
+      <WhyItMattersBlock
+        text={event.whyItMatters}
+        whyThisIsHere={event.whyThisIsHere}
+        emphatic={emphatic}
+      />
 
       {showTimeline && event.timeline.length ? <TimelineBlock timeline={event.timeline} /> : null}
 
-      {showRelatedArticles ? <RelatedArticlesList articles={event.relatedArticles} compact={compact || list} /> : null}
+      {showRelatedArticles ? (
+        <RelatedArticlesList articles={event.relatedArticles} compact={compact || list} />
+      ) : null}
 
       <div className="flex flex-wrap gap-2 text-xs font-medium text-[var(--muted)]">
         <MetaPill>{minutesToLabel(event.estimatedMinutes)} read</MetaPill>
-        <MetaPill>{event.relatedArticles.length} related sources</MetaPill>
+        <MetaPill>{event.sourceCount} related sources</MetaPill>
         {event.rankingSignals[1] ? <MetaPill>{event.rankingSignals[1]}</MetaPill> : null}
       </div>
     </div>
   );
 }
 
-function WhyItMattersBlock({ text, emphatic = false }: { text: string; emphatic?: boolean }) {
+function WhyItMattersBlock({
+  text,
+  whyThisIsHere,
+  emphatic = false,
+}: {
+  text: string;
+  whyThisIsHere: string;
+  emphatic?: boolean;
+}) {
   return (
     <div
       className={cn(
         "rounded-[22px] border-l-2 border-[#294f86] bg-[rgba(41,79,134,0.05)] px-4 py-3",
-        emphatic && "border border-[rgba(41,79,134,0.14)] bg-[linear-gradient(180deg,rgba(41,79,134,0.08),rgba(41,79,134,0.03))]",
+        emphatic &&
+          "border border-[rgba(41,79,134,0.14)] bg-[linear-gradient(180deg,rgba(41,79,134,0.08),rgba(41,79,134,0.03))]",
       )}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#294f86]">Why it matters</p>
       <p className="mt-2 text-sm leading-7 text-[var(--foreground)]">{text}</p>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        Why this is here
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{whyThisIsHere}</p>
     </div>
   );
 }
 
-function TimelineBlock({ timeline }: { timeline: EventTimelineMilestone[] }) {
+function TimelineBlock({
+  timeline,
+}: {
+  timeline: Array<{ label: string; detail: string }>;
+}) {
   return (
     <div className="rounded-[22px] border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.58)] px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">What led to today</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        What led to today
+      </p>
       <div className="mt-4 space-y-3">
         {timeline.map((milestone) => (
-          <div key={`${milestone.label}-${milestone.detail}`} className="grid grid-cols-[92px_minmax(0,1fr)] gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#294f86]">{milestone.label}</p>
+          <div
+            key={`${milestone.label}-${milestone.detail}`}
+            className="grid grid-cols-[92px_minmax(0,1fr)] gap-3"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#294f86]">
+              {milestone.label}
+            </p>
             <p className="text-sm leading-6 text-[var(--foreground)]">{milestone.detail}</p>
           </div>
         ))}
@@ -572,14 +582,16 @@ function RelatedArticlesList({
   articles,
   compact = false,
 }: {
-  articles: EventArticle[];
+  articles: Array<{ title: string; url: string; sourceName: string; note?: string }>;
   compact?: boolean;
 }) {
   if (!articles.length) return null;
 
   return (
     <div className="rounded-[22px] border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.52)] px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Related coverage</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        Related coverage
+      </p>
       <div className="mt-3 space-y-2.5">
         {articles.map((article) => (
           <a
@@ -590,7 +602,12 @@ function RelatedArticlesList({
             className="flex items-start justify-between gap-3 rounded-[16px] border border-[rgba(19,26,34,0.06)] bg-white/70 px-3 py-3 transition-colors hover:bg-white"
           >
             <div className="min-w-0">
-              <p className={cn("font-semibold text-[var(--foreground)]", compact ? "text-sm leading-5" : "text-sm leading-6")}>
+              <p
+                className={cn(
+                  "font-semibold text-[var(--foreground)]",
+                  compact ? "text-sm leading-5" : "text-sm leading-6",
+                )}
+              >
                 {article.title}
               </p>
               <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
@@ -617,7 +634,9 @@ function DelayedCtaSection({
     <Panel className="rounded-[32px] border-[rgba(19,26,34,0.1)] bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(255,255,255,0.72))] px-6 py-7 lg:px-8 lg:py-8">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Daily briefing access</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            Daily briefing access
+          </p>
           <h2 className="display-font mt-3 text-[2rem] leading-tight text-[var(--foreground)] sm:text-[2.35rem]">
             Get your daily intelligence briefing
           </h2>
@@ -652,9 +671,25 @@ function SectionHeader({
 }) {
   return (
     <div className={cn("max-w-3xl", compact && "max-w-2xl")}>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{eyebrow}</p>
-      <h2 className={cn("mt-2 font-semibold tracking-tight text-[var(--foreground)]", compact ? "text-[1.45rem]" : "text-[1.8rem] lg:text-[2rem]")}>{title}</h2>
-      <p className={cn("mt-2 text-[var(--muted)]", compact ? "text-sm leading-7" : "text-sm leading-7 lg:text-[15px]")}>{description}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+        {eyebrow}
+      </p>
+      <h2
+        className={cn(
+          "mt-2 font-semibold tracking-tight text-[var(--foreground)]",
+          compact ? "text-[1.45rem]" : "text-[1.8rem] lg:text-[2rem]",
+        )}
+      >
+        {title}
+      </h2>
+      <p
+        className={cn(
+          "mt-2 text-[var(--muted)]",
+          compact ? "text-sm leading-7" : "text-sm leading-7 lg:text-[15px]",
+        )}
+      >
+        {description}
+      </p>
     </div>
   );
 }
@@ -667,160 +702,158 @@ function MetaPill({ children }: { children: React.ReactNode }) {
   );
 }
 
-function organizeHomepageContent(items: BriefingItem[], sources: Source[]) {
-  const events = buildHomepageEvents(items, sources);
-  const featured = events[0] ?? null;
-  const topRanked = events.slice(0, 5);
-  const reservedIds = new Set<string>(topRanked.map((event) => event.id));
-
-  const categorySections = CATEGORY_CONFIG.map((category) => {
-    const matchingEvents = events.filter((event) => !reservedIds.has(event.id) && eventMatchesCategory(event, category));
-    matchingEvents.forEach((event) => reservedIds.add(event.id));
-
-    return {
-      label: category.label,
-      description: category.description,
-      events: matchingEvents.slice(0, 3),
-    };
-  });
-
-  const trending = events.filter((event) => !reservedIds.has(event.id)).slice(0, 4);
-
-  return {
-    featured,
-    topRanked,
-    categorySections,
-    trending,
-  };
-}
-
-function buildHomepageEvents(items: BriefingItem[], sources: Source[]): HomepageEvent[] {
-  return items
-    .slice()
-    .sort((left, right) => getRankScore(right) - getRankScore(left))
-    .map((item, index, sortedItems) => {
-      const siblingItems = sortedItems.filter((candidate) => candidate.id !== item.id && candidate.topicId === item.topicId);
-
-      return {
-        id: item.id,
-        topicName: item.topicName,
-        title: item.title,
-        summary: summarize(item.whatHappened, item.priority === "top" ? 2 : 1),
-        whyItMatters: item.whyItMatters,
-        relatedArticles: buildRelatedArticles(item, siblingItems, sources),
-        timeline: buildEventTimeline(item, siblingItems),
-        estimatedMinutes: item.estimatedMinutes,
-        importanceLabel: item.importanceLabel,
-        rankingSignals: item.rankingSignals ?? [],
-        matchedKeywords: item.matchedKeywords ?? [],
-        priority: item.priority,
-        rankScore: getRankScore(item) - index * 0.01,
-      };
-    });
-}
-
-function buildRelatedArticles(item: BriefingItem, siblingItems: BriefingItem[], sources: Source[]) {
-  if (item.relatedArticles?.length) {
-    return item.relatedArticles.slice(0, 5).map((article) => ({
-      title: article.title,
-      url: article.url,
-      sourceName: article.sourceName,
-      note: "Primary coverage",
-    }));
-  }
-
-  const supportCoverage = [
-    ...item.sources.map((source) => ({
-      title: source.title === item.title ? source.title : `${source.title} coverage`,
-      url: source.url,
-      sourceName: source.title,
-      note: "Primary coverage",
-    })),
-    ...siblingItems.flatMap((sibling) =>
-      sibling.sources.map((source) => ({
-        title: `${source.title} on ${sibling.title}`,
-        url: source.url,
-        sourceName: source.title,
-        note: "Related development",
-      })),
-    ),
-    ...sources
-      .filter((source) => source.topicId === item.topicId)
-      .map((source) => ({
-        title: `Monitor ${source.name}`,
-        url: source.homepageUrl ?? source.feedUrl,
-        sourceName: source.name,
-        note: "Topic watchlist",
-      })),
-  ];
-
-  const seen = new Set<string>();
-
-  return supportCoverage
-    .filter((article) => isValidStoryUrl(article.url))
-    .filter((article) => {
-      const key = `${article.url}-${article.title}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 5);
-}
-
-function buildEventTimeline(item: BriefingItem, siblingItems: BriefingItem[]) {
-  const keywordMilestone = item.matchedKeywords?.length
-    ? {
-        label: "Trigger",
-        detail: `The event began surfacing across coverage through matches on ${item.matchedKeywords.join(", ")}.`,
-      }
-    : null;
-
-  const keyPointMilestones = item.keyPoints
-    .filter((point) => !point.startsWith("Matched on:"))
-    .map((point, index) => ({
-      label: index === 0 ? "Earlier" : index === 1 ? "Shift" : "Now",
-      detail: point,
-    }));
-
-  const siblingMilestones = siblingItems.slice(0, 2).map((sibling, index) => ({
-    label: index === 0 ? "Build-up" : "Follow-on",
-    detail: summarize(sibling.whatHappened, 1),
-  }));
-
-  const timeline = [keywordMilestone, ...keyPointMilestones, ...siblingMilestones].filter(
-    (milestone): milestone is EventTimelineMilestone => Boolean(milestone),
-  );
-
-  return timeline.slice(0, 3);
-}
-
-function getRankScore(item: BriefingItem) {
+function CoverageBuildingCard({ label }: { label: string }) {
   return (
-    (item.importanceScore ?? 0) +
-    (item.matchScore ?? 0) +
-    (item.priority === "top" ? 100 : 0)
+    <Panel className="border-dashed border-[rgba(19,26,34,0.12)] bg-[rgba(255,255,255,0.38)] p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        Coverage Still Building
+      </p>
+      <h3 className="mt-3 text-lg font-semibold text-[var(--foreground)]">
+        More {label} coverage is on the way
+      </h3>
+      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+        This rail keeps its shape while we wait for more confirmed category-matched events.
+      </p>
+    </Panel>
   );
 }
 
-function eventMatchesCategory(event: HomepageEvent, category: (typeof CATEGORY_CONFIG)[number]) {
-  const haystack = `${event.topicName} ${event.title} ${event.summary} ${event.whyItMatters}`.toLowerCase();
-  return category.keywords.some((keyword) => haystack.includes(keyword));
+function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
+  return (
+    <div className="space-y-4">
+      <Panel className="rounded-[28px] border-[rgba(19,26,34,0.1)] bg-[rgba(255,255,255,0.72)] p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          Category status
+        </p>
+        <h3 className="mt-3 text-[1.4rem] font-semibold text-[var(--foreground)]">
+          No {section.label} events yet
+        </h3>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
+          We&apos;re still building this section from live coverage. Refresh shortly or continue with the top briefing.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button variant="secondary" className="px-4" onClick={() => window.location.reload()}>
+            <RefreshCcw className="mr-2 h-4 w-4" />
+            Refresh briefing
+          </Button>
+          <a
+            href="#top-events"
+            className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm font-semibold text-[var(--foreground)]"
+          >
+            Top events
+          </a>
+        </div>
+        <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{section.emptyReason}</p>
+      </Panel>
+
+      {section.fallbackEvents.length ? (
+        <Panel className="rounded-[28px] border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.5)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            Top stories while this category fills in
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {section.fallbackEvents.map((event) => (
+              <Panel
+                key={`${section.key}-${event.id}`}
+                className="border-[rgba(19,26,34,0.08)] bg-white/70 p-4"
+              >
+                <EventCard event={event} variant="compact" label="Fallback story" showRelatedArticles />
+              </Panel>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+    </div>
+  );
 }
 
-function summarize(value: string, maxSentences: number) {
-  const sentences = value
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-
-  return sentences.slice(0, maxSentences).join(" ") || value;
+function StatusPanel({ title, body }: { title: string; body: string }) {
+  return (
+    <Panel className="p-5 text-sm leading-7 text-[var(--muted)]">
+      <p className="font-semibold text-[var(--foreground)]">{title}</p>
+      <p className="mt-2">{body}</p>
+    </Panel>
+  );
 }
 
-function isValidStoryUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
+function HomepageDebugPanel({ debug }: { debug: HomepageDebugModel }) {
+  return (
+    <Panel className="rounded-[28px] border-[rgba(19,26,34,0.1)] bg-[rgba(255,255,255,0.78)] p-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        Homepage debug
+      </p>
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <DebugStat label="Articles fetched" value={formatDebugValue(debug.totalArticlesFetched)} />
+        <DebugStat label="Candidate events" value={formatDebugValue(debug.totalCandidateEvents)} />
+        <DebugStat label="Ranked events" value={String(debug.rankedEventsCount)} />
+        <DebugStat label="Uncategorized events" value={String(debug.uncategorizedEventsCount)} />
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <DebugList
+          title="Category counts"
+          rows={[
+            `Tech: ${debug.categoryCounts.tech}`,
+            `Finance: ${debug.categoryCounts.finance}`,
+            `Politics: ${debug.categoryCounts.politics}`,
+          ]}
+        />
+        <DebugList
+          title="Source counts by category"
+          rows={[
+            `Tech sources: ${debug.sourceCountsByCategory.tech}`,
+            `Finance sources: ${debug.sourceCountsByCategory.finance}`,
+            `Politics sources: ${debug.sourceCountsByCategory.politics}`,
+          ]}
+        />
+        <DebugList
+          title="Last successful runs"
+          rows={[
+            `Last fetch time: ${debug.lastSuccessfulFetchTime ?? "Unknown"}`,
+            `Last ranking run: ${debug.lastRankingRunTime ?? "Unknown"}`,
+          ]}
+        />
+        <DebugList
+          title="Why a section is empty"
+          rows={[
+            `Tech: ${debug.categoryEmptyReasons.tech}`,
+            `Finance: ${debug.categoryEmptyReasons.finance}`,
+            `Politics: ${debug.categoryEmptyReasons.politics}`,
+          ]}
+        />
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <DebugList title="Tech exclusions" rows={debug.categoryExclusionReasons.tech} />
+        <DebugList title="Finance exclusions" rows={debug.categoryExclusionReasons.finance} />
+        <DebugList title="Politics exclusions" rows={debug.categoryExclusionReasons.politics} />
+      </div>
+    </Panel>
+  );
+}
+
+function DebugStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[20px] border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.54)] px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p>
+    </div>
+  );
+}
+
+function DebugList({ title, rows }: { title: string; rows: string[] }) {
+  return (
+    <div className="rounded-[20px] border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.54)] px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        {title}
+      </p>
+      <div className="mt-3 space-y-2 text-sm leading-6 text-[var(--foreground)]">
+        {rows.length ? rows.map((row) => <p key={row}>{row}</p>) : <p>No exclusions recorded.</p>}
+      </div>
+    </div>
+  );
+}
+
+function formatDebugValue(value: number | null) {
+  return value === null ? "Unknown" : String(value);
 }

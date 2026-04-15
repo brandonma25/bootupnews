@@ -1,4 +1,5 @@
 import type { FeedArticle } from "@/lib/rss";
+import { classifyHomepageCategory } from "@/lib/homepage-taxonomy";
 
 type ArticleCluster = {
   representative: FeedArticle;
@@ -42,42 +43,6 @@ const IMPACT_KEYWORDS = [
   "breach",
   "layoff",
   "tariff",
-  "ipo",
-];
-
-const TECH_KEYWORDS = [
-  "ai",
-  "artificial intelligence",
-  "chip",
-  "openai",
-  "google",
-  "microsoft",
-  "meta",
-  "apple",
-  "amazon",
-  "nvidia",
-  "tesla",
-  "software",
-  "cloud",
-  "model",
-  "cybersecurity",
-];
-
-const FINANCE_KEYWORDS = [
-  "market",
-  "stocks",
-  "bonds",
-  "treasury",
-  "fed",
-  "inflation",
-  "earnings",
-  "revenue",
-  "guidance",
-  "bank",
-  "rates",
-  "economy",
-  "oil",
-  "dollar",
   "ipo",
 ];
 
@@ -151,11 +116,20 @@ function impactScore(cluster: ArticleCluster) {
 }
 
 function categoryFitScore(topicName: string, cluster: ArticleCluster) {
-  const corpus = `${cluster.representative.title} ${cluster.sources
-    .slice(0, 3)
-    .map((article) => article.summaryText)
-    .join(" ")}`.toLowerCase();
-  const keywordSet = topicName.toLowerCase().includes("finance") ? FINANCE_KEYWORDS : TECH_KEYWORDS;
-  const matches = keywordSet.filter((keyword) => corpus.includes(keyword)).length;
-  return Math.max(0.35, Math.min(matches, 5) / 5);
+  const classification = classifyHomepageCategory({
+    topicName,
+    title: cluster.representative.title,
+    summary: cluster.sources
+      .slice(0, 3)
+      .map((article) => article.summaryText)
+      .join(" "),
+    sourceNames: cluster.sources.map((article) => article.sourceName),
+  });
+
+  if (!classification.primaryCategory) {
+    return 0.35;
+  }
+
+  const strongestScore = Math.max(...Object.values(classification.scores));
+  return Math.max(0.35, Math.min(strongestScore, 10) / 10);
 }
