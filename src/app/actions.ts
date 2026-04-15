@@ -32,6 +32,12 @@ const credentialsSchema = z.object({
 });
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+type UserEventStateUpsert = {
+  event_key: string;
+  last_seen_fingerprint: string;
+  last_seen_importance_score: number;
+  last_viewed_at: string | null;
+};
 
 async function syncUserProfile() {
   const supabase = await createSupabaseServerClient();
@@ -123,6 +129,33 @@ async function ensureDefaultTopic(
   }
 
   throw new Error("Default topic creation failed");
+}
+
+async function upsertUserEventState(
+  supabase: SupabaseServerClient,
+  userId: string,
+  rows: UserEventStateUpsert[],
+) {
+  if (!rows.length) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const result = await supabase.from("user_event_state").upsert(
+    rows.map((row) => ({
+      user_id: userId,
+      event_key: row.event_key,
+      last_seen_at: now,
+      last_viewed_at: row.last_viewed_at,
+      last_seen_fingerprint: row.last_seen_fingerprint,
+      last_seen_importance_score: row.last_seen_importance_score,
+    })),
+    { onConflict: "user_id,event_key" },
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
 }
 
 export async function requestMagicLinkAction(formData: FormData) {
@@ -554,20 +587,34 @@ export async function toggleReadAction(formData: FormData) {
     redirect("/dashboard?demo=1");
   }
 
-  const itemId = z.string().min(1).parse(formData.get("itemId"));
+  const itemId = z.string().optional().parse(formData.get("itemId"));
+  const eventKey = z.string().min(1).parse(formData.get("eventKey"));
+  const continuityFingerprint = z.string().min(1).parse(formData.get("continuityFingerprint"));
+  const importanceScore = z.coerce.number().default(0).parse(formData.get("importanceScore"));
   const current = z.enum(["true", "false"]).parse(formData.get("current"));
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/dashboard?demo=1");
+  const { supabase, user } = await requireActionSession("/dashboard?demo=1", "toggleReadAction");
 
   try {
-    await supabase
-      .from("briefing_items")
-      .update({ is_read: current !== "true" })
-      .eq("id", itemId);
+    await upsertUserEventState(supabase, user.id, [
+      {
+        event_key: eventKey,
+        last_seen_fingerprint: continuityFingerprint,
+        last_seen_importance_score: importanceScore,
+        last_viewed_at: current === "true" ? null : new Date().toISOString(),
+      },
+    ]);
+
+    if (itemId && !itemId.startsWith("generated-")) {
+      await supabase
+        .from("briefing_items")
+        .update({ is_read: current !== "true" })
+        .eq("id", itemId);
+    }
   } catch (error) {
     logServerEvent("error", "Toggle read failed", {
       route: "/dashboard",
       itemId,
+      eventKey,
       ...errorContext(error),
     });
     redirect("/dashboard?error=1");
@@ -582,26 +629,45 @@ export async function markAllReadAction(formData: FormData) {
     redirect("/dashboard");
   }
 
-  const briefingId = z.string().min(1).parse(formData.get("briefingId"));
-  if (briefingId.startsWith("generated-")) {
-    redirect("/dashboard");
-  }
-
   const { supabase, user } = await requireActionSession("/dashboard", "markAllReadAction");
+  const rawStates = z.string().min(2).parse(formData.get("eventStates"));
+  const eventStates = z.array(
+    z.object({
+      eventKey: z.string().min(1),
+      continuityFingerprint: z.string().min(1),
+      importanceScore: z.number(),
+    }),
+  ).parse(JSON.parse(rawStates));
+  const briefingId = z.string().optional().parse(formData.get("briefingId"));
 
-  const { data: briefing } = await supabase
-    .from("daily_briefings")
-    .select("id")
-    .eq("id", briefingId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  try {
+    await upsertUserEventState(
+      supabase,
+      user.id,
+      eventStates.map((state) => ({
+        event_key: state.eventKey,
+        last_seen_fingerprint: state.continuityFingerprint,
+        last_seen_importance_score: state.importanceScore,
+        last_viewed_at: new Date().toISOString(),
+      })),
+    );
 
-  if (!briefing) redirect("/dashboard");
-
-  await supabase
-    .from("briefing_items")
-    .update({ is_read: true })
-    .eq("briefing_id", briefingId);
+    if (briefingId && !briefingId.startsWith("generated-")) {
+      await supabase
+        .from("briefing_items")
+        .update({ is_read: true })
+        .eq("briefing_id", briefingId);
+    }
+  } catch (error) {
+    logServerEvent("error", "Mark all read failed", {
+      route: "/dashboard",
+      userId: user.id,
+      briefingId,
+      attemptedItems: eventStates.length,
+      ...errorContext(error),
+    });
+    redirect("/dashboard?error=1");
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/history");

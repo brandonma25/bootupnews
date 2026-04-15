@@ -126,6 +126,42 @@ When updating this file:
 - Ensure all AI agents consistently read and update this file
 - Begin logging all future changes using defined structure
 
+### [2026-04-16 00:04] — PRD 5 Daily Habit Loop
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- The dashboard feed had no continuity across sessions, no deterministic notion of what changed since a user’s last pass, and no reliable completion moment once a session was finished.
+
+**Root cause:**
+- Event rows are regenerated during clustering, so the previous implementation had no stable per-event identity for retention logic.
+- Existing read state lived on `briefing_items`, but the live dashboard renders generated event clusters directly and did not consume persistent read/view state.
+
+**Change made:**
+- Added a lightweight habit-loop continuity layer based on stable event keys and change fingerprints derived from clustered article signals.
+- Introduced `user_event_state` persistence in the Supabase schema for `last_viewed_at`, last seen fingerprint, and prior importance score.
+- Updated live dashboard briefing construction to classify each event as `new`, `changed`, `escalated`, or `unchanged`, and to derive read state from the persisted event-state snapshot.
+- Added dashboard UI for “Since your last pass” metrics, event badges, and an end-of-feed “You’re caught up” closure panel.
+- Updated read actions so marking one event or the whole dashboard as read writes to the new event-state store instead of depending on ephemeral event ids.
+- Added unit tests covering continuity-key stability, fingerprint change detection, display-state classification, and session summary counts.
+
+**Files modified:**
+- `src/lib/types.ts`
+- `src/lib/habit-loop.ts`
+- `src/lib/habit-loop.test.ts`
+- `src/lib/data.ts`
+- `src/app/actions.ts`
+- `src/app/dashboard/page.tsx`
+- `src/components/story-card.tsx`
+- `supabase/schema.sql`
+- `PROJECT.md`
+
+**Remaining risks / next steps:**
+- The new `user_event_state` table must exist in the target Supabase database before live persistence will activate; the code degrades safely if the table is missing, but continuity will not persist server-side until the schema is applied.
+- Repository-wide `npm run lint` still reports pre-existing React hook lint errors in `src/components/app-shell.tsx` and `src/components/settings-preferences.tsx`, which are unrelated to this PRD work.
+- Public/demo mode still lacks a localStorage-backed continuity implementation; live/authenticated mode is the completed path in this branch.
+
 ---
 
 ## 8. NEXT ACTION (FOCUS)

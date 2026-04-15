@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { ManualRefreshTrigger } from "@/components/dashboard/manual-refresh-trigger";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
+import { getDisplayStateLabel, getDisplayStateTone } from "@/lib/habit-loop";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
 import { isAiConfigured } from "@/lib/env";
 import { formatBriefingDate } from "@/lib/utils";
@@ -41,8 +42,19 @@ export default async function DashboardPage({
       }),
   }));
 
-  const allRead = data.briefing.items.length > 0 && data.briefing.items.every((item) => item.read);
-  const isLiveBriefing = !data.briefing.id.startsWith("generated-");
+  const trackableItems = data.briefing.items.filter(
+    (item) => item.continuityKey && item.continuityFingerprint,
+  );
+  const canTrackProgress = data.mode === "live" && trackableItems.length > 0;
+  const isCaughtUp = canTrackProgress && trackableItems.every((item) => item.read);
+  const sessionSummary = data.briefing.sessionSummary;
+  const serializedEventStates = JSON.stringify(
+    trackableItems.map((item) => ({
+      eventKey: item.continuityKey,
+      continuityFingerprint: item.continuityFingerprint,
+      importanceScore: Math.round(item.importanceScore ?? item.matchScore ?? 0),
+    })),
+  );
 
   return (
     <AppShell currentPath="/dashboard" mode={data.mode} account={viewer}>
@@ -71,6 +83,30 @@ export default async function DashboardPage({
           </div>
         ) : null}
 
+        {sessionSummary ? (
+          <Panel className="p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                  Since your last pass
+                </p>
+                <h2 className="mt-1.5 text-xl font-semibold text-[var(--foreground)]">
+                  What changed since yesterday
+                </h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  New signals are surfaced first, updates stay visible, and the feed closes with a calm caught-up moment.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <StateMetric label="Reviewed" value={sessionSummary.reviewedCount} />
+                <StateMetric label="New" value={sessionSummary.newCount} />
+                <StateMetric label="Changed" value={sessionSummary.changedCount} />
+                <StateMetric label="Escalated" value={sessionSummary.escalatedCount} />
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+
         {/* Priority scan + coverage map */}
         <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
           <Panel className="p-5">
@@ -85,9 +121,10 @@ export default async function DashboardPage({
               </div>
               <div className="flex items-center gap-2">
                 <Badge>{topEvents.length} {topEvents.length === 1 ? "event" : "events"}</Badge>
-                {isLiveBriefing && !allRead ? (
+                {canTrackProgress && !isCaughtUp ? (
                   <form action={markAllReadAction}>
                     <input type="hidden" name="briefingId" value={data.briefing.id} />
+                    <input type="hidden" name="eventStates" value={serializedEventStates} />
                     <button
                       type="submit"
                       className="flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-white/60 px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-white"
@@ -112,6 +149,11 @@ export default async function DashboardPage({
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{event.topicName}</Badge>
                       <Badge className="text-[var(--accent)]">Top event</Badge>
+                      {getDisplayStateLabel(event.displayState) ? (
+                        <Badge className={getDisplayStateTone(event.displayState)}>
+                          {getDisplayStateLabel(event.displayState)}
+                        </Badge>
+                      ) : null}
                       <Badge>{sourceCount} {sourceCount === 1 ? "source" : "sources"}</Badge>
                     </div>
                     {primarySourceUrl ? (
@@ -220,8 +262,45 @@ export default async function DashboardPage({
             </div>
           ))}
         </section>
+
+        {canTrackProgress ? (
+          <Panel className="p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              Session status
+            </p>
+            {isCaughtUp ? (
+              <>
+                <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                  You&apos;re caught up
+                </h2>
+                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                  {sessionSummary?.reviewedCount ?? 0} events reviewed today, with {sessionSummary?.newCount ?? 0} new,{" "}
+                  {sessionSummary?.changedCount ?? 0} changed, and {sessionSummary?.escalatedCount ?? 0} escalated since your last pass.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                  Keep scanning
+                </h2>
+                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                  Mark events as read as you finish them. When everything in today&apos;s feed is reviewed, this becomes your closure point.
+                </p>
+              </>
+            )}
+          </Panel>
+        ) : null}
       </div>
     </AppShell>
+  );
+}
+
+function StateMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[18px] border border-[var(--line)] bg-white/60 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">{value}</p>
+    </div>
   );
 }
 

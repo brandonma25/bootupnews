@@ -85,6 +85,16 @@ create table if not exists public.daily_briefings (
   unique (user_id, briefing_date)
 );
 
+create table if not exists public.user_event_state (
+  user_id uuid not null,
+  event_key text not null,
+  last_viewed_at timestamptz,
+  last_seen_at timestamptz not null default now(),
+  last_seen_fingerprint text,
+  last_seen_importance_score numeric,
+  primary key (user_id, event_key)
+);
+
 create table if not exists public.briefing_items (
   id uuid primary key default gen_random_uuid(),
   briefing_id uuid not null references public.daily_briefings(id) on delete cascade,
@@ -125,6 +135,7 @@ alter table public.events enable row level security;
 alter table public.article_topics enable row level security;
 alter table public.daily_briefings enable row level security;
 alter table public.briefing_items enable row level security;
+alter table public.user_event_state enable row level security;
 
 create policy "Users manage their own profile" on public.user_profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -173,3 +184,6 @@ create policy "Users manage their own briefing items" on public.briefing_items
       and public.daily_briefings.user_id = auth.uid()
     )
   );
+
+create policy "Users manage their own event state" on public.user_event_state
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

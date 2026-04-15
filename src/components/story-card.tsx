@@ -4,6 +4,7 @@ import { toggleReadAction } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { getArticleRationale } from "@/lib/article-rationale";
+import { getDisplayStateLabel, getDisplayStateTone } from "@/lib/habit-loop";
 import type { BriefingItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { minutesToLabel } from "@/lib/utils";
@@ -13,6 +14,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
   const sourceCount = item.sourceCount ?? item.sources.length;
   const relatedCoverage = item.relatedArticles?.length ? item.relatedArticles : null;
   const rationale = getArticleRationale(item);
+  const displayStateLabel = getDisplayStateLabel(item.displayState);
 
   return (
     <Panel className={cn("p-6 transition-opacity", item.read && "opacity-50 hover:opacity-80")}>
@@ -23,6 +25,9 @@ export function StoryCard({ item }: { item: BriefingItem }) {
               <Badge>{item.topicName}</Badge>
               {item.priority === "top" ? (
                 <Badge className="text-[var(--accent)]">Top event</Badge>
+              ) : null}
+              {displayStateLabel ? (
+                <Badge className={getDisplayStateTone(item.displayState)}>{displayStateLabel}</Badge>
               ) : null}
               <Badge>{sourceCount} {sourceCount === 1 ? "source" : "sources"}</Badge>
               {item.read ? (
@@ -72,9 +77,16 @@ export function StoryCard({ item }: { item: BriefingItem }) {
             </div>
           </div>
 
-          {item.id.startsWith("generated-") ? null : (
+          {item.continuityKey && item.continuityFingerprint ? (
             <form action={toggleReadAction}>
               <input type="hidden" name="itemId" value={item.id} />
+              <input type="hidden" name="eventKey" value={item.continuityKey} />
+              <input type="hidden" name="continuityFingerprint" value={item.continuityFingerprint} />
+              <input
+                type="hidden"
+                name="importanceScore"
+                value={String(Math.round(item.importanceScore ?? item.matchScore ?? 0))}
+              />
               <input type="hidden" name="current" value={String(item.read)} />
               <button
                 className={cn(
@@ -92,7 +104,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
                 {item.read ? "Read" : "Mark as read"}
               </button>
             </form>
-          )}
+          ) : null}
         </div>
 
         <section className="space-y-2">

@@ -2,6 +2,12 @@ import { createHash } from "crypto";
 import { formatISO } from "date-fns";
 
 import { demoDashboardData, demoHistory, demoSources, demoTopics } from "@/lib/demo-data";
+import {
+  classifyEventDisplayState,
+  createContinuityFingerprint,
+  createContinuityKey,
+  summarizeSessionStates,
+} from "@/lib/habit-loop";
 import { countSourcesByHomepageCategory } from "@/lib/homepage-taxonomy";
 import { logServerEvent } from "@/lib/observability";
 import { selectRelatedCoverage } from "@/lib/related-coverage";
@@ -30,6 +36,7 @@ type StoredArticle = {
   published_at: string | null;
   url: string;
   source_id: string | null;
+  dedupe_key?: string | null;
   event_id?: string | null;
 };
 
@@ -62,6 +69,13 @@ type EventCluster = {
   sources: EventSeedArticle[];
 };
 
+type UserEventStateRow = {
+  event_key: string;
+  last_viewed_at: string | null;
+  last_seen_fingerprint: string | null;
+  last_seen_importance_score: number | null;
+};
+
 function createEmptyBriefing(): DailyBriefing {
   return {
     id: `generated-empty-${Date.now()}`,
@@ -70,6 +84,12 @@ function createEmptyBriefing(): DailyBriefing {
     intro: "No clustered events yet for your current topics. Try adjusting keywords or refreshing your briefing.",
     readingWindow: "0 minutes",
     items: [],
+    sessionSummary: {
+      reviewedCount: 0,
+      newCount: 0,
+      changedCount: 0,
+      escalatedCount: 0,
+    },
   };
 }
 
@@ -613,7 +633,7 @@ export async function buildMatchedBriefing(
   const [articleResult, eventResult, matchResult] = await Promise.all([
     supabase
       .from("articles")
-      .select("id, title, summary_text, published_at, url, source_id, event_id")
+      .select("id, title, summary_text, published_at, url, source_id, dedupe_key, event_id")
       .eq("user_id", userId),
     supabase
       .from("events")
@@ -674,7 +694,7 @@ export async function buildMatchedBriefing(
     articlesByEvent.set(article.event_id, bucket);
   });
 
-  const items = events
+  const draftItems = events
     .map((event) => {
       const eventArticles = (articlesByEvent.get(event.id) ?? []).sort(
         (left, right) =>
@@ -698,6 +718,11 @@ export async function buildMatchedBriefing(
       const relatedArticles = buildRelatedArticles(eventArticles);
       const sourceCount = new Set(eventArticles.map((article) => article.sourceName)).size;
       const freshest = eventArticles[0];
+      const continuityKey = createContinuityKey(
+        topic.id,
+        eventArticles.map((article) => article.title),
+        matchedKeywords,
+      );
 
       return {
         id: `generated-event-${event.id}`,
@@ -728,6 +753,13 @@ export async function buildMatchedBriefing(
         importanceScore: rankedCluster?.importanceScore,
         importanceLabel: rankedCluster?.importanceLabel,
         rankingSignals: rankedCluster?.rankingSignals ?? [],
+        continuityKey,
+        continuityFingerprint: createContinuityFingerprint({
+          articleSignals: eventArticles.map((article) => article.dedupe_key || article.url || article.title),
+          importanceScore: rankedCluster?.importanceScore,
+          publishedAt: freshest.published_at ?? undefined,
+          sourceCount,
+        }),
       } satisfies BriefingItem;
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
@@ -743,9 +775,39 @@ export async function buildMatchedBriefing(
       priority: index < 5 ? ("top" as const) : ("normal" as const),
     }));
 
-  if (!items.length) {
+  if (!draftItems.length) {
     return createEmptyBriefing();
   }
+
+  const stateByKey = await getUserEventStateMap(
+    supabase,
+    userId,
+    draftItems.map((item) => item.continuityKey).filter((value): value is string => Boolean(value)),
+  );
+
+  const items = draftItems.map((item) => {
+    const state = item.continuityKey ? stateByKey.get(item.continuityKey) : undefined;
+    const displayState = classifyEventDisplayState({
+      lastViewedAt: state?.last_viewed_at,
+      previousFingerprint: state?.last_seen_fingerprint,
+      currentFingerprint: item.continuityFingerprint ?? "",
+      previousImportanceScore: state?.last_seen_importance_score,
+      currentImportanceScore: item.importanceScore,
+    });
+    const read = Boolean(
+      state?.last_viewed_at &&
+      state?.last_seen_fingerprint &&
+      item.continuityFingerprint &&
+      state.last_seen_fingerprint === item.continuityFingerprint,
+    );
+
+    return {
+      ...item,
+      displayState,
+      read,
+      lastViewedAt: state?.last_viewed_at ?? undefined,
+    };
+  });
 
   return {
     id: `generated-${Date.now()}`,
@@ -754,6 +816,7 @@ export async function buildMatchedBriefing(
     intro: "Related reporting is clustered into events so you can scan developments instead of isolated articles.",
     readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
     items,
+    sessionSummary: summarizeSessionStates(items),
   };
 }
 
@@ -931,6 +994,36 @@ function getPrimaryMatches(matches: StoredArticleTopic[]) {
   });
 
   return primaryMatches;
+}
+
+async function getUserEventStateMap(
+  supabase: SupabaseServerClient,
+  userId: string,
+  continuityKeys: string[],
+) {
+  if (!continuityKeys.length) {
+    return new Map<string, UserEventStateRow>();
+  }
+
+  const stateResult = await supabase
+    .from("user_event_state")
+    .select("event_key, last_viewed_at, last_seen_fingerprint, last_seen_importance_score")
+    .eq("user_id", userId)
+    .in("event_key", continuityKeys);
+
+  if (stateResult.error) {
+    logServerEvent("warn", "Habit loop state lookup failed", {
+      route: "/dashboard",
+      userId,
+      errorMessage: stateResult.error.message,
+      requestedKeys: continuityKeys.length,
+    });
+    return new Map<string, UserEventStateRow>();
+  }
+
+  return new Map(
+    ((stateResult.data ?? []) as UserEventStateRow[]).map((row) => [row.event_key, row]),
+  );
 }
 
 function clusterEventSeedArticles(articles: EventSeedArticle[]): EventCluster[] {
