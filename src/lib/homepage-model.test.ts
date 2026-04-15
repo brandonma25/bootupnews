@@ -168,4 +168,64 @@ describe("buildHomepageViewModel", () => {
 
     expect(politicsSection?.excludedReasons.join(" ")).toContain("classified as Finance");
   });
+
+  it("uses ranking quality instead of the old priority bonus to order homepage events", () => {
+    const weakTop = createItem({
+      id: "weak-top",
+      priority: "top",
+      title: "Thin single-source update",
+      importanceScore: 50,
+      eventIntelligence: {
+        id: "intel-weak",
+        title: "Thin single-source update",
+        summary: "A light update happened.",
+        primaryChange: "Thin single-source update",
+        keyEntities: ["Company"],
+        topics: ["finance"],
+        signals: {
+          articleCount: 1,
+          sourceDiversity: 1,
+          recencyScore: 80,
+          velocityScore: 20,
+        },
+        rankingScore: 50,
+        rankingReason: "Early single-source coverage kept this on the radar.",
+        confidenceScore: 44,
+        isHighSignal: true,
+        createdAt: "2026-04-15T08:00:00.000Z",
+      },
+    });
+    const strongerNormal = createItem({
+      id: "strong-normal",
+      priority: "normal",
+      title: "Broadly confirmed policy shift",
+      importanceScore: 82,
+      eventIntelligence: {
+        id: "intel-strong",
+        title: "Broadly confirmed policy shift",
+        summary: "Multiple outlets confirmed a broader policy move.",
+        primaryChange: "Broadly confirmed policy shift",
+        keyEntities: ["White House"],
+        topics: ["politics"],
+        signals: {
+          articleCount: 6,
+          sourceDiversity: 4,
+          recencyScore: 75,
+          velocityScore: 68,
+        },
+        rankingScore: 82,
+        rankingReason: "Broad multi-source reporting kept this near the top of the briefing.",
+        confidenceScore: 78,
+        isHighSignal: true,
+        createdAt: "2026-04-15T07:00:00.000Z",
+      },
+    });
+
+    const model = buildHomepageViewModel(createData([weakTop, strongerNormal]));
+
+    expect(model.topRanked.map((event) => event.id).slice(0, 2)).toEqual([
+      "strong-normal",
+      "weak-top",
+    ]);
+  });
 });

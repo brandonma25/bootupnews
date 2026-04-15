@@ -87,4 +87,42 @@ describe("StoryCard timeline", () => {
 
     expect(screen.getByText("No timeline available yet")).toBeInTheDocument();
   });
+
+  it("shows compact ranking explainability signals on the card", () => {
+    render(
+      <StoryCard
+        item={createItem({
+          publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          eventIntelligence: {
+            id: "intel-1",
+            title: "Fed signals rates will stay elevated",
+            summary: "Markets are repricing after the latest Fed signal.",
+            primaryChange: "Fed signaled rates will stay elevated",
+            keyEntities: ["Federal Reserve"],
+            topics: ["finance"],
+            signals: {
+              articleCount: 5,
+              sourceDiversity: 3,
+              recencyScore: 88,
+              velocityScore: 80,
+            },
+            rankingScore: 79,
+            rankingReason:
+              "Broad coverage around the Federal Reserve across 5 articles from 3 sources.",
+            confidenceScore: 77,
+            isHighSignal: true,
+            createdAt: "2026-04-15T08:00:00.000Z",
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Why this ranks")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Broad coverage around the Federal Reserve across 5 articles from 3 sources/i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("Covered by 5 articles")).toBeInTheDocument();
+    expect(screen.getByText("Seen across 3 sources")).toBeInTheDocument();
+  });
 });

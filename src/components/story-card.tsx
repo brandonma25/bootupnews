@@ -3,6 +3,7 @@ import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
 import { toggleReadAction } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
+import { buildRankingDisplaySignals } from "@/lib/ranking";
 import type { BriefingItem } from "@/lib/types";
 import { buildTrustLayerPresentation } from "@/lib/why-it-matters";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
   const primarySourceUrl = item.sources.find((source) => isValidStoryUrl(source.url))?.url;
   const sourceCount = item.sourceCount ?? item.sources.length;
   const relatedCoverage = item.relatedArticles?.length ? item.relatedArticles : null;
+  const rankingDisplaySignals = buildRankingDisplaySignals(item);
   const trustLayer = buildTrustLayerPresentation(item.eventIntelligence, {
     title: item.title,
     topicName: item.topicName,
@@ -31,6 +33,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
                 <Badge className="text-[var(--accent)]">Top event</Badge>
               ) : null}
               <Badge>{sourceCount} {sourceCount === 1 ? "source" : "sources"}</Badge>
+              {rankingDisplaySignals[0] ? <Badge>{rankingDisplaySignals[0]}</Badge> : null}
               {item.read ? (
                 <Badge className="text-[var(--muted)]">Read</Badge>
               ) : null}
@@ -112,6 +115,29 @@ export function StoryCard({ item }: { item: BriefingItem }) {
               </li>
             ))}
           </ul>
+        </section>
+
+        <section className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            Why this ranks
+          </p>
+          <p className="text-sm leading-7 text-[var(--foreground)]">
+            {item.eventIntelligence?.rankingReason ??
+              item.rankingSignals?.[0] ??
+              "This event rose because it cleared the current ranking thresholds."}
+          </p>
+          {rankingDisplaySignals.length > 1 ? (
+            <div className="flex flex-wrap gap-2">
+              {rankingDisplaySignals.slice(1).map((signal) => (
+                <span
+                  key={signal}
+                  className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-2.5 py-1 text-xs font-medium text-[var(--muted)]"
+                >
+                  {signal}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="space-y-2" data-trust-tier={trustLayer.tier}>

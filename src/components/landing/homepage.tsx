@@ -579,8 +579,9 @@ function EventCard({
 
       <div className="flex flex-wrap gap-2 text-xs font-medium text-[var(--muted)]">
         <MetaPill>{minutesToLabel(event.estimatedMinutes)} read</MetaPill>
-        <MetaPill>{event.sourceCount} related sources</MetaPill>
-        {event.rankingSignals[1] ? <MetaPill>{event.rankingSignals[1]}</MetaPill> : null}
+        {event.rankingDisplaySignals.map((signal) => (
+          <MetaPill key={signal}>{signal}</MetaPill>
+        ))}
       </div>
     </div>
   );

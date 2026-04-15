@@ -10,6 +10,11 @@ import {
   type HomepageCategoryKey,
 } from "@/lib/homepage-taxonomy";
 import { buildTrustLayerPresentation, type TrustLayerPresentation } from "@/lib/why-it-matters";
+import {
+  buildRankingDisplaySignals,
+  compareBriefingItemsByRanking,
+  getBriefingRankSnapshot,
+} from "@/lib/ranking";
 import { firstSentence } from "@/lib/utils";
 
 export type EventArticle = {
@@ -35,6 +40,7 @@ export type HomepageEvent = {
   estimatedMinutes: number;
   importanceLabel?: BriefingItem["importanceLabel"];
   rankingSignals: string[];
+  rankingDisplaySignals: string[];
   matchedKeywords: string[];
   priority: BriefingItem["priority"];
   rankScore: number;
@@ -156,7 +162,7 @@ export function buildHomepageViewModel(data: DashboardData): HomepageViewModel {
 export function buildHomepageEvents(items: BriefingItem[]) {
   return items
     .slice()
-    .sort((left, right) => getRankScore(right) - getRankScore(left))
+    .sort(compareBriefingItemsByRanking)
     .map((item, index, sortedItems) => {
       const classification = classifyHomepageCategory({
         topicName: item.topicName,
@@ -187,6 +193,7 @@ export function buildHomepageEvents(items: BriefingItem[]) {
         estimatedMinutes: item.estimatedMinutes,
         importanceLabel: item.importanceLabel,
         rankingSignals: item.rankingSignals ?? [],
+        rankingDisplaySignals: buildRankingDisplaySignals(item),
         matchedKeywords: item.matchedKeywords ?? [],
         priority: item.priority,
         rankScore: getRankScore(item) - index * 0.01,
@@ -298,7 +305,8 @@ function getExclusionReason(event: HomepageEvent, categoryKey: HomepageCategoryK
 }
 
 function getRankScore(item: BriefingItem) {
-  return (item.eventIntelligence?.rankingScore ?? item.importanceScore ?? 0) + (item.matchScore ?? 0) + (item.priority === "top" ? 100 : 0);
+  const snapshot = getBriefingRankSnapshot(item);
+  return snapshot.rankingScore + snapshot.confidenceScore / 1000 + snapshot.freshestTimestamp / 1_000_000_000_000;
 }
 
 function summarize(value: string, maxSentences: number) {
