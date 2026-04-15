@@ -71,6 +71,11 @@ function createEmptyBriefing(): DailyBriefing {
   };
 }
 
+function getDerivedDashboardUpdatedAt() {
+  // TODO: Replace this request-time fallback with persisted backend refresh metadata once briefings store an updated timestamp.
+  return new Date().toISOString();
+}
+
 export async function getViewerAccount(): Promise<ViewerAccount | null> {
   const { user, sessionCookiePresent } = await safeGetUser("/");
 
@@ -136,6 +141,14 @@ export async function getDashboardData(): Promise<DashboardData> {
           .select("id, user_id, name, feed_url, homepage_url, topic_id, status, created_at, topics(name)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
+        supabase
+          .from("daily_briefings")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .eq("briefing_date", new Date().toISOString().slice(0, 10))
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]),
     null,
     { route: "/dashboard", userId: user.id },
@@ -150,14 +163,15 @@ export async function getDashboardData(): Promise<DashboardData> {
     return getPublicDashboardData();
   }
 
-  const [topicsResult, sourcesResult] = dashboardQueryResults;
+  const [topicsResult, sourcesResult, briefingMetaResult] = dashboardQueryResults;
 
-  if (topicsResult.error || sourcesResult.error) {
+  if (topicsResult.error || sourcesResult.error || briefingMetaResult.error) {
     logServerEvent("warn", "Dashboard data degraded to public fallback", {
       route: "/dashboard",
       userId: user.id,
       topicsError: topicsResult.error?.message,
       sourcesError: sourcesResult.error?.message,
+      briefingMetaError: briefingMetaResult.error?.message,
     });
     return getPublicDashboardData();
   }
@@ -198,6 +212,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     topics,
     sources,
     briefing,
+    lastUpdatedAt: briefingMetaResult.data?.created_at ?? getDerivedDashboardUpdatedAt(),
   };
 }
 
@@ -209,6 +224,7 @@ async function getPublicDashboardData(): Promise<DashboardData> {
     briefing,
     topics: demoTopics,
     sources: demoSources,
+    lastUpdatedAt: getDerivedDashboardUpdatedAt(),
   };
 }
 

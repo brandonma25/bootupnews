@@ -199,4 +199,5 @@ export const demoDashboardData: DashboardData = {
   briefing: demoBriefing,
   topics: demoTopics,
   sources: demoSources,
+  lastUpdatedAt: new Date().toISOString(),
 };

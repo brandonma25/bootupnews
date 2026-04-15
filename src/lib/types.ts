@@ -69,11 +69,14 @@ export type DailyBriefing = {
   items: BriefingItem[];
 };
 
+export type DashboardViewState = "loading" | "empty" | "ready";
+
 export type DashboardData = {
   mode: "demo" | "live" | "public";
   briefing: DailyBriefing;
   topics: Topic[];
   sources: Source[];
+  lastUpdatedAt: string;
 };
 
 export type ViewerAccount = {
