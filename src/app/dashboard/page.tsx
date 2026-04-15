@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { AlertCircle, CheckCheck, ExternalLink, RefreshCw } from "lucide-react";
+import { CheckCheck, ExternalLink } from "lucide-react";
 
-import { generateBriefingAction, markAllReadAction } from "@/app/actions";
+import { markAllReadAction } from "@/app/actions";
 import { PageHeader } from "@/components/page-header";
 import { StoryCard } from "@/components/story-card";
 import { AppShell } from "@/components/app-shell";
+import { ManualRefreshTrigger } from "@/components/dashboard/manual-refresh-trigger";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { getDashboardData, getViewerAccount } from "@/lib/data";
 import { isAiConfigured } from "@/lib/env";
@@ -53,31 +52,10 @@ export default async function DashboardPage({
           title={data.briefing.title}
           description={data.briefing.intro}
           aside={
-            <div className="flex flex-col items-stretch gap-2 min-w-[168px]">
-              <div className="rounded-[22px] border border-[var(--line)] bg-white/70 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                  Reading window
-                </p>
-                <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">
-                  {data.briefing.readingWindow}
-                </p>
-              </div>
-              {isAiConfigured ? (
-                <form action={generateBriefingAction}>
-                  <Button className="w-full gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh briefing
-                  </Button>
-                </form>
-              ) : (
-                <Link href="/settings">
-                  <Button variant="secondary" className="w-full gap-2 text-xs">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    Connect AI key
-                  </Button>
-                </Link>
-              )}
-            </div>
+            <ManualRefreshTrigger
+              readingWindow={data.briefing.readingWindow}
+              isAiConfigured={isAiConfigured}
+            />
           }
         />
 
@@ -180,7 +158,7 @@ export default async function DashboardPage({
                 Events by topic in today&apos;s briefing
               </p>
               <div className="mt-4 space-y-3">
-                {grouped.map(({ topic, items }) => {
+                {grouped.map(({ topic }) => {
                   const total = data.briefing.items.filter((i) => i.topicId === topic.id).length;
                   return (
                     <a
