@@ -187,57 +187,34 @@ export function getSignalStrength(input: {
   recencyScore?: number;
   velocityScore?: number;
 }): EventSignalStrength {
-  let score = 0;
+  let score = getEventTypeSignalWeight(input.eventType);
+  const sourceTierWeight = getSourceTierSignalWeight(input.sourceNames ?? []);
 
-  score += getEventTypeSignalWeight(input.eventType);
-  score += getSourceTierSignalWeight(input.sourceNames ?? []);
-
-  if (input.sourceDiversity >= 3) {
-    score += 2;
-  } else if (input.sourceDiversity >= 2) {
+  if (sourceTierWeight >= 2 || input.sourceDiversity >= 2) {
     score += 1;
   }
 
-  if (input.articleCount >= 4) {
-    score += 1;
-  } else if (input.articleCount <= 1) {
+  if (input.articleCount <= 1 && input.sourceDiversity <= 1) {
     score -= 1;
   }
 
-  if (input.affectedMarkets.length >= 2 || input.topics.includes("finance")) {
+  if (input.eventType === "product" && input.affectedMarkets.length >= 2 && sourceTierWeight >= 1) {
     score += 1;
   }
 
-  const noveltyScore = Math.max(input.recencyScore ?? 0, input.velocityScore ?? 0);
-  if (noveltyScore >= 75) {
+  if (input.eventType === "corporate" && input.rankingScore >= 65) {
     score += 1;
-  }
-
-  if (input.rankingScore >= 78) {
-    score += 1;
-  }
-
-  if (input.sourceDiversity <= 1) {
-    score -= 1;
   }
 
   if (input.eventType === "company_update" && input.sourceDiversity <= 1) {
     score -= 1;
   }
 
-  if (
-    (input.eventType === "governance_politics" || input.eventType === "product_launch_major") &&
-    input.sourceDiversity <= 1 &&
-    input.articleCount <= 1
-  ) {
-    score -= 1;
-  }
-
-  if (score >= 7) {
+  if (score >= 2) {
     return "strong";
   }
 
-  if (score >= 4) {
+  if (score >= 1) {
     return "moderate";
   }
 
@@ -332,14 +309,15 @@ function inferEventType(
   );
 
   const rules: Array<[string, string[]]> = [
-    ["earnings_financials", ["earnings", "guidance", "revenue", "profit", "quarter", "results"]],
+    ["defense", ["department of defense", "classified", "government", "military", "pentagon", "defense department"]],
+    ["political", ["election", "minister", "foreign office", "foreign minister", "cabinet", "parliament", "vetting", "ambassador", "appointment"]],
+    ["corporate", ["earnings", "guidance", "revenue", "profit", "quarter", "results"]],
+    ["product", ["product launch", "launch", "launched", "feature", "features", "update", "updated", "release", "released", "rollout", "debut", "debuts", "adds"]],
     ["legal_investigation", ["lawsuit", "probe", "investigation", "charges", "doj", "sec", "antitrust case"]],
-    ["governance_politics", ["vetting", "ambassador", "minister", "foreign office", "cabinet", "parliament", "appointment", "diplomatic", "diplomacy"]],
     ["policy_regulation", ["regulation", "regulatory", "antitrust", "rule", "rules", "senate", "congress", "policy", "ban", "approval", "approved", "export restrictions", "tariff"]],
     ["macro_market_move", ["inflation", "fed", "federal reserve", "rates", "treasury", "jobs", "gdp", "economy", "economic", "trade"]],
     ["mna_funding", ["acquisition", "acquire", "merger", "buyout", "takeover", "stake", "deal", "funding", "raises", "series a", "series b"]],
-    ["product_launch_major", ["launch", "launched", "unveiled", "release", "released", "rollout", "debuts", "adds"]],
-    ["geopolitics", ["sanctions", "war", "military", "diplomacy", "china", "russia", "ukraine", "taiwan", "middle east", "border"]],
+    ["geopolitical", ["sanctions", "war", "diplomacy", "china", "russia", "ukraine", "taiwan", "middle east", "border"]],
   ];
 
   const matchedRule = rules.find(([, keywords]) => keywords.some((keyword) => matchesKeyword(corpus, keyword)));
@@ -357,19 +335,21 @@ function inferPrimaryImpact(input: {
   const marketLabel = input.affectedMarkets[0] ?? "investor expectations";
 
   switch (input.eventType) {
-    case "earnings_financials":
+    case "corporate":
       return `${entityLabel} is resetting near-term expectations for pricing, margins, or guidance in ${marketLabel}.`;
+    case "political":
+      return `${entityLabel} may affect governance credibility, diplomatic standing, or policy risk around the story.`;
+    case "defense":
+      return `${entityLabel} may change defense posture, state capacity, or international risk assumptions tied to ${marketLabel}.`;
     case "policy_regulation":
       return `${entityLabel} could alter operating rules, compliance costs, or market access across ${marketLabel}.`;
     case "macro_market_move":
       return `${entityLabel} changes the rate, demand, or liquidity backdrop feeding into ${marketLabel}.`;
     case "mna_funding":
       return `${entityLabel} can shift competitive positioning, capital allocation, and consolidation expectations in ${marketLabel}.`;
-    case "governance_politics":
-      return `${entityLabel} may affect governance credibility, diplomatic standing, or political accountability around the story.`;
-    case "geopolitics":
+    case "geopolitical":
       return `${entityLabel} may disrupt supply chains, policy alignment, or risk premiums tied to ${marketLabel}.`;
-    case "product_launch_major":
+    case "product":
       return `${entityLabel} could change adoption curves, platform choice, or buyer expectations in ${marketLabel}.`;
     case "legal_investigation":
       return `${entityLabel} may raise liability, operating constraints, or reputational risk across ${marketLabel}.`;
@@ -398,27 +378,43 @@ function inferAffectedMarkets(
     affected.add("equities");
   }
 
-  if (eventType === "earnings_financials" || corpus.includes("guidance") || corpus.includes("revenue")) {
-    affected.add("equities");
-    affected.add("sector sentiment");
+  if (eventType === "corporate" || corpus.includes("guidance") || corpus.includes("revenue")) {
+    affected.add("financials");
+    affected.add("margins");
+    affected.add("valuation");
   }
 
-  if (eventType === "policy_regulation" || eventType === "governance_politics" || eventType === "geopolitics" || eventType === "legal_investigation") {
+  if (eventType === "policy_regulation") {
     affected.add("policy-sensitive sectors");
   }
 
   if (eventType === "mna_funding") {
-    affected.add("corporate valuations");
+    affected.add("competition");
+    affected.add("market structure");
   }
 
-  if (eventType === "product_launch_major") {
-    affected.add("technology");
-    affected.add("platform competition");
+  if (eventType === "product") {
+    affected.add("adoption");
+    affected.add("user behavior");
+    affected.add("competitive feature dynamics");
   }
 
-  if (eventType === "governance_politics") {
-    affected.add("diplomatic credibility");
-    affected.add("political accountability");
+  if (eventType === "political") {
+    affected.add("governance credibility");
+    affected.add("policy risk");
+    affected.add("international relations");
+  }
+
+  if (eventType === "defense" || eventType === "geopolitical") {
+    affected.add("policy risk");
+    affected.add("defense posture");
+    affected.add("international relations");
+  }
+
+  if (eventType === "legal_investigation") {
+    affected.add("liability");
+    affected.add("operations");
+    affected.add("reputation");
   }
 
   if (corpus.includes("chip") || corpus.includes("semiconductor")) {
@@ -433,11 +429,11 @@ function inferAffectedMarkets(
     affected.add("credit");
   }
 
-  if (topics.includes("finance") && eventType !== "governance_politics") {
+  if (topics.includes("finance") && !["political", "defense", "geopolitical"].includes(eventType)) {
     affected.add("equities");
   }
 
-  if (topics.includes("tech") && eventType !== "governance_politics") {
+  if (topics.includes("tech") && !["political", "defense", "geopolitical"].includes(eventType)) {
     affected.add("technology");
   }
 
@@ -455,15 +451,17 @@ function inferTimeHorizon(eventType: string, articles: FeedArticle[]): EventTime
 
   if (
     eventType === "policy_regulation" ||
-    eventType === "governance_politics" ||
-    eventType === "geopolitics" ||
+    eventType === "defense" ||
+    eventType === "geopolitical" ||
     corpus.includes("multi-year") ||
     corpus.includes("long term")
   ) {
-    return eventType === "governance_politics" ? "medium" : "long";
+    return "long";
   }
 
   if (
+    eventType === "political" ||
+    eventType === "corporate" ||
     eventType === "macro_market_move" ||
     eventType === "mna_funding" ||
     eventType === "legal_investigation" ||
@@ -590,17 +588,18 @@ function buildRankingReason(input: {
 
 function getEventTypeSignalWeight(eventType: string) {
   switch (eventType) {
+    case "defense":
+    case "geopolitical":
+    case "political":
     case "policy_regulation":
-    case "earnings_financials":
     case "macro_market_move":
-      return 3;
-    case "mna_funding":
-    case "geopolitics":
-    case "legal_investigation":
       return 2;
-    case "governance_politics":
-    case "product_launch_major":
+    case "corporate":
+    case "mna_funding":
+    case "legal_investigation":
       return 1;
+    case "product":
+      return 0;
     default:
       return 0;
   }

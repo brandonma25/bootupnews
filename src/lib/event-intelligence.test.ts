@@ -104,34 +104,48 @@ describe("buildEventIntelligence", () => {
 
     expect(
       getSignalStrength({
-        eventType: "governance_politics",
-        affectedMarkets: ["diplomatic credibility"],
+        eventType: "corporate",
+        affectedMarkets: ["financials", "valuation"],
         sourceDiversity: 1,
         articleCount: 1,
         rankingScore: 48,
-        topics: ["politics"],
+        topics: ["finance"],
         sourceNames: ["Reuters"],
         recencyScore: 72,
         velocityScore: 20,
       }),
-    ).toBe("weak");
+    ).toBe("moderate");
 
     expect(
       getSignalStrength({
-        eventType: "macro_market_move",
-        affectedMarkets: ["housing", "consumer demand"],
-        sourceDiversity: 2,
-        articleCount: 2,
+        eventType: "defense",
+        affectedMarkets: ["defense posture", "international relations"],
+        sourceDiversity: 1,
+        articleCount: 1,
         rankingScore: 67,
-        topics: ["finance"],
-        sourceNames: ["Reuters", "Financial Times"],
+        topics: ["politics"],
+        sourceNames: ["Reuters"],
         recencyScore: 85,
         velocityScore: 64,
       }),
     ).toBe("strong");
+
+    expect(
+      getSignalStrength({
+        eventType: "product",
+        affectedMarkets: ["adoption"],
+        sourceDiversity: 1,
+        articleCount: 1,
+        rankingScore: 40,
+        topics: ["tech"],
+        sourceNames: ["TechCrunch"],
+        recencyScore: 80,
+        velocityScore: 20,
+      }),
+    ).toBe("weak");
   });
 
-  it("covers product launches, legal investigations, and governance stories with explicit event typing", () => {
+  it("routes product, legal, political, and defense stories into explicit event types and safe domains", () => {
     const product = buildEventIntelligence(
       [
         createArticle({
@@ -165,12 +179,27 @@ describe("buildEventIntelligence", () => {
       { topicName: "Politics" },
     );
 
-    expect(product.eventType).toBe("product_launch_major");
+    const defense = buildEventIntelligence(
+      [
+        createArticle({
+          title: "Google Gemini wins Department of Defense classified prototype contract",
+          summaryText: "The agreement ties Google more closely to sensitive U.S. government AI work.",
+          sourceName: "Reuters",
+        }),
+      ],
+      { topicName: "Tech" },
+    );
+
+    expect(product.eventType).toBe("product");
     expect(legal.eventType).toBe("legal_investigation");
-    expect(governance.eventType).toBe("governance_politics");
-    expect(governance.affectedMarkets).toContain("diplomatic credibility");
+    expect(governance.eventType).toBe("political");
+    expect(governance.affectedMarkets).toContain("governance credibility");
     expect(governance.affectedMarkets).not.toContain("technology");
     expect(governance.timeHorizon).toBe("medium");
+    expect(defense.eventType).toBe("defense");
+    expect(defense.affectedMarkets).toContain("defense posture");
+    expect(defense.affectedMarkets).not.toContain("equities");
+    expect(defense.signalStrength).not.toBe("weak");
   });
 });
 

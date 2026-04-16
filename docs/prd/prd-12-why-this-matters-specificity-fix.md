@@ -18,6 +18,10 @@
 - Applied repetition control to fallback outputs as well as standard templates.
 - Added governance-specific reasoning and safer phrasing.
 - Recalibrated signal scoring to penalize thin evidence and vary labels more clearly.
+- Added explicit event routing for defense/geopolitical, political, corporate, and product stories.
+- Added grammar post-processing to catch malformed `because changes` output.
+- Replaced vague fallback phrasing with shorter, specific causal statements.
+- Added stronger subject anchoring rules for generic one-word tokens such as `Mode`.
 
 ## Out of Scope
 - No UI redesign.

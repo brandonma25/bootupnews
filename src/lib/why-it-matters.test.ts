@@ -45,44 +45,61 @@ describe("why-it-matters", () => {
     const text = await generateWhyThisMatters(createIntelligence());
 
     expect(firstClause(text)).toContain("InsightFinder");
-    expect(text.toLowerCase()).not.toContain("this is an early signal with limited confirmed impact");
+    expect(text.toLowerCase()).not.toContain("early signal");
+    expect(text.toLowerCase()).not.toContain("watch for");
   });
 
-  it("uses visibly different reasoning across funding, demand, governance, and macro stories", async () => {
+  it("uses visibly different reasoning across funding, product, political, defense, and macro stories", async () => {
     const funding = await generateWhyThisMatters(
       createIntelligence({
         id: "funding",
       }),
     );
-    const demand = await generateWhyThisMatters(
+    const product = await generateWhyThisMatters(
       createIntelligence({
-        id: "demand",
-        title: "Adobe says AI-driven retail traffic surged in the first quarter",
-        summary: "Adobe data showed sharp AI referral growth for U.S. retailers.",
-        primaryChange: "Adobe reported a surge in AI-driven retail traffic",
-        entities: ["Adobe"],
-        eventType: "macro_market_move",
-        primaryImpact: "The data could affect demand expectations across e-commerce and ad spending.",
-        affectedMarkets: ["retail demand", "e-commerce"],
-        topics: ["finance", "business"],
+        id: "product",
+        title: "Google adds AI Mode to Chrome",
+        summary: "The feature extends browser-integrated AI navigation inside Chrome.",
+        primaryChange: "Google added AI Mode to Chrome",
+        entities: ["Mode"],
+        keyEntities: ["Mode"],
+        eventType: "product",
+        primaryImpact: "The change could alter search behavior and Chrome engagement.",
+        affectedMarkets: ["adoption", "competitive feature dynamics"],
+        topics: ["tech", "business"],
         signalStrength: "moderate",
         confidenceScore: 63,
       }),
     );
-    const governance = await generateWhyThisMatters(
+    const political = await generateWhyThisMatters(
       createIntelligence({
-        id: "governance",
+        id: "political",
         title: "Peter Mandelson failed UK Foreign Office vetting",
         summary: "The setback raises questions about UK diplomatic judgment and political accountability.",
         primaryChange: "Peter Mandelson failed UK Foreign Office vetting",
         entities: ["UK Foreign Office", "Peter Mandelson"],
-        eventType: "governance_politics",
+        eventType: "political",
         primaryImpact: "The development could affect diplomatic credibility and political accountability.",
-        affectedMarkets: ["diplomatic credibility", "political accountability"],
+        affectedMarkets: ["governance credibility", "policy risk"],
         topics: ["politics", "geopolitics"],
         timeHorizon: "medium",
-        signalStrength: "weak",
+        signalStrength: "moderate",
         confidenceScore: 52,
+      }),
+    );
+    const defense = await generateWhyThisMatters(
+      createIntelligence({
+        id: "defense",
+        title: "Google Gemini wins Department of Defense classified prototype contract",
+        summary: "The agreement ties Google more closely to sensitive U.S. government AI work.",
+        primaryChange: "Google Gemini won a Department of Defense classified prototype contract",
+        entities: ["Google", "Department of Defense"],
+        eventType: "defense",
+        primaryImpact: "The contract could affect defense AI procurement and government platform alignment.",
+        affectedMarkets: ["defense posture", "international relations"],
+        topics: ["tech", "politics"],
+        signalStrength: "strong",
+        confidenceScore: 66,
       }),
     );
     const macro = await generateWhyThisMatters(
@@ -102,55 +119,75 @@ describe("why-it-matters", () => {
     );
 
     expect(funding.toLowerCase()).toContain("capital");
-    expect(demand.toLowerCase()).toMatch(/demand|markets price|market expectations|rates/);
-    expect(governance.toLowerCase()).toMatch(/governance|diplomatic|political accountability/);
-    expect(governance.toLowerCase()).not.toMatch(/equities|technology/);
+    expect(product.startsWith("Google")).toBe(true);
+    expect(product.toLowerCase()).toMatch(/adoption|feature|chrome|user behavior/);
+    expect(political.toLowerCase()).toMatch(/governance|policy risk|political accountability|diplomatic/);
+    expect(political.toLowerCase()).not.toMatch(/equities|technology/);
+    expect(defense.toLowerCase()).toMatch(/defense|international relations|policy/);
+    expect(defense.toLowerCase()).not.toMatch(/valuation|equities/);
     expect(macro.toLowerCase()).toMatch(/mortgage|rates|housing/);
   });
 
   it("fails the swap test across unrelated event types", async () => {
     const funding = await generateWhyThisMatters(createIntelligence());
-    const governance = await generateWhyThisMatters(
+    const political = await generateWhyThisMatters(
       createIntelligence({
-        id: "governance-swap",
+        id: "political-swap",
         title: "Peter Mandelson failed UK Foreign Office vetting",
         summary: "The setback raises questions about UK diplomatic judgment and political accountability.",
         primaryChange: "Peter Mandelson failed UK Foreign Office vetting",
         entities: ["UK Foreign Office", "Peter Mandelson"],
-        eventType: "governance_politics",
+        eventType: "political",
         primaryImpact: "The development could affect diplomatic credibility and political accountability.",
-        affectedMarkets: ["diplomatic credibility", "political accountability"],
+        affectedMarkets: ["governance credibility", "policy risk"],
         topics: ["politics", "geopolitics"],
-        signalStrength: "weak",
+        signalStrength: "moderate",
         confidenceScore: 52,
       }),
     );
+    const defense = await generateWhyThisMatters(
+      createIntelligence({
+        id: "defense-swap",
+        title: "Google Gemini wins Department of Defense classified prototype contract",
+        summary: "The agreement ties Google more closely to sensitive U.S. government AI work.",
+        primaryChange: "Google Gemini won a Department of Defense classified prototype contract",
+        entities: ["Google", "Department of Defense"],
+        eventType: "defense",
+        primaryImpact: "The contract could affect defense AI procurement and government platform alignment.",
+        affectedMarkets: ["defense posture", "international relations"],
+        topics: ["tech", "politics"],
+        signalStrength: "strong",
+        confidenceScore: 66,
+      }),
+    );
 
-    expect(funding).not.toBe(governance);
+    expect(funding).not.toBe(political);
+    expect(political).not.toBe(defense);
     expect(funding.toLowerCase()).not.toContain("diplomatic credibility");
-    expect(governance.toLowerCase()).not.toContain("capital availability");
+    expect(political.toLowerCase()).not.toContain("capital availability");
+    expect(defense.toLowerCase()).not.toContain("valuation");
   });
 
-  it("falls back honestly for low-data governance stories without drifting into finance or tech language", async () => {
+  it("uses concise limited-data copy without fallback-style vagueness or finance drift for political stories", async () => {
     const text = await generateWhyThisMatters(
       createIntelligence({
-        id: "governance-fallback",
+        id: "political-fallback",
         title: "Peter Mandelson failed UK Foreign Office vetting",
         summary: "The setback raises questions about UK diplomatic judgment and political accountability.",
         entities: ["Wait"],
         keyEntities: ["Wait"],
-        eventType: "governance_politics",
+        eventType: "political",
         primaryImpact: "The development could affect diplomatic credibility and political accountability.",
-        affectedMarkets: ["diplomatic credibility", "political accountability"],
+        affectedMarkets: ["governance credibility", "policy risk"],
         topics: ["politics"],
         signalStrength: "weak",
         confidenceScore: 24,
       }),
     );
 
-    expect(text).toMatch(/UK|This governance story|Early coverage around/);
-    expect(text.toLowerCase()).toMatch(/governance|diplomatic|political accountability/);
-    expect(text.toLowerCase()).not.toMatch(/equities|technology|wait matters because wait/);
+    expect(text).toMatch(/UK|This political development/);
+    expect(text.toLowerCase()).toMatch(/governance|policy risk|political accountability|diplomatic/);
+    expect(text.toLowerCase()).not.toMatch(/equities|technology|watch for|early signal|wait matters because wait/);
   });
 
   it("prevents one fallback opener from dominating an entire low-data batch", async () => {
@@ -173,12 +210,12 @@ describe("why-it-matters", () => {
               index === 0
                 ? "mna_funding"
                 : index === 1
-                  ? "governance_politics"
+                  ? "political"
                   : index === 2
                     ? "macro_market_move"
-                    : "product_launch_major",
+                    : "product",
             affectedMarkets:
-              index === 1 ? ["diplomatic credibility"] : ["technology"],
+              index === 1 ? ["governance credibility"] : ["adoption"],
             topics: index === 1 ? ["politics"] : ["tech"],
             signalStrength: "weak",
             confidenceScore: 22,
@@ -203,36 +240,41 @@ describe("why-it-matters", () => {
     expect(new Set(patternKeys).size).toBeGreaterThan(1);
   });
 
-  it("keeps heuristic outputs from collapsing into fallback for valid anchored stories", () => {
+  it("keeps heuristic outputs anchored to the company when the extracted token is generic", () => {
     const text = generateWhyThisMattersHeuristically(
       createIntelligence({
-        title: "Adobe says AI-driven retail traffic surged in the first quarter",
-        summary: "Adobe data showed sharp AI referral growth for U.S. retailers.",
-        primaryChange: "Adobe reported a surge in AI-driven retail traffic",
-        entities: ["Adobe"],
-        eventType: "macro_market_move",
-        primaryImpact: "The data could affect demand expectations across e-commerce and ad spending.",
-        affectedMarkets: ["retail demand", "e-commerce"],
-        topics: ["finance", "business"],
+        title: "Google adds AI Mode to Chrome",
+        summary: "The feature extends browser-integrated AI navigation inside Chrome.",
+        primaryChange: "Google added AI Mode to Chrome",
+        entities: ["Mode"],
+        keyEntities: ["Mode"],
+        eventType: "product",
+        primaryImpact: "The change could alter search behavior and Chrome engagement.",
+        affectedMarkets: ["adoption", "competitive feature dynamics"],
+        topics: ["tech", "business"],
         signalStrength: "moderate",
         confidenceScore: 63,
       }),
     );
 
-    expect(text.startsWith("Adobe")).toBe(true);
-    expect(text.toLowerCase()).not.toContain("still an early signal");
+    expect(text.startsWith("Google")).toBe(true);
+    expect(text.toLowerCase()).not.toContain("mode could");
+    expect(text.toLowerCase()).not.toContain("watch for");
   });
 
-  it("extracts meaningful anchors and rejects stray-token subjects", () => {
+  it("enforces grammar fixes and rejects stray-token subjects", () => {
     const anchor = __testing__.extractPrimaryAnchor(
       createIntelligence({
         title: "Google adds Nano Banana-powered image generation to Gemini",
         entities: ["Google", "Gemini"],
       }),
     );
+    const fixed = __testing__.postProcessGrammar("Google matters because changes adoption in Chrome");
 
     expect(anchor?.label).toBe("Google");
     expect(__testing__.isMeaningfulAnchor("Wait")).toBe(false);
+    expect(__testing__.isMeaningfulAnchor("Mode")).toBe(false);
     expect(__testing__.isLowDataScenario(createIntelligence())).toBe(false);
+    expect(fixed).toContain("because this changes");
   });
 });

@@ -13,11 +13,11 @@ type GenerateWhyThisMattersOptions = {
 
 type NormalizedReasoningCategory =
   | "policy_regulation"
-  | "earnings_financials"
+  | "corporate"
   | "mna_funding"
-  | "product_launch_major"
-  | "governance_politics"
-  | "geopolitics"
+  | "product"
+  | "political"
+  | "defense_geopolitical"
   | "legal_investigation"
   | "macro_market_move"
   | "company_update";
@@ -60,143 +60,148 @@ const INVALID_ANCHORS = new Set([
   "watch",
   "live",
   "breaking",
+  "mode",
+  "feature",
+  "update",
+  "launch",
+  "product",
 ]);
 
 const REASONING_TEMPLATES: Record<NormalizedReasoningCategory, PatternTemplate[]> = {
   policy_regulation: [
     {
-      key: "policy_framework",
+      key: "implication_first",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the policy framework around the story, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "policy_constraint",
+      key: "policy_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} tightens the operating constraints companies or governments have to work within, which ${mechanism}, and that can ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for policy risk because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "policy_repricing",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} forces investors and operators to reprice the rule set they are working under, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `Even before the full policy response is clear, ${anchor} matters because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
   ],
-  earnings_financials: [
+  corporate: [
     {
-      key: "earnings_baseline",
+      key: "implication_first",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} resets the earnings and guidance baseline, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "earnings_expectations",
+      key: "financial_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes near-term expectations investors use to value the story, because ${mechanism}, which can ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for financial expectations because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "earnings_visibility",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} increases the visibility around revenue, margins, or guidance, which ${mechanism}, and that may ${impact} over the ${horizonLabel}.`,
+        `The headline is company-specific, but ${anchor} could still ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
   ],
   mna_funding: [
     {
-      key: "market_structure",
+      key: "competitive_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} can reshape market structure, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "competition_funding",
+      key: "allocation_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes competitive intensity and capital availability, which ${mechanism}, and that can ${impact} over the ${horizonLabel}.`,
+        `${anchor} changes the competitive picture because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "allocation_funding",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes how capital and strategic attention are allocated, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
-    },
-  ],
-  product_launch_major: [
-    {
-      key: "product_adoption",
-      build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could shift product adoption and buyer expectations, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
-    },
-    {
-      key: "platform_competition",
-      build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the platform comparison buyers and rivals are making, which ${mechanism}, and that can ${impact} over the ${horizonLabel}.`,
-    },
-    {
-      key: "product_positioning",
-      build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} puts pressure on competing product roadmaps, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `This is partly a capital story, but ${anchor} could still ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
   ],
-  governance_politics: [
+  product: [
     {
-      key: "governance_accountability",
+      key: "adoption_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} raises governance and accountability questions, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "governance_credibility",
+      key: "competitive_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} can affect political or diplomatic credibility, because ${mechanism}, and that may ${impact} over the ${horizonLabel}.`,
+        `${anchor} changes the feature benchmark buyers compare against because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "governance_followthrough",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} tests whether this develops into a broader governance problem, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `It is a product story rather than a policy one, but ${anchor} could still ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
   ],
-  geopolitics: [
+  political: [
     {
-      key: "geopolitics_risk",
+      key: "governance_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} raises geopolitical risk, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "geopolitics_trade",
+      key: "credibility_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} can disrupt trade, supply, or energy flows, because ${mechanism}, and that may ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for governance credibility because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "geopolitics_premium",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the risk premium markets attach to the story, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `This is not an equity story by default; ${anchor} matters because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
+    },
+  ],
+  defense_geopolitical: [
+    {
+      key: "policy_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+    },
+    {
+      key: "defense_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} matters for defense and international relations because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "contrast_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `This should be read through a geopolitical lens, not a valuation lens, because ${anchor} matters where ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
     },
   ],
   legal_investigation: [
     {
-      key: "legal_liability",
+      key: "liability_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} raises legal and liability risk, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "legal_operations",
+      key: "operations_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} may constrain operations or strategic flexibility, which ${mechanism}, and that can ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for operational risk because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "legal_reputation",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} puts reputational and regulatory pressure on the story, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `Even if the legal outcome is still unfolding, ${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
   ],
   macro_market_move: [
     {
-      key: "macro_backdrop",
+      key: "implication_first",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the macro backdrop investors are using, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "macro_pricing",
+      key: "market_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes how markets price growth, rates, or demand, because ${mechanism}, and that can ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for the macro backdrop because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "macro_expectations",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} shifts the baseline assumptions behind market expectations, which ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `This changes the macro baseline rather than just the headline, because ${anchor} matters where ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
     },
   ],
   company_update: [
@@ -263,10 +268,10 @@ export function buildTrustLayerPresentation(
 }
 
 function buildSignalChips(intelligence: NormalizedIntelligence) {
-  const anchor = extractPrimaryAnchor(intelligence);
+  const anchor = getAnchorLabel(intelligence);
 
   return [
-    anchor?.label ?? "Event-specific",
+    anchor ?? "Event-specific",
     intelligence.reasoningCategory.replace(/_/g, " "),
     intelligence.signals.sourceDiversity > 1
       ? `${intelligence.signals.sourceDiversity} sources`
@@ -289,8 +294,7 @@ function buildGroundedWhyThisMatters(
     return buildLowConfidenceFallback(intelligence, previousOutputs);
   }
 
-  const anchor = extractPrimaryAnchor(intelligence);
-  const anchorLabel = anchor?.label ?? buildEventLabel(intelligence);
+  const anchorLabel = getAnchorLabel(intelligence);
   const marketLabel = intelligence.affectedMarkets.slice(0, 2).join(" and ");
   const horizonLabel = getTimeHorizonLabel(intelligence.timeHorizon);
   const mechanism = buildMechanism(intelligence, marketLabel);
@@ -334,6 +338,29 @@ function extractPrimaryAnchor(intelligence: NormalizedIntelligence) {
   return null;
 }
 
+function getAnchorLabel(intelligence: NormalizedIntelligence) {
+  const anchor = extractPrimaryAnchor(intelligence);
+  if (anchor?.label) {
+    return anchor.label;
+  }
+
+  const titleCandidates = extractHeadlineCandidates(intelligence.title).filter((candidate) =>
+    isMeaningfulAnchor(candidate),
+  );
+  if (titleCandidates.length) {
+    return titleCandidates[0];
+  }
+
+  const companyMatch = intelligence.title.match(
+    /^([A-Z][A-Za-z0-9.&'-]+(?:\s+[A-Z][A-Za-z0-9.&'-]+){0,2})(?=\s+(?:adds|launches|unveils|expands|raises|signals|tests|faces|wins|loses|gets|rolls|releases|updates)\b)/,
+  );
+  if (companyMatch?.[1] && isMeaningfulAnchor(companyMatch[1])) {
+    return companyMatch[1];
+  }
+
+  return buildEventLabel(intelligence);
+}
+
 function extractHeadlineCandidates(title: string) {
   return (
     title.match(/\b(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}|[A-Z]{2,}|U\.S\.|UK|EU|Federal Reserve|White House)\b/g) ?? []
@@ -366,15 +393,15 @@ function buildEventLabel(intelligence: NormalizedIntelligence) {
   switch (intelligence.reasoningCategory) {
     case "policy_regulation":
       return "This policy move";
-    case "earnings_financials":
-      return "This earnings update";
+    case "corporate":
+      return "This corporate update";
     case "mna_funding":
       return "This deal or funding round";
-    case "product_launch_major":
-      return "This product release";
-    case "governance_politics":
-      return "This governance story";
-    case "geopolitics":
+    case "product":
+      return "This product move";
+    case "political":
+      return "This political development";
+    case "defense_geopolitical":
       return "This geopolitical development";
     case "legal_investigation":
       return "This legal development";
@@ -388,23 +415,23 @@ function buildEventLabel(intelligence: NormalizedIntelligence) {
 function buildMechanism(intelligence: NormalizedIntelligence, marketLabel: string) {
   switch (intelligence.reasoningCategory) {
     case "policy_regulation":
-      return `changes regulation, compliance, or market-access assumptions around ${marketLabel}`;
-    case "earnings_financials":
-      return `changes revenue, margin, or guidance expectations tied to ${marketLabel}`;
+      return `this changes regulation, compliance, or market-access assumptions around ${marketLabel}`;
+    case "corporate":
+      return `this changes revenue, margin, or guidance expectations tied to ${marketLabel}`;
     case "mna_funding":
-      return `changes capital availability, competitive positioning, or market structure in ${marketLabel}`;
-    case "product_launch_major":
-      return `changes adoption expectations and the competitive benchmark in ${marketLabel}`;
-    case "governance_politics":
-      return `changes assumptions about political accountability, diplomatic credibility, or institutional follow-through`;
-    case "geopolitics":
-      return `changes risk, trade, supply, or energy assumptions feeding into ${marketLabel}`;
+      return `this changes capital availability, competitive positioning, or market structure in ${marketLabel}`;
+    case "product":
+      return `this changes adoption expectations, product comparison, and feature benchmarks in ${marketLabel}`;
+    case "political":
+      return `this raises questions about governance credibility, diplomatic judgment, and policy follow-through`;
+    case "defense_geopolitical":
+      return `this changes assumptions about defense posture, state capacity, or international alignment in ${marketLabel}`;
     case "legal_investigation":
-      return `changes liability, operating flexibility, or reputational assumptions around ${marketLabel}`;
+      return `this changes liability, operating flexibility, or reputational assumptions around ${marketLabel}`;
     case "macro_market_move":
-      return `changes how investors price rates, demand, or risk in ${marketLabel}`;
+      return `this changes how investors price rates, demand, or risk in ${marketLabel}`;
     default:
-      return trimTrailingPeriod(intelligence.primaryImpact).toLowerCase();
+      return `this changes execution expectations around ${marketLabel}`;
   }
 }
 
@@ -412,22 +439,22 @@ function buildImpact(intelligence: NormalizedIntelligence, marketLabel: string) 
   switch (intelligence.reasoningCategory) {
     case "policy_regulation":
       return `shift sector constraints, cost structures, or strategic flexibility in ${marketLabel}`;
-    case "earnings_financials":
-      return `move valuation, guidance credibility, or sector sentiment in ${marketLabel}`;
+    case "corporate":
+      return `move financial expectations, guidance credibility, or valuation in ${marketLabel}`;
     case "mna_funding":
-      return `shift competitive intensity, consolidation expectations, or valuation support in ${marketLabel}`;
-    case "product_launch_major":
-      return `change buyer adoption, platform share, or roadmap pressure in ${marketLabel}`;
-    case "governance_politics":
-      return `shift diplomatic standing, political accountability, or policy credibility around the story`;
-    case "geopolitics":
-      return `move trade exposure, energy sensitivity, or risk premia in ${marketLabel}`;
+      return `reshape competition, capital allocation, or market structure in ${marketLabel}`;
+    case "product":
+      return `change adoption patterns, user behavior, or competitive feature dynamics in ${marketLabel}`;
+    case "political":
+      return `shift governance credibility, political accountability, or policy risk around the story`;
+    case "defense_geopolitical":
+      return `raise defense risk, policy pressure, or international-relations risk in ${marketLabel}`;
     case "legal_investigation":
       return `raise downside risk for operations, cash flow, or reputation in ${marketLabel}`;
     case "macro_market_move":
       return `move market expectations, sector sentiment, or pricing in ${marketLabel}`;
     default:
-      return trimTrailingPeriod(intelligence.primaryImpact).toLowerCase();
+      return `change expectations around ${marketLabel}`;
   }
 }
 
@@ -436,22 +463,22 @@ function buildLowConfidenceFallback(
   previousOutputs: string[] = [],
 ) {
   const marketLabel = intelligence.affectedMarkets.slice(0, 2).join(" and ");
-  const watchFor = buildWatchForPhrase(intelligence, marketLabel);
-  const anchor = extractPrimaryAnchor(intelligence);
-  const anchorLabel = anchor?.label ?? buildEventLabel(intelligence);
+  const anchorLabel = getAnchorLabel(intelligence);
   const horizonLabel = getTimeHorizonLabel(intelligence.timeHorizon);
+  const mechanism = buildMechanism(intelligence, marketLabel);
+  const impact = buildImpact(intelligence, marketLabel);
   const templates = [
     {
-      key: "early_signal_subject",
-      text: `${anchorLabel} is still an early signal, but watch for ${watchFor} over the ${horizonLabel}.`,
+      key: "specific_shift",
+      text: `${anchorLabel} points to an early shift in ${marketLabel}, which could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "early_signal_question",
-      text: `${anchorLabel} is still lightly confirmed, so the key question is whether ${watchFor} over the ${horizonLabel}.`,
+      key: "specific_implication",
+      text: `${anchorLabel} already touches ${marketLabel}, and even limited reporting could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "early_signal_coverage",
-      text: `Early coverage around ${anchorLabel} is still thin, but it is worth watching for ${watchFor} over the ${horizonLabel}.`,
+      key: "specific_causal",
+      text: `${anchorLabel} suggests pressure on ${marketLabel} because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
   ];
   const usageByKey = countPatternUsage(previousOutputs);
@@ -473,39 +500,16 @@ function buildLowConfidenceFallback(
   return chosen?.text ?? templates[getFallbackVariantIndex(intelligence)]?.text ?? templates[0].text;
 }
 
-function buildWatchForPhrase(intelligence: NormalizedIntelligence, marketLabel: string) {
-  switch (intelligence.reasoningCategory) {
-    case "policy_regulation":
-      return `follow-through on regulation, compliance requirements, or market-access changes tied to ${marketLabel}`;
-    case "earnings_financials":
-      return `additional confirmation on guidance, margins, or demand in ${marketLabel}`;
-    case "mna_funding":
-      return `evidence that competition, funding capacity, or consolidation in ${marketLabel} is actually changing`;
-    case "product_launch_major":
-      return `evidence of real adoption, pricing power, or competitive response in ${marketLabel}`;
-    case "governance_politics":
-      return `whether it turns into a broader governance, diplomatic, or political accountability issue`;
-    case "geopolitics":
-      return `further confirmation that trade, supply, or energy risk is moving in ${marketLabel}`;
-    case "legal_investigation":
-      return `signs the legal pressure expands into operational, financial, or reputational consequences`;
-    case "macro_market_move":
-      return `confirmation that rates, demand, or macro pricing in ${marketLabel} is actually shifting`;
-    default:
-      return `further confirmation on how this changes ${marketLabel}`;
-  }
-}
-
 function isLowDataScenario(intelligence: NormalizedIntelligence) {
   const thinEvidence =
     intelligence.signals.sourceDiversity <= 1 && intelligence.signals.articleCount <= 1;
-  const missingAnchor = !extractPrimaryAnchor(intelligence);
+  const missingAnchor = !getAnchorLabel(intelligence);
   const weakEventType = intelligence.reasoningCategory === "company_update";
-  const veryLowConfidence = intelligence.confidenceScore < 32;
+  const veryLowConfidence = intelligence.confidenceScore < 28;
   const weakThinStory =
     thinEvidence &&
     intelligence.signalStrength === "weak" &&
-    intelligence.confidenceScore < 48;
+    intelligence.confidenceScore < 38;
 
   return (
     veryLowConfidence ||
@@ -515,8 +519,17 @@ function isLowDataScenario(intelligence: NormalizedIntelligence) {
 }
 
 function formatWhyThisMatters(text: string, signalStrength: EventIntelligence["signalStrength"]) {
-  const normalized = ensureSentence(text);
+  const normalized = ensureSentence(postProcessGrammar(text));
   return `${normalized} (Signal: ${capitalize(signalStrength)})`;
+}
+
+function postProcessGrammar(value: string) {
+  return value
+    .replace(/\bbecause changes\b/gi, "because this changes")
+    .replace(/\bwhere this changes\b/gi, "where this changes")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;!?])/g, "$1")
+    .trim();
 }
 
 function countPatternUsage(previousOutputs: string[]) {
@@ -544,37 +557,19 @@ function chooseBestCandidate<T extends { text: string; usage: number }>(
 function getPatternKey(output: string) {
   const normalized = output.toLowerCase();
 
-  if (normalized.startsWith("this is an early signal")) return "early_signal";
-  if (normalized.includes("is still an early signal")) return "early_signal_subject";
-  if (normalized.includes("is still lightly confirmed")) return "early_signal_question";
-  if (normalized.includes("early coverage around")) return "early_signal_coverage";
-  if (normalized.includes("changes the policy framework")) return "policy_framework";
-  if (normalized.includes("tightens the operating constraints")) return "policy_constraint";
-  if (normalized.includes("forces investors and operators to reprice")) return "policy_repricing";
-  if (normalized.includes("resets the earnings and guidance baseline")) return "earnings_baseline";
-  if (normalized.includes("changes near-term expectations investors use to value")) return "earnings_expectations";
-  if (normalized.includes("increases the visibility around revenue")) return "earnings_visibility";
-  if (normalized.includes("can reshape market structure")) return "market_structure";
-  if (normalized.includes("changes competitive intensity and capital availability")) return "competition_funding";
-  if (normalized.includes("changes how capital and strategic attention are allocated")) return "allocation_funding";
-  if (normalized.includes("could shift product adoption")) return "product_adoption";
-  if (normalized.includes("changes the platform comparison")) return "platform_competition";
-  if (normalized.includes("puts pressure on competing product roadmaps")) return "product_positioning";
-  if (normalized.includes("raises governance and accountability questions")) return "governance_accountability";
-  if (normalized.includes("can affect political or diplomatic credibility")) return "governance_credibility";
-  if (normalized.includes("tests whether this develops into a broader governance problem")) return "governance_followthrough";
-  if (normalized.includes("raises geopolitical risk")) return "geopolitics_risk";
-  if (normalized.includes("can disrupt trade, supply, or energy flows")) return "geopolitics_trade";
-  if (normalized.includes("changes the risk premium")) return "geopolitics_premium";
-  if (normalized.includes("raises legal and liability risk")) return "legal_liability";
-  if (normalized.includes("may constrain operations or strategic flexibility")) return "legal_operations";
-  if (normalized.includes("puts reputational and regulatory pressure")) return "legal_reputation";
-  if (normalized.includes("changes the macro backdrop investors are using")) return "macro_backdrop";
-  if (normalized.includes("changes how markets price growth, rates, or demand")) return "macro_pricing";
-  if (normalized.includes("shifts the baseline assumptions behind market expectations")) return "macro_expectations";
-  if (normalized.includes("changes the company-specific execution picture")) return "company_execution";
-  if (normalized.includes("alters the operating assumptions around the story")) return "company_expectations";
-  return "company_watch";
+  if (normalized.includes("points to an early shift")) return "specific_shift";
+  if (normalized.includes("already touches")) return "specific_implication";
+  if (normalized.includes("suggests pressure on")) return "specific_causal";
+  if (normalized.includes("matters for policy risk")) return "policy_frame";
+  if (normalized.includes("even before the full policy response is clear")) return "contrast_frame";
+  if (normalized.includes("matters for financial expectations")) return "financial_frame";
+  if (normalized.includes("changes the competitive picture")) return "allocation_frame";
+  if (normalized.includes("changes the feature benchmark")) return "competitive_frame";
+  if (normalized.includes("matters for governance credibility")) return "credibility_frame";
+  if (normalized.includes("matters for defense and international relations")) return "defense_frame";
+  if (normalized.includes("matters for operational risk")) return "operations_frame";
+  if (normalized.includes("matters for the macro backdrop")) return "market_frame";
+  return "implication_first";
 }
 
 function isTooSimilar(candidate: string, previousOutputs: string[]) {
@@ -601,14 +596,10 @@ function normalizeForSimilarity(value: string) {
 function ensureSentence(value: string) {
   const trimmed = value.trim();
   if (!trimmed) {
-    return "This is an early signal with limited confirmed impact.";
+    return "This development could shift near-term expectations.";
   }
 
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
-}
-
-function trimTrailingPeriod(value: string) {
-  return value.trim().replace(/[.!?]+$/, "");
 }
 
 function getTimeHorizonLabel(horizon: EventIntelligence["timeHorizon"]) {
@@ -656,19 +647,23 @@ function mapReasoningCategory(eventType: string): NormalizedReasoningCategory {
     case "policy_regulation":
     case "regulation":
       return "policy_regulation";
+    case "corporate":
     case "earnings_financials":
     case "earnings":
-      return "earnings_financials";
+      return "corporate";
     case "mna_funding":
     case "m&a":
       return "mna_funding";
+    case "product":
     case "product_launch_major":
-      return "product_launch_major";
+      return "product";
+    case "political":
     case "governance_politics":
-      return "governance_politics";
-    case "geopolitics":
+      return "political";
+    case "defense":
     case "geopolitical":
-      return "geopolitics";
+    case "geopolitics":
+      return "defense_geopolitical";
     case "legal_investigation":
       return "legal_investigation";
     case "macro_market_move":
@@ -682,14 +677,15 @@ function mapReasoningCategory(eventType: string): NormalizedReasoningCategory {
 function deriveLegacyEventType(intelligence: EventIntelligence) {
   const corpus = `${intelligence.title} ${intelligence.summary} ${intelligence.topics?.join(" ") ?? ""}`.toLowerCase();
 
-  if (/earnings|guidance|revenue|profit|quarter/.test(corpus)) return "earnings_financials";
+  if (/department of defense|classified|government|military|pentagon/.test(corpus)) return "defense";
+  if (/election|minister|foreign office|parliament|cabinet|vetting|ambassador|appointment/.test(corpus)) return "political";
+  if (/earnings|guidance|revenue|profit|quarter/.test(corpus)) return "corporate";
   if (/lawsuit|probe|investigation|charges|sec|doj/.test(corpus)) return "legal_investigation";
-  if (/vetting|ambassador|minister|foreign office|parliament|cabinet|governance|diplomatic|diplomacy|appointment/.test(corpus)) return "governance_politics";
   if (/regulation|regulatory|policy|senate|congress|ban|antitrust/.test(corpus)) return "policy_regulation";
   if (/fed|inflation|rates|treasury|economy|macro/.test(corpus)) return "macro_market_move";
   if (/acquisition|merger|buyout|deal|takeover|funding|raises/.test(corpus)) return "mna_funding";
-  if (/launch|launched|release|released|unveiled|rollout|debut/.test(corpus)) return "product_launch_major";
-  if (/sanctions|war|export restrictions|geopolit/.test(corpus)) return "geopolitics";
+  if (/product launch|launch|launched|release|released|unveiled|rollout|debut|feature|update/.test(corpus)) return "product";
+  if (/sanctions|war|export restrictions|geopolit|diplomacy|border/.test(corpus)) return "geopolitical";
   return "company_update";
 }
 
@@ -697,6 +693,7 @@ export const __testing__ = {
   extractPrimaryAnchor,
   mapReasoningCategory,
   buildLowConfidenceFallback,
+  postProcessGrammar,
   getPatternKey,
   isMeaningfulAnchor,
   isLowDataScenario,
