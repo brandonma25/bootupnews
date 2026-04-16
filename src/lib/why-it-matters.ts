@@ -682,7 +682,10 @@ function buildHeadlineDeltaPhrase(intelligence: NormalizedIntelligence) {
     return "how governance credibility and diplomatic scrutiny evolve";
   }
 
-  if (/mortgage|rates|refinancing|housing/.test(corpus)) {
+  if (
+    intelligence.reasoningCategory === "macro_market_move" &&
+    /mortgage|rates|refinancing|housing/.test(corpus)
+  ) {
     return "how borrowing conditions feed into housing demand";
   }
 
@@ -697,8 +700,26 @@ function buildHeadlineDeltaPhrase(intelligence: NormalizedIntelligence) {
   return "";
 }
 
+function sanitizeDeltaPhrase(
+  intelligence: NormalizedIntelligence,
+  delta: string,
+) {
+  if (!delta) {
+    return "";
+  }
+
+  if (
+    intelligence.reasoningCategory !== "macro_market_move" &&
+    /housing|mortgage|refinancing|borrowing conditions/.test(delta.toLowerCase())
+  ) {
+    return "";
+  }
+
+  return delta;
+}
+
 function buildMechanism(intelligence: NormalizedIntelligence, marketLabel: string) {
-  const delta = buildHeadlineDeltaPhrase(intelligence);
+  const delta = sanitizeDeltaPhrase(intelligence, buildHeadlineDeltaPhrase(intelligence));
   const deltaSuffix = delta ? `, especially in ${delta}` : "";
 
   switch (intelligence.reasoningCategory) {
@@ -734,7 +755,7 @@ function buildMechanism(intelligence: NormalizedIntelligence, marketLabel: strin
 }
 
 function buildImpact(intelligence: NormalizedIntelligence, marketLabel: string) {
-  const delta = buildHeadlineDeltaPhrase(intelligence);
+  const delta = sanitizeDeltaPhrase(intelligence, buildHeadlineDeltaPhrase(intelligence));
   const deltaSuffix = delta ? `, with the clearest effect in ${delta}` : "";
 
   switch (intelligence.reasoningCategory) {
@@ -898,10 +919,42 @@ function dedupeRepeatedClauses(value: string) {
     }
   }
 
-  return deduped
+  const joined = deduped
     .join(", ")
     .replace(/\b(and)\s+\1\b/gi, "$1")
     .replace(/\b(this changes [^,.;]+)\s+\1\b/gi, "$1");
+
+  return removeRepeatedPhrasePatterns(joined);
+}
+
+function removeRepeatedPhrasePatterns(value: string) {
+  let result = value;
+  const phrasePatterns = [
+    /(in\s+[a-z][a-z\s-]+?)(?=,?\s+so it could [^,.!?]+?\s+\1)/gi,
+    /(across\s+[a-z][a-z\s-]+?)(?=,?\s+so it could [^,.!?]+?\s+\1)/gi,
+    /(around\s+[a-z][a-z\s-]+?)(?=,?\s+so it could [^,.!?]+?\s+\1)/gi,
+  ];
+
+  for (const pattern of phrasePatterns) {
+    const match = pattern.exec(result);
+    if (!match?.[1]) {
+      pattern.lastIndex = 0;
+      continue;
+    }
+
+    const repeatedPhrase = match[1];
+    result = result.replace(
+      new RegExp(`(so it could [^,.!?]+?)\\s+${escapeRegExp(repeatedPhrase)}`, "i"),
+      "$1",
+    );
+    pattern.lastIndex = 0;
+  }
+
+  return result.replace(/\s+/g, " ").replace(/\s+([,.;!?])/g, "$1").trim();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function countPatternUsage(previousOutputs: string[]) {

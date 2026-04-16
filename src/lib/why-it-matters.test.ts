@@ -472,6 +472,27 @@ describe("why-it-matters", () => {
     expect(text.toLowerCase()).not.toMatch(/housing|mortgage|rates|inflation/);
   });
 
+  it("blocks housing-domain contamination from non-macro stories", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "InsightFinder raises $15M to help companies monitor AI agents",
+        summary:
+          "The startup raised funding to expand its AI reliability platform. Mortgage markets were unchanged.",
+        primaryChange: "InsightFinder raised $15M to expand its AI reliability platform",
+        entities: ["InsightFinder"],
+        keyEntities: ["InsightFinder"],
+        eventType: "early_stage_funding",
+        affectedMarkets: ["startup competition", "capital formation"],
+        topics: ["tech", "business"],
+        signalStrength: "weak",
+        confidenceScore: 46,
+      }),
+    );
+
+    expect(text.toLowerCase()).not.toContain("how borrowing conditions feed into housing demand");
+    expect(text.toLowerCase()).not.toMatch(/housing demand|mortgage/);
+  });
+
   it("differentiates funding and IPO explanations", async () => {
     const funding = await generateWhyThisMatters(
       createIntelligence({
@@ -509,6 +530,16 @@ describe("why-it-matters", () => {
     );
 
     expect(cleaned).toBe("Adobe changes demand assumptions, so it could move expectations.");
+  });
+
+  it("removes repeated market phrases inside one sentence", () => {
+    const cleaned = __testing__.dedupeRepeatedClauses(
+      "Adobe changes demand assumptions in equities and technology, so it could move expectations in equities and technology.",
+    );
+
+    expect(cleaned).toBe(
+      "Adobe changes demand assumptions in equities and technology, so it could move expectations.",
+    );
   });
 
   it("keeps sentence ordering as subject to mechanism to impact", async () => {

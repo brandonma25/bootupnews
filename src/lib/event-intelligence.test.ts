@@ -322,6 +322,33 @@ describe("buildEventIntelligence", () => {
       }),
     ).toBe("moderate");
   });
+
+  it("keeps same-event Iran conflict stories in the defense/geopolitical domain", () => {
+    const cluster = buildEventIntelligence(
+      [
+        createArticle({
+          title: "Iran war talks intensify after regional strike",
+          summaryText: "Diplomats and defense officials are weighing the next steps.",
+          sourceName: "Reuters",
+        }),
+        createArticle({
+          title: "Congressional vote sharpens Iran conflict response debate",
+          summaryText: "Lawmakers are preparing a vote as defense planning continues.",
+          sourceName: "Associated Press",
+        }),
+        createArticle({
+          title: "Military planners review Iran defense posture after talks stall",
+          summaryText: "Officials are reassessing regional posture after talks broke down.",
+          sourceName: "Financial Times",
+        }),
+      ],
+      { topicName: "World", matchedKeywords: ["Iran", "war", "talks", "defense"] },
+    );
+
+    expect(cluster.eventType).toBe("defense");
+    expect(cluster.affectedMarkets).toContain("defense posture");
+    expect(cluster.affectedMarkets).toContain("international relations");
+  });
 });
 
 describe("rankNewsClusters", () => {

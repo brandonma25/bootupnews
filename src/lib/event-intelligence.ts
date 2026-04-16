@@ -360,6 +360,10 @@ function inferEventType(
     return "product";
   }
 
+  if (isDefenseGeopoliticalCluster(corpus, topicName, matchedKeywords)) {
+    return "defense";
+  }
+
   const rules: Array<[string, string[]]> = [
     ["defense", ["department of defense", "classified", "government", "military", "pentagon", "defense department"]],
     ["political", ["election", "minister", "foreign office", "foreign minister", "cabinet", "parliament", "vetting", "ambassador", "appointment", "surveillance powers", "oversight", "executive authority"]],
@@ -378,6 +382,35 @@ function inferEventType(
 
   const matchedRule = rules.find(([, keywords]) => keywords.some((keyword) => matchesKeyword(corpus, keyword)));
   return matchedRule?.[0] ?? "company_update";
+}
+
+function isDefenseGeopoliticalCluster(
+  corpus: string,
+  topicName: string,
+  matchedKeywords?: string[],
+) {
+  const normalizedTopic = normalizeText(topicName);
+  const normalizedKeywords = normalizeText((matchedKeywords ?? []).join(" "));
+  const combined = `${corpus} ${normalizedTopic} ${normalizedKeywords}`;
+
+  const coreConflictTerms = [
+    "iran",
+    "israel",
+    "gaza",
+    "war",
+    "missile",
+    "strike",
+    "talks",
+    "ceasefire",
+    "defense",
+    "military",
+    "congressional vote",
+    "congress vote",
+    "resolution",
+  ];
+  const overlapCount = coreConflictTerms.filter((term) => combined.includes(term)).length;
+
+  return overlapCount >= 2;
 }
 
 function inferPrimaryImpact(input: {
