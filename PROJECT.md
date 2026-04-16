@@ -250,6 +250,29 @@ When updating this file:
 - The audit found historical infrastructure-identifying references in prior commits; if public minimization of those identifiers matters, history rewrite is a separate decision and was not performed here.
 - No confirmed committed secret values were found, so provider-side credential rotation is not clearly warranted from git-history evidence alone; if there are off-repo concerns about leaked local env files or copied credentials, rotation should be decided provider-side.
 
+### [2026-04-16 14:41] — Public Audit Doc Sanitization
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- The audit conclusions were sound, but the public audit record still included one unnecessary concrete infrastructure example in current HEAD.
+
+**Root cause:**
+- The historical-security audit intentionally documented what had been found, and one project-specific deployment hostname remained in the write-up as an example rather than as a necessary conclusion.
+
+**Change made:**
+- Sanitized the remaining concrete infrastructure example in `docs/bug-fixes/repo-history-security-audit.md` so the document now refers to generalized production/preview deployment URLs instead of a specific hostname.
+- Re-checked the current audit/hygiene docs to confirm the findings still clearly state that the historical exposure was infrastructure-specific, no committed live secret values were confirmed, and rotation/history rewrite were not recommended by default.
+
+**Files modified:**
+- `PROJECT.md`
+- `docs/bug-fixes/repo-history-security-audit.md`
+
+**Remaining risks / next steps:**
+- The public repo is cleaner, but historical commit content still exists unchanged unless a separate history-rewrite decision is made later.
+- Current placeholders and example domains elsewhere in the repo remain intentional and public-safe.
+
 ---
 
 ## 8. NEXT ACTION (FOCUS)

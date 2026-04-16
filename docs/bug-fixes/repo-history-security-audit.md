@@ -54,7 +54,7 @@ Review git history, not just the current tree, for evidence of past exposure of 
 - No committed `.env.local`, `.env.production`, private cert/key files, service-role keys, OpenAI API keys, OAuth client secrets, access tokens, refresh tokens, or JWT/session token payloads were confirmed in git history.
 - `.env.example` is the only env-style file found in tracked history, and it contains placeholders only.
 - Historical tracked docs and test fixtures did contain project-specific but non-secret identifiers, including:
-  - Vercel deployment URLs such as `daily-intelligence-aggregator-ybs9.vercel.app`
+  - Canonical production and preview deployment URLs
   - Preview deployment URLs
   - A concrete Supabase project ref in callback/config examples
   - A production deployment ID in the QA log
