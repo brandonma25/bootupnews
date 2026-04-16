@@ -2,7 +2,12 @@ import { createHash } from "crypto";
 
 import { classifyHomepageCategory, getHomepageCategoryLabel } from "@/lib/homepage-taxonomy";
 import type { FeedArticle } from "@/lib/rss";
-import type { BriefingItem, EventIntelligence } from "@/lib/types";
+import type {
+  BriefingItem,
+  EventIntelligence,
+  EventSignalStrength,
+  EventTimeHorizon,
+} from "@/lib/types";
 import { firstSentence, stripHtml } from "@/lib/utils";
 
 type EventIntelligenceOptions = {
@@ -83,7 +88,17 @@ export function buildEventIntelligence(
   const articleCount = sorted.length;
   const keyEntities = extractKeyEntities(sorted, options.matchedKeywords);
   const topics = deriveTopics(sorted, options.topicName, options.matchedKeywords);
+  const eventType = inferEventType(sorted, options.topicName, options.matchedKeywords);
+  const affectedMarkets = inferAffectedMarkets(sorted, eventType, topics, keyEntities);
+  const timeHorizon = inferTimeHorizon(eventType, sorted);
   const primaryChange = buildPrimaryChange(representative?.title ?? options.topicName);
+  const primaryImpact = inferPrimaryImpact({
+    eventType,
+    primaryChange,
+    entities: keyEntities,
+    affectedMarkets,
+    topics,
+  });
   const summary = buildSummary(sorted, primaryChange, sourceDiversity, topics);
   const recencyScore = computeRecencyScore(sorted);
   const velocityScore = computeVelocityScore(sorted);
@@ -110,6 +125,14 @@ export function buildEventIntelligence(
     summary,
     matchedKeywords: options.matchedKeywords ?? [],
   });
+  const signalStrength = getSignalStrength({
+    eventType,
+    affectedMarkets,
+    sourceDiversity,
+    articleCount,
+    rankingScore,
+    topics,
+  });
   const isHighSignal = evaluateHighSignal({
     title: representative?.title ?? primaryChange,
     summary,
@@ -127,6 +150,12 @@ export function buildEventIntelligence(
     title: representative?.title ?? primaryChange,
     summary,
     primaryChange,
+    entities: keyEntities,
+    eventType,
+    primaryImpact,
+    affectedMarkets,
+    timeHorizon,
+    signalStrength,
     keyEntities,
     topics,
     signals: {
@@ -141,6 +170,47 @@ export function buildEventIntelligence(
     isHighSignal,
     createdAt: options.createdAt ?? representative?.publishedAt ?? new Date().toISOString(),
   };
+}
+
+export function getSignalStrength(input: {
+  eventType: string;
+  affectedMarkets: string[];
+  sourceDiversity: number;
+  articleCount: number;
+  rankingScore: number;
+  topics: string[];
+}): EventSignalStrength {
+  let score = 0;
+
+  if (["macro", "regulation", "geopolitical"].includes(input.eventType)) {
+    score += 3;
+  } else if (["earnings", "m&a"].includes(input.eventType)) {
+    score += 2;
+  } else {
+    score += 1;
+  }
+
+  if (input.affectedMarkets.length >= 2) {
+    score += 1;
+  }
+
+  if (input.sourceDiversity >= 3 || input.articleCount >= 4) {
+    score += 1;
+  }
+
+  if (input.rankingScore >= 70 || input.topics.includes("finance")) {
+    score += 1;
+  }
+
+  if (score >= 5) {
+    return "strong";
+  }
+
+  if (score >= 3) {
+    return "moderate";
+  }
+
+  return "weak";
 }
 
 export function getTrustTier(confidenceScore: number) {
@@ -219,6 +289,134 @@ function deriveTopics(articles: FeedArticle[], topicName: string, matchedKeyword
   }
 
   return [...topics].slice(0, 4);
+}
+
+function inferEventType(
+  articles: FeedArticle[],
+  topicName: string,
+  matchedKeywords?: string[],
+) {
+  const corpus = normalizeText(
+    `${topicName} ${articles.map((article) => `${article.title} ${article.summaryText}`).join(" ")} ${(matchedKeywords ?? []).join(" ")}`,
+  );
+
+  const rules: Array<[string, string[]]> = [
+    ["earnings", ["earnings", "guidance", "revenue", "profit", "quarter", "results"]],
+    ["regulation", ["regulation", "regulatory", "antitrust", "rule", "rules", "senate", "congress", "policy", "ban", "approval", "approved"]],
+    ["macro", ["inflation", "fed", "federal reserve", "rates", "treasury", "jobs", "gdp", "economy", "economic", "tariff", "trade"]],
+    ["m&a", ["acquisition", "acquire", "merger", "buyout", "takeover", "stake", "deal"]],
+    ["geopolitical", ["sanctions", "war", "military", "export restrictions", "diplomacy", "china", "russia", "ukraine", "taiwan", "middle east"]],
+  ];
+
+  const matchedRule = rules.find(([, keywords]) => keywords.some((keyword) => matchesKeyword(corpus, keyword)));
+  return matchedRule?.[0] ?? "company-update";
+}
+
+function inferPrimaryImpact(input: {
+  eventType: string;
+  primaryChange: string;
+  entities: string[];
+  affectedMarkets: string[];
+  topics: string[];
+}) {
+  const entityLabel = input.entities[0] ?? input.primaryChange;
+  const marketLabel = input.affectedMarkets[0] ?? "investor expectations";
+
+  switch (input.eventType) {
+    case "earnings":
+      return `${entityLabel} is resetting near-term expectations for pricing, margins, or guidance in ${marketLabel}.`;
+    case "regulation":
+      return `${entityLabel} could alter operating rules, compliance costs, or market access across ${marketLabel}.`;
+    case "macro":
+      return `${entityLabel} changes the rate, demand, or liquidity backdrop feeding into ${marketLabel}.`;
+    case "m&a":
+      return `${entityLabel} can shift competitive positioning, capital allocation, and consolidation expectations in ${marketLabel}.`;
+    case "geopolitical":
+      return `${entityLabel} may disrupt supply chains, policy alignment, or risk premiums tied to ${marketLabel}.`;
+    default:
+      if (input.topics.includes("tech")) {
+        return `${entityLabel} could change execution risk and platform positioning across ${marketLabel}.`;
+      }
+
+      return `${entityLabel} has the clearest near-term effect on ${marketLabel}.`;
+  }
+}
+
+function inferAffectedMarkets(
+  articles: FeedArticle[],
+  eventType: string,
+  topics: string[],
+  entities: string[],
+) {
+  const corpus = normalizeText(
+    `${topics.join(" ")} ${entities.join(" ")} ${articles.map((article) => `${article.title} ${article.summaryText}`).join(" ")}`,
+  );
+  const affected = new Set<string>();
+
+  if (eventType === "macro") {
+    affected.add("rates");
+    affected.add("equities");
+  }
+
+  if (eventType === "earnings" || corpus.includes("guidance") || corpus.includes("revenue")) {
+    affected.add("equities");
+    affected.add("sector sentiment");
+  }
+
+  if (eventType === "regulation" || eventType === "geopolitical") {
+    affected.add("policy-sensitive sectors");
+  }
+
+  if (eventType === "m&a") {
+    affected.add("corporate valuations");
+  }
+
+  if (corpus.includes("chip") || corpus.includes("semiconductor")) {
+    affected.add("semiconductors");
+  }
+
+  if (corpus.includes("oil") || corpus.includes("energy")) {
+    affected.add("energy");
+  }
+
+  if (corpus.includes("bank") || corpus.includes("credit")) {
+    affected.add("credit");
+  }
+
+  if (topics.includes("finance")) {
+    affected.add("equities");
+  }
+
+  if (topics.includes("tech")) {
+    affected.add("technology");
+  }
+
+  if (!affected.size) {
+    affected.add(topics[0] ?? "risk appetite");
+  }
+
+  return [...affected].slice(0, 4);
+}
+
+function inferTimeHorizon(eventType: string, articles: FeedArticle[]): EventTimeHorizon {
+  const corpus = normalizeText(
+    articles.map((article) => `${article.title} ${article.summaryText}`).join(" "),
+  );
+
+  if (
+    eventType === "regulation" ||
+    eventType === "geopolitical" ||
+    corpus.includes("multi-year") ||
+    corpus.includes("long term")
+  ) {
+    return "long";
+  }
+
+  if (eventType === "macro" || eventType === "m&a" || corpus.includes("guidance")) {
+    return "medium";
+  }
+
+  return "short";
 }
 
 function buildPrimaryChange(title: string) {
@@ -416,6 +614,12 @@ function normalizeText(value: string) {
     .replace(/[^a-z0-9\s&-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function matchesKeyword(corpus: string, keyword: string) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i");
+  return pattern.test(corpus);
 }
 
 function ensurePeriod(value: string) {

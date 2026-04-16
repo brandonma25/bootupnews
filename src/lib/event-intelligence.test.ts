@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEventIntelligence, getTrustTier } from "@/lib/event-intelligence";
+import { buildEventIntelligence, getSignalStrength, getTrustTier } from "@/lib/event-intelligence";
 import { rankNewsClusters } from "@/lib/ranking";
 import type { FeedArticle } from "@/lib/rss";
 
@@ -16,7 +16,7 @@ function createArticle(overrides: Partial<FeedArticle>): FeedArticle {
 }
 
 describe("buildEventIntelligence", () => {
-  it("enriches an event with entities, topics, ranking reason, and confidence", () => {
+  it("enriches an event with structured analyst fields, ranking reason, and confidence", () => {
     const intelligence = buildEventIntelligence(
       [
         createArticle({}),
@@ -38,7 +38,12 @@ describe("buildEventIntelligence", () => {
     );
 
     expect(intelligence.summary.length).toBeGreaterThan(20);
-    expect(intelligence.keyEntities.length).toBeGreaterThan(0);
+    expect(intelligence.entities.length).toBeGreaterThan(0);
+    expect(intelligence.eventType).toBe("macro");
+    expect(intelligence.primaryImpact.length).toBeGreaterThan(20);
+    expect(intelligence.affectedMarkets).toContain("rates");
+    expect(intelligence.timeHorizon).toBe("medium");
+    expect(intelligence.signalStrength).toBe("strong");
     expect(intelligence.topics).toContain("finance");
     expect(intelligence.rankingReason.length).toBeGreaterThan(10);
     expect(intelligence.confidenceScore).toBeGreaterThan(45);
@@ -66,6 +71,30 @@ describe("buildEventIntelligence", () => {
     expect(getTrustTier(80)).toBe("high");
     expect(getTrustTier(55)).toBe("medium");
     expect(getTrustTier(20)).toBe("low");
+  });
+
+  it("scores signal strength with simple event heuristics", () => {
+    expect(
+      getSignalStrength({
+        eventType: "regulation",
+        affectedMarkets: ["equities", "semiconductors"],
+        sourceDiversity: 3,
+        articleCount: 4,
+        rankingScore: 80,
+        topics: ["tech", "finance"],
+      }),
+    ).toBe("strong");
+
+    expect(
+      getSignalStrength({
+        eventType: "company-update",
+        affectedMarkets: ["technology"],
+        sourceDiversity: 1,
+        articleCount: 1,
+        rankingScore: 35,
+        topics: ["tech"],
+      }),
+    ).toBe("weak");
   });
 });
 

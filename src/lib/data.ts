@@ -24,7 +24,7 @@ import type {
   Topic,
   ViewerAccount,
 } from "@/lib/types";
-import { buildTrustLayerPresentation } from "@/lib/why-it-matters";
+import { buildTrustLayerPresentation, generateWhyThisMatters } from "@/lib/why-it-matters";
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
@@ -95,20 +95,6 @@ type IngestionRunSummary = {
   fallbackSourceCount: number;
   degradedSourceNames: string[];
 };
-
-type ReliabilityCategoryKey = "tech" | "finance" | "politics";
-
-type TopicFallbackResult = {
-  categoryKey: ReliabilityCategoryKey | null;
-  articles: FeedArticle[];
-  failures: SourceFetchFailure[];
-  successfulAttempts: SourceFetchAttempt[];
-  fallbackTriggered: boolean;
-};
-
-const MIN_ARTICLES_PER_CATEGORY = 3;
-const INGESTION_FETCH_TIMEOUT_MS = 4_500;
-const INGESTION_MAX_RETRY_COUNT = 2;
 
 function createEmptyBriefing(): DailyBriefing {
   return {
@@ -434,14 +420,7 @@ export async function generateDailyBriefing(
       const sourceResults = await Promise.all(
         topicSources.map((source) => fetchSourceArticlesWithFallback(source)),
       );
-      const primaryArticles = sourceResults.flatMap((result) => result.articles);
-      const fallbackResult = await ensureTopicMinimumArticles(
-        topic.name,
-        topicSources,
-        primaryArticles,
-        "/",
-      );
-      const articles = dedupeFeedArticles([...primaryArticles, ...fallbackResult.articles]);
+      const articles = sourceResults.flatMap((result) => result.articles);
 
       if (!articles.length) {
         return null;
@@ -453,15 +432,22 @@ export async function generateDailyBriefing(
         return null;
       }
 
-      const summaries = rankedClusters.map((cluster, clusterIndex) =>
-        buildBriefingItemFromFeedCluster({
+      const whyHistory: string[] = [];
+      const summaries: BriefingItem[] = [];
+
+      for (const [clusterIndex, cluster] of rankedClusters.entries()) {
+        const item = await buildBriefingItemFromFeedCluster({
           id: `generated-${topic.id}-${clusterIndex + 1}`,
           topicId: topic.id,
           topicName: topic.name,
           cluster,
           priority: index < 2 ? ("top" as const) : ("normal" as const),
-        }),
-      );
+          previousWhyOutputs: whyHistory,
+        });
+
+        whyHistory.push(item.whyItMatters);
+        summaries.push(item);
+      }
 
       return summaries;
     }),
@@ -678,6 +664,7 @@ export async function syncEventClusters(
     if (!topic) continue;
 
     const clusters = clusterEventSeedArticles(topicArticles);
+    const whyHistory: string[] = [];
 
     for (const cluster of clusters) {
       const feedArticles = cluster.sources.map(toFeedArticle);
@@ -686,12 +673,10 @@ export async function syncEventClusters(
         matchedKeywords: cluster.sources.flatMap((article) => article.matchedKeywords),
         createdAt: cluster.representative.published_at ?? undefined,
       });
-      const trustLayer = buildTrustLayerPresentation(intelligence, {
-        title: intelligence.title,
-        topicName: topic.name,
-        whyItMatters: intelligence.summary,
-        sourceCount: intelligence.signals.sourceDiversity,
+      const whyItMatters = await generateWhyThisMatters(intelligence, {
+        previousOutputs: whyHistory,
       });
+      whyHistory.push(whyItMatters);
       const insertEvent = await supabase
         .from("events")
         .insert({
@@ -699,7 +684,7 @@ export async function syncEventClusters(
           topic_id: topic.id,
           title: intelligence.title,
           summary: intelligence.summary,
-          why_it_matters: trustLayer.body,
+          why_it_matters: whyItMatters,
         })
         .select("id")
         .single();
@@ -940,20 +925,6 @@ export async function persistRawArticles(
   const fetchedResults = await Promise.all(
     activeSources.map((source) => fetchSourceArticlesWithFallback(source)),
   );
-  const categoryFallbackResults = await Promise.all(
-    groupSourcesByReliabilityCategory(activeSources).map(async ({ categoryKey, topicName, sources: categorySources }) =>
-      ensureTopicMinimumArticles(
-        topicName,
-        categorySources,
-        fetchedResults
-          .filter((result) => categorySources.some((source) => source.id === result.source.id))
-          .flatMap((result) => result.articles),
-        route,
-        userId,
-        categoryKey,
-      ),
-    ),
-  );
 
   fetchedResults.forEach((result) => {
     if (!result.failures.length) {
@@ -994,41 +965,22 @@ export async function persistRawArticles(
   const failedSourceNames = fetchedResults
     .filter((result) => result.articles.length === 0)
     .map((result) => result.source.name);
-  const fallbackSourceCount =
-    fetchedResults.filter((result) => result.usedFallback).length +
-    categoryFallbackResults.filter((result) => result.fallbackTriggered).length;
-  const fetchedArticles = [
-    ...fetchedResults.flatMap((result) =>
-      result.articles.map((article) => {
-        const canonicalUrl = canonicalizeArticleUrl(article.url);
-        return {
-          sourceId: result.source.id,
-          sourceName: article.sourceName,
-          title: article.title,
-          url: canonicalUrl,
-          summaryText: article.summaryText,
-          contentText: article.contentText,
-          publishedAt: article.publishedAt,
-          dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
-        };
-      }),
-    ),
-    ...categoryFallbackResults.flatMap((result) =>
-      result.articles.map((article) => {
-        const canonicalUrl = canonicalizeArticleUrl(article.url);
-        return {
-          sourceId: null,
-          sourceName: article.sourceName,
-          title: article.title,
-          url: canonicalUrl,
-          summaryText: article.summaryText,
-          contentText: article.contentText,
-          publishedAt: article.publishedAt,
-          dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
-        };
-      }),
-    ),
-  ];
+  const fallbackSourceCount = fetchedResults.filter((result) => result.usedFallback).length;
+  const fetchedArticles = fetchedResults.flatMap((result) =>
+    result.articles.map((article) => {
+      const canonicalUrl = canonicalizeArticleUrl(article.url);
+      return {
+        sourceId: result.source.id,
+        sourceName: article.sourceName,
+        title: article.title,
+        url: canonicalUrl,
+        summaryText: article.summaryText,
+        contentText: article.contentText,
+        publishedAt: article.publishedAt,
+        dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
+      };
+    }),
+  );
 
   if (!fetchedArticles.length) {
     logServerEvent("warn", "No raw articles were fetched from active sources", {
@@ -1259,7 +1211,7 @@ function toFeedArticle(article: EventSeedArticle): FeedArticle {
   };
 }
 
-function buildBriefingItemFromFeedCluster(input: {
+async function buildBriefingItemFromFeedCluster(input: {
   id: string;
   topicId: string;
   topicName: string;
@@ -1272,7 +1224,8 @@ function buildBriefingItemFromFeedCluster(input: {
     eventIntelligence: BriefingItem["eventIntelligence"];
   };
   priority: "top" | "normal";
-}): BriefingItem {
+  previousWhyOutputs?: string[];
+}): Promise<BriefingItem> {
   const sourceCount = new Set(input.cluster.sources.map((article) => article.sourceName)).size;
   const intelligence =
     input.cluster.eventIntelligence ??
@@ -1280,12 +1233,8 @@ function buildBriefingItemFromFeedCluster(input: {
       topicName: input.topicName,
       createdAt: input.cluster.representative.publishedAt,
     });
-  const trustLayer = buildTrustLayerPresentation(intelligence, {
-    title: intelligence.title,
-    topicName: input.topicName,
-    whyItMatters: intelligence.summary,
-    sourceCount,
-    rankingSignals: input.cluster.rankingSignals,
+  const whyItMatters = await generateWhyThisMatters(intelligence, {
+    previousOutputs: input.previousWhyOutputs,
   });
 
   return {
@@ -1295,7 +1244,7 @@ function buildBriefingItemFromFeedCluster(input: {
     title: intelligence.title,
     whatHappened: intelligence.summary,
     keyPoints: buildKeyPoints(intelligence, input.cluster.representative.sourceName, input.cluster.representative.publishedAt, []),
-    whyItMatters: trustLayer.body,
+    whyItMatters,
     sources: input.cluster.sources.slice(0, 3).map((article) => ({
       title: article.sourceName,
       url: article.url,
@@ -1494,8 +1443,8 @@ function buildSourceFetchAttempts(source: Source): SourceFetchAttempt[] {
       label: source.name,
       feedUrl: source.feedUrl,
       kind: "primary",
-      timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-      retryCount: INGESTION_MAX_RETRY_COUNT,
+      timeoutMs: isGdeltSource(source) ? 4_500 : 8_000,
+      retryCount: isGdeltSource(source) ? 0 : 1,
     },
   ];
 
@@ -1521,240 +1470,6 @@ function buildSourceFetchAttempts(source: Source): SourceFetchAttempt[] {
   return attempts;
 }
 
-async function ensureTopicMinimumArticles(
-  topicName: string,
-  existingSources: Source[],
-  existingArticles: FeedArticle[],
-  route: string,
-  userId?: string,
-  forcedCategoryKey?: ReliabilityCategoryKey,
-): Promise<TopicFallbackResult> {
-  const categoryKey = forcedCategoryKey ?? inferReliabilityCategory(topicName);
-  const dedupedExistingArticles = dedupeFeedArticles(existingArticles);
-
-  if (!categoryKey || dedupedExistingArticles.length >= MIN_ARTICLES_PER_CATEGORY) {
-    return {
-      categoryKey,
-      articles: [],
-      failures: [],
-      successfulAttempts: [],
-      fallbackTriggered: false,
-    };
-  }
-
-  const attempts = buildCategoryFallbackAttempts(categoryKey, existingSources);
-  const failures: SourceFetchFailure[] = [];
-  const successfulAttempts: SourceFetchAttempt[] = [];
-  const existingKeys = new Set(
-    dedupedExistingArticles.map((article) =>
-      createArticleDedupeKey(article.title, canonicalizeArticleUrl(article.url)),
-    ),
-  );
-  const supplementalArticles: FeedArticle[] = [];
-  const supplementalKeys = new Set<string>();
-
-  for (const attempt of attempts) {
-    try {
-      const fetchedArticles = filterAttemptArticles(
-        await fetchFeedArticles(attempt.feedUrl, attempt.label, {
-          timeoutMs: attempt.timeoutMs,
-          retryCount: attempt.retryCount,
-        }),
-        attempt,
-      );
-      const newArticles = fetchedArticles.filter((article) => {
-        const dedupeKey = createArticleDedupeKey(article.title, canonicalizeArticleUrl(article.url));
-        if (existingKeys.has(dedupeKey) || supplementalKeys.has(dedupeKey)) {
-          return false;
-        }
-
-        supplementalKeys.add(dedupeKey);
-        return true;
-      });
-
-      if (newArticles.length > 0) {
-        supplementalArticles.push(...newArticles);
-        successfulAttempts.push(attempt);
-      } else {
-        failures.push({
-          ...attempt,
-          errorMessage: "Feed returned zero new articles",
-        });
-      }
-
-      if (dedupedExistingArticles.length + supplementalArticles.length >= MIN_ARTICLES_PER_CATEGORY) {
-        break;
-      }
-    } catch (error) {
-      failures.push({
-        ...attempt,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  const fallbackTriggered = successfulAttempts.length > 0 || failures.length > 0;
-
-  if (fallbackTriggered) {
-    const timestamp = new Date().toISOString();
-    logServerEvent("info", "Category fallback ingestion evaluated", {
-      route,
-      userId,
-      category: categoryKey,
-      sourceUsed: successfulAttempts.map((attempt) => attempt.label),
-      fallbackTriggered,
-      timestamp,
-      resultCount: supplementalArticles.length,
-    });
-    console.info(
-      "[ingestion:fallback]",
-      "category=",
-      categoryKey,
-      "source_used=",
-      successfulAttempts.map((attempt) => attempt.label).join(",") || "none",
-      "fallback_triggered=",
-      fallbackTriggered,
-      "timestamp=",
-      timestamp,
-      "result_count=",
-      supplementalArticles.length,
-    );
-  }
-
-  return {
-    categoryKey,
-    articles: supplementalArticles,
-    failures,
-    successfulAttempts,
-    fallbackTriggered,
-  };
-}
-
-function groupSourcesByReliabilityCategory(sources: Source[]) {
-  const grouped = new Map<ReliabilityCategoryKey, { topicName: string; sources: Source[] }>();
-
-  for (const source of sources) {
-    const topicName = source.topicName ?? source.name;
-    const categoryKey = inferReliabilityCategory(topicName);
-
-    if (!categoryKey) {
-      continue;
-    }
-
-    const current = grouped.get(categoryKey) ?? { topicName, sources: [] };
-    current.sources.push(source);
-    grouped.set(categoryKey, current);
-  }
-
-  return [...grouped.entries()].map(([categoryKey, value]) => ({
-    categoryKey,
-    topicName: value.topicName,
-    sources: value.sources,
-  }));
-}
-
-function inferReliabilityCategory(value: string | undefined): ReliabilityCategoryKey | null {
-  const normalized = (value ?? "").toLowerCase();
-
-  if (/tech|technology|ai|product|software|startup/.test(normalized)) {
-    return "tech";
-  }
-
-  if (/finance|market|business|econom|rates|bank/.test(normalized)) {
-    return "finance";
-  }
-
-  if (/politic|policy|government|world|geopolit|diplomac|election/.test(normalized)) {
-    return "politics";
-  }
-
-  return null;
-}
-
-function buildCategoryFallbackAttempts(
-  categoryKey: ReliabilityCategoryKey,
-  existingSources: Source[],
-): SourceFetchAttempt[] {
-  const existingFeedUrls = new Set(existingSources.map((source) => source.feedUrl));
-  const attemptsByCategory: Record<ReliabilityCategoryKey, SourceFetchAttempt[]> = {
-    finance: [
-      {
-        label: "GDELT Finance Monitor",
-        feedUrl:
-          "https://api.gdeltproject.org/api/v2/doc/doc?query=(market%20OR%20stocks%20OR%20fed%20OR%20inflation%20OR%20earnings)&mode=artlist&maxrecords=25&timespan=1day&sort=datedesc&format=rss",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 48,
-      },
-      {
-        label: "Reuters Business fallback",
-        feedUrl: "https://feeds.reuters.com/reuters/businessNews",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 72,
-      },
-    ],
-    politics: [
-      {
-        label: "GDELT Geopolitics",
-        feedUrl:
-          "https://api.gdeltproject.org/api/v2/doc/doc?query=china%20OR%20us%20OR%20war%20OR%20election&mode=artlist&maxrecords=25&timespan=1day&sort=datedesc&format=rss",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 48,
-      },
-      {
-        label: "AP Top News fallback",
-        feedUrl: "https://apnews.com/hub/apf-topnews?output=rss",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 72,
-      },
-      {
-        label: "BBC News fallback",
-        feedUrl: "https://feeds.bbci.co.uk/news/rss.xml",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 72,
-      },
-    ],
-    tech: [
-      {
-        label: "GDELT AI Monitor",
-        feedUrl:
-          "https://api.gdeltproject.org/api/v2/doc/doc?query=artificial%20intelligence&mode=artlist&maxrecords=25&timespan=1day&sort=datedesc&format=rss",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 48,
-      },
-      {
-        label: "Reuters Technology fallback",
-        feedUrl: "https://feeds.reuters.com/reuters/technologyNews",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 72,
-      },
-      {
-        label: "TechCrunch fallback",
-        feedUrl: "https://techcrunch.com/feed/",
-        kind: "fallback",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
-        maxAgeHours: 72,
-      },
-    ],
-  };
-
-  return attemptsByCategory[categoryKey].filter((attempt) => !existingFeedUrls.has(attempt.feedUrl));
-}
-
 function isGdeltSource(source: Source) {
   return /gdelt/i.test(source.name) || /api\.gdeltproject\.org/i.test(source.feedUrl);
 }
@@ -1767,8 +1482,8 @@ function getGdeltFallbackFeeds(source: Source) {
       {
         label: "Reuters Business fallback",
         feedUrl: "https://feeds.reuters.com/reuters/businessNews",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
+        timeoutMs: 4_500,
+        retryCount: 0,
         maxAgeHours: 72,
       },
     ];
@@ -1779,8 +1494,8 @@ function getGdeltFallbackFeeds(source: Source) {
       {
         label: "AP Top News fallback",
         feedUrl: "https://apnews.com/hub/apf-topnews?output=rss",
-        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-        retryCount: INGESTION_MAX_RETRY_COUNT,
+        timeoutMs: 4_500,
+        retryCount: 0,
         maxAgeHours: 72,
       },
     ];
@@ -1790,8 +1505,8 @@ function getGdeltFallbackFeeds(source: Source) {
     {
       label: "TechCrunch fallback",
       feedUrl: "https://techcrunch.com/feed/",
-      timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
-      retryCount: INGESTION_MAX_RETRY_COUNT,
+      timeoutMs: 4_500,
+      retryCount: 0,
       maxAgeHours: 72,
     },
   ];
@@ -1826,11 +1541,8 @@ function dedupeFeedArticles(articles: FeedArticle[]) {
 }
 
 export const __testing__ = {
-  buildCategoryFallbackAttempts,
   buildSourceFetchAttempts,
-  ensureTopicMinimumArticles,
   fetchSourceArticlesWithFallback,
-  inferReliabilityCategory,
 };
 
 function normalizeSignal(value: string) {
