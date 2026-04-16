@@ -109,4 +109,29 @@ describe("/auth/callback", () => {
       "http://localhost:3000/?auth=callback-error",
     );
   });
+
+  it("returns callback-error immediately when the provider sends explicit error params", async () => {
+    const { GET } = await import("@/app/auth/callback/route");
+    const response = await GET(
+      {
+        url: "http://localhost:3000/auth/callback?error=access_denied&error_code=otp_expired&error_description=User%20denied%20access",
+        cookies: {
+          getAll: () => [],
+        },
+      } as unknown as NextRequest,
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/?auth=callback-error",
+    );
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(logServerEvent).toHaveBeenCalledWith(
+      "error",
+      "Auth callback returned provider error params",
+      expect.objectContaining({
+        providerError: "access_denied",
+        providerErrorCode: "otp_expired",
+      }),
+    );
+  });
 });

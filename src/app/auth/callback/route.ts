@@ -1,20 +1,66 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { buildAuthConfigErrorPath, safeRedirectPath } from "@/lib/auth";
+import {
+  buildAuthConfigErrorPath,
+  hasSupabaseCodeVerifierCookie,
+  hasSupabaseSessionCookie,
+  safeRedirectPath,
+} from "@/lib/auth";
 import { bootstrapUserDefaults } from "@/lib/default-topics";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { errorContext, logServerEvent } from "@/lib/observability";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
+  const requestCookies = request.cookies.getAll();
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type");
+  const providerError = requestUrl.searchParams.get("error");
+  const providerErrorCode = requestUrl.searchParams.get("error_code");
+  const providerErrorDescription = requestUrl.searchParams.get("error_description");
   const next = safeRedirectPath(requestUrl.searchParams.get("next"));
+  const sessionCookiePresent = hasSupabaseSessionCookie(requestCookies);
+  const codeVerifierCookiePresent = hasSupabaseCodeVerifierCookie(requestCookies);
+
+  logServerEvent("info", "Auth callback received", {
+    route: "/auth/callback",
+    requestOrigin: requestUrl.origin,
+    requestPath: requestUrl.pathname,
+    next,
+    hasCode: Boolean(code),
+    hasTokenHash: Boolean(tokenHash),
+    otpType: type,
+    providerError,
+    providerErrorCode,
+    providerErrorDescription,
+    sessionCookiePresent,
+    codeVerifierCookiePresent,
+    appUrl: env.appUrl,
+    supabaseUrlHost: new URL(env.supabaseUrl).host,
+  });
 
   if (!isSupabaseConfigured) {
     return NextResponse.redirect(new URL(buildAuthConfigErrorPath(), request.url));
+  }
+
+  if (providerError || providerErrorCode || providerErrorDescription) {
+    logServerEvent("error", "Auth callback returned provider error params", {
+      route: "/auth/callback",
+      requestOrigin: requestUrl.origin,
+      next,
+      providerError,
+      providerErrorCode,
+      providerErrorDescription,
+      hasCode: Boolean(code),
+      hasTokenHash: Boolean(tokenHash),
+      otpType: type,
+      sessionCookiePresent,
+      codeVerifierCookiePresent,
+    });
+
+    return NextResponse.redirect(new URL("/?auth=callback-error", request.url));
   }
 
   const response = NextResponse.redirect(new URL(next, request.url));
@@ -34,6 +80,15 @@ export async function GET(request: NextRequest) {
 
   try {
     if (code) {
+      logServerEvent("info", "Auth callback exchanging code for session", {
+        route: "/auth/callback",
+        requestOrigin: requestUrl.origin,
+        next,
+        hasCode: true,
+        sessionCookiePresent,
+        codeVerifierCookiePresent,
+      });
+
       const exchangeResult = await supabase.auth.exchangeCodeForSession(code);
       if (exchangeResult.error) {
         throw exchangeResult.error;
@@ -47,19 +102,49 @@ export async function GET(request: NextRequest) {
         throw verifyResult.error;
       }
     } else {
+      logServerEvent("error", "Auth callback missing exchange params", {
+        route: "/auth/callback",
+        requestOrigin: requestUrl.origin,
+        next,
+        providerError,
+        providerErrorCode,
+        providerErrorDescription,
+        hasCode: false,
+        hasTokenHash: Boolean(tokenHash),
+        otpType: type,
+        sessionCookiePresent,
+        codeVerifierCookiePresent,
+      });
+
       return NextResponse.redirect(new URL("/?auth=callback-error", request.url));
     }
   } catch (error) {
     logServerEvent("error", "Auth callback failed", {
       route: "/auth/callback",
+      requestOrigin: requestUrl.origin,
+      next,
+      providerError,
+      providerErrorCode,
+      providerErrorDescription,
       hasCode: Boolean(code),
       hasTokenHash: Boolean(tokenHash),
       otpType: type,
+      sessionCookiePresent,
+      codeVerifierCookiePresent,
       ...errorContext(error),
     });
 
     return NextResponse.redirect(new URL("/?auth=callback-error", request.url));
   }
+
+  logServerEvent("info", "Auth callback exchanged session successfully", {
+    route: "/auth/callback",
+    requestOrigin: requestUrl.origin,
+    next,
+    sessionCookiePresent,
+    codeVerifierCookiePresent,
+    responseSessionCookiePresent: hasSupabaseSessionCookie(response.cookies.getAll()),
+  });
 
   try {
     const {

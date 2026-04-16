@@ -46,4 +46,21 @@ describe("proxy auth return handling", () => {
       "http://localhost:3000/auth/callback?code=oauth-code&next=%2Fdashboard",
     );
   });
+
+  it("does not refresh auth state on the callback route before code exchange", async () => {
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      {
+        url: "http://localhost:3000/auth/callback?code=oauth-code&next=%2Fdashboard",
+        cookies: {
+          getAll: () => [],
+          set: () => undefined,
+        },
+      } as unknown as NextRequest,
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(getUser).not.toHaveBeenCalled();
+  });
 });

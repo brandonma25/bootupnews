@@ -6,18 +6,23 @@ import { env, isSupabaseConfigured } from "@/lib/env";
 
 export async function proxy(request: NextRequest) {
   const requestUrl = new URL(request.url);
+  const isAuthCallbackRequest = requestUrl.pathname === "/auth/callback";
 
   if (
     isSupabaseConfigured &&
-    requestUrl.pathname !== "/auth/callback" &&
+    !isAuthCallbackRequest &&
     hasAuthReturnParams(requestUrl.searchParams)
   ) {
     return NextResponse.redirect(buildAuthCallbackExchangeUrl(requestUrl));
   }
 
-  let response = NextResponse.next({
-    request,
-  });
+  if (isAuthCallbackRequest) {
+    return NextResponse.next({
+      request,
+    });
+  }
+
+  let response = NextResponse.next({ request });
 
   if (!isSupabaseConfigured) {
     return response;

@@ -50,6 +50,12 @@ export function hasSupabaseSessionCookie(cookies: Array<{ name: string }>) {
   );
 }
 
+export function hasSupabaseCodeVerifierCookie(cookies: Array<{ name: string }>) {
+  return cookies.some(
+    (cookie) => cookie.name.startsWith("sb-") && cookie.name.endsWith("-auth-token-code-verifier"),
+  );
+}
+
 export function hasAuthReturnParams(searchParams: URLSearchParams) {
   return AUTH_RETURN_PARAMS.some((name) => searchParams.has(name));
 }

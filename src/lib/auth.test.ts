@@ -7,6 +7,7 @@ import {
   buildAuthConfigErrorPath,
   buildAuthReturnNextPath,
   buildAuthRedirectPath,
+  hasSupabaseCodeVerifierCookie,
   hasAuthReturnParams,
   hasSupabaseSessionCookie,
   safeRedirectPath,
@@ -36,6 +37,13 @@ describe("auth helpers", () => {
   it("detects Supabase session cookies", () => {
     expect(hasSupabaseSessionCookie([{ name: "sb-localhost-auth-token" }])).toBe(true);
     expect(hasSupabaseSessionCookie([{ name: "theme" }])).toBe(false);
+  });
+
+  it("detects the Supabase PKCE code verifier cookie", () => {
+    expect(
+      hasSupabaseCodeVerifierCookie([{ name: "sb-localhost-auth-token-code-verifier" }]),
+    ).toBe(true);
+    expect(hasSupabaseCodeVerifierCookie([{ name: "sb-localhost-auth-token" }])).toBe(false);
   });
 
   it("detects auth return params and builds a safe next path", () => {
