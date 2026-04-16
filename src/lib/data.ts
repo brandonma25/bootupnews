@@ -11,6 +11,13 @@ import {
   rankNewsClusters,
 } from "@/lib/ranking";
 import { clusterArticles, fetchFeedArticles, type FeedArticle } from "@/lib/rss";
+import {
+  applySignalFiltering,
+  type EventType,
+  type FilterDecision,
+  type HeadlineQuality,
+  type SourceTier,
+} from "@/lib/signal-filtering";
 import { withServerFallback } from "@/lib/server-safety";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
 import { buildTimelineGroups } from "@/lib/timeline-builder";
@@ -36,6 +43,11 @@ type StoredArticle = {
   url: string;
   source_id: string | null;
   event_id?: string | null;
+  source_tier?: SourceTier | null;
+  headline_quality?: HeadlineQuality | null;
+  event_type?: EventType | null;
+  filter_decision?: FilterDecision | null;
+  filter_reasons?: string[] | null;
 };
 
 type StoredArticleTopic = {
@@ -60,6 +72,11 @@ type EventSeedArticle = StoredArticle & {
   sourceName: string;
   matchedKeywords: string[];
   matchScore: number;
+  sourceTier: SourceTier;
+  headlineQuality: HeadlineQuality;
+  eventType: EventType;
+  filterDecision: FilterDecision;
+  filterReasons: string[];
 };
 
 type EventCluster = {
@@ -263,6 +280,7 @@ export async function getDashboardData(
     sources,
     resolvedAuthState.route,
   );
+  await syncArticleSignalFilters(supabase, user.id, sources, resolvedAuthState.route);
   await syncTopicMatches(supabase, user.id, topics);
   await syncEventClusters(supabase, user.id, topics, sources);
 
@@ -420,7 +438,31 @@ export async function generateDailyBriefing(
       const sourceResults = await Promise.all(
         topicSources.map((source) => fetchSourceArticlesWithFallback(source)),
       );
-      const articles = sourceResults.flatMap((result) => result.articles);
+      const articleCandidates = sourceResults.flatMap((result) =>
+        result.articles.map((article) => ({
+          id: `${result.source.id}:${article.url}`,
+          article,
+          candidate: {
+            id: `${result.source.id}:${article.url}`,
+            title: article.title,
+            summaryText: article.summaryText,
+            url: article.url,
+            publishedAt: article.publishedAt,
+            sourceName: article.sourceName,
+            sourceFeedUrl: result.source.feedUrl,
+            sourceHomepageUrl: result.source.homepageUrl,
+            topicName: result.source.topicName ?? topic.name,
+          },
+        })),
+      );
+      const passingArticleIds = new Set(
+        applySignalFiltering(articleCandidates.map((entry) => entry.candidate))
+          .filter((evaluation) => evaluation.filterDecision === "pass")
+          .map((evaluation) => evaluation.id),
+      );
+      const articles = articleCandidates
+        .filter((entry) => passingArticleIds.has(entry.id))
+        .map((entry) => entry.article);
 
       if (!articles.length) {
         return null;
@@ -482,7 +524,7 @@ export async function syncTopicMatches(
 ) {
   const articleResult = await supabase
     .from("articles")
-    .select("id, title, summary_text")
+    .select("id, title, summary_text, filter_decision")
     .eq("user_id", userId);
 
   if (articleResult.error) {
@@ -494,7 +536,9 @@ export async function syncTopicMatches(
     return;
   }
 
-  const articles = articleResult.data ?? [];
+  const articles = (articleResult.data ?? []).filter(
+    (article) => article.filter_decision !== "reject",
+  );
   if (!articles.length || !topics.length) {
     return;
   }
@@ -564,7 +608,7 @@ export async function syncEventClusters(
   const [articleResult, matchResult] = await Promise.all([
     supabase
       .from("articles")
-      .select("id, title, summary_text, published_at, url, source_id")
+      .select("id, title, summary_text, published_at, url, source_id, source_tier, headline_quality, event_type, filter_decision, filter_reasons")
       .eq("user_id", userId),
     supabase
       .from("article_topics")
@@ -588,6 +632,7 @@ export async function syncEventClusters(
   const primaryMatches = getPrimaryMatches(matches);
 
   const seededArticles = articles
+    .filter((article) => article.filter_decision === "pass")
     .map((article) => {
       const match = primaryMatches.get(article.id);
       const topic = match ? topicById.get(match.topic_id) : undefined;
@@ -606,6 +651,11 @@ export async function syncEventClusters(
         sourceName,
         matchedKeywords: (match.matched_keywords ?? []).filter(Boolean),
         matchScore: match.match_score ?? 0,
+        sourceTier: article.source_tier ?? "unknown",
+        headlineQuality: article.headline_quality ?? "medium",
+        eventType: article.event_type ?? "generic_commentary",
+        filterDecision: article.filter_decision ?? "suppress",
+        filterReasons: (article.filter_reasons ?? []).filter(Boolean),
       } satisfies EventSeedArticle;
     })
     .filter((article): article is EventSeedArticle => Boolean(article));
@@ -728,7 +778,7 @@ export async function buildMatchedBriefing(
   const [articleResult, eventResult, matchResult] = await Promise.all([
     supabase
       .from("articles")
-      .select("id, title, summary_text, published_at, url, source_id, event_id")
+      .select("id, title, summary_text, published_at, url, source_id, event_id, source_tier, headline_quality, event_type, filter_decision, filter_reasons")
       .eq("user_id", userId),
     supabase
       .from("events")
@@ -782,6 +832,11 @@ export async function buildMatchedBriefing(
       sourceName,
       matchedKeywords: (match?.matched_keywords ?? []).filter(Boolean),
       matchScore: match?.match_score ?? 0,
+      sourceTier: article.source_tier ?? "unknown",
+      headlineQuality: article.headline_quality ?? "medium",
+      eventType: article.event_type ?? "generic_commentary",
+      filterDecision: article.filter_decision ?? "suppress",
+      filterReasons: (article.filter_reasons ?? []).filter(Boolean),
     };
 
     const bucket = articlesByEvent.get(article.event_id) ?? [];
@@ -1125,6 +1180,94 @@ export async function persistRawArticles(
     fallbackSourceCount,
     degradedSourceNames: failedSourceNames,
   } satisfies IngestionRunSummary;
+}
+
+export async function syncArticleSignalFilters(
+  supabase: SupabaseServerClient,
+  userId: string,
+  sources: Source[],
+  route = "/dashboard",
+) {
+  const articleResult = await supabase
+    .from("articles")
+    .select("id, title, summary_text, published_at, url, source_id")
+    .eq("user_id", userId);
+
+  if (articleResult.error) {
+    logServerEvent("warn", "Signal filtering article lookup failed", {
+      route,
+      userId,
+      errorMessage: articleResult.error.message,
+    });
+    return;
+  }
+
+  const articles = (articleResult.data ?? []) as StoredArticle[];
+  if (!articles.length) {
+    return;
+  }
+
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
+  const evaluations = applySignalFiltering(
+    articles.map((article) => {
+      const source = article.source_id ? sourceById.get(article.source_id) : undefined;
+
+      return {
+        id: article.id,
+        title: article.title,
+        summaryText: article.summary_text,
+        url: article.url,
+        publishedAt: article.published_at,
+        sourceName: source?.name ?? "Unknown source",
+        sourceFeedUrl: source?.feedUrl,
+        sourceHomepageUrl: source?.homepageUrl,
+        topicName: source?.topicName,
+      };
+    }),
+  );
+
+  const updateResults = await Promise.all(
+    evaluations.map((evaluation) =>
+      supabase
+        .from("articles")
+        .update({
+          source_tier: evaluation.sourceTier,
+          headline_quality: evaluation.headlineQuality,
+          event_type: evaluation.eventType,
+          filter_decision: evaluation.filterDecision,
+          filter_reasons: evaluation.filterReasons,
+          filter_evaluated_at: new Date().toISOString(),
+        })
+        .eq("id", evaluation.id),
+    ),
+  );
+
+  const failedUpdates = updateResults.filter((result) => result.error);
+  if (failedUpdates.length) {
+    logServerEvent("warn", "Signal filtering metadata update partially failed", {
+      route,
+      userId,
+      attemptedRows: evaluations.length,
+      failedRows: failedUpdates.length,
+    });
+  }
+
+  const counts = evaluations.reduce(
+    (summary, evaluation) => {
+      summary[evaluation.filterDecision] += 1;
+      return summary;
+    },
+    { pass: 0, suppress: 0, reject: 0 },
+  );
+
+  logServerEvent("info", "Signal filtering updated article metadata", {
+    route,
+    userId,
+    totalArticles: evaluations.length,
+    passCount: counts.pass,
+    suppressCount: counts.suppress,
+    rejectCount: counts.reject,
+  });
 }
 
 function getPrimaryMatches(matches: StoredArticleTopic[]) {
