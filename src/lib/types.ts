@@ -59,11 +59,21 @@ export type EventIntelligenceSignals = {
   velocityScore: number;
 };
 
+export type EventTimeHorizon = "short" | "medium" | "long";
+export type EventSignalStrength = "weak" | "moderate" | "strong";
+
 export type EventIntelligence = {
   id: string;
   title: string;
   summary: string;
   primaryChange: string;
+  entities: string[];
+  sourceNames?: string[];
+  eventType: string;
+  primaryImpact: string;
+  affectedMarkets: string[];
+  timeHorizon: EventTimeHorizon;
+  signalStrength: EventSignalStrength;
   keyEntities: string[];
   topics: string[];
   signals: EventIntelligenceSignals;

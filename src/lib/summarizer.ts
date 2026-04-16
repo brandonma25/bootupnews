@@ -1,6 +1,8 @@
 import { env, isAiConfigured } from "@/lib/env";
+import { buildEventIntelligence } from "@/lib/event-intelligence";
 import { classifyHomepageCategory, getHomepageCategoryLabel } from "@/lib/homepage-taxonomy";
 import type { FeedArticle } from "@/lib/rss";
+import { generateWhyThisMattersHeuristically } from "@/lib/why-it-matters";
 import { firstSentence } from "@/lib/utils";
 
 export type StorySummary = {
@@ -30,6 +32,9 @@ async function summarizeWithAi(
   topicName: string,
   articles: FeedArticle[],
 ): Promise<StorySummary> {
+  const intelligence = buildEventIntelligence(articles, {
+    topicName,
+  });
   const sourceBlock = articles
     .slice(0, 5)
     .map(
@@ -56,7 +61,24 @@ async function summarizeWithAi(
         },
         {
           role: "user",
-          content: `Topic: ${topicName}\n\nCreate a high-signal daily briefing item from these articles:\n\n${sourceBlock}`,
+          content: `Topic: ${topicName}
+
+Structured event intelligence:
+- Event type: ${intelligence.eventType}
+- Entities: ${intelligence.entities.join(", ") || "None"}
+- Primary impact: ${intelligence.primaryImpact}
+- Affected markets: ${intelligence.affectedMarkets.join(", ") || "broad markets"}
+- Time horizon: ${intelligence.timeHorizon}
+
+Create a high-signal daily briefing item from these articles:
+
+${sourceBlock}
+
+For whyItMatters specifically:
+- Focus on causality (what changes and why)
+- Be specific to this event
+- Avoid generic phrases
+- Do not repeat the summary`,
         },
       ],
     }),
@@ -98,6 +120,9 @@ export function summarizeHeuristically(topicName: string, articles: FeedArticle[
     : topicName;
   const sourceCount = new Set(articles.map((article) => article.sourceName)).size;
   const leadSummary = firstSentence(lead.summaryText, lead.title);
+  const intelligence = buildEventIntelligence(articles, {
+    topicName,
+  });
 
   const whatHappened = firstSentence(
     lead.summaryText,
@@ -116,7 +141,9 @@ export function summarizeHeuristically(topicName: string, articles: FeedArticle[
         : `Treat this as an early signal until more independent sources confirm it.`,
   ];
 
-  const whyItMatters = buildWhyItMatters(primaryCategory, lead.title, leadSummary, sourceCount);
+  const whyItMatters = truncateWhyThisMatters(
+    `${generateWhyThisMattersHeuristically(intelligence)} (Signal: ${intelligence.signalStrength.charAt(0).toUpperCase()}${intelligence.signalStrength.slice(1)})`,
+  );
 
   return {
     headline: lead.title,
@@ -127,29 +154,16 @@ export function summarizeHeuristically(topicName: string, articles: FeedArticle[
   };
 }
 
-function buildWhyItMatters(
-  primaryCategory: string,
-  title: string,
-  leadSummary: string,
-  sourceCount: number,
-) {
-  const normalizedTitle = title.toLowerCase();
-
-  if (/earnings|rates|inflation|fed|treasury|ipo|acquisition|merger|tariff|trade/i.test(normalizedTitle)) {
-    return `It can move market expectations quickly because it changes the outlook for pricing, policy, or company performance.`;
+function truncateWhyThisMatters(value: string, maxLength = 179) {
+  if (value.length <= maxLength) {
+    return value;
   }
 
-  if (/regulation|senate|congress|election|white house|sanctions|executive order|policy/i.test(normalizedTitle)) {
-    return `It matters because policy shifts can change operating conditions faster than product or market cycles do.`;
+  const trimmed = value.slice(0, maxLength - 1);
+  const sentenceEnd = Math.max(trimmed.lastIndexOf("."), trimmed.lastIndexOf(";"), trimmed.lastIndexOf(","));
+  if (sentenceEnd > 100) {
+    return `${trimmed.slice(0, sentenceEnd).trim()}…`;
   }
 
-  if (/ai|chip|cloud|software|cyber|platform|developer|data center|device/i.test(normalizedTitle)) {
-    return `It matters because changes in ${primaryCategory.toLowerCase()} infrastructure or platform power can quickly reshape execution risk and competitive positioning.`;
-  }
-
-  if (sourceCount > 1) {
-    return `It matters because multiple outlets converged on the same ${primaryCategory.toLowerCase()} development, suggesting broader decision impact.`;
-  }
-
-  return `It matters because this shift could change near-term assumptions around ${leadSummary.toLowerCase()}.`;
+  return `${trimmed.trim()}…`;
 }

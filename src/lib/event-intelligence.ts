@@ -2,7 +2,12 @@ import { createHash } from "crypto";
 
 import { classifyHomepageCategory, getHomepageCategoryLabel } from "@/lib/homepage-taxonomy";
 import type { FeedArticle } from "@/lib/rss";
-import type { BriefingItem, EventIntelligence } from "@/lib/types";
+import type {
+  BriefingItem,
+  EventIntelligence,
+  EventSignalStrength,
+  EventTimeHorizon,
+} from "@/lib/types";
 import { firstSentence, stripHtml } from "@/lib/utils";
 
 type EventIntelligenceOptions = {
@@ -83,7 +88,17 @@ export function buildEventIntelligence(
   const articleCount = sorted.length;
   const keyEntities = extractKeyEntities(sorted, options.matchedKeywords);
   const topics = deriveTopics(sorted, options.topicName, options.matchedKeywords);
+  const eventType = inferEventType(sorted, options.topicName, options.matchedKeywords);
+  const affectedMarkets = inferAffectedMarkets(sorted, eventType, topics, keyEntities);
+  const timeHorizon = inferTimeHorizon(eventType, sorted);
   const primaryChange = buildPrimaryChange(representative?.title ?? options.topicName);
+  const primaryImpact = inferPrimaryImpact({
+    eventType,
+    primaryChange,
+    entities: keyEntities,
+    affectedMarkets,
+    topics,
+  });
   const summary = buildSummary(sorted, primaryChange, sourceDiversity, topics);
   const recencyScore = computeRecencyScore(sorted);
   const velocityScore = computeVelocityScore(sorted);
@@ -110,6 +125,17 @@ export function buildEventIntelligence(
     summary,
     matchedKeywords: options.matchedKeywords ?? [],
   });
+  const signalStrength = getSignalStrength({
+    eventType,
+    affectedMarkets,
+    sourceDiversity,
+    articleCount,
+    rankingScore,
+    topics,
+    sourceNames: sorted.map((article) => article.sourceName),
+    recencyScore,
+    velocityScore,
+  });
   const isHighSignal = evaluateHighSignal({
     title: representative?.title ?? primaryChange,
     summary,
@@ -127,6 +153,13 @@ export function buildEventIntelligence(
     title: representative?.title ?? primaryChange,
     summary,
     primaryChange,
+    entities: keyEntities,
+    sourceNames: sorted.map((article) => article.sourceName),
+    eventType,
+    primaryImpact,
+    affectedMarkets,
+    timeHorizon,
+    signalStrength,
     keyEntities,
     topics,
     signals: {
@@ -141,6 +174,51 @@ export function buildEventIntelligence(
     isHighSignal,
     createdAt: options.createdAt ?? representative?.publishedAt ?? new Date().toISOString(),
   };
+}
+
+export function getSignalStrength(input: {
+  eventType: string;
+  affectedMarkets: string[];
+  sourceDiversity: number;
+  articleCount: number;
+  rankingScore: number;
+  topics: string[];
+  sourceNames?: string[];
+  recencyScore?: number;
+  velocityScore?: number;
+}): EventSignalStrength {
+  let score = getEventTypeSignalWeight(input.eventType);
+  const sourceTierWeight = getSourceTierSignalWeight(input.sourceNames ?? []);
+
+  if (sourceTierWeight >= 2 || input.sourceDiversity >= 2) {
+    score += 1;
+  }
+
+  if (input.articleCount <= 1 && input.sourceDiversity <= 1) {
+    score -= 1;
+  }
+
+  if (input.eventType === "product" && input.affectedMarkets.length >= 2 && sourceTierWeight >= 1) {
+    score += 1;
+  }
+
+  if (input.eventType === "corporate" && input.rankingScore >= 65) {
+    score += 1;
+  }
+
+  if (input.eventType === "company_update" && input.sourceDiversity <= 1) {
+    score -= 1;
+  }
+
+  if (score >= 2) {
+    return "strong";
+  }
+
+  if (score >= 1) {
+    return "moderate";
+  }
+
+  return "weak";
 }
 
 export function getTrustTier(confidenceScore: number) {
@@ -219,6 +297,187 @@ function deriveTopics(articles: FeedArticle[], topicName: string, matchedKeyword
   }
 
   return [...topics].slice(0, 4);
+}
+
+function inferEventType(
+  articles: FeedArticle[],
+  topicName: string,
+  matchedKeywords?: string[],
+) {
+  const corpus = normalizeText(
+    `${topicName} ${articles.map((article) => `${article.title} ${article.summaryText}`).join(" ")} ${(matchedKeywords ?? []).join(" ")}`,
+  );
+
+  if (
+    (corpus.includes("chrome") || corpus.includes("ai mode")) &&
+    (corpus.includes("lets you") || corpus.includes("open links") || corpus.includes("side-by-side"))
+  ) {
+    return "product";
+  }
+
+  const rules: Array<[string, string[]]> = [
+    ["defense", ["department of defense", "classified", "government", "military", "pentagon", "defense department"]],
+    ["political", ["election", "minister", "foreign office", "foreign minister", "cabinet", "parliament", "vetting", "ambassador", "appointment"]],
+    ["corporate", ["earnings", "guidance", "revenue", "profit", "quarter", "results"]],
+    ["product", ["product launch", "launch", "launched", "feature", "features", "update", "updated", "release", "released", "rollout", "debut", "debuts", "adds"]],
+    ["legal_investigation", ["lawsuit", "probe", "investigation", "charges", "doj", "sec", "antitrust case"]],
+    ["policy_regulation", ["regulation", "regulatory", "antitrust", "rule", "rules", "senate", "congress", "policy", "ban", "approval", "approved", "export restrictions", "tariff"]],
+    ["macro_market_move", ["inflation", "fed", "federal reserve", "rates", "treasury", "jobs", "gdp", "economy", "economic", "trade"]],
+    ["mna_funding", ["acquisition", "acquire", "merger", "buyout", "takeover", "stake", "deal", "funding", "raises", "series a", "series b"]],
+    ["geopolitical", ["sanctions", "war", "diplomacy", "china", "russia", "ukraine", "taiwan", "middle east", "border"]],
+  ];
+
+  const matchedRule = rules.find(([, keywords]) => keywords.some((keyword) => matchesKeyword(corpus, keyword)));
+  return matchedRule?.[0] ?? "company_update";
+}
+
+function inferPrimaryImpact(input: {
+  eventType: string;
+  primaryChange: string;
+  entities: string[];
+  affectedMarkets: string[];
+  topics: string[];
+}) {
+  const entityLabel = input.entities[0] ?? input.primaryChange;
+  const marketLabel = input.affectedMarkets[0] ?? "investor expectations";
+
+  switch (input.eventType) {
+    case "corporate":
+      return `${entityLabel} is resetting near-term expectations for pricing, margins, or guidance in ${marketLabel}.`;
+    case "political":
+      return `${entityLabel} may affect governance credibility, diplomatic standing, or policy risk around the story.`;
+    case "defense":
+      return `${entityLabel} may change defense posture, state capacity, or international risk assumptions tied to ${marketLabel}.`;
+    case "policy_regulation":
+      return `${entityLabel} could alter operating rules, compliance costs, or market access across ${marketLabel}.`;
+    case "macro_market_move":
+      return `${entityLabel} changes the rate, demand, or liquidity backdrop feeding into ${marketLabel}.`;
+    case "mna_funding":
+      return `${entityLabel} can shift competitive positioning, capital allocation, and consolidation expectations in ${marketLabel}.`;
+    case "geopolitical":
+      return `${entityLabel} may disrupt supply chains, policy alignment, or risk premiums tied to ${marketLabel}.`;
+    case "product":
+      return `${entityLabel} could change adoption curves, platform choice, or buyer expectations in ${marketLabel}.`;
+    case "legal_investigation":
+      return `${entityLabel} may raise liability, operating constraints, or reputational risk across ${marketLabel}.`;
+    default:
+      if (input.topics.includes("tech")) {
+        return `${entityLabel} could change execution risk and platform positioning across ${marketLabel}.`;
+      }
+
+      return `${entityLabel} has the clearest near-term effect on ${marketLabel}.`;
+  }
+}
+
+function inferAffectedMarkets(
+  articles: FeedArticle[],
+  eventType: string,
+  topics: string[],
+  entities: string[],
+) {
+  const corpus = normalizeText(
+    `${topics.join(" ")} ${entities.join(" ")} ${articles.map((article) => `${article.title} ${article.summaryText}`).join(" ")}`,
+  );
+  const affected = new Set<string>();
+
+  if (eventType === "macro_market_move") {
+    affected.add("rates");
+    affected.add("equities");
+  }
+
+  if (eventType === "corporate" || corpus.includes("guidance") || corpus.includes("revenue")) {
+    affected.add("financials");
+    affected.add("margins");
+    affected.add("valuation");
+  }
+
+  if (eventType === "policy_regulation") {
+    affected.add("policy-sensitive sectors");
+  }
+
+  if (eventType === "mna_funding") {
+    affected.add("competition");
+    affected.add("market structure");
+  }
+
+  if (eventType === "product") {
+    affected.add("adoption");
+    affected.add("user behavior");
+    affected.add("competitive feature dynamics");
+  }
+
+  if (eventType === "political") {
+    affected.add("governance credibility");
+    affected.add("policy risk");
+    affected.add("international relations");
+  }
+
+  if (eventType === "defense" || eventType === "geopolitical") {
+    affected.add("policy risk");
+    affected.add("defense posture");
+    affected.add("international relations");
+  }
+
+  if (eventType === "legal_investigation") {
+    affected.add("liability");
+    affected.add("operations");
+    affected.add("reputation");
+  }
+
+  if (corpus.includes("chip") || corpus.includes("semiconductor")) {
+    affected.add("semiconductors");
+  }
+
+  if (corpus.includes("oil") || corpus.includes("energy")) {
+    affected.add("energy");
+  }
+
+  if (corpus.includes("bank") || corpus.includes("credit")) {
+    affected.add("credit");
+  }
+
+  if (topics.includes("finance") && !["political", "defense", "geopolitical"].includes(eventType)) {
+    affected.add("equities");
+  }
+
+  if (topics.includes("tech") && !["political", "defense", "geopolitical"].includes(eventType)) {
+    affected.add("technology");
+  }
+
+  if (!affected.size) {
+    affected.add(topics[0] ?? "risk appetite");
+  }
+
+  return [...affected].slice(0, 4);
+}
+
+function inferTimeHorizon(eventType: string, articles: FeedArticle[]): EventTimeHorizon {
+  const corpus = normalizeText(
+    articles.map((article) => `${article.title} ${article.summaryText}`).join(" "),
+  );
+
+  if (
+    eventType === "policy_regulation" ||
+    eventType === "defense" ||
+    eventType === "geopolitical" ||
+    corpus.includes("multi-year") ||
+    corpus.includes("long term")
+  ) {
+    return "long";
+  }
+
+  if (
+    eventType === "political" ||
+    eventType === "corporate" ||
+    eventType === "macro_market_move" ||
+    eventType === "mna_funding" ||
+    eventType === "legal_investigation" ||
+    corpus.includes("guidance")
+  ) {
+    return "medium";
+  }
+
+  return "short";
 }
 
 function buildPrimaryChange(title: string) {
@@ -334,6 +593,53 @@ function buildRankingReason(input: {
   return `${anchor} ranked on current coverage breadth, freshness, and clear topic fit.`;
 }
 
+function getEventTypeSignalWeight(eventType: string) {
+  switch (eventType) {
+    case "defense":
+    case "geopolitical":
+    case "political":
+    case "policy_regulation":
+    case "macro_market_move":
+      return 2;
+    case "corporate":
+    case "mna_funding":
+    case "legal_investigation":
+      return 1;
+    case "product":
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function getSourceTierSignalWeight(sourceNames: string[]) {
+  const tier = getBestSourceTier(sourceNames);
+  if (tier === "tier1") return 2;
+  if (tier === "tier2") return 1;
+  return 0;
+}
+
+function getBestSourceTier(sourceNames: string[]) {
+  let best = 0;
+
+  for (const name of sourceNames) {
+    const normalized = name.toLowerCase();
+    if (/(reuters|financial times|bloomberg|associated press|ap news|bbc|wall street journal)/.test(normalized)) {
+      best = Math.max(best, 3);
+      continue;
+    }
+
+    if (/(techcrunch|the verge|axios|cnbc|semafor|ars technica)/.test(normalized)) {
+      best = Math.max(best, 2);
+      continue;
+    }
+
+    best = Math.max(best, 1);
+  }
+
+  return best >= 3 ? "tier1" : best === 2 ? "tier2" : "unknown";
+}
+
 function computeConfidenceScore(input: {
   articleCount: number;
   sourceDiversity: number;
@@ -416,6 +722,12 @@ function normalizeText(value: string) {
     .replace(/[^a-z0-9\s&-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function matchesKeyword(corpus: string, keyword: string) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i");
+  return pattern.test(corpus);
 }
 
 function ensurePeriod(value: string) {
