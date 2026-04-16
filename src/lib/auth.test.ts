@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   AUTH_CONFIG_ERROR,
+  buildAuthCallbackExchangeUrl,
   buildAuthCallbackUrl,
   buildAuthConfigErrorPath,
+  buildAuthReturnNextPath,
   buildAuthRedirectPath,
+  hasAuthReturnParams,
   hasSupabaseSessionCookie,
   safeRedirectPath,
 } from "@/lib/auth";
@@ -33,5 +36,22 @@ describe("auth helpers", () => {
   it("detects Supabase session cookies", () => {
     expect(hasSupabaseSessionCookie([{ name: "sb-localhost-auth-token" }])).toBe(true);
     expect(hasSupabaseSessionCookie([{ name: "theme" }])).toBe(false);
+  });
+
+  it("detects auth return params and builds a safe next path", () => {
+    const url = new URL("https://example.com/?code=oauth-code&state=abc");
+
+    expect(hasAuthReturnParams(url.searchParams)).toBe(true);
+    expect(buildAuthReturnNextPath(url)).toBe("/dashboard");
+  });
+
+  it("normalizes a stray homepage auth code into the callback route", () => {
+    const callbackUrl = buildAuthCallbackExchangeUrl(
+      new URL("https://example.com/?code=oauth-code"),
+    );
+
+    expect(callbackUrl.toString()).toBe(
+      "https://example.com/auth/callback?code=oauth-code&next=%2Fdashboard",
+    );
   });
 });
