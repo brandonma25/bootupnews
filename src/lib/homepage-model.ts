@@ -430,8 +430,8 @@ export function buildOverallNoDataMessage(itemCount: number) {
   }
 
   return {
-    title: "Coverage unavailable right now",
-    body: "We could not build ranked events from the latest coverage yet. Refresh shortly to try again.",
+    title: "No updates yet — check back shortly",
+    body: "We could not confirm enough live coverage to populate this view yet, so the layout stays intentional instead of rendering blank sections.",
   };
 }
 

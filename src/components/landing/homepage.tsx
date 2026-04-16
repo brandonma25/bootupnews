@@ -959,10 +959,10 @@ function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
           Category status
         </p>
         <h3 className="mt-3 text-[1.4rem] font-semibold text-[var(--foreground)]">
-          No {section.label} events yet
+          No updates yet — check back shortly
         </h3>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-          We&apos;re still building this section from live coverage. Refresh shortly or continue with the top briefing.
+          We&apos;re keeping this section intentional while live coverage catches up, so it never collapses into an empty gap.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button variant="secondary" className="px-4" onClick={() => window.location.reload()}>

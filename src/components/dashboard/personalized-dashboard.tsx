@@ -395,7 +395,7 @@ export default function PersonalizedDashboard({
                 </div>
               ) : (
                 <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] bg-white/40 p-5 text-sm leading-7 text-[var(--muted)]">
-                  No clustered events yet for this topic. Try adjusting keywords or refreshing your briefing.
+                  No updates yet — check back shortly.
                 </div>
               )}
             </Panel>

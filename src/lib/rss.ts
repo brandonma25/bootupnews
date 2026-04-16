@@ -13,8 +13,8 @@ export type FeedArticle = {
 };
 
 const parser = new Parser();
-const DEFAULT_FEED_TIMEOUT_MS = 8_000;
-const DEFAULT_FEED_RETRY_COUNT = 1;
+const DEFAULT_FEED_TIMEOUT_MS = 4_500;
+const DEFAULT_FEED_RETRY_COUNT = 2;
 
 type FeedRequestOptions = {
   timeoutMs?: number;
@@ -207,25 +207,41 @@ function similarity(left: string[], right: string[]) {
 async function requestFeed(url: string, options: FeedRequestOptions, sourceName: string) {
   const timeoutMs = options.timeoutMs ?? DEFAULT_FEED_TIMEOUT_MS;
   const retryCount = options.retryCount ?? DEFAULT_FEED_RETRY_COUNT;
+  return fetchWithRetry(
+    url,
+    {
+      next: { revalidate: 900 },
+      headers: options.headers,
+    },
+    {
+      timeoutMs,
+      retryCount,
+      sourceName,
+    },
+  );
+}
+
+export async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  options: {
+    timeoutMs: number;
+    retryCount: number;
+    sourceName: string;
+  },
+) {
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+  for (let attempt = 0; attempt <= options.retryCount; attempt += 1) {
     try {
-      const response = await fetchWithTimeout(
-        url,
-        {
-          next: { revalidate: 900 },
-          headers: options.headers,
-        },
-        timeoutMs,
-      );
+      const response = await fetchWithTimeout(url, init, options.timeoutMs);
 
       if (!response.ok) {
         const error = new Error(
-          `Feed request failed for ${sourceName} with status ${response.status}`,
+          `Feed request failed for ${options.sourceName} with status ${response.status}`,
         );
 
-        if (attempt < retryCount && isRetryableStatus(response.status)) {
+        if (attempt < options.retryCount && isRetryableStatus(response.status)) {
           lastError = error;
           continue;
         }
@@ -235,10 +251,10 @@ async function requestFeed(url: string, options: FeedRequestOptions, sourceName:
 
       return response;
     } catch (error) {
-      const normalized = normalizeFeedRequestError(error, sourceName, timeoutMs);
+      const normalized = normalizeFeedRequestError(error, options.sourceName, options.timeoutMs);
       lastError = normalized;
 
-      if (attempt < retryCount && isRetryableFetchError(error)) {
+      if (attempt < options.retryCount && isRetryableFetchError(error)) {
         continue;
       }
 
@@ -246,7 +262,7 @@ async function requestFeed(url: string, options: FeedRequestOptions, sourceName:
     }
   }
 
-  throw lastError ?? new Error(`Feed request failed for ${sourceName}`);
+  throw lastError ?? new Error(`Feed request failed for ${options.sourceName}`);
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {

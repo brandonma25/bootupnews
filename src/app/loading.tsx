@@ -2,6 +2,7 @@ export default function Loading() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-[1280px] animate-pulse px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-24">
       <div className="rounded-[32px] border border-[rgba(19,26,34,0.08)] bg-white/60 p-8">
+        <p className="text-sm font-medium text-[var(--muted)]">Setting up your feed (10–20 seconds)...</p>
         <div className="h-4 w-40 rounded-full bg-[rgba(19,26,34,0.08)]" />
         <div className="mt-4 h-12 max-w-2xl rounded-[20px] bg-[rgba(19,26,34,0.08)]" />
         <div className="mt-4 h-6 max-w-xl rounded-full bg-[rgba(19,26,34,0.06)]" />

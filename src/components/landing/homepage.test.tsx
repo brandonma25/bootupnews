@@ -230,7 +230,7 @@ describe("LandingHomepage", () => {
   it("renders no-data state when no ranked events are available", () => {
     render(<LandingHomepage data={createData([])} viewer={null} />);
 
-    expect(screen.getAllByText("Coverage unavailable right now").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("No updates yet — check back shortly").length).toBeGreaterThan(0);
   });
 });
 
@@ -238,6 +238,7 @@ describe("supporting states", () => {
   it("renders the loading shell", () => {
     render(<Loading />);
     expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(screen.getByText("Setting up your feed (10–20 seconds)...")).toBeInTheDocument();
   });
 
   it("renders the route error state", () => {

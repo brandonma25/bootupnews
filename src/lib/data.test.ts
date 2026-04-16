@@ -200,13 +200,13 @@ describe("fetchSourceArticlesWithFallback", () => {
       1,
       source.feedUrl,
       source.name,
-      expect.objectContaining({ timeoutMs: 4500, retryCount: 0 }),
+      expect.objectContaining({ timeoutMs: 4500, retryCount: 2 }),
     );
     expect(fetchSpy).toHaveBeenNthCalledWith(
       2,
       "https://feeds.reuters.com/reuters/businessNews",
       source.name,
-      expect.objectContaining({ timeoutMs: 4500, retryCount: 0 }),
+      expect.objectContaining({ timeoutMs: 4500, retryCount: 2 }),
     );
   });
 
@@ -236,5 +236,87 @@ describe("fetchSourceArticlesWithFallback", () => {
 
     expect(result.articles).toHaveLength(0);
     expect(result.failures.at(-1)?.errorMessage).toBe("Feed returned zero articles");
+  });
+});
+
+describe("topic fallback supplementation", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("supplements a thin finance category up to the minimum article floor", async () => {
+    const fetchSpy = vi.spyOn(rssModule, "fetchFeedArticles");
+    const currentArticle: FeedArticle = {
+      title: "Current finance story",
+      url: "https://example.com/current-finance",
+      summaryText: "Current finance summary",
+      sourceName: "Reuters Business",
+      publishedAt: new Date().toISOString(),
+    };
+    const fallbackArticles: FeedArticle[] = [
+      {
+        title: "Fallback finance story 1",
+        url: "https://example.com/fallback-finance-1",
+        summaryText: "Fallback finance summary 1",
+        sourceName: "GDELT Finance Monitor",
+        publishedAt: new Date().toISOString(),
+      },
+      {
+        title: "Fallback finance story 2",
+        url: "https://example.com/fallback-finance-2",
+        summaryText: "Fallback finance summary 2",
+        sourceName: "GDELT Finance Monitor",
+        publishedAt: new Date().toISOString(),
+      },
+    ];
+
+    fetchSpy.mockResolvedValueOnce(fallbackArticles);
+
+    const result = await __testing__.ensureTopicMinimumArticles(
+      "Finance",
+      [
+        {
+          id: "source-finance",
+          name: "Financial Times",
+          feedUrl: "https://www.ft.com/rss/home",
+          topicName: "Finance",
+          status: "active",
+        },
+      ],
+      [currentArticle],
+      "/dashboard",
+      "user-1",
+    );
+
+    expect(result.fallbackTriggered).toBe(true);
+    expect(result.articles).toHaveLength(2);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("gdeltproject.org"),
+      "GDELT Finance Monitor",
+      expect.objectContaining({ timeoutMs: 4500, retryCount: 2 }),
+    );
+  });
+
+  it("returns an intentional empty supplement result when every fallback source fails", async () => {
+    const fetchSpy = vi.spyOn(rssModule, "fetchFeedArticles");
+    fetchSpy.mockRejectedValue(new Error("Feed request failed"));
+
+    const result = await __testing__.ensureTopicMinimumArticles(
+      "Politics",
+      [],
+      [],
+      "/dashboard",
+      "user-1",
+    );
+
+    expect(result.fallbackTriggered).toBe(true);
+    expect(result.articles).toHaveLength(0);
+    expect(result.failures.length).toBeGreaterThan(0);
+  });
+
+  it("maps repo topic names into the homepage reliability categories", () => {
+    expect(__testing__.inferReliabilityCategory("Business")).toBe("finance");
+    expect(__testing__.inferReliabilityCategory("World")).toBe("politics");
+    expect(__testing__.inferReliabilityCategory("AI")).toBe("tech");
   });
 });

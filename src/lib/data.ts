@@ -96,6 +96,20 @@ type IngestionRunSummary = {
   degradedSourceNames: string[];
 };
 
+type ReliabilityCategoryKey = "tech" | "finance" | "politics";
+
+type TopicFallbackResult = {
+  categoryKey: ReliabilityCategoryKey | null;
+  articles: FeedArticle[];
+  failures: SourceFetchFailure[];
+  successfulAttempts: SourceFetchAttempt[];
+  fallbackTriggered: boolean;
+};
+
+const MIN_ARTICLES_PER_CATEGORY = 3;
+const INGESTION_FETCH_TIMEOUT_MS = 4_500;
+const INGESTION_MAX_RETRY_COUNT = 2;
+
 function createEmptyBriefing(): DailyBriefing {
   return {
     id: `generated-empty-${Date.now()}`,
@@ -420,7 +434,14 @@ export async function generateDailyBriefing(
       const sourceResults = await Promise.all(
         topicSources.map((source) => fetchSourceArticlesWithFallback(source)),
       );
-      const articles = sourceResults.flatMap((result) => result.articles);
+      const primaryArticles = sourceResults.flatMap((result) => result.articles);
+      const fallbackResult = await ensureTopicMinimumArticles(
+        topic.name,
+        topicSources,
+        primaryArticles,
+        "/",
+      );
+      const articles = dedupeFeedArticles([...primaryArticles, ...fallbackResult.articles]);
 
       if (!articles.length) {
         return null;
@@ -919,6 +940,20 @@ export async function persistRawArticles(
   const fetchedResults = await Promise.all(
     activeSources.map((source) => fetchSourceArticlesWithFallback(source)),
   );
+  const categoryFallbackResults = await Promise.all(
+    groupSourcesByReliabilityCategory(activeSources).map(async ({ categoryKey, topicName, sources: categorySources }) =>
+      ensureTopicMinimumArticles(
+        topicName,
+        categorySources,
+        fetchedResults
+          .filter((result) => categorySources.some((source) => source.id === result.source.id))
+          .flatMap((result) => result.articles),
+        route,
+        userId,
+        categoryKey,
+      ),
+    ),
+  );
 
   fetchedResults.forEach((result) => {
     if (!result.failures.length) {
@@ -959,22 +994,41 @@ export async function persistRawArticles(
   const failedSourceNames = fetchedResults
     .filter((result) => result.articles.length === 0)
     .map((result) => result.source.name);
-  const fallbackSourceCount = fetchedResults.filter((result) => result.usedFallback).length;
-  const fetchedArticles = fetchedResults.flatMap((result) =>
-    result.articles.map((article) => {
-      const canonicalUrl = canonicalizeArticleUrl(article.url);
-      return {
-        sourceId: result.source.id,
-        sourceName: article.sourceName,
-        title: article.title,
-        url: canonicalUrl,
-        summaryText: article.summaryText,
-        contentText: article.contentText,
-        publishedAt: article.publishedAt,
-        dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
-      };
-    }),
-  );
+  const fallbackSourceCount =
+    fetchedResults.filter((result) => result.usedFallback).length +
+    categoryFallbackResults.filter((result) => result.fallbackTriggered).length;
+  const fetchedArticles = [
+    ...fetchedResults.flatMap((result) =>
+      result.articles.map((article) => {
+        const canonicalUrl = canonicalizeArticleUrl(article.url);
+        return {
+          sourceId: result.source.id,
+          sourceName: article.sourceName,
+          title: article.title,
+          url: canonicalUrl,
+          summaryText: article.summaryText,
+          contentText: article.contentText,
+          publishedAt: article.publishedAt,
+          dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
+        };
+      }),
+    ),
+    ...categoryFallbackResults.flatMap((result) =>
+      result.articles.map((article) => {
+        const canonicalUrl = canonicalizeArticleUrl(article.url);
+        return {
+          sourceId: null,
+          sourceName: article.sourceName,
+          title: article.title,
+          url: canonicalUrl,
+          summaryText: article.summaryText,
+          contentText: article.contentText,
+          publishedAt: article.publishedAt,
+          dedupeKey: createArticleDedupeKey(article.title, canonicalUrl),
+        };
+      }),
+    ),
+  ];
 
   if (!fetchedArticles.length) {
     logServerEvent("warn", "No raw articles were fetched from active sources", {
@@ -1440,8 +1494,8 @@ function buildSourceFetchAttempts(source: Source): SourceFetchAttempt[] {
       label: source.name,
       feedUrl: source.feedUrl,
       kind: "primary",
-      timeoutMs: isGdeltSource(source) ? 4_500 : 8_000,
-      retryCount: isGdeltSource(source) ? 0 : 1,
+      timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+      retryCount: INGESTION_MAX_RETRY_COUNT,
     },
   ];
 
@@ -1467,6 +1521,240 @@ function buildSourceFetchAttempts(source: Source): SourceFetchAttempt[] {
   return attempts;
 }
 
+async function ensureTopicMinimumArticles(
+  topicName: string,
+  existingSources: Source[],
+  existingArticles: FeedArticle[],
+  route: string,
+  userId?: string,
+  forcedCategoryKey?: ReliabilityCategoryKey,
+): Promise<TopicFallbackResult> {
+  const categoryKey = forcedCategoryKey ?? inferReliabilityCategory(topicName);
+  const dedupedExistingArticles = dedupeFeedArticles(existingArticles);
+
+  if (!categoryKey || dedupedExistingArticles.length >= MIN_ARTICLES_PER_CATEGORY) {
+    return {
+      categoryKey,
+      articles: [],
+      failures: [],
+      successfulAttempts: [],
+      fallbackTriggered: false,
+    };
+  }
+
+  const attempts = buildCategoryFallbackAttempts(categoryKey, existingSources);
+  const failures: SourceFetchFailure[] = [];
+  const successfulAttempts: SourceFetchAttempt[] = [];
+  const existingKeys = new Set(
+    dedupedExistingArticles.map((article) =>
+      createArticleDedupeKey(article.title, canonicalizeArticleUrl(article.url)),
+    ),
+  );
+  const supplementalArticles: FeedArticle[] = [];
+  const supplementalKeys = new Set<string>();
+
+  for (const attempt of attempts) {
+    try {
+      const fetchedArticles = filterAttemptArticles(
+        await fetchFeedArticles(attempt.feedUrl, attempt.label, {
+          timeoutMs: attempt.timeoutMs,
+          retryCount: attempt.retryCount,
+        }),
+        attempt,
+      );
+      const newArticles = fetchedArticles.filter((article) => {
+        const dedupeKey = createArticleDedupeKey(article.title, canonicalizeArticleUrl(article.url));
+        if (existingKeys.has(dedupeKey) || supplementalKeys.has(dedupeKey)) {
+          return false;
+        }
+
+        supplementalKeys.add(dedupeKey);
+        return true;
+      });
+
+      if (newArticles.length > 0) {
+        supplementalArticles.push(...newArticles);
+        successfulAttempts.push(attempt);
+      } else {
+        failures.push({
+          ...attempt,
+          errorMessage: "Feed returned zero new articles",
+        });
+      }
+
+      if (dedupedExistingArticles.length + supplementalArticles.length >= MIN_ARTICLES_PER_CATEGORY) {
+        break;
+      }
+    } catch (error) {
+      failures.push({
+        ...attempt,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const fallbackTriggered = successfulAttempts.length > 0 || failures.length > 0;
+
+  if (fallbackTriggered) {
+    const timestamp = new Date().toISOString();
+    logServerEvent("info", "Category fallback ingestion evaluated", {
+      route,
+      userId,
+      category: categoryKey,
+      sourceUsed: successfulAttempts.map((attempt) => attempt.label),
+      fallbackTriggered,
+      timestamp,
+      resultCount: supplementalArticles.length,
+    });
+    console.info(
+      "[ingestion:fallback]",
+      "category=",
+      categoryKey,
+      "source_used=",
+      successfulAttempts.map((attempt) => attempt.label).join(",") || "none",
+      "fallback_triggered=",
+      fallbackTriggered,
+      "timestamp=",
+      timestamp,
+      "result_count=",
+      supplementalArticles.length,
+    );
+  }
+
+  return {
+    categoryKey,
+    articles: supplementalArticles,
+    failures,
+    successfulAttempts,
+    fallbackTriggered,
+  };
+}
+
+function groupSourcesByReliabilityCategory(sources: Source[]) {
+  const grouped = new Map<ReliabilityCategoryKey, { topicName: string; sources: Source[] }>();
+
+  for (const source of sources) {
+    const topicName = source.topicName ?? source.name;
+    const categoryKey = inferReliabilityCategory(topicName);
+
+    if (!categoryKey) {
+      continue;
+    }
+
+    const current = grouped.get(categoryKey) ?? { topicName, sources: [] };
+    current.sources.push(source);
+    grouped.set(categoryKey, current);
+  }
+
+  return [...grouped.entries()].map(([categoryKey, value]) => ({
+    categoryKey,
+    topicName: value.topicName,
+    sources: value.sources,
+  }));
+}
+
+function inferReliabilityCategory(value: string | undefined): ReliabilityCategoryKey | null {
+  const normalized = (value ?? "").toLowerCase();
+
+  if (/tech|technology|ai|product|software|startup/.test(normalized)) {
+    return "tech";
+  }
+
+  if (/finance|market|business|econom|rates|bank/.test(normalized)) {
+    return "finance";
+  }
+
+  if (/politic|policy|government|world|geopolit|diplomac|election/.test(normalized)) {
+    return "politics";
+  }
+
+  return null;
+}
+
+function buildCategoryFallbackAttempts(
+  categoryKey: ReliabilityCategoryKey,
+  existingSources: Source[],
+): SourceFetchAttempt[] {
+  const existingFeedUrls = new Set(existingSources.map((source) => source.feedUrl));
+  const attemptsByCategory: Record<ReliabilityCategoryKey, SourceFetchAttempt[]> = {
+    finance: [
+      {
+        label: "GDELT Finance Monitor",
+        feedUrl:
+          "https://api.gdeltproject.org/api/v2/doc/doc?query=(market%20OR%20stocks%20OR%20fed%20OR%20inflation%20OR%20earnings)&mode=artlist&maxrecords=25&timespan=1day&sort=datedesc&format=rss",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 48,
+      },
+      {
+        label: "Reuters Business fallback",
+        feedUrl: "https://feeds.reuters.com/reuters/businessNews",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 72,
+      },
+    ],
+    politics: [
+      {
+        label: "GDELT Geopolitics",
+        feedUrl:
+          "https://api.gdeltproject.org/api/v2/doc/doc?query=china%20OR%20us%20OR%20war%20OR%20election&mode=artlist&maxrecords=25&timespan=1day&sort=datedesc&format=rss",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 48,
+      },
+      {
+        label: "AP Top News fallback",
+        feedUrl: "https://apnews.com/hub/apf-topnews?output=rss",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 72,
+      },
+      {
+        label: "BBC News fallback",
+        feedUrl: "https://feeds.bbci.co.uk/news/rss.xml",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 72,
+      },
+    ],
+    tech: [
+      {
+        label: "GDELT AI Monitor",
+        feedUrl:
+          "https://api.gdeltproject.org/api/v2/doc/doc?query=artificial%20intelligence&mode=artlist&maxrecords=25&timespan=1day&sort=datedesc&format=rss",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 48,
+      },
+      {
+        label: "Reuters Technology fallback",
+        feedUrl: "https://feeds.reuters.com/reuters/technologyNews",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 72,
+      },
+      {
+        label: "TechCrunch fallback",
+        feedUrl: "https://techcrunch.com/feed/",
+        kind: "fallback",
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
+        maxAgeHours: 72,
+      },
+    ],
+  };
+
+  return attemptsByCategory[categoryKey].filter((attempt) => !existingFeedUrls.has(attempt.feedUrl));
+}
+
 function isGdeltSource(source: Source) {
   return /gdelt/i.test(source.name) || /api\.gdeltproject\.org/i.test(source.feedUrl);
 }
@@ -1479,8 +1767,8 @@ function getGdeltFallbackFeeds(source: Source) {
       {
         label: "Reuters Business fallback",
         feedUrl: "https://feeds.reuters.com/reuters/businessNews",
-        timeoutMs: 4_500,
-        retryCount: 0,
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
         maxAgeHours: 72,
       },
     ];
@@ -1491,8 +1779,8 @@ function getGdeltFallbackFeeds(source: Source) {
       {
         label: "AP Top News fallback",
         feedUrl: "https://apnews.com/hub/apf-topnews?output=rss",
-        timeoutMs: 4_500,
-        retryCount: 0,
+        timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+        retryCount: INGESTION_MAX_RETRY_COUNT,
         maxAgeHours: 72,
       },
     ];
@@ -1502,8 +1790,8 @@ function getGdeltFallbackFeeds(source: Source) {
     {
       label: "TechCrunch fallback",
       feedUrl: "https://techcrunch.com/feed/",
-      timeoutMs: 4_500,
-      retryCount: 0,
+      timeoutMs: INGESTION_FETCH_TIMEOUT_MS,
+      retryCount: INGESTION_MAX_RETRY_COUNT,
       maxAgeHours: 72,
     },
   ];
@@ -1538,8 +1826,11 @@ function dedupeFeedArticles(articles: FeedArticle[]) {
 }
 
 export const __testing__ = {
+  buildCategoryFallbackAttempts,
   buildSourceFetchAttempts,
+  ensureTopicMinimumArticles,
   fetchSourceArticlesWithFallback,
+  inferReliabilityCategory,
 };
 
 function normalizeSignal(value: string) {
