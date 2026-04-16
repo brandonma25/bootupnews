@@ -1,7 +1,7 @@
 # AGENTS.md — Codex Operating Rules
 
 ## 1. Required Reading
-Before any substantial implementation, read:
+Before ANY substantial implementation work, you MUST read:
 
 - `docs/engineering/engineering-protocol.md`
 - `docs/engineering/test-checklist.md`

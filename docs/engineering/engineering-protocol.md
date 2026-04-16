@@ -1,5 +1,12 @@
 # Daily Intelligence Aggregator — Engineering & Product Management Protocol
 
+## System Authority
+- `AGENTS.md` = execution rules enforced by Codex
+- `engineering-protocol.md` = canonical system definition
+- `test-checklist.md` = validation reference
+- `prd-template.md` = planning standard
+- `pull_request_template.md` = merge enforcement
+
 ## 1. Core Operating Model
 - The user is the PM and architect.
 - Codex is the execution layer.
