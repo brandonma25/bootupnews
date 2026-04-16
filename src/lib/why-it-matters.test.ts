@@ -185,7 +185,7 @@ describe("why-it-matters", () => {
       }),
     );
 
-    expect(text).toMatch(/UK|This political development/);
+    expect(text).toMatch(/UK|Peter Mandelson|This political development/);
     expect(text.toLowerCase()).toMatch(/governance|policy risk|political accountability|diplomatic/);
     expect(text.toLowerCase()).not.toMatch(/equities|technology|watch for|early signal|wait matters because wait/);
   });

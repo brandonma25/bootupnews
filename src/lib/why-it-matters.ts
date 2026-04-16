@@ -69,6 +69,18 @@ const INVALID_ANCHORS = new Set([
   "product",
 ]);
 
+const CONNECTOR_WORDS = new Set([
+  "in",
+  "with",
+  "to",
+  "for",
+  "of",
+  "on",
+  "at",
+  "by",
+  "from",
+]);
+
 const REASONING_TEMPLATES: Record<NormalizedReasoningCategory, PatternTemplate[]> = {
   policy_regulation: [
     {
@@ -106,14 +118,14 @@ const REASONING_TEMPLATES: Record<NormalizedReasoningCategory, PatternTemplate[]
   ],
   mna_funding: [
     {
-      key: "competitive_frame",
-      build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
-    },
-    {
       key: "allocation_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
         `${anchor} changes the competitive picture because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "competitive_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
       key: "contrast_frame",
@@ -157,14 +169,14 @@ const REASONING_TEMPLATES: Record<NormalizedReasoningCategory, PatternTemplate[]
   ],
   defense_geopolitical: [
     {
-      key: "policy_frame",
-      build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
-    },
-    {
       key: "defense_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
         `${anchor} matters for defense and international relations because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "policy_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
       key: "contrast_frame",
@@ -331,7 +343,7 @@ function extractPrimaryAnchor(intelligence: NormalizedIntelligence) {
   ];
 
   for (const candidate of candidates) {
-    const normalized = candidate.trim();
+    const normalized = sanitizeAnchorCandidate(candidate);
     if (isMeaningfulAnchor(normalized)) {
       return { label: normalized };
     }
@@ -363,6 +375,18 @@ function getAnchorLabel(intelligence: NormalizedIntelligence) {
   return buildEventLabel(intelligence);
 }
 
+function sanitizeAnchorCandidate(value: string) {
+  const trimmed = value.trim().replace(/[’']s$/i, "");
+  const words = trimmed.split(/\s+/);
+  const connectorIndex = words.findIndex((word, index) => index > 0 && CONNECTOR_WORDS.has(word.toLowerCase()));
+
+  if (connectorIndex > 0) {
+    return words.slice(0, connectorIndex).join(" ");
+  }
+
+  return trimmed;
+}
+
 function extractHeadlineCandidates(title: string) {
   return (
     title.match(/\b(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}|[A-Z]{2,}|U\.S\.|UK|EU|Federal Reserve|White House)\b/g) ?? []
@@ -382,7 +406,12 @@ function isMeaningfulAnchor(value: string) {
   }
 
   if (value.split(/\s+/).length === 2 && /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(value)) {
-    return /(bank|fund|group|holdings|inc|corp|ltd|plc|ministry|office|department|agency|commission|reserve|house|union)/i.test(value);
+    const words = value.split(/\s+/).map((word) => word.toLowerCase());
+    if (words.some((word) => INVALID_ANCHORS.has(word) || CONNECTOR_WORDS.has(word))) {
+      return false;
+    }
+
+    return true;
   }
 
   return (
