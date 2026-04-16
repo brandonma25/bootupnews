@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 
 import { SubmitButton } from "@/components/submit-button";
 import { buildAuthCallbackUrl } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/env";
+import { getSupabasePublicEnvDiagnostics, isSupabaseConfigured } from "@/lib/env";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -16,10 +16,11 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
   const [googlePending, setGooglePending] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const redirectTo = useMemo(() => getGoogleRedirectTo("/dashboard"), []);
+  const authDiagnostics = useMemo(() => getSupabasePublicEnvDiagnostics(), []);
   const authConfigured = isSupabaseConfigured;
   const configErrorMessage = authConfigured
     ? null
-    : "Authentication is not configured for this environment yet. Add the public Supabase URL and anon key before using sign-in.";
+    : `Authentication is not configured for this environment yet. Missing: ${authDiagnostics.missingNames.join(", ")}.`;
   const visibleError = googleError ?? errorMessage ?? null;
 
   if (!open) return null;
@@ -35,9 +36,10 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
 
     if (!supabase) {
       const message =
-        "Google sign-in is not configured on this deployment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then reload this environment.";
+        `Google sign-in is not configured on this deployment. Missing: ${authDiagnostics.missingNames.join(", ")}.`;
       console.error("[auth] Google OAuth cannot start because public Supabase env vars are missing", {
         redirectTo,
+        missingNames: authDiagnostics.missingNames,
       });
       setGoogleError(message);
       return;

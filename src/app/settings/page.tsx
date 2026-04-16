@@ -44,7 +44,8 @@ const setupItems = [
     icon: Key,
     ready: isSupabaseConfigured,
     value: env.supabaseAnonKey ? "Connected" : "Not connected",
-    helpText: "Set NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables.",
+    helpText:
+      "Set NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in your environment variables.",
     docsUrl: "https://supabase.com/docs/guides/getting-started",
   },
   {
