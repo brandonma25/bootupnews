@@ -28,15 +28,35 @@ Before ANY substantial implementation work, you MUST read:
 - Verify the app loads.
 - If build fails, stop.
 
-## 5. Human Validation Required
+## 5. Playwright Post-Coding Execution Rule
+- For any UI-affecting, auth-affecting, routing-affecting, SSR-affecting, dashboard-affecting, or data-rendering change, Codex must evaluate whether Playwright coverage must be added or updated.
+- After implementation is complete, Codex must run the local Playwright workflow when technically possible.
+- Minimum default local flow:
+- `npm install`
+- `npm run lint || true`
+- `npm run test || true`
+- `npm run build`
+- the Dev Server Rule
+- `npm run dev`
+- `npx playwright test --project=chromium`
+- If the feature affects broader UI behavior, Codex should run `npx playwright test`.
+- Codex must report:
+- exact commands run
+- exact Local URL
+- Playwright pass/fail results
+- remaining preview-required checks
+- remaining human-only checks
+- Codex must not claim preview or production validation from local Playwright results alone.
+
+## 6. Human Validation Required
 - Request user validation for OAuth or login flows.
 - Request user validation for session persistence.
 - Request user validation for preview environment behavior.
 - Request user validation for auth, SSR, or env-sensitive changes.
 
-## 6. Documentation & Security
+## 7. Documentation & Security
 - Update repo-safe documentation for every serious feature or fix.
 - Never commit or expose API keys, tokens, secrets, auth vulnerabilities, exploit steps, cookies, headers, or sensitive logs.
 
-## 7. Merge Conditions
+## 8. Merge Conditions
 - Do not recommend merge unless build passes, local validation is complete, preview validation is confirmed, and docs are updated.

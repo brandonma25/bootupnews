@@ -66,11 +66,17 @@
 - `npm run build`
 - the Dev Server Rule
 - `npm run dev`
+- Playwright is the default local E2E and functional automation layer for UI flows.
+- After coding is complete, Codex should run the local Playwright workflow when technically possible.
+- Minimum required local Playwright path is `npx playwright test --project=chromium`.
+- Codex should broaden to `npx playwright test` when the feature scope meaningfully affects multiple UI flows.
 - basic smoke validation
 - a concise test report
 - a repo-safe docs update
 - Build failure is blocking.
 - Lint and test failures must be reported explicitly.
+- Codex must report the exact commands run, Local URL, Playwright results, preview-required checks, and human-only checks.
+- Local Playwright passing does not replace preview validation for auth, cookies, redirects, SSR, or env-sensitive behavior.
 
 ## 8. Human Validation Requirements
 - The user must validate in preview when relevant:
@@ -128,6 +134,8 @@
 ## 14. Enforcement Behavior
 - Do not recommend merge when:
 - preview validation is missing for env, auth, cookies, redirects, or SSR work
+- required Playwright local automation has not been run for the branch scope
+- required Playwright coverage is failing for the branch scope
 - scope is mixed
 - docs are missing
 - build is broken
