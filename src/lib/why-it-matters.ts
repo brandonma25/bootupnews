@@ -43,6 +43,8 @@ type PatternTemplate = {
 
 const INVALID_ANCHORS = new Set([
   "ai",
+  "ipo",
+  "with",
   "wait",
   "according",
   "conservatives",
@@ -206,19 +208,19 @@ const REASONING_TEMPLATES: Record<NormalizedReasoningCategory, PatternTemplate[]
   ],
   company_update: [
     {
-      key: "company_execution",
+      key: "implication_first",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the company-specific execution picture, because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
     {
-      key: "company_expectations",
+      key: "company_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} alters the operating assumptions around the story, which ${mechanism}, and that can ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for company execution because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
     },
     {
-      key: "company_watch",
+      key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} is worth watching because ${mechanism}, so ${impact} over the ${horizonLabel}.`,
+        `This still looks company-specific, but ${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
     },
   ],
 };
@@ -323,9 +325,9 @@ function buildGroundedWhyThisMatters(
 
 function extractPrimaryAnchor(intelligence: NormalizedIntelligence) {
   const candidates = [
+    ...extractHeadlineCandidates(intelligence.title),
     ...(intelligence.entities ?? []),
     ...(intelligence.keyEntities ?? []),
-    ...extractHeadlineCandidates(intelligence.title),
   ];
 
   for (const candidate of candidates) {
@@ -548,7 +550,7 @@ function chooseBestCandidate<T extends { text: string; usage: number }>(
   previousOutputs: string[],
 ) {
   return (
-    candidates.find((candidate) => candidate.usage < 2 && !isTooSimilar(candidate.text, previousOutputs)) ??
+    candidates.find((candidate) => candidate.usage < 1 && !isTooSimilar(candidate.text, previousOutputs)) ??
     candidates.find((candidate) => !isTooSimilar(candidate.text, previousOutputs)) ??
     candidates[0]
   );
@@ -563,6 +565,7 @@ function getPatternKey(output: string) {
   if (normalized.includes("matters for policy risk")) return "policy_frame";
   if (normalized.includes("even before the full policy response is clear")) return "contrast_frame";
   if (normalized.includes("matters for financial expectations")) return "financial_frame";
+  if (normalized.includes("matters for company execution")) return "company_frame";
   if (normalized.includes("changes the competitive picture")) return "allocation_frame";
   if (normalized.includes("changes the feature benchmark")) return "competitive_frame";
   if (normalized.includes("matters for governance credibility")) return "credibility_frame";
@@ -677,6 +680,10 @@ function mapReasoningCategory(eventType: string): NormalizedReasoningCategory {
 function deriveLegacyEventType(intelligence: EventIntelligence) {
   const corpus = `${intelligence.title} ${intelligence.summary} ${intelligence.topics?.join(" ") ?? ""}`.toLowerCase();
 
+  if (
+    (corpus.includes("chrome") || corpus.includes("ai mode")) &&
+    (corpus.includes("lets you") || corpus.includes("open links") || corpus.includes("side-by-side"))
+  ) return "product";
   if (/department of defense|classified|government|military|pentagon/.test(corpus)) return "defense";
   if (/election|minister|foreign office|parliament|cabinet|vetting|ambassador|appointment/.test(corpus)) return "political";
   if (/earnings|guidance|revenue|profit|quarter/.test(corpus)) return "corporate";

@@ -308,6 +308,13 @@ function inferEventType(
     `${topicName} ${articles.map((article) => `${article.title} ${article.summaryText}`).join(" ")} ${(matchedKeywords ?? []).join(" ")}`,
   );
 
+  if (
+    (corpus.includes("chrome") || corpus.includes("ai mode")) &&
+    (corpus.includes("lets you") || corpus.includes("open links") || corpus.includes("side-by-side"))
+  ) {
+    return "product";
+  }
+
   const rules: Array<[string, string[]]> = [
     ["defense", ["department of defense", "classified", "government", "military", "pentagon", "defense department"]],
     ["political", ["election", "minister", "foreign office", "foreign minister", "cabinet", "parliament", "vetting", "ambassador", "appointment"]],
