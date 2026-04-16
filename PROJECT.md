@@ -194,6 +194,37 @@ When updating this file:
 - Public/demo mode compares against sample history only; live accuracy for day-over-day comparison still depends on users having at least one prior saved briefing.
 - Repository-wide `npm run lint` still includes unrelated pre-existing React hook lint errors outside this PRD scope.
 
+### [2026-04-16 14:14] — Repo Hygiene Sanity Check
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- Public-facing repository docs and test fixtures exposed more deployment-specific detail than necessary, and the repo referenced a non-existent `.env.example` despite relying on it for setup.
+
+**Root cause:**
+- Prior auth debugging and deployment verification notes preserved concrete Vercel and Supabase identifiers in tracked markdown and test files.
+- Environment-file ignore rules were broad, but there was no explicit exception for a tracked example env file with placeholders only.
+
+**Change made:**
+- Rewrote the public setup and OAuth sections in `README.md` to remove local absolute paths, concrete deployment URLs, and project-specific Supabase identifiers while keeping the setup flow usable.
+- Added a tracked `.env.example` with placeholders only and updated `.gitignore` to keep real env files ignored while allowing the example file to be committed.
+- Redacted deployment-specific identifiers from the live verification note and replaced project-specific OAuth URLs in the auth modal test with example domains.
+- Performed a repo-wide search for likely secrets, tracked env files, key material, real user emails, and infra-specific references, then documented the findings in the repo hygiene records.
+
+**Files modified:**
+- `.gitignore`
+- `.env.example`
+- `README.md`
+- `QA-LIVE-TEST-2026-04-15.md`
+- `src/components/auth/auth-modal.test.tsx`
+- `docs/bug-fixes/repo-hygiene-sanity-check.md`
+- `PROJECT.md`
+
+**Remaining risks / next steps:**
+- Ignored local files such as `.env.local` can still hold real credentials on a developer machine; they are not tracked, but their values should still be managed carefully outside Git.
+- Existing branch-local code changes outside this hygiene task were preserved and not reviewed for behavioral correctness.
+
 ---
 
 ## 8. NEXT ACTION (FOCUS)

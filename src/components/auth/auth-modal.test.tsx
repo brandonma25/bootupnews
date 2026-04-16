@@ -52,7 +52,7 @@ describe("AuthModal", () => {
       expect(signInWithOAuth).toHaveBeenCalledWith({
         provider: "google",
         options: {
-          redirectTo: "http://localhost:3000/auth/callback?next=%2Fdashboard",
+          redirectTo: "http://localhost:3000/auth/callback",
           skipBrowserRedirect: true,
         },
       });
@@ -63,5 +63,30 @@ describe("AuthModal", () => {
         "https://accounts.google.com/mock-oauth",
       );
     });
+  });
+
+  it("blocks OAuth when Supabase returns a provider URL that points back to production", async () => {
+    signInWithOAuth.mockResolvedValue({
+      data: {
+        url: "https://example.supabase.co/auth/v1/authorize?redirect_to=https%3A%2F%2Fapp.example.com%2Fauth%2Fcallback",
+      },
+      error: null,
+    });
+
+    const { default: AuthModal } = await import("@/components/auth/auth-modal");
+
+    render(<AuthModal open onClose={() => undefined} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /continue with google/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          /Google sign-in is configured to return to https:\/\/app\.example\.com/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    expect(window.location.assign).not.toHaveBeenCalled();
   });
 });

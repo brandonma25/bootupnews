@@ -1,13 +1,13 @@
 # Live Site Verification Log — April 15, 2026
 
-Production URL: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+Production URL: redacted for public repo hygiene
 
 ## Deployment checks
 
 - Local `main` HEAD: `0f8f3f8fdc38bca5f0c87b928b9eac49522a7267`
 - Remote GitHub `main`: `0f8f3f8fdc38bca5f0c87b928b9eac49522a7267`
 - Latest Vercel production deployment:
-  - Deployment ID: `dpl_B4f4KNyq3Cg7mTi2zVCcMD3dtCeP`
+  - Deployment ID: redacted for public repo hygiene
   - Commit ref: `main`
   - Commit SHA: `0f8f3f8fdc38bca5f0c87b928b9eac49522a7267`
   - Status: `READY`
