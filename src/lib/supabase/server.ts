@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { User } from "@supabase/supabase-js";
 
+import { hasSupabaseSessionCookie } from "@/lib/auth";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { errorContext, logServerEvent } from "@/lib/observability";
 
@@ -40,9 +41,7 @@ export async function safeGetUser(route: string): Promise<{
 }> {
   const supabase = await createSupabaseServerClient();
   const cookieStore = await cookies();
-  const sessionCookiePresent = cookieStore
-    .getAll()
-    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"));
+  const sessionCookiePresent = hasSupabaseSessionCookie(cookieStore.getAll());
 
   if (!supabase) {
     return {

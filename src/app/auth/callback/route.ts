@@ -1,23 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { buildAuthConfigErrorPath, safeRedirectPath } from "@/lib/auth";
 import { bootstrapUserDefaults } from "@/lib/default-topics";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { errorContext, logServerEvent } from "@/lib/observability";
-
-function safeRedirectPath(value: string | null, fallback = "/dashboard") {
-  if (!value) {
-    return fallback;
-  }
-
-  const normalized = value.trim();
-
-  if (!normalized.startsWith("/") || normalized.startsWith("//")) {
-    return fallback;
-  }
-
-  return normalized;
-}
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -27,7 +14,7 @@ export async function GET(request: NextRequest) {
   const next = safeRedirectPath(requestUrl.searchParams.get("next"));
 
   if (!isSupabaseConfigured) {
-    return NextResponse.redirect(new URL(next, request.url));
+    return NextResponse.redirect(new URL(buildAuthConfigErrorPath(), request.url));
   }
 
   const response = NextResponse.redirect(new URL(next, request.url));

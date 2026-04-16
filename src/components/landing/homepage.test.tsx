@@ -116,6 +116,7 @@ describe("LandingHomepage", () => {
 
     expect(screen.getAllByText("You're viewing the public briefing").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Sign in to personalize your intelligence").length).toBeGreaterThan(0);
+    expect(screen.getByText("Signed out in public briefing mode")).toBeInTheDocument();
     expect(screen.getByText("Personalized topics")).toBeInTheDocument();
     expect(screen.getByText("Saved history")).toBeInTheDocument();
     expect(screen.getByText("Custom alerts")).toBeInTheDocument();
@@ -178,6 +179,7 @@ describe("LandingHomepage", () => {
 
     expect(screen.queryByText("You're viewing the public briefing")).not.toBeInTheDocument();
     expect(screen.queryByText("Sign in to personalize your intelligence")).not.toBeInTheDocument();
+    expect(screen.getByText("Signed in as Alex Analyst")).toBeInTheDocument();
   });
 
   it("shows a personalization summary for signed-in viewers with saved preferences", () => {
@@ -215,6 +217,14 @@ describe("LandingHomepage", () => {
     expect(screen.getByText(/This homepage is tuned to your tracked priorities/i)).toBeInTheDocument();
     expect(screen.getByText(/Tracking Tech/i)).toBeInTheDocument();
     expect(screen.getByText(/Following Nvidia/i)).toBeInTheDocument();
+  });
+
+  it("shows a clear auth configuration error when requested", () => {
+    render(<LandingHomepage data={createData([])} viewer={null} authState="config-error" />);
+
+    expect(
+      screen.getAllByText(/Authentication is not configured for this environment yet/i).length,
+    ).toBeGreaterThan(0);
   });
 
   it("renders no-data state when no ranked events are available", () => {
