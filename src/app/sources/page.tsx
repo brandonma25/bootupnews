@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { getDashboardData, getViewerAccount } from "@/lib/data";
+import { getDashboardPageState } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/env";
 import { recommendedSources } from "@/lib/source-catalog";
 
@@ -22,8 +22,7 @@ export default async function SourcesPage({
   searchParams: Promise<{ saved?: string; demo?: string }>;
 }) {
   const params = await searchParams;
-  const data = await getDashboardData();
-  const viewer = await getViewerAccount();
+  const { data, viewer } = await getDashboardPageState("/sources");
 
   const activeSources = data.sources.filter((s) => s.status === "active");
   const pausedSources = data.sources.filter((s) => s.status === "paused");

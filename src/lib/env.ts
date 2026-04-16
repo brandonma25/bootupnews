@@ -16,6 +16,10 @@ export function resolvePublicSupabaseConfig({
   const normalizedUrl = normalizeEnv(supabaseUrl);
   const normalizedAnonKey = normalizeEnv(supabaseAnonKey);
   const normalizedPublishableKey = normalizeEnv(supabasePublishableKey);
+  const defaultAppUrl =
+    process.env.NODE_ENV === "development"
+      ? "http://localhost:3000"
+      : "";
 
   return {
     url: normalizedUrl,
@@ -25,7 +29,7 @@ export function resolvePublicSupabaseConfig({
       : normalizedPublishableKey
         ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
         : null,
-    appUrl: normalizeEnv(appUrl) || "http://localhost:3000",
+    appUrl: normalizeEnv(appUrl) || defaultAppUrl,
   };
 }
 

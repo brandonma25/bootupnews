@@ -1,5 +1,5 @@
 import LandingHomepage from "@/components/landing/homepage";
-import { getDashboardData, getViewerAccount } from "@/lib/data";
+import { getDashboardPageState } from "@/lib/data";
 import { isHomepageDebugConfigured } from "@/lib/env";
 
 type PageProps = {
@@ -11,8 +11,10 @@ function readSingleParam(value: string | string[] | undefined) {
 }
 
 export default async function Page({ searchParams }: PageProps) {
-  const [data, viewer] = await Promise.all([getDashboardData(), getViewerAccount()]);
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const [{ data, viewer }, resolvedSearchParams] = await Promise.all([
+    getDashboardPageState("/"),
+    searchParams ? searchParams : Promise.resolve(undefined),
+  ]);
   const authState = readSingleParam(resolvedSearchParams?.auth);
   const debugParam = readSingleParam(resolvedSearchParams?.debug);
   const debugEnabled = isHomepageDebugConfigured || /^(1|true|yes|on)$/i.test(debugParam ?? "");

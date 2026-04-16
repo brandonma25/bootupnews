@@ -2,7 +2,6 @@
 import { useMemo, useState } from "react";
 
 import { SubmitButton } from "@/components/submit-button";
-import { buildAuthCallbackUrl } from "@/lib/auth";
 import { getSupabasePublicEnvDiagnostics, isSupabaseConfigured } from "@/lib/env";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -15,7 +14,7 @@ type Props = {
 export default function AuthModal({ open, onClose, errorMessage }: Props) {
   const [googlePending, setGooglePending] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const redirectTo = useMemo(() => getGoogleRedirectTo("/dashboard"), []);
+  const redirectTo = useMemo(() => getGoogleRedirectTo(), []);
   const authDiagnostics = useMemo(() => getSupabasePublicEnvDiagnostics(), []);
   const authConfigured = isSupabaseConfigured;
   const configErrorMessage = authConfigured
@@ -88,6 +87,17 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           data,
         });
         setGoogleError(message);
+        setGooglePending(false);
+        return;
+      }
+
+      const redirectMismatchMessage = getOAuthRedirectMismatchMessage(data.url);
+      if (redirectMismatchMessage) {
+        console.error("[auth] Google OAuth returned a provider URL with the wrong callback origin", {
+          redirectTo,
+          providerUrl: data.url,
+        });
+        setGoogleError(redirectMismatchMessage);
         setGooglePending(false);
         return;
       }
@@ -234,12 +244,39 @@ function GoogleAuthButton({
   );
 }
 
-function getGoogleRedirectTo(next: string) {
+function getGoogleRedirectTo() {
   if (typeof window !== "undefined") {
-    return buildAuthCallbackUrl({ origin: window.location.origin, next });
+    return `${window.location.origin}/auth/callback`;
   }
 
-  return buildAuthCallbackUrl({ next });
+  return "/auth/callback";
+}
+
+function getOAuthRedirectMismatchMessage(providerUrl: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const oauthUrl = new URL(providerUrl);
+    const redirectParam = oauthUrl.searchParams.get("redirect_to");
+
+    if (!redirectParam) {
+      return null;
+    }
+
+    const redirectUrl = new URL(redirectParam);
+    if (redirectUrl.origin !== window.location.origin) {
+      return `Google sign-in is configured to return to ${redirectUrl.origin}, but this app is running on ${window.location.origin}. Update the Supabase/Google redirect settings for this environment before continuing.`;
+    }
+  } catch (error) {
+    console.warn("[auth] Could not verify Google OAuth redirect target", {
+      providerUrl,
+      error,
+    });
+  }
+
+  return null;
 }
 
 function EmailAuthButton({

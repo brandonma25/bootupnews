@@ -22,7 +22,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { getDashboardData, getViewerAccount } from "@/lib/data";
+import { getDashboardPageState } from "@/lib/data";
 import { env, isAiConfigured, isSupabaseConfigured } from "@/lib/env";
 import { buildPersonalizationTopicOptions, buildSuggestedEntities } from "@/lib/personalization";
 
@@ -105,8 +105,7 @@ const accountManagementFeatures = [
 ];
 
 export default async function SettingsPage() {
-  const viewer = await getViewerAccount();
-  const data = await getDashboardData();
+  const { viewer, data } = await getDashboardPageState("/settings");
   const allConnected = isSupabaseConfigured && isAiConfigured;
   const personalizationTopics = buildPersonalizationTopicOptions(data.topics, data.briefing.items);
   const suggestedEntities = buildSuggestedEntities(data.briefing.items);

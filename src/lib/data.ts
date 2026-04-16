@@ -107,16 +107,16 @@ function createEmptyBriefing(): DailyBriefing {
   };
 }
 
-export async function getViewerAccount(): Promise<ViewerAccount | null> {
-  const { user, sessionCookiePresent } = await safeGetUser("/");
+type RequestAuthState = {
+  route: string;
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  user: Awaited<ReturnType<typeof safeGetUser>>["user"];
+  sessionCookiePresent: boolean;
+  viewer: ViewerAccount | null;
+};
 
+function buildViewerAccount(user: Awaited<ReturnType<typeof safeGetUser>>["user"]): ViewerAccount | null {
   if (!user?.email) {
-    if (sessionCookiePresent) {
-      logServerEvent("warn", "Viewer lookup fell back to guest mode", {
-        route: "/",
-        sessionCookiePresent,
-      });
-    }
     return null;
   }
 
@@ -145,13 +145,47 @@ export async function getViewerAccount(): Promise<ViewerAccount | null> {
   };
 }
 
-export async function getDashboardData(): Promise<DashboardData> {
-  const { supabase, user, sessionCookiePresent } = await safeGetUser("/dashboard");
+export async function getRequestAuthState(route: string): Promise<RequestAuthState> {
+  const authState = await safeGetUser(route);
+
+  return {
+    route,
+    ...authState,
+    viewer: buildViewerAccount(authState.user),
+  };
+}
+
+export async function getViewerAccount(
+  route = "/",
+  authState?: RequestAuthState,
+): Promise<ViewerAccount | null> {
+  const resolvedAuthState = authState ?? (await getRequestAuthState(route));
+  const { viewer, sessionCookiePresent } = resolvedAuthState;
+
+  if (!viewer) {
+    if (sessionCookiePresent) {
+      logServerEvent("warn", "Viewer lookup fell back to guest mode", {
+        route: resolvedAuthState.route,
+        sessionCookiePresent,
+      });
+    }
+    return null;
+  }
+
+  return viewer;
+}
+
+export async function getDashboardData(
+  route = "/dashboard",
+  authState?: RequestAuthState,
+): Promise<DashboardData> {
+  const resolvedAuthState = authState ?? (await getRequestAuthState(route));
+  const { supabase, user, sessionCookiePresent } = resolvedAuthState;
 
   if (!supabase || !user) {
     if (sessionCookiePresent) {
       logServerEvent("warn", "Dashboard SSR fell back to public mode", {
-        route: "/dashboard",
+        route: resolvedAuthState.route,
         sessionCookiePresent,
       });
     }
@@ -174,12 +208,12 @@ export async function getDashboardData(): Promise<DashboardData> {
           .order("created_at", { ascending: false }),
       ]),
     null,
-    { route: "/dashboard", userId: user.id },
+    { route: resolvedAuthState.route, userId: user.id },
   );
 
   if (!dashboardQueryResults) {
     logServerEvent("warn", "Dashboard data degraded to public fallback", {
-      route: "/dashboard",
+      route: resolvedAuthState.route,
       userId: user.id,
       reason: "query bundle failed",
     });
@@ -190,7 +224,7 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   if (topicsResult.error || sourcesResult.error) {
     logServerEvent("warn", "Dashboard data degraded to public fallback", {
-      route: "/dashboard",
+      route: resolvedAuthState.route,
       userId: user.id,
       topicsError: topicsResult.error?.message,
       sourcesError: sourcesResult.error?.message,
@@ -223,7 +257,12 @@ export async function getDashboardData(): Promise<DashboardData> {
       createdAt: source.created_at,
     })) ?? [];
 
-  const ingestionSummary = await persistRawArticles(supabase, user.id, sources, "/dashboard");
+  const ingestionSummary = await persistRawArticles(
+    supabase,
+    user.id,
+    sources,
+    resolvedAuthState.route,
+  );
   await syncTopicMatches(supabase, user.id, topics);
   await syncEventClusters(supabase, user.id, topics, sources);
 
@@ -241,6 +280,23 @@ export async function getDashboardData(): Promise<DashboardData> {
     sources,
     briefing,
     homepageDiagnostics,
+  };
+}
+
+export async function getDashboardPageState(route: string): Promise<{
+  data: DashboardData;
+  viewer: ViewerAccount | null;
+}> {
+  const authState = await getRequestAuthState(route);
+
+  const [data, viewer] = await Promise.all([
+    getDashboardData(route, authState),
+    getViewerAccount(route, authState),
+  ]);
+
+  return {
+    data,
+    viewer,
   };
 }
 
@@ -265,12 +321,16 @@ async function getPublicDashboardData(): Promise<DashboardData> {
   };
 }
 
-export async function getHistory() {
-  const { supabase, user, sessionCookiePresent } = await safeGetUser("/history");
+export async function getHistory(
+  route = "/history",
+  authState?: RequestAuthState,
+) {
+  const resolvedAuthState = authState ?? (await getRequestAuthState(route));
+  const { supabase, user, sessionCookiePresent } = resolvedAuthState;
   if (!supabase || !user) {
     if (sessionCookiePresent) {
       logServerEvent("warn", "History SSR fell back to demo history", {
-        route: "/history",
+        route: resolvedAuthState.route,
         sessionCookiePresent,
       });
     }
@@ -287,12 +347,12 @@ export async function getHistory() {
         .order("briefing_date", { ascending: false })
         .limit(14),
     null,
-    { route: "/history", userId: user.id },
+    { route: resolvedAuthState.route, userId: user.id },
   );
 
   if (!historyResult || historyResult.error) {
     logServerEvent("warn", "History data degraded to demo history", {
-      route: "/history",
+      route: resolvedAuthState.route,
       userId: user.id,
       errorMessage: historyResult?.error?.message ?? "history query failed",
     });
@@ -334,6 +394,20 @@ export async function getHistory() {
       ),
     }),
   );
+}
+
+export async function getHistoryPageState(route = "/history") {
+  const authState = await getRequestAuthState(route);
+
+  const [history, viewer] = await Promise.all([
+    getHistory(route, authState),
+    getViewerAccount(route, authState),
+  ]);
+
+  return {
+    history,
+    viewer,
+  };
 }
 
 export async function generateDailyBriefing(

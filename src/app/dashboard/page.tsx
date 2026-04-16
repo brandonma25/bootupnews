@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import PersonalizedDashboard from "@/components/dashboard/personalized-dashboard";
-import { getDashboardData, getViewerAccount } from "@/lib/data";
+import { getDashboardPageState } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Today's Briefing — Daily Intelligence",
@@ -12,11 +12,16 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ generated?: string; allread?: string }>;
 }) {
-  const [params, data, viewer] = await Promise.all([
+  const [params, pageState] = await Promise.all([
     searchParams,
-    getDashboardData(),
-    getViewerAccount(),
+    getDashboardPageState("/dashboard"),
   ]);
 
-  return <PersonalizedDashboard searchParams={params} data={data} viewer={viewer} />;
+  return (
+    <PersonalizedDashboard
+      searchParams={params}
+      data={pageState.data}
+      viewer={pageState.viewer}
+    />
+  );
 }

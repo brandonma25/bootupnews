@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
-import { getHistory, getViewerAccount } from "@/lib/data";
+import { getHistoryPageState } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/env";
 import { formatBriefingDate } from "@/lib/utils";
 
@@ -15,8 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HistoryPage() {
-  const history = await getHistory();
-  const viewer = await getViewerAccount();
+  const { history, viewer } = await getHistoryPageState("/history");
   const isGuest = !viewer && isSupabaseConfigured;
   const isDemo = !isSupabaseConfigured;
 

@@ -1,12 +1,28 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { buildAuthCallbackExchangeUrl, hasAuthReturnParams } from "@/lib/auth";
 import { env, isSupabaseConfigured } from "@/lib/env";
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({
-    request,
-  });
+  const requestUrl = new URL(request.url);
+  const isAuthCallbackRequest = requestUrl.pathname === "/auth/callback";
+
+  if (
+    isSupabaseConfigured &&
+    !isAuthCallbackRequest &&
+    hasAuthReturnParams(requestUrl.searchParams)
+  ) {
+    return NextResponse.redirect(buildAuthCallbackExchangeUrl(requestUrl));
+  }
+
+  if (isAuthCallbackRequest) {
+    return NextResponse.next({
+      request,
+    });
+  }
+
+  let response = NextResponse.next({ request });
 
   if (!isSupabaseConfigured) {
     return response;

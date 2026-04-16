@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { getDashboardData, getViewerAccount } from "@/lib/data";
+import { getDashboardPageState } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/env";
 
 export const metadata: Metadata = {
@@ -31,8 +31,7 @@ export default async function TopicsPage({
   searchParams: Promise<{ saved?: string; demo?: string }>;
 }) {
   const params = await searchParams;
-  const data = await getDashboardData();
-  const viewer = await getViewerAccount();
+  const { data, viewer } = await getDashboardPageState("/topics");
 
   return (
     <AppShell currentPath="/topics" mode={data.mode} account={viewer}>
