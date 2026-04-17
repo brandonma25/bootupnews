@@ -20,7 +20,7 @@
 - Homepage intelligence categorization.
 
 ## Implementation Shape / System Impact
-- The homepage becomes an intentional signed-out acquisition surface.
+- The homepage emphasizes a signed-out entry experience instead of a thin generic landing page.
 - Auth entrypoints move closer to the first product-value explanation.
 
 ## Dependencies / Risks
@@ -36,15 +36,14 @@
 - Public homepage rendering stays stable after the simplified auth flow changes.
 
 ## Evidence and Confidence
-- Repo evidence:
+- Directly evidenced:
   - Historical PRD content from commit `0c6196f`
   - Commit `69487c4` (`feat: simplify landing page auth flow`) created `src/components/auth/auth-modal.tsx` and `src/components/landing/hero.tsx`
   - Current related files: `src/app/page.tsx`, `src/components/auth/auth-modal.tsx`, `src/components/landing/hero.tsx`
-- Directly evidenced:
   - The homepage was simplified around a landing hero plus auth modal flow.
   - Public homepage entrypoints into auth were added explicitly.
 - Inferred:
   - The wording "acquisition surface" is a product framing layer inferred from the hero copy, CTA placement, and commit message about simplifying landing-page auth flow.
 - Still uncertain:
   - There is no surviving contemporaneous product brief proving a broader conversion strategy beyond the simplified hero-plus-auth implementation.
-- Confidence: Medium. The repo clearly shows a landing-page auth simplification, but the broader acquisition framing is still partly reconstructed from implementation shape.
+- Confidence: Medium. The repo clearly supports a landing-page auth simplification, but broader acquisition framing is still reconstructed rather than directly documented.

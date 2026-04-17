@@ -36,13 +36,12 @@
 - Ranking and timeline logic stays centralized in shared library code.
 
 ## Evidence and Confidence
-- Repo evidence:
+- Directly evidenced:
   - Historical PRD content from commit `0c6196f`
   - Commit `6354eb9` (`feat: timeline builder for event-level narratives`)
   - Commit `92766b2` (`feat: activate ranking across homepage and dashboard`)
   - Current related files: `src/lib/ranking.ts`, `src/lib/timeline-builder.ts`, `src/lib/data.ts`, `src/components/story-card.tsx`, `src/components/landing/homepage.tsx`, `src/app/dashboard/page.tsx`
   - Related tests: `src/lib/ranking.test.ts`, `src/lib/timeline-builder.test.ts`, `src/components/story-card.test.tsx`
-- Directly evidenced:
   - A dedicated timeline-builder module was added for event-level narratives.
   - Shared ranking logic was added across homepage and dashboard.
   - Story cards render timeline and ranking-derived signals.
@@ -50,4 +49,4 @@
   - The phrase "activation" is a summarizing label inferred from the pair of ranking and timeline commits rather than a surviving historical feature title in code.
 - Still uncertain:
   - The exact original product framing that grouped ranking and timeline into one numbered feature is reconstructed from the historical PRD content and adjacent commit sequence.
-- Confidence: High. The repo has unusually strong direct evidence for both the ranking and timeline pieces, and they were implemented in a tight historical sequence with supporting tests.
+- Confidence: High. The repo has strong direct evidence for both the ranking and timeline pieces, including dedicated commits, current implementation, and supporting tests.
