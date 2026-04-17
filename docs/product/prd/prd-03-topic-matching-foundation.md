@@ -1,7 +1,7 @@
 # PRD-3 — Topic Matching Foundation
 
 - PRD ID: `PRD-3`
-- Canonical file: `docs/product/prd/prd-3-topic-matching-foundation.md`
+- Canonical file: `docs/product/prd/prd-03-topic-matching-foundation.md`
 
 ## Objective
 - Introduce deterministic topic matching so ingested articles can be grouped against user-relevant themes instead of remaining a flat article pool.

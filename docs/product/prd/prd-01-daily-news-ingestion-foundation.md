@@ -1,7 +1,7 @@
 # PRD-1 — Daily News Ingestion Foundation
 
 - PRD ID: `PRD-1`
-- Canonical file: `docs/product/prd/prd-1-daily-news-ingestion-foundation.md`
+- Canonical file: `docs/product/prd/prd-01-daily-news-ingestion-foundation.md`
 
 ## Objective
 - Establish the first reusable ingestion layer that can fetch news from multiple sources and normalize article payloads for downstream product surfaces.

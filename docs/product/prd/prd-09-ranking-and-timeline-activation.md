@@ -1,7 +1,7 @@
 # PRD-9 — Ranking and Timeline Activation
 
 - PRD ID: `PRD-9`
-- Canonical file: `docs/product/prd/prd-9-ranking-and-timeline-activation.md`
+- Canonical file: `docs/product/prd/prd-09-ranking-and-timeline-activation.md`
 
 ## Objective
 - Activate shared ranking and timeline context so event clusters are ordered consistently and can show concise development timelines.

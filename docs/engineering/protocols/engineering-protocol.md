@@ -26,6 +26,7 @@
 - Before creating a PRD, Codex must check both `docs/product/prd/` and `docs/product/feature-system.csv` for an existing `PRD-XX`.
 - If the PRD ID already exists, Codex must update the existing document instead of creating a new file.
 - If the feature is new, Codex must assign the next sequential `PRD-XX`, create exactly one canonical file at `docs/product/prd/prd-XX-<feature-name>.md`, and register the mapping in `docs/product/feature-system.csv`.
+- Canonical PRD filenames must use lowercase kebab-case and zero-padded numbering for `1` through `9`, for example `prd-01-...`, `prd-09-...`, `prd-10-...`.
 - `docs/product/feature-system.csv` must include `prd_id` and `prd_file` so every feature maps to exactly one PRD file.
 - `docs/product/prd/` is reserved for canonical PRDs only. Architecture notes, system briefs, and supporting implementation docs belong in `docs/engineering/` unless they are part of the canonical PRD itself.
 - Every PRD must include:

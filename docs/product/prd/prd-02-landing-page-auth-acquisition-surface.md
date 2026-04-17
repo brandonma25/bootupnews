@@ -1,7 +1,7 @@
 # PRD-2 — Landing Page Auth Acquisition Surface
 
 - PRD ID: `PRD-2`
-- Canonical file: `docs/product/prd/prd-2-landing-page-auth-acquisition-surface.md`
+- Canonical file: `docs/product/prd/prd-02-landing-page-auth-acquisition-surface.md`
 
 ## Objective
 - Establish the homepage as a clearer signed-out entry surface with a direct path into authentication.

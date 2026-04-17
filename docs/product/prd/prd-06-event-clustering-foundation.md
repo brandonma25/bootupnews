@@ -1,7 +1,7 @@
 # PRD-6 — Event Clustering Foundation
 
 - PRD ID: `PRD-6`
-- Canonical file: `docs/product/prd/prd-6-event-clustering-foundation.md`
+- Canonical file: `docs/product/prd/prd-06-event-clustering-foundation.md`
 
 ## Objective
 - Convert matched articles into event-level clusters so the product can reason about developments instead of isolated article rows.

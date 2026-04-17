@@ -32,7 +32,7 @@ CSV_PATH = "docs/product/feature-system.csv"
 PRD_DIR = "docs/product/prd"
 TRIVIAL_MAX_CHANGED_LINES = 15
 PRD_ID_RE = re.compile(r"^PRD-(\d+)$")
-PRD_FILE_RE = re.compile(r"^docs/product/prd/prd-(\d+)-[a-z0-9-]+\.md$")
+PRD_FILE_RE = re.compile(r"^docs/product/prd/prd-(0[1-9]|[1-9]\d+)-[a-z0-9-]+\.md$")
 
 
 @dataclass
@@ -243,7 +243,7 @@ def validate_new_prd_alignment(new_prd_files: list[str], csv_mappings: dict[str,
         if not prd_id_match or not prd_file_match:
             continue
 
-        if prd_id_match.group(1) != prd_file_match.group(1):
+        if int(prd_id_match.group(1)) != int(prd_file_match.group(1)):
             errors.append(
                 f"FAIL: New PRD mapping mismatch.\n"
                 f"CSV prd_id: {prd_id}\n"
@@ -311,7 +311,7 @@ def main() -> int:
         if not new_prd_files:
             return fail(
                 "New feature or system change detected, but no canonical PRD was added in docs/product/prd/.",
-                "How to fix: add one canonical docs/product/prd/prd-XX-<slug>.md file and map it in docs/product/feature-system.csv.",
+                "How to fix: add one canonical docs/product/prd/prd-XX-<slug>.md file, zero-pad 1-9 as prd-01 through prd-09, and map it in docs/product/feature-system.csv.",
             )
 
         csv_mappings = load_csv_mappings(repo_root)

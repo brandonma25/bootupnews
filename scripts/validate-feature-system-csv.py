@@ -25,7 +25,7 @@ EXPECTED_HEADER = [
 ]
 EXPECTED_COLUMN_COUNT = len(EXPECTED_HEADER)
 PRD_ID_RE = re.compile(r"^PRD-(\d+)$")
-PRD_FILE_RE = re.compile(r"^docs/product/prd/prd-(\d+)-[a-z0-9-]+\.md$")
+PRD_FILE_RE = re.compile(r"^docs/product/prd/prd-(0[1-9]|[1-9]\d+)-[a-z0-9-]+\.md$")
 PRD_FILE_CASE_INSENSITIVE_RE = re.compile(r"^prd-(\d+)-.+\.md$", re.IGNORECASE)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -150,7 +150,7 @@ def validate_rows(
             fail(
                 errors,
                 f"Invalid prd_file on line {row_number}.\n"
-                "Expected format: docs/product/prd/prd-[number]-<slug>.md\n"
+                "Expected format: docs/product/prd/prd-XX-<slug>.md with zero-padded filenames for 1-9, for example docs/product/prd/prd-01-example.md\n"
                 f"Actual: {prd_file}",
             )
         else:
@@ -174,8 +174,8 @@ def validate_rows(
                 )
 
         if prd_id_match and prd_file_match:
-            prd_id_number = prd_id_match.group(1)
-            prd_file_number = prd_file_match.group(1)
+            prd_id_number = int(prd_id_match.group(1))
+            prd_file_number = int(prd_file_match.group(1))
             if prd_id_number != prd_file_number:
                 fail(
                     errors,
@@ -230,8 +230,15 @@ def validate_prd_directory_parity(
                     f"Found: {relative_path}",
                 )
 
-            prd_number = case_insensitive_match.group(1)
+            prd_number = str(int(case_insensitive_match.group(1)))
             prd_number_to_files.setdefault(prd_number, []).append(relative_path)
+
+            if int(case_insensitive_match.group(1)) < 10 and not filename.startswith(f"prd-0{int(case_insensitive_match.group(1))}-"):
+                fail(
+                    errors,
+                    "PRD file must use zero-padded numbering for 1-9.\n"
+                    f"Found: {relative_path}",
+                )
 
         if strict_match:
             repo_prd_files.append(relative_path)

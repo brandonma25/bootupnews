@@ -1,7 +1,7 @@
 # PRD-4 — Default Topic Bootstrap
 
 - PRD ID: `PRD-4`
-- Canonical file: `docs/product/prd/prd-4-default-topic-bootstrap.md`
+- Canonical file: `docs/product/prd/prd-04-default-topic-bootstrap.md`
 
 ## Objective
 - Ensure new accounts have enough default topic structure to generate a meaningful briefing immediately after onboarding.

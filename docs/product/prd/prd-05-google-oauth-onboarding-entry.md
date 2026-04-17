@@ -1,7 +1,7 @@
 # PRD-5 — Google OAuth Onboarding Entry
 
 - PRD ID: `PRD-5`
-- Canonical file: `docs/product/prd/prd-5-google-oauth-onboarding-entry.md`
+- Canonical file: `docs/product/prd/prd-05-google-oauth-onboarding-entry.md`
 
 ## Objective
 - Add the first Google OAuth entry path so users can begin sign-in through a provider-based login instead of password-only flows.

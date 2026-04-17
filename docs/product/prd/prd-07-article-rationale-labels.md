@@ -1,7 +1,7 @@
 # PRD-7 — Article Rationale Labels
 
 - PRD ID: `PRD-7`
-- Canonical file: `docs/product/prd/prd-7-article-rationale-labels.md`
+- Canonical file: `docs/product/prd/prd-07-article-rationale-labels.md`
 
 ## Objective
 - Provide compact rationale labels that explain why an article or event was surfaced without requiring users to infer the product’s selection logic.

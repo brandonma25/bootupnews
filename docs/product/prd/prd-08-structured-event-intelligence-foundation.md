@@ -1,7 +1,7 @@
 # PRD-8 — Structured Event Intelligence Foundation
 
 - PRD ID: `PRD-8`
-- Canonical file: `docs/product/prd/prd-8-structured-event-intelligence-foundation.md`
+- Canonical file: `docs/product/prd/prd-08-structured-event-intelligence-foundation.md`
 
 ## Objective
 - Enrich event clusters with structured intelligence fields so downstream ranking and explanation layers can operate on event semantics instead of raw summaries.

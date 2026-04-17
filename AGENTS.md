@@ -128,6 +128,11 @@ This repository uses a strict documentation system to prevent bloat and maintain
 - Every feature must have a unique PRD ID using the format `PRD-XX` where `XX` is the canonical numeric identifier.
 - Each PRD ID maps to exactly one canonical PRD file:
   `/docs/product/prd/prd-XX-<feature-name>.md`
+- Canonical PRD filenames must use lowercase kebab-case and zero-padded numbering for `1` through `9`.
+- Required filename pattern: `prd-XX-short-kebab-case-title.md`
+- Examples: `prd-01-...`, `prd-09-...`, `prd-10-...`
+- New PRDs must follow the canonical filename pattern at creation time, not in a later cleanup pass.
+- Do not create or rename PRDs in uppercase, mixed case, or non-zero-padded numeric formats such as `prd-1-...`.
 - Create a PRD only for meaningful system-level or multi-file features.
 - Use `/docs/engineering/protocols/prd-template.md` when a PRD is needed.
 - One PRD ID equals one document. Do not create multiple PRD versions. Update the existing canonical PRD instead.
@@ -174,7 +179,7 @@ The CSV must be updated in the same PR as the feature work whenever feature stat
 
 ### PRD Duplication Prevention
 - Each `prd_id` in `/docs/product/feature-system.csv` must map to exactly one file in `/docs/product/prd/`.
-- Each PRD filename in `/docs/product/prd/` must include its `PRD-XX` identifier.
+- Each PRD filename in `/docs/product/prd/` must include its `PRD-XX` identifier in zero-padded filename form.
 - Codex must not create multiple PRD-level documents for the same feature identity.
 - If duplicate PRD-level documentation is discovered, consolidate it into the canonical PRD or move non-PRD material into `/docs/engineering/`.
 
