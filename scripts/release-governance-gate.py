@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -27,6 +28,8 @@ RELEVANT_DOC_PREFIXES = (
 CSV_PATH = "docs/product/feature-system.csv"
 PRD_DIR = "docs/prd"
 TRIVIAL_MAX_CHANGED_LINES = 15
+PRD_ID_RE = re.compile(r"^PRD-(\d+)$")
+PRD_FILE_RE = re.compile(r"^docs/prd/prd-(\d+)-[a-z0-9-]+\.md$")
 
 
 @dataclass
@@ -225,6 +228,28 @@ def validate_prd_csv_consistency(repo_root: Path) -> list[str]:
     return errors
 
 
+def validate_new_prd_alignment(new_prd_files: list[str], csv_mappings: dict[str, str]) -> list[str]:
+    errors: list[str] = []
+    for prd_file in new_prd_files:
+        prd_id = csv_mappings.get(prd_file)
+        if not prd_id:
+            continue
+
+        prd_id_match = PRD_ID_RE.fullmatch(prd_id)
+        prd_file_match = PRD_FILE_RE.fullmatch(prd_file)
+        if not prd_id_match or not prd_file_match:
+            continue
+
+        if prd_id_match.group(1) != prd_file_match.group(1):
+            errors.append(
+                f"FAIL: New PRD mapping mismatch.\n"
+                f"CSV prd_id: {prd_id}\n"
+                f"PRD file: {prd_file}"
+            )
+
+    return errors
+
+
 def fail(message: str, extra: str | None = None) -> int:
     print(f"FAIL: {message}")
     if extra:
@@ -293,6 +318,19 @@ def main() -> int:
                     f"New PRD file {prd_file} is missing from docs/product/feature-system.csv.",
                     "How to fix: add a CSV row with the matching prd_id and prd_file.",
                 )
+
+            if not (repo_root / prd_file).is_file():
+                return fail(
+                    f"New PRD file {prd_file} does not exist in the repository.",
+                    "How to fix: create the canonical PRD file or fix the PRD path in the CSV.",
+                )
+
+        alignment_errors = validate_new_prd_alignment(new_prd_files, csv_mappings)
+        if alignment_errors:
+            return fail(
+                "New PRD file and CSV entry do not refer to the same PRD ID.",
+                "\n".join(alignment_errors),
+            )
 
         if not relevant_doc_updates:
             return fail(

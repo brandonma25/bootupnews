@@ -26,6 +26,7 @@ EXPECTED_HEADER = [
 EXPECTED_COLUMN_COUNT = len(EXPECTED_HEADER)
 PRD_ID_RE = re.compile(r"^PRD-(\d+)$")
 PRD_FILE_RE = re.compile(r"^docs/prd/prd-(\d+)-[a-z0-9-]+\.md$")
+PRD_FILE_CASE_INSENSITIVE_RE = re.compile(r"^prd-(\d+)-.+\.md$", re.IGNORECASE)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -43,6 +44,14 @@ def is_valid_date(value: str) -> bool:
 
 def fail(errors: list[str], message: str) -> None:
     errors.append(f"FAIL: {message}")
+
+
+def warn(warnings: list[str], message: str) -> None:
+    warnings.append(f"WARN: {message}")
+
+
+def normalize_slug(value: str) -> str:
+    return re.sub(r"-{2,}", "-", re.sub(r"[^a-z0-9]+", "-", value.lower())).strip("-")
 
 
 def load_rows(csv_path: Path, errors: list[str]) -> list[list[str]]:
@@ -80,11 +89,16 @@ def validate_header(rows: list[list[str]], errors: list[str]) -> bool:
     return True
 
 
-def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> dict[str, str]:
+def validate_rows(
+    repo_root: Path,
+    rows: list[list[str]],
+    errors: list[str],
+    warnings: list[str],
+) -> dict[str, tuple[str, str]]:
     seen_prd_ids: dict[str, int] = {}
     seen_prd_files: dict[str, int] = {}
     seen_feature_names: dict[str, int] = {}
-    csv_prd_mappings: dict[str, str] = {}
+    csv_prd_mappings: dict[str, tuple[str, str]] = {}
 
     for row_number, row in enumerate(rows[1:], start=2):
         if row == EXPECTED_HEADER:
@@ -148,7 +162,7 @@ def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> 
                 )
             else:
                 seen_prd_files[prd_file] = row_number
-                csv_prd_mappings[prd_file] = prd_id
+                csv_prd_mappings[prd_file] = (prd_id, feature_name)
 
             prd_path = repo_root / prd_file
             if not prd_path.is_file():
@@ -170,6 +184,16 @@ def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> 
                     f"Actual file: {prd_file}",
                 )
 
+            filename_slug = Path(prd_file).stem.split("-", 2)[2]
+            expected_slug = normalize_slug(feature_name)
+            if filename_slug != expected_slug:
+                warn(
+                    warnings,
+                    f"PRD slug does not match feature name.\n"
+                    f"Feature Name: {feature_name}\n"
+                    f"File: {prd_file}",
+                )
+
         if not is_valid_date(last_updated):
             fail(
                 errors,
@@ -182,15 +206,43 @@ def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> 
 
 def validate_prd_directory_parity(
     repo_root: Path,
-    csv_prd_mappings: dict[str, str],
+    csv_prd_mappings: dict[str, tuple[str, str]],
     errors: list[str],
 ) -> None:
     prd_root = repo_root / "docs" / "prd"
-    repo_prd_files = sorted(
-        str(path.relative_to(repo_root)).replace("\\", "/")
-        for path in prd_root.glob("prd-*.md")
-        if path.is_file()
-    )
+    repo_prd_files = []
+    prd_number_to_files: dict[str, list[str]] = {}
+
+    for path in sorted(prd_root.iterdir()):
+        if not path.is_file():
+            continue
+
+        relative_path = str(path.relative_to(repo_root)).replace("\\", "/")
+        filename = path.name
+        case_insensitive_match = PRD_FILE_CASE_INSENSITIVE_RE.fullmatch(filename)
+        strict_match = PRD_FILE_RE.fullmatch(relative_path)
+
+        if case_insensitive_match:
+            if filename != filename.lower():
+                fail(
+                    errors,
+                    "PRD file must be lowercase.\n"
+                    f"Found: {relative_path}",
+                )
+
+            prd_number = case_insensitive_match.group(1)
+            prd_number_to_files.setdefault(prd_number, []).append(relative_path)
+
+        if strict_match:
+            repo_prd_files.append(relative_path)
+
+    for prd_number, files in sorted(prd_number_to_files.items()):
+        if len(files) > 1:
+            fail(
+                errors,
+                "Duplicate PRD number detected\n"
+                f"PRD-{prd_number} appears in:\n- " + "\n- ".join(files),
+            )
 
     for prd_file in repo_prd_files:
         if prd_file not in csv_prd_mappings:
@@ -205,12 +257,13 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     csv_path = repo_root / "docs" / "product" / "feature-system.csv"
     errors: list[str] = []
+    warnings: list[str] = []
     rows = load_rows(csv_path, errors)
 
     header_ok = validate_header(rows, errors) if rows else False
-    csv_prd_mappings: dict[str, str] = {}
+    csv_prd_mappings: dict[str, tuple[str, str]] = {}
     if rows and header_ok:
-        csv_prd_mappings = validate_rows(repo_root, rows, errors)
+        csv_prd_mappings = validate_rows(repo_root, rows, errors, warnings)
         validate_prd_directory_parity(repo_root, csv_prd_mappings, errors)
 
     data_row_count = max(len(rows) - 1, 0)
@@ -222,8 +275,16 @@ def main() -> int:
         print("")
         for error in errors:
             print(error)
+        if warnings:
+            print("")
+            for warning in warnings:
+                print(warning)
         return 1
 
+    if warnings:
+        print("")
+        for warning in warnings:
+            print(warning)
     print("PASS: docs/product/feature-system.csv matches the strict 12-column schema and semantic PRD mapping rules.")
     return 0
 
