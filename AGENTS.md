@@ -6,6 +6,7 @@ Before ANY substantial implementation work, you MUST read:
 - `docs/engineering/engineering-protocol.md`
 - `docs/engineering/test-checklist.md`
 - `docs/engineering/prd-template.md`
+- `docs/engineering/release-machine.md`
 
 ## 2. Scope & Branching
 - Always make an explicit branch decision.
