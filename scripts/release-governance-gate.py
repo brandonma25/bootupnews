@@ -20,16 +20,19 @@ MONITORED_PREFIXES = (
     ".github/workflows/",
 )
 RELEVANT_DOC_PREFIXES = (
-    "docs/prd/",
-    "docs/testing/",
-    "docs/bug-fixes/",
-    "docs/engineering/",
+    "docs/product/briefs/",
+    "docs/product/prd/",
+    "docs/engineering/bug-fixes/",
+    "docs/engineering/incidents/",
+    "docs/engineering/change-records/",
+    "docs/engineering/testing/",
+    "docs/engineering/protocols/",
 )
 CSV_PATH = "docs/product/feature-system.csv"
-PRD_DIR = "docs/prd"
+PRD_DIR = "docs/product/prd"
 TRIVIAL_MAX_CHANGED_LINES = 15
 PRD_ID_RE = re.compile(r"^PRD-(\d+)$")
-PRD_FILE_RE = re.compile(r"^docs/prd/prd-(\d+)-[a-z0-9-]+\.md$")
+PRD_FILE_RE = re.compile(r"^docs/product/prd/prd-(\d+)-[a-z0-9-]+\.md$")
 
 
 @dataclass
@@ -135,7 +138,7 @@ def is_test_file(path: str) -> bool:
 
 
 def is_canonical_prd(path: str) -> bool:
-    return path.startswith("docs/prd/prd-") and path.endswith(".md")
+    return path.startswith("docs/product/prd/prd-") and path.endswith(".md")
 
 
 def classify_pr(changes: dict[str, Change]) -> tuple[str, list[Change], list[Change], list[str]]:
@@ -286,7 +289,7 @@ def main() -> int:
     changed_paths = sorted(changes)
     relevant_doc_updates = [path for path in changed_paths if is_relevant_doc_file(path)]
     full_validation_triggered = CSV_PATH in changes or any(
-        path.startswith("docs/prd/") for path in changed_paths
+        path.startswith("docs/product/prd/") for path in changed_paths
     )
 
     print(f"classification: {classification}")
@@ -307,8 +310,8 @@ def main() -> int:
     if classification == "new-feature-or-system":
         if not new_prd_files:
             return fail(
-                "New feature or system change detected, but no canonical PRD was added in docs/prd/.",
-                "How to fix: add one canonical docs/prd/prd-XX-<slug>.md file and map it in docs/product/feature-system.csv.",
+                "New feature or system change detected, but no canonical PRD was added in docs/product/prd/.",
+                "How to fix: add one canonical docs/product/prd/prd-XX-<slug>.md file and map it in docs/product/feature-system.csv.",
             )
 
         csv_mappings = load_csv_mappings(repo_root)
@@ -344,7 +347,7 @@ def main() -> int:
     if monitored_changes and not relevant_doc_updates:
         return fail(
             "Material feature change detected, but no supporting docs were updated.",
-            "How to fix: update docs/prd, docs/testing, docs/bug-fixes, or docs/engineering to reflect the change.",
+            "How to fix: update docs/product/prd, docs/product/briefs, or the relevant docs/engineering bucket to reflect the change.",
         )
 
     print("PASS: Material feature change includes required supporting docs and strict governance checks passed.")

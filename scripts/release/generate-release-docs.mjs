@@ -7,18 +7,18 @@ import { parseArgs } from "./common.mjs";
 const TEMPLATE_MAP = [
   {
     type: "testing",
-    templatePath: "docs/testing/templates/release-testing-report-template.md",
-    targetDir: "docs/testing",
+    templatePath: "docs/engineering/testing/templates/release-testing-report-template.md",
+    targetDir: "docs/engineering/testing",
   },
   {
     type: "bug-fix",
-    templatePath: "docs/bug-fixes/templates/release-bug-fix-template.md",
-    targetDir: "docs/bug-fixes",
+    templatePath: "docs/engineering/bug-fixes/templates/release-bug-fix-template.md",
+    targetDir: "docs/engineering/bug-fixes",
   },
   {
     type: "release-brief",
-    templatePath: "docs/prd/templates/release-brief-template.md",
-    targetDir: "docs/prd",
+    templatePath: "docs/product/briefs/templates/release-brief-template.md",
+    targetDir: "docs/product/briefs",
   },
 ];
 
@@ -65,4 +65,3 @@ function main() {
 }
 
 main();
-

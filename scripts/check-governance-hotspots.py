@@ -10,8 +10,8 @@ from pathlib import Path
 HOTSPOT_FILES = [
     "docs/product/feature-system.csv",
     "AGENTS.md",
-    "docs/engineering/engineering-protocol.md",
-    "docs/engineering/prd-template.md",
+    "docs/engineering/protocols/engineering-protocol.md",
+    "docs/engineering/protocols/prd-template.md",
     "docs/product/documentation-rules.md",
 ]
 

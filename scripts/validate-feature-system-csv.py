@@ -25,7 +25,7 @@ EXPECTED_HEADER = [
 ]
 EXPECTED_COLUMN_COUNT = len(EXPECTED_HEADER)
 PRD_ID_RE = re.compile(r"^PRD-(\d+)$")
-PRD_FILE_RE = re.compile(r"^docs/prd/prd-(\d+)-[a-z0-9-]+\.md$")
+PRD_FILE_RE = re.compile(r"^docs/product/prd/prd-(\d+)-[a-z0-9-]+\.md$")
 PRD_FILE_CASE_INSENSITIVE_RE = re.compile(r"^prd-(\d+)-.+\.md$", re.IGNORECASE)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -150,7 +150,7 @@ def validate_rows(
             fail(
                 errors,
                 f"Invalid prd_file on line {row_number}.\n"
-                "Expected format: docs/prd/prd-[number]-<slug>.md\n"
+                "Expected format: docs/product/prd/prd-[number]-<slug>.md\n"
                 f"Actual: {prd_file}",
             )
         else:
@@ -209,7 +209,7 @@ def validate_prd_directory_parity(
     csv_prd_mappings: dict[str, tuple[str, str]],
     errors: list[str],
 ) -> None:
-    prd_root = repo_root / "docs" / "prd"
+    prd_root = repo_root / "docs" / "product" / "prd"
     repo_prd_files = []
     prd_number_to_files: dict[str, list[str]] = {}
 
