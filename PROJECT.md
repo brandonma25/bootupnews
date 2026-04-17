@@ -417,6 +417,29 @@ When updating this file:
 - Branch protection, preview URL handoff, and `PRODUCTION_BASE_URL` still require external GitHub/Vercel configuration.
 - `npm install` still reports one pre-existing high severity vulnerability unrelated to this rollout work.
 
+### [2026-04-18 00:10] — Release Automation System Internal PRD
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- The rollout branch already had branch-level rollout docs, but the repo still lacked one concise system-level PRD that explains the release automation machine itself as an ongoing internal capability.
+
+**Root cause:**
+- Existing docs were oriented around the rollout branch and verification history rather than a stable internal feature brief for the release automation system.
+
+**Change made:**
+- Added `docs/prd/release-automation-system.md` as a concise internal PRD covering the objective, problem, why the system is needed, release gates, automated versus human-only scope, GitHub/Vercel dependencies, success criteria, and known limitations.
+- Kept the document repo-safe and secret-free, with no tokens, headers, cookies, or private infrastructure material.
+
+**Files modified:**
+- `docs/prd/release-automation-system.md`
+- `PROJECT.md`
+
+**Remaining risks / next steps:**
+- The rollout still depends on pushing and merging `codex/release-automation-architecture` through the protected PR path once local Git authentication can update workflow files.
+- External GitHub/Vercel configuration remains necessary even after the PRD exists.
+
 ---
 
 ## 8. NEXT ACTION (FOCUS)
