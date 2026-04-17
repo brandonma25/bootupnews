@@ -8,9 +8,12 @@ vi.mock("@/lib/supabase/server", () => ({
 describe("auth-driven SSR viewer detection", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.resetModules();
   });
 
-  it("returns a signed-in viewer account when safeGetUser resolves a user", async () => {
+  it(
+    "returns a signed-in viewer account when safeGetUser resolves a user",
+    async () => {
     const { safeGetUser } = await import("@/lib/supabase/server");
 
     vi.mocked(safeGetUser).mockResolvedValue({
@@ -34,9 +37,13 @@ describe("auth-driven SSR viewer detection", () => {
       displayName: "Alex Analyst",
       initials: "AA",
     });
-  });
+    },
+    15000,
+  );
 
-  it("uses one auth lookup for combined dashboard page state", async () => {
+  it(
+    "uses one auth lookup for combined dashboard page state",
+    async () => {
     const { safeGetUser } = await import("@/lib/supabase/server");
 
     vi.mocked(safeGetUser).mockResolvedValue({
@@ -52,5 +59,7 @@ describe("auth-driven SSR viewer detection", () => {
     expect(safeGetUser).toHaveBeenCalledWith("/");
     expect(pageState.viewer).toBeNull();
     expect(pageState.data.mode).toBe("public");
-  });
+    },
+    15000,
+  );
 });

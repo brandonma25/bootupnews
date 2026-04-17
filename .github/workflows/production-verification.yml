@@ -1,0 +1,40 @@
+name: Production Verification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      production_url:
+        description: Production base URL to verify
+        required: false
+        type: string
+
+jobs:
+  production-route-probe:
+    name: production-route-probe
+    runs-on: ubuntu-latest
+    env:
+      PRODUCTION_URL: ${{ github.event.inputs.production_url || vars.PRODUCTION_BASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify production routes
+        if: ${{ env.PRODUCTION_URL != '' }}
+        run: npm run release:production -- --base-url "$PRODUCTION_URL"
+
+      - name: Skip when production URL is not configured
+        if: ${{ env.PRODUCTION_URL == '' }}
+        run: |
+          echo "PRODUCTION_BASE_URL repo variable is not configured. Skipping production route probe."
+          echo "Configure PRODUCTION_BASE_URL or dispatch this workflow with production_url." >> "$GITHUB_STEP_SUMMARY"

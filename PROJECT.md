@@ -336,6 +336,110 @@ When updating this file:
 - `feature/auth-preview-host-fix` still requires preview and human validation before it should be considered for merge.
 - The original repo worktree still contains active uncommitted feature work that was intentionally left untouched.
 
+### [2026-04-17 22:15] — Release Automation Architecture
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- Release readiness for this repo depended on scattered manual steps, which made local validation, PR validation, preview sanity checks, and release documentation inconsistent and easy to miss.
+
+**Root cause:**
+- The repo had baseline CI and Playwright coverage, but it lacked a single release entrypoint, reusable deploy probes, explicit protected-branch check names, a concise human auth/session gate, and reusable release-doc scaffolding.
+
+**Change made:**
+- Added a release-automation layer with a scripted local gate, preview and production route probes, PR summary generation, release-doc scaffolding, and clearer GitHub Actions workflows for PR validation, preview verification, and post-merge production verification.
+- Added concise release operating documentation and a reusable human auth/session checklist that keeps Google OAuth, callback truth, refresh persistence, sign-out truth, and final auth-sensitive product judgment explicitly human-owned.
+- Scaffolded repo-safe PRD, testing, and bug-fix documents for the release-automation branch and updated the README with the new release commands and flow.
+
+**Files modified:**
+- `.github/workflows/ci.yml`
+- `.github/workflows/preview-gate.yml`
+- `.github/workflows/production-verification.yml`
+- `package.json`
+- `scripts/release/common.mjs`
+- `scripts/release/validate-local.mjs`
+- `scripts/release/verify-deployment.mjs`
+- `scripts/release/generate-release-docs.mjs`
+- `scripts/release/generate-pr-summary.mjs`
+- `docs/engineering/release-automation-operating-guide.md`
+- `docs/testing/human-auth-session-gate.md`
+- `docs/testing/templates/release-testing-report-template.md`
+- `docs/bug-fixes/templates/release-bug-fix-template.md`
+- `docs/prd/templates/release-brief-template.md`
+- `docs/testing/release-automation-architecture.md`
+- `docs/bug-fixes/release-automation-architecture.md`
+- `docs/prd/release-automation-architecture.md`
+- `README.md`
+- `PROJECT.md`
+
+**Remaining risks / next steps:**
+- Preview and production workflows still require external GitHub/Vercel configuration to supply the preview URL handoff and canonical production URL.
+- The local release gate required escalation in this environment so the dev server could bind to port `3000`; the repo code itself passed once allowed to run normally.
+- `npm install` still reports one pre-existing high severity vulnerability that was not changed by this release work.
+
+### [2026-04-17 22:35] — Release Automation Rollout Verification And Enforcement Alignment
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- The release automation implementation existed on the local rollout branch, but `origin/main` had advanced independently with a separate release-machine protocol, and `main` still lacked most of the intended release automation assets.
+
+**Root cause:**
+- The original release automation branch never reached remote because the current GitHub credential could not push `.github/workflows/*` changes without `workflow` scope.
+- Meanwhile, `origin/main` merged a smaller release-machine protocol branch that added required docs and wrapper entrypoints but not the fuller preview/prod workflows, release automation scripts, or templates.
+- The merged branch also surfaced brittle auth-focused tests that timed out under the full parallel Vitest suite until their module isolation was tightened.
+
+**Change made:**
+- Verified directly that `origin/main` still lacks the release automation implementation assets and that commit `d016623` is not reachable from `main`.
+- Merged `origin/main` into `codex/release-automation-architecture` so the branch now contains both the release-machine protocol and the fuller release automation system.
+- Updated `AGENTS.md` to require both `docs/engineering/release-machine.md` and `docs/engineering/release-automation-operating-guide.md` before serious implementation work.
+- Rewired `scripts/release-check.sh`, `scripts/preview-check.js`, and `scripts/prod-check.js` to delegate to the stronger release automation entrypoints instead of maintaining weaker parallel logic.
+- Stabilized `src/lib/data.auth.test.ts` and `src/components/auth/auth-modal.test.tsx` by resetting modules between tests and raising their timeout budget so the full repo test suite passes reliably after the merge.
+- Re-ran lint, test, build, the standardized local release gate, and the preview/prod wrappers against a live local server.
+
+**Files modified:**
+- `AGENTS.md`
+- `README.md`
+- `PROJECT.md`
+- `docs/testing/release-automation-architecture.md`
+- `docs/bug-fixes/release-automation-architecture.md`
+- `docs/prd/release-automation-architecture.md`
+- `scripts/release-check.sh`
+- `scripts/preview-check.js`
+- `scripts/prod-check.js`
+- `src/lib/data.auth.test.ts`
+- `src/components/auth/auth-modal.test.tsx`
+
+**Remaining risks / next steps:**
+- `origin/main` still does not contain the release automation rollout because this branch still cannot be pushed with the current GitHub credential.
+- Branch protection, preview URL handoff, and `PRODUCTION_BASE_URL` still require external GitHub/Vercel configuration.
+- `npm install` still reports one pre-existing high severity vulnerability unrelated to this rollout work.
+
+### [2026-04-18 00:10] — Release Automation System Internal PRD
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- The rollout branch already had branch-level rollout docs, but the repo still lacked one concise system-level PRD that explains the release automation machine itself as an ongoing internal capability.
+
+**Root cause:**
+- Existing docs were oriented around the rollout branch and verification history rather than a stable internal feature brief for the release automation system.
+
+**Change made:**
+- Added `docs/prd/release-automation-system.md` as a concise internal PRD covering the objective, problem, why the system is needed, release gates, automated versus human-only scope, GitHub/Vercel dependencies, success criteria, and known limitations.
+- Kept the document repo-safe and secret-free, with no tokens, headers, cookies, or private infrastructure material.
+
+**Files modified:**
+- `docs/prd/release-automation-system.md`
+- `PROJECT.md`
+
+**Remaining risks / next steps:**
+- The rollout still depends on pushing and merging `codex/release-automation-architecture` through the protected PR path once local Git authentication can update workflow files.
+- External GitHub/Vercel configuration remains necessary even after the PRD exists.
+
 ---
 
 ## 8. NEXT ACTION (FOCUS)

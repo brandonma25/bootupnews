@@ -1,0 +1,45 @@
+name: Preview Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: Vercel preview URL to verify
+        required: true
+        type: string
+  repository_dispatch:
+    types:
+      - vercel-preview-ready
+
+jobs:
+  preview-route-probe:
+    name: preview-route-probe
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_URL: ${{ github.event.inputs.preview_url || github.event.client_payload.preview_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify preview routes
+        run: npm run release:preview -- --base-url "$PREVIEW_URL"
+
+      - name: Publish preview summary
+        if: always()
+        run: |
+          {
+            echo "## Preview Gate"
+            echo ""
+            echo "- Preview URL: $PREVIEW_URL"
+            echo "- Routes checked: / and /dashboard"
+            echo "- Human auth/session gate still required for OAuth, callback truth, refresh persistence, and sign-out"
+          } >> "$GITHUB_STEP_SUMMARY"

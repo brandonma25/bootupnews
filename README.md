@@ -159,6 +159,58 @@ NEXT_PUBLIC_APP_URL=https://your-vercel-domain.vercel.app
 
 Use your canonical production alias here so auth callbacks and environment checks point at the correct live site.
 
+## Release automation
+
+This repo now includes a reusable release-gate flow that keeps most validation automated while preserving a small human auth/session gate.
+
+### Local gate
+
+Run the full local release validation flow with:
+
+```bash
+npm run release:local
+./scripts/release-check.sh
+```
+
+This runs install, lint, unit/integration tests, build, the Dev Server Rule on port `3000`, Chromium Playwright smoke coverage, and signed-out route probes for `/` and `/dashboard`.
+
+### Preview and production probes
+
+Once you have a deployed URL, run:
+
+```bash
+npm run release:preview -- --base-url https://preview.example.com
+npm run release:production -- --base-url https://app.example.com
+node scripts/preview-check.js https://preview.example.com
+node scripts/prod-check.js https://app.example.com
+```
+
+These probes verify `/` and `/dashboard`, require HTTP `200`, and fail on obvious deployment or framework error markers.
+
+### Release docs scaffolding
+
+To create the standard release doc set for a branch or release:
+
+```bash
+npm run release:docs -- --slug your-release-slug --title "Your Release Title"
+```
+
+This scaffolds:
+
+- `docs/prd/<slug>.md`
+- `docs/testing/<slug>.md`
+- `docs/bug-fixes/<slug>.md`
+
+### GitHub Actions
+
+The repo also includes:
+
+- PR automation in `.github/workflows/ci.yml`
+- Preview route validation in `.github/workflows/preview-gate.yml`
+- Post-merge production route verification in `.github/workflows/production-verification.yml`
+
+See `docs/engineering/release-automation-operating-guide.md` for the full release flow and the remaining human-only auth/session checklist.
+
 ## What accounts or keys you need
 
 - Supabase account

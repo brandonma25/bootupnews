@@ -9,8 +9,14 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:chromium": "playwright test --project=chromium",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "release:local": "node scripts/release/validate-local.mjs",
+    "release:preview": "node scripts/release/verify-deployment.mjs --stage preview",
+    "release:production": "node scripts/release/verify-deployment.mjs --stage production",
+    "release:docs": "node scripts/release/generate-release-docs.mjs",
+    "release:pr-summary": "node scripts/release/generate-pr-summary.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",
