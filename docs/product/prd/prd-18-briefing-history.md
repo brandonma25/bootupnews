@@ -1,7 +1,7 @@
 # PRD-18 — Briefing History
 
 - PRD ID: `PRD-18`
-- Canonical file: `docs/prd/prd-18-briefing-history.md`
+- Canonical file: `docs/product/prd/prd-18-briefing-history.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective

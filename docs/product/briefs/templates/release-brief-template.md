@@ -29,6 +29,7 @@
 - Production sanity:
 
 ## Documentation Updates Required
-- `docs/prd/`
-- `docs/testing/`
-- `docs/bug-fixes/`
+- `docs/product/briefs/`
+- `docs/product/prd/` when the release maps to numbered feature work
+- `docs/engineering/testing/`
+- `docs/engineering/bug-fixes/` when a real defect was fixed

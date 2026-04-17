@@ -27,9 +27,9 @@
 - [ ] SSR / Environment Logic
 
 ## Documentation Updates
-- [ ] `docs/prd-summaries/` updated
-- [ ] `docs/testing/` updated
-- [ ] `docs/bug-fixes/` updated if applicable
+- [ ] `docs/product/briefs/` updated if applicable
+- [ ] `docs/product/prd/` updated if applicable
+- [ ] relevant `docs/engineering/` bucket updated if applicable
 - [ ] No sensitive information included
 
 ## Security Check

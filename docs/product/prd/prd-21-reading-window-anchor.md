@@ -1,7 +1,7 @@
 # PRD-21 — Reading Window Anchor
 
 - PRD ID: `PRD-21`
-- Canonical file: `docs/prd/prd-21-reading-window-anchor.md`
+- Canonical file: `docs/product/prd/prd-21-reading-window-anchor.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective

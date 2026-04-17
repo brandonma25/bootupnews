@@ -1,7 +1,7 @@
 # PRD-20 — Daily Habit Loop Continuity
 
 - PRD ID: `PRD-20`
-- Canonical file: `docs/prd/prd-20-daily-habit-loop-continuity.md`
+- Canonical file: `docs/product/prd/prd-20-daily-habit-loop-continuity.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective

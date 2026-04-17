@@ -1,7 +1,7 @@
 # PRD-15 — Topic and Source Management
 
 - PRD ID: `PRD-15`
-- Canonical file: `docs/prd/prd-15-topic-source-management.md`
+- Canonical file: `docs/product/prd/prd-15-topic-and-source-management.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective

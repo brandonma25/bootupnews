@@ -35,9 +35,10 @@
 
 ## 7. Documentation Check
 - Canonical PRD updated if applicable.
+- Product brief added or updated if the feature work is meaningful.
 - `docs/product/feature-system.csv` updated if applicable.
-- Bug-fix or feature doc created if applicable.
-- Testing notes added if applicable.
+- Bug-fix, incident, or change-record doc created if applicable.
+- Testing note added if meaningful validation was performed.
 - No sensitive information is included.
 
 ## 8. Merge Readiness

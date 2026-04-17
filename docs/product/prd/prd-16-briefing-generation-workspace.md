@@ -1,7 +1,7 @@
 # PRD-16 — Briefing Generation Workspace
 
 - PRD ID: `PRD-16`
-- Canonical file: `docs/prd/prd-16-briefing-generation-workspace.md`
+- Canonical file: `docs/product/prd/prd-16-briefing-generation-workspace.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective

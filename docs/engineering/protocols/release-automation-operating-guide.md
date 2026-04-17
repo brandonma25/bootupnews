@@ -49,8 +49,8 @@
 - Enforcement:
   - docs-only changes pass when CSV validation still passes
   - trivial code changes pass when CSV validation still passes
-  - material feature or system changes require at least one supporting docs update in `docs/prd/`, `docs/testing/`, `docs/bug-fixes/`, or `docs/engineering/`
-  - new feature or system changes require a canonical `PRD-XX` file plus a matching `docs/product/feature-system.csv` mapping
+  - material feature or system changes require at least one supporting docs update in `docs/product/briefs/`, `docs/product/prd/`, `docs/engineering/bug-fixes/`, `docs/engineering/incidents/`, `docs/engineering/change-records/`, `docs/engineering/testing/`, or `docs/engineering/protocols/`
+  - new feature or system changes require a canonical `PRD-XX` file in `docs/product/prd/` plus a matching `docs/product/feature-system.csv` mapping
 
 ### 3. Preview Gate
 - Workflow: [preview-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/preview-gate.yml)
@@ -65,7 +65,7 @@
 - This gate is intended to run once the Vercel preview URL is known.
 
 ### 4. Human Auth/Session Gate
-- Checklist: [human-auth-session-gate.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/testing/human-auth-session-gate.md)
+- Checklist: [human-auth-session-gate.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/protocols/human-auth-session-gate.md)
 - Human-only truth remains required for:
   - Google OAuth/provider login
   - callback redirect correctness
@@ -84,9 +84,9 @@
 ### 6. Release Documentation Gate
 - Template scaffolder: `npm run release:docs -- --slug your-release-slug --title "Your Release Title"`
 - Reusable templates live in:
-  - [docs/testing/templates/release-testing-report-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/testing/templates/release-testing-report-template.md)
-  - [docs/bug-fixes/templates/release-bug-fix-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/bug-fixes/templates/release-bug-fix-template.md)
-  - [docs/prd/templates/release-brief-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/prd/templates/release-brief-template.md)
+  - [docs/engineering/testing/templates/release-testing-report-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/testing/templates/release-testing-report-template.md)
+  - [docs/engineering/bug-fixes/templates/release-bug-fix-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/bug-fixes/templates/release-bug-fix-template.md)
+  - [docs/product/briefs/templates/release-brief-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/product/briefs/templates/release-brief-template.md)
 
 ## Automated Versus Human
 ### Automated
@@ -126,5 +126,5 @@
 
 ## Documentation Placement
 - Release automation is governed as engineering documentation, not as a standalone PRD family.
-- Supporting architecture notes, operating guides, and rollout briefs must live in `docs/engineering/`, `docs/testing/`, or `docs/bug-fixes/` as appropriate.
-- `docs/prd/` should contain only canonical `PRD-XX` feature documents.
+- Supporting architecture notes, operating guides, and rollout briefs must live in `docs/engineering/change-records/`, `docs/engineering/protocols/`, `docs/engineering/testing/`, or `docs/engineering/bug-fixes/` as appropriate.
+- `docs/product/prd/` should contain only canonical `PRD-XX` feature documents.

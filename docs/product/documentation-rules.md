@@ -18,11 +18,15 @@ This repository uses a controlled documentation system. The goal is to keep docs
   `In Review` = implementation complete and waiting for merge or review;
   `Built` = merged or explicitly accepted as complete;
   `Deprecated` = no longer active
-- Each feature gets one canonical PRD in `docs/prd/`.
+- Each numbered feature gets one canonical PRD in `docs/product/prd/`.
 - PRDs must stay short, execution-focused, and current.
 - Small changes do not require PRDs.
-- Testing notes belong in `docs/testing/` only when they add validation context that should live outside the PRD.
-- Bug records belong in `docs/bug-fixes/` only when they capture a real defect, root cause, and fix history that should stay separate from the PRD.
+- Product briefs belong in `docs/product/briefs/` when feature work is meaningful enough to merit concise scoping before or alongside implementation.
+- Testing notes belong in `docs/engineering/testing/` only when they add validation context that should live outside the PRD.
+- Bug records belong in `docs/engineering/bug-fixes/` only when they capture a real defect, root cause, and fix history that should stay separate from the PRD.
+- Incident records belong in `docs/engineering/incidents/` only when they capture a meaningful governance, process, release, or workflow failure.
+- Change records belong in `docs/engineering/change-records/` when the work is primarily an audit, migration, consolidation, normalization, or repo-structure change.
+- Rules, checklists, and templates belong in `docs/engineering/protocols/`.
 
 ## Visibility Note
 - `docs/product/feature-system.csv` is visible if this repository is public.
@@ -33,6 +37,9 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - No versioned PRD files such as `v2`, `final`, `updated`, or `summary`.
 - No duplicate feature descriptions across product, PRD, testing, and bug-fix docs.
 - No PRDs for UI tweaks, copy edits, or minor fixes.
+- No bug-fix docs for repo audits or structural cleanup when a change record is the truthful home.
+- No testing reports in protocol folders.
+- No checklists stored as testing notes when they are actually operating standards.
 
 ## Required Workflow
 1. Check `docs/product/feature-system.csv` first.
@@ -54,9 +61,36 @@ This repository uses a controlled documentation system. The goal is to keep docs
 ## Directory Roles
 - `docs/product/`:
   Control documents and product-level rules
-- `docs/prd/`:
+- `docs/product/prd/`:
   One canonical PRD per feature
-- `docs/bug-fixes/`:
+- `docs/product/briefs/`:
+  Concise product scoping and feature briefs for meaningful work
+- `docs/engineering/bug-fixes/`:
   Concise defect-specific records
-- `docs/testing/`:
+- `docs/engineering/incidents/`:
+  Governance, process, release, or workflow incident records
+- `docs/engineering/change-records/`:
+  Audits, migrations, consolidations, and structural change history
+- `docs/engineering/testing/`:
   Concise validation notes and test reports
+- `docs/engineering/protocols/`:
+  Operating rules, templates, checklists, and governance standards
+
+## Meaningful Documentation Threshold
+- Use the smallest truthful documentation set that preserves future understanding.
+- "Meaningful" usually means one of:
+  - a multi-file or system-level feature
+  - a defect with a non-trivial root cause or follow-up risk
+  - a release or process failure that should change how the repo is operated
+  - a migration, audit, or consolidation that changes repo structure or source-of-truth rules
+  - a validation run whose details matter after the task is closed
+- Do not create standalone docs for trivial copy edits, formatting-only changes, or tiny one-line refactors unless the user explicitly asks.
+
+## Routing Guide
+1. If the work defines or scopes meaningful product behavior, create or update a brief in `docs/product/briefs/`.
+2. If the work is numbered feature work, create or update the canonical PRD in `docs/product/prd/`.
+3. If the work fixes a real defect, create or update `docs/engineering/bug-fixes/`.
+4. If the work records a meaningful process, governance, release, or workflow failure, use `docs/engineering/incidents/`.
+5. If the work primarily records an audit, migration, normalization, taxonomy cleanup, or repo-structure repair, use `docs/engineering/change-records/`.
+6. If the work records meaningful validation performed, use `docs/engineering/testing/`.
+7. If the file is a standing rule, checklist, template, or standard, use `docs/engineering/protocols/`.

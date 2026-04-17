@@ -1,7 +1,7 @@
 # PRD-14 — Auth and Session Routing
 
 - PRD ID: `PRD-14`
-- Canonical file: `docs/prd/prd-14-auth-session-routing.md`
+- Canonical file: `docs/product/prd/prd-14-auth-and-session-routing.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective

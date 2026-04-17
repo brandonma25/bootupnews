@@ -1,7 +1,7 @@
 # PRD-22 — Release Automation System
 
 - PRD ID: `PRD-22`
-- Canonical file: `docs/prd/prd-22-release-automation-system.md`
+- Canonical file: `docs/product/prd/prd-22-release-automation-system.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective
@@ -19,7 +19,7 @@
 ### Must Not Do
 - Pretend local-only validation replaces preview truth.
 - Fully automate provider-login and session-persistence checks that still require human confirmation.
-- Scatter canonical PRD ownership across multiple docs in `docs/prd/`.
+- Scatter canonical PRD ownership across multiple docs in `docs/product/prd/`.
 
 ## System Behavior
 - Serious work flows through a documented sequence of local validation, PR automation, preview validation, human auth/session checks, production verification, and release documentation.
@@ -27,8 +27,8 @@
 - Merge recommendations are blocked when required gates are incomplete.
 
 ## Key Logic
-- `docs/engineering/release-machine.md` defines the mandatory release protocol.
-- `docs/engineering/release-automation-operating-guide.md` explains the reusable release-gate architecture and external dependencies.
+- `docs/engineering/protocols/release-machine.md` defines the mandatory release protocol.
+- `docs/engineering/protocols/release-automation-operating-guide.md` explains the reusable release-gate architecture and external dependencies.
 - Repo workflows and scripts implement the automated portions of those gates.
 
 ## Risks / Limitations

@@ -3,11 +3,11 @@
 ## 1. Required Reading
 Before ANY substantial implementation work, you MUST read:
 
-- `docs/engineering/engineering-protocol.md`
-- `docs/engineering/test-checklist.md`
-- `docs/engineering/prd-template.md`
-- `docs/engineering/release-machine.md`
-- `docs/engineering/release-automation-operating-guide.md`
+- `docs/engineering/protocols/engineering-protocol.md`
+- `docs/engineering/protocols/test-checklist.md`
+- `docs/engineering/protocols/prd-template.md`
+- `docs/engineering/protocols/release-machine.md`
+- `docs/engineering/protocols/release-automation-operating-guide.md`
 
 ## Branch Discipline Rules (Mandatory)
 
@@ -53,8 +53,8 @@ The following files are serialized hotspot files:
 
 - `docs/product/feature-system.csv`
 - `AGENTS.md`
-- `docs/engineering/engineering-protocol.md`
-- `docs/engineering/prd-template.md`
+- `docs/engineering/protocols/engineering-protocol.md`
+- `docs/engineering/protocols/prd-template.md`
 - `docs/product/documentation-rules.md`
 
 Rules:
@@ -127,19 +127,19 @@ This repository uses a strict documentation system to prevent bloat and maintain
 ### PRD Rules
 - Every feature must have a unique PRD ID using the format `PRD-XX` where `XX` is the canonical numeric identifier.
 - Each PRD ID maps to exactly one canonical PRD file:
-  `/docs/prd/prd-XX-<feature-name>.md`
+  `/docs/product/prd/prd-XX-<feature-name>.md`
 - Create a PRD only for meaningful system-level or multi-file features.
-- Use `/docs/engineering/prd-template.md` when a PRD is needed.
+- Use `/docs/engineering/protocols/prd-template.md` when a PRD is needed.
 - One PRD ID equals one document. Do not create multiple PRD versions. Update the existing canonical PRD instead.
 - Before creating any PRD, Codex MUST:
-  1. check `/docs/prd/` for an existing `PRD-XX` file
+  1. check `/docs/product/prd/` for an existing `PRD-XX` file
   2. check `/docs/product/feature-system.csv` for an existing `prd_id`
   3. update the existing document instead of creating a new file when that `prd_id` already exists
 - If a new feature is created, Codex MUST:
   1. assign the next sequential `PRD-XX`
-  2. create exactly one file at `/docs/prd/prd-XX-<feature-name>.md`
+  2. create exactly one file at `/docs/product/prd/prd-XX-<feature-name>.md`
   3. register both `prd_id` and `prd_file` in `/docs/product/feature-system.csv`
-- Codex MUST NOT create “architecture”, “system”, or “brief” documents in `/docs/prd/` for an existing PRD ID.
+- Codex MUST NOT create “architecture”, “system”, or “brief” documents in `/docs/product/prd/` for an existing PRD ID.
 - If supporting documentation is needed for an existing PRD, merge it into the canonical PRD or move the content into `/docs/engineering/`.
 
 ### Feature Execution Rules
@@ -173,7 +173,23 @@ If a feature is no longer active:
 The CSV must be updated in the same PR as the feature work whenever feature state changes.
 
 ### PRD Duplication Prevention
-- Each `prd_id` in `/docs/product/feature-system.csv` must map to exactly one file in `/docs/prd/`.
-- Each PRD filename in `/docs/prd/` must include its `PRD-XX` identifier.
+- Each `prd_id` in `/docs/product/feature-system.csv` must map to exactly one file in `/docs/product/prd/`.
+- Each PRD filename in `/docs/product/prd/` must include its `PRD-XX` identifier.
 - Codex must not create multiple PRD-level documents for the same feature identity.
 - If duplicate PRD-level documentation is discovered, consolidate it into the canonical PRD or move non-PRD material into `/docs/engineering/`.
+
+### Documentation Taxonomy and Routing
+- Optimize for strict truth, not convenience. Do not keep a document in the wrong folder just to avoid churn.
+- Product control documents remain at `docs/product/`.
+- Product briefs for meaningful feature work belong in `docs/product/briefs/`.
+- Numbered feature PRDs belong in `docs/product/prd/`.
+- Meaningful defect records belong in `docs/engineering/bug-fixes/`.
+- Meaningful governance, process, release, or workflow failures belong in `docs/engineering/incidents/`.
+- Meaningful repo, documentation, audit, migration, or consolidation records belong in `docs/engineering/change-records/`.
+- Meaningful validation notes and test reports belong in `docs/engineering/testing/`.
+- Operating rules, checklists, templates, and standards belong in `docs/engineering/protocols/`.
+- "Meaningful" means work that changes behavior, coordination, validation expectations, or future maintenance understanding. Tiny copy edits, trivial renames, and purely mechanical one-line fixes do not require standalone docs.
+- When uncertain between bug-fix, incident, and change-record docs:
+  1. Use `bug-fixes` for user-facing or system-facing defects with a real root cause and fix.
+  2. Use `incidents` for process, governance, release, or operational failures that need lessons and follow-up.
+  3. Use `change-records` for audits, migrations, structural cleanup, and normalization passes.

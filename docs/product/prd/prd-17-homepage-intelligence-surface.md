@@ -1,7 +1,7 @@
 # PRD-17 — Homepage Intelligence Surface
 
 - PRD ID: `PRD-17`
-- Canonical file: `docs/prd/prd-17-homepage-intelligence-surface.md`
+- Canonical file: `docs/product/prd/prd-17-homepage-intelligence-surface.md`
 - Feature system row: update `docs/product/feature-system.csv` with matching `prd_id` and `prd_file`
 
 ## Objective

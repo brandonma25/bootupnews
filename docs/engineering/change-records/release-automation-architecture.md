@@ -28,15 +28,11 @@
   - `scripts/release-check.sh`
   - `scripts/preview-check.js`
   - `scripts/prod-check.js`
-  - `docs/engineering/release-automation-operating-guide.md`
-  - `docs/engineering/release-machine.md`
-  - `docs/testing/human-auth-session-gate.md`
-  - `docs/testing/templates/release-testing-report-template.md`
-  - `docs/bug-fixes/templates/release-bug-fix-template.md`
-  - `docs/prd/templates/release-brief-template.md`
-  - `docs/testing/release-automation-architecture.md`
-  - `docs/bug-fixes/release-automation-architecture.md`
-  - `docs/prd/release-automation-architecture.md`
+  - historical equivalents of the current protocol, testing, bug-fix, and brief templates that now live under:
+    - `docs/engineering/protocols/`
+    - `docs/engineering/testing/`
+    - `docs/engineering/bug-fixes/`
+    - `docs/product/briefs/`
   - `README.md`
   - `src/lib/data.auth.test.ts`
   - `src/components/auth/auth-modal.test.tsx`

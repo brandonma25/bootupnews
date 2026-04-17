@@ -23,24 +23,33 @@
 
 ## 3. PRD Standard
 - PRD identity is governed by a unique `PRD-XX` ID, and that ID is the single source of truth for a feature across the repo.
-- Before creating a PRD, Codex must check both `docs/prd/` and `docs/product/feature-system.csv` for an existing `PRD-XX`.
+- Before creating a PRD, Codex must check both `docs/product/prd/` and `docs/product/feature-system.csv` for an existing `PRD-XX`.
 - If the PRD ID already exists, Codex must update the existing document instead of creating a new file.
-- If the feature is new, Codex must assign the next sequential `PRD-XX`, create exactly one canonical file at `docs/prd/prd-XX-<feature-name>.md`, and register the mapping in `docs/product/feature-system.csv`.
+- If the feature is new, Codex must assign the next sequential `PRD-XX`, create exactly one canonical file at `docs/product/prd/prd-XX-<feature-name>.md`, and register the mapping in `docs/product/feature-system.csv`.
 - `docs/product/feature-system.csv` must include `prd_id` and `prd_file` so every feature maps to exactly one PRD file.
-- `docs/prd/` is reserved for canonical PRDs only. Architecture notes, system briefs, and supporting implementation docs belong in `docs/engineering/` unless they are part of the canonical PRD itself.
+- `docs/product/prd/` is reserved for canonical PRDs only. Architecture notes, system briefs, and supporting implementation docs belong in `docs/engineering/` unless they are part of the canonical PRD itself.
 - Every PRD must include:
 - Objective
+- User problem
 - Scope
-- Explicit exclusions
+- Non-goals
+- Implementation shape or system impact
+- Dependencies and risks
 - Acceptance criteria
-- Risks
-- Testing requirements
-- Risks must explicitly consider:
-- auth or session behavior
-- SSR versus client mismatch
-- environment mismatch
-- data edge cases
-- regression risk
+- Evidence and confidence note for backfilled or historically reconstructed PRDs
+
+## 3a. Documentation Routing Standard
+- Optimize for truthful minimum documentation. Do not preserve misleading folder placement just because it already exists.
+- Product control docs stay at `docs/product/`.
+- Product briefs for meaningful feature work live at `docs/product/briefs/`.
+- Canonical numbered PRDs live at `docs/product/prd/`.
+- Meaningful defect records live at `docs/engineering/bug-fixes/`.
+- Meaningful governance, process, release, or workflow failures live at `docs/engineering/incidents/`.
+- Meaningful audits, migrations, consolidations, taxonomy changes, and repo-structure updates live at `docs/engineering/change-records/`.
+- Meaningful validation reports and execution notes live at `docs/engineering/testing/`.
+- Rules, checklists, templates, and standards live at `docs/engineering/protocols/`.
+- "Meaningful" means the work materially changes behavior, implementation shape, operational expectations, or future maintenance understanding. Small copy tweaks and tiny mechanical edits do not need standalone docs.
+- If a work item needs more than one supporting doc, choose the smallest truthful set instead of duplicating the same narrative in multiple places.
 
 ## 4. Codex Prompt Standard
 - Every substantial prompt must include:
@@ -162,7 +171,7 @@ git push origin --delete feature/<name>
 - Merge only after validation and docs updates are complete.
 
 ## 10a. Governance Hotspot Workflow
-- Treat `docs/product/feature-system.csv`, `AGENTS.md`, `docs/engineering/engineering-protocol.md`, `docs/engineering/prd-template.md`, and `docs/product/documentation-rules.md` as serialized hotspot files.
+- Treat `docs/product/feature-system.csv`, `AGENTS.md`, `docs/engineering/protocols/engineering-protocol.md`, `docs/engineering/protocols/prd-template.md`, and `docs/product/documentation-rules.md` as serialized hotspot files.
 - Hotspot changes should be short-lived and should sync with `origin/main` immediately before PR creation and again before merge.
 - Avoid parallel hotspot branches when possible; if overlap exists, prefer rebasing or stacking on the latest branch instead of letting both drift.
 - If a hotspot PR becomes stale, it should usually be superseded by port-forwarding the still-needed logic into a fresh branch from `main` instead of force-merging the stale branch.
@@ -201,9 +210,13 @@ git push origin --delete feature/<name>
 
 ## 14. Expected Docs Structure
 - `docs/product/`
-- `docs/prd/`
-- `docs/bug-fixes/`
-- `docs/testing/`
+- `docs/product/prd/`
+- `docs/product/briefs/`
+- `docs/engineering/bug-fixes/`
+- `docs/engineering/incidents/`
+- `docs/engineering/change-records/`
+- `docs/engineering/testing/`
+- `docs/engineering/protocols/`
 
 ## 15. Enforcement Behavior
 - Do not recommend merge when:

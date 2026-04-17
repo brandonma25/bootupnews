@@ -197,9 +197,9 @@ npm run release:docs -- --slug your-release-slug --title "Your Release Title"
 
 This scaffolds:
 
-- `docs/prd/<slug>.md`
-- `docs/testing/<slug>.md`
-- `docs/bug-fixes/<slug>.md`
+- `docs/product/briefs/<slug>.md`
+- `docs/engineering/testing/<slug>.md`
+- `docs/engineering/bug-fixes/<slug>.md`
 
 ### GitHub Actions
 
@@ -209,7 +209,7 @@ The repo also includes:
 - Preview route validation in `.github/workflows/preview-gate.yml`
 - Post-merge production route verification in `.github/workflows/production-verification.yml`
 
-See `docs/engineering/release-automation-operating-guide.md` for the full release flow and the remaining human-only auth/session checklist.
+See `docs/engineering/protocols/release-automation-operating-guide.md` for the full release flow and the remaining human-only auth/session checklist.
 
 ## What accounts or keys you need
 
