@@ -5,6 +5,8 @@ This file defines the mandatory release system for all future feature work, bug 
 
 Codex must follow this system by default. It is not optional and must not be skipped merely because a task seems small.
 
+If this file is not followed, any merge recommendation or release recommendation is invalid.
+
 ---
 
 ## 1. When This Applies
@@ -89,11 +91,14 @@ For every serious feature, fix, consolidation, or release, Codex must update con
 ## 4. Required Commands and Entrypoints
 Codex must prefer repo entrypoints/scripts over ad hoc command sequences whenever the repo provides them.
 
-If the repo contains a local release-validation script, Codex must use it.
+Mandatory standard entrypoints:
+- `./scripts/release-check.sh`
+- `node scripts/preview-check.js <preview-url>`
+- `node scripts/prod-check.js <production-url>`
 
-If the repo contains preview or production verification scripts, Codex must use them.
+If these scripts exist, Codex must use them by default for release validation and verification.
 
-If such scripts do not yet exist, Codex may run equivalent commands, but should favor creating or improving standard entrypoints over repeating one-off command chains.
+If such scripts are missing or broken, Codex may run equivalent commands temporarily, but should favor restoring the standard entrypoints over repeating one-off command chains.
 
 ---
 
