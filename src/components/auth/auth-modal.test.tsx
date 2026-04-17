@@ -58,20 +58,16 @@ describe("AuthModal", () => {
           provider: "google",
           options: {
             redirectTo: "http://localhost:3000/auth/callback",
-            skipBrowserRedirect: true,
           },
         });
       });
-
-      await waitFor(() => {
-        expect(assignMock).toHaveBeenCalledWith("https://accounts.google.com/mock-oauth");
-      });
+      expect(assignMock).not.toHaveBeenCalled();
     },
     15000,
   );
 
   it(
-    "blocks OAuth when Supabase returns a provider URL that points back to production",
+    "does not manually redirect the browser when Supabase returns a mismatched provider callback URL",
     async () => {
       signInWithOAuth.mockResolvedValue({
         data: {
@@ -87,14 +83,16 @@ describe("AuthModal", () => {
       fireEvent.click(screen.getByRole("button", { name: /continue with google/i }));
 
       await waitFor(() => {
-        expect(
-          screen.getByText(
-            /Google sign-in is configured to return to https:\/\/app\.example\.com/i,
-          ),
-        ).toBeInTheDocument();
+        expect(signInWithOAuth).toHaveBeenCalledWith({
+          provider: "google",
+          options: {
+            redirectTo: "http://localhost:3000/auth/callback",
+          },
+        });
       });
 
       expect(assignMock).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     },
     15000,
   );

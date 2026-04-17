@@ -1,36 +1,15 @@
-# PRD Template
-
-## Title
-- 
+# PRD <number> — <feature name>
 
 ## Objective
-- 
 
 ## Problem
-- 
 
 ## Scope
-- 
 
-## Explicit Exclusions
-- 
+### Must Do
 
-## Acceptance Criteria
-- 
+### Must Not Do
 
-## Risks
-- Auth or session risk:
-- SSR versus client mismatch risk:
-- Environment mismatch risk:
-- Data edge case risk:
-- Regression risk:
+## Success Criteria
 
-## Testing Requirements
-- Local validation:
-- Preview validation when auth, env, or SSR is involved:
-- Production sanity after merge:
-
-## Documentation Updates Required
-- `docs/prd-summaries/`:
-- `docs/testing/`:
-- `docs/bug-fixes/` if applicable:
+## Done When

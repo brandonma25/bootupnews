@@ -34,7 +34,8 @@
 - Env-sensitive logic behaves correctly.
 
 ## 7. Documentation Check
-- PRD summary updated if applicable.
+- Canonical PRD updated if applicable.
+- `docs/product/feature-system.csv` updated if applicable.
 - Bug-fix or feature doc created if applicable.
 - Testing notes added if applicable.
 - No sensitive information is included.
