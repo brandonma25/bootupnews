@@ -44,6 +44,31 @@ export function buildAuthCallbackUrl({
   return `${normalizedOrigin}/auth/callback?next=${encodeURIComponent(normalizedNext)}`;
 }
 
+export function resolveRequestOrigin({
+  origin,
+  forwardedHost,
+  forwardedProto,
+  host,
+}: {
+  origin?: string | null;
+  forwardedHost?: string | null;
+  forwardedProto?: string | null;
+  host?: string | null;
+}) {
+  const normalizedOrigin = origin?.trim();
+  if (normalizedOrigin) {
+    return normalizedOrigin;
+  }
+
+  const normalizedHost = forwardedHost?.trim() || host?.trim();
+  if (!normalizedHost) {
+    return env.appUrl;
+  }
+
+  const normalizedProto = forwardedProto?.trim() || "https";
+  return `${normalizedProto}://${normalizedHost}`;
+}
+
 export function hasSupabaseSessionCookie(cookies: Array<{ name: string }>) {
   return cookies.some(
     (cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"),
