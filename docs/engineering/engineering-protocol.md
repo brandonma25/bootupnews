@@ -92,26 +92,83 @@
 - Preview remains the source of truth for auth, cookies, redirects, SSR, and environment-specific behavior.
 - Production is not a debugging ground.
 
-## 9. Git and Branch Discipline
+## 9. Branching Strategy and Branch Cleanup Policy
+- This policy exists to keep scope isolated, reduce merge confusion, prevent branch sprawl, and make it obvious which branch owns each feature, fix, or documentation update.
+- One feature or fix equals one branch.
+- Never stack new work on top of an older feature branch.
+- If branch purpose overlaps another active branch, stop and resolve branch strategy before coding.
+
+### Naming Patterns
+- `feature/prd-<number>-<short-name>`
+- `fix/<short-name>`
+- `docs/<short-name>`
+- `chore/<short-name>`
+
+### Clean Start Requirement
+- Always start clean from updated `main`.
+- Use this exact flow before creating a new branch:
+
+```bash
+cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
+pwd
+git checkout main
+git pull
+git checkout -b feature/prd-<number>-<short-name>
+```
+
+### Non-Negotiable Rules
+- Never push WIP, backup, or final-state helper branches such as `*-wip`, `*-backup`, or `*-final`.
+- If more work is needed for the same feature or fix and that branch has not been merged, continue on the same branch.
+- If the prior branch for that feature or fix has already been merged, start again from updated `main` and create the correct new branch for the next scoped task.
+- Do not create a new branch when the work actually belongs to an already-active branch for the same exact feature or fix.
+
+### Wrong vs Correct Examples
+- Wrong: implementing PRD-12 on `feature/prd-11-auth-hardening`
+- Correct: implementing PRD-12 on `feature/prd-12-<short-name>`
+- Wrong: finishing a bug fix on `fix/login-timeout-final`
+- Correct: finishing the bug fix on `fix/login-timeout`
+- Wrong: starting docs governance work on `feature/prd-18-dashboard`
+- Correct: starting docs governance work on `docs/branching-strategy-governance`
+- Wrong: creating `feature/prd-14-data-ingest-backup` because the branch feels risky
+- Correct: keep the single scoped branch and rely on commits and PR review instead of backup branches
+
+### Post-Merge Cleanup Requirement
+- Delete merged branches immediately after merge, both locally and remotely.
+- Use this exact cleanup flow:
+
+```bash
+git checkout main
+git pull
+git branch -d feature/<name>
+git push origin --delete feature/<name>
+```
+
+### Prompt Requirement For Future Development
+- Every future development prompt must explicitly state whether to use an existing branch or create a new one.
+- Every future development prompt must explicitly state the exact branch name.
+- Every future development prompt must explicitly state why that branch choice is correct.
+- Every future development prompt must explicitly state the cleanup step required after merge.
+
+## 10. Git and Branch Discipline
 - One feature or fix per branch.
 - No unrelated changes in the same branch.
 - No direct experimentation in `main`.
 - Merge only after validation and docs updates are complete.
 
-## 10. Merge Checklist
+## 11. Merge Checklist
 - Branch is correct and isolated.
 - Local validation passed.
 - Preview validation passed.
 - Docs updated.
 - No blockers remain.
 
-## 11. Debugging Protocol
+## 12. Debugging Protocol
 - Classify the environment first.
 - Classify the issue type next.
 - Fix the issue at the lowest valid layer.
 - Retest upward from local to preview to production sanity.
 
-## 12. Documentation Security Policy
+## 13. Documentation Security Policy
 - Allowed:
 - PRD summaries
 - feature briefs
@@ -130,13 +187,13 @@
 - infrastructure weaknesses
 - Decision rule: "Does this help a future maintainer more than an attacker?"
 
-## 13. Expected Docs Structure
+## 14. Expected Docs Structure
 - `docs/product/`
 - `docs/prd/`
 - `docs/bug-fixes/`
 - `docs/testing/`
 
-## 14. Enforcement Behavior
+## 15. Enforcement Behavior
 - Do not recommend merge when:
 - preview validation is missing for env, auth, cookies, redirects, or SSR work
 - required Playwright local automation has not been run for the branch scope

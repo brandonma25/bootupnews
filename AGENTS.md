@@ -9,6 +9,38 @@ Before ANY substantial implementation work, you MUST read:
 - `docs/engineering/release-machine.md`
 - `docs/engineering/release-automation-operating-guide.md`
 
+## Branch Discipline Rules (Mandatory)
+
+Before starting any new development:
+
+1. Always start from `main`.
+2. Always update `main` first.
+3. Create exactly one branch per feature/fix.
+4. Do not stack new work on old feature branches.
+5. Do not create backup branches like `*-wip`, `*-backup`, or `*-final`.
+6. If more work is needed for the same feature, continue on the same branch unless the feature has already been merged.
+7. After a PR is merged, delete the branch locally and remotely.
+8. If branch purpose is unclear or overlaps another branch, stop and resolve branch strategy before coding.
+
+Required branch creation flow:
+
+```bash
+cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
+pwd
+git checkout main
+git pull
+git checkout -b feature/prd-<number>-<short-name>
+```
+
+Required post-merge cleanup flow:
+
+```bash
+git checkout main
+git pull
+git branch -d feature/<name>
+git push origin --delete feature/<name>
+```
+
 ## 2. Scope & Branching
 - Always make an explicit branch decision.
 - Keep one feature or fix per branch.
