@@ -107,3 +107,8 @@
 - Vercel preview automation must provide a preview URL to the Preview Gate workflow.
 - GitHub repo variable `PRODUCTION_BASE_URL` should point at the canonical production URL for automatic post-merge verification.
 - No secrets are stored in repo scripts or workflows; placeholder env values are used for build-safe automation.
+
+## Documentation Placement
+- Release automation is governed as engineering documentation, not as a standalone PRD family.
+- Supporting architecture notes, operating guides, and rollout briefs must live in `docs/engineering/`, `docs/testing/`, or `docs/bug-fixes/` as appropriate.
+- `docs/prd/` should contain only canonical `PRD-XX` feature documents.

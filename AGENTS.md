@@ -100,14 +100,26 @@ git push origin --delete feature/<name>
 This repository uses a strict documentation system to prevent bloat and maintain clarity.
 
 ### Source of Truth
-- `/docs/product/feature-system.csv` is the source of truth for feature order, status, dependencies, and decisions.
+- `PRD-XX` is the single source of truth for feature identity across the repo.
+- `/docs/product/feature-system.csv` is the source of truth for feature order, status, dependencies, decisions, and PRD mapping.
 
 ### PRD Rules
-- Each feature has ONLY ONE canonical PRD file:
-  `/docs/prd/prd-<number>-<short-name>.md`
+- Every feature must have a unique PRD ID using the format `PRD-XX` where `XX` is the canonical numeric identifier.
+- Each PRD ID maps to exactly one canonical PRD file:
+  `/docs/prd/prd-XX-<feature-name>.md`
 - Create a PRD only for meaningful system-level or multi-file features.
 - Use `/docs/engineering/prd-template.md` when a PRD is needed.
-- Do not create multiple PRD versions. Update the existing canonical PRD instead.
+- One PRD ID equals one document. Do not create multiple PRD versions. Update the existing canonical PRD instead.
+- Before creating any PRD, Codex MUST:
+  1. check `/docs/prd/` for an existing `PRD-XX` file
+  2. check `/docs/product/feature-system.csv` for an existing `prd_id`
+  3. update the existing document instead of creating a new file when that `prd_id` already exists
+- If a new feature is created, Codex MUST:
+  1. assign the next sequential `PRD-XX`
+  2. create exactly one file at `/docs/prd/prd-XX-<feature-name>.md`
+  3. register both `prd_id` and `prd_file` in `/docs/product/feature-system.csv`
+- Codex MUST NOT create “architecture”, “system”, or “brief” documents in `/docs/prd/` for an existing PRD ID.
+- If supporting documentation is needed for an existing PRD, merge it into the canonical PRD or move the content into `/docs/engineering/`.
 
 ### Feature Execution Rules
 Before implementing ANY feature:
@@ -138,3 +150,9 @@ If a feature is no longer active:
 - update `decision` accordingly if explicitly instructed
 
 The CSV must be updated in the same PR as the feature work whenever feature state changes.
+
+### PRD Duplication Prevention
+- Each `prd_id` in `/docs/product/feature-system.csv` must map to exactly one file in `/docs/prd/`.
+- Each PRD filename in `/docs/prd/` must include its `PRD-XX` identifier.
+- Codex must not create multiple PRD-level documents for the same feature identity.
+- If duplicate PRD-level documentation is discovered, consolidate it into the canonical PRD or move non-PRD material into `/docs/engineering/`.
