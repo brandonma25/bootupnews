@@ -71,18 +71,20 @@ def validate_header(rows: list[list[str]], errors: list[str]) -> bool:
     if header != EXPECTED_HEADER:
         fail(
             errors,
-            "CSV header does not match the required 12-column schema and order. "
-            f"Expected exactly: {', '.join(EXPECTED_HEADER)}",
+            "CSV header mismatch.\n"
+            f"Expected: {', '.join(EXPECTED_HEADER)}\n"
+            f"Actual: {', '.join(header)}",
         )
         return False
 
     return True
 
 
-def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> None:
+def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> dict[str, str]:
     seen_prd_ids: dict[str, int] = {}
     seen_prd_files: dict[str, int] = {}
     seen_feature_names: dict[str, int] = {}
+    csv_prd_mappings: dict[str, str] = {}
 
     for row_number, row in enumerate(rows[1:], start=2):
         if row == EXPECTED_HEADER:
@@ -133,8 +135,9 @@ def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> 
         if not prd_file_match:
             fail(
                 errors,
-                f"prd_file '{prd_file}' on line {row_number} is invalid. "
-                "Use docs/prd/prd-[number]-<slug>.md.",
+                f"Invalid prd_file on line {row_number}.\n"
+                "Expected format: docs/prd/prd-[number]-<slug>.md\n"
+                f"Actual: {prd_file}",
             )
         else:
             if prd_file in seen_prd_files:
@@ -145,13 +148,15 @@ def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> 
                 )
             else:
                 seen_prd_files[prd_file] = row_number
+                csv_prd_mappings[prd_file] = prd_id
 
             prd_path = repo_root / prd_file
             if not prd_path.is_file():
                 fail(
                     errors,
-                    f"prd_file '{prd_file}' on line {row_number} does not exist in the repo. "
-                    "Create the canonical PRD file or fix the CSV path.",
+                    f"CSV row {row_number} references a missing PRD file.\n"
+                    f"Expected existing file: {prd_file}\n"
+                    f"Actual: file does not exist",
                 )
 
         if prd_id_match and prd_file_match:
@@ -160,8 +165,9 @@ def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> 
             if prd_id_number != prd_file_number:
                 fail(
                     errors,
-                    f"prd_id {prd_id} does not match prd_file {prd_file} on line {row_number}. "
-                    f"Use a file whose numeric prefix matches {prd_id}.",
+                    f"prd_id to prd_file mismatch on line {row_number}.\n"
+                    f"Expected matching number for: {prd_id}\n"
+                    f"Actual file: {prd_file}",
                 )
 
         if not is_valid_date(last_updated):
@@ -169,6 +175,29 @@ def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> 
                 errors,
                 f"Last Updated '{last_updated}' on line {row_number} is invalid. "
                 "Use YYYY-MM-DD or leave the field empty.",
+            )
+
+    return csv_prd_mappings
+
+
+def validate_prd_directory_parity(
+    repo_root: Path,
+    csv_prd_mappings: dict[str, str],
+    errors: list[str],
+) -> None:
+    prd_root = repo_root / "docs" / "prd"
+    repo_prd_files = sorted(
+        str(path.relative_to(repo_root)).replace("\\", "/")
+        for path in prd_root.glob("prd-*.md")
+        if path.is_file()
+    )
+
+    for prd_file in repo_prd_files:
+        if prd_file not in csv_prd_mappings:
+            fail(
+                errors,
+                "PRD file not registered in CSV.\n"
+                f"File: {prd_file}",
             )
 
 
@@ -179,8 +208,10 @@ def main() -> int:
     rows = load_rows(csv_path, errors)
 
     header_ok = validate_header(rows, errors) if rows else False
+    csv_prd_mappings: dict[str, str] = {}
     if rows and header_ok:
-        validate_rows(repo_root, rows, errors)
+        csv_prd_mappings = validate_rows(repo_root, rows, errors)
+        validate_prd_directory_parity(repo_root, csv_prd_mappings, errors)
 
     data_row_count = max(len(rows) - 1, 0)
     print(f"row count: {data_row_count}")
