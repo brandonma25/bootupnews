@@ -1,0 +1,4 @@
+feature_id,feature_name,canonical_prd,priority,status,build_order,decision,dependencies,last_updated,notes
+11,Ingestion reliability fallbacks,/docs/prd/prd-11-ingestion-reliability-fallbacks.md,High,Built,11,build,,2026-04-18,Resilient multi-source ingestion and fallback behavior
+12,Why this matters,/docs/prd/prd-12-why-this-matters.md,High,Built,12,build,11,2026-04-18,Canonical PRD consolidates v2 and all follow-up precision fixes
+13,Signal filtering layer,/docs/prd/prd-13-signal-filtering-layer.md,High,Built,13,build,11,2026-04-18,Deterministic filtering before clustering and ranking

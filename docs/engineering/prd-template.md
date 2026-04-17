@@ -31,6 +31,7 @@
 - Production sanity after merge:
 
 ## Documentation Updates Required
-- `docs/prd-summaries/`:
+- Canonical PRD in `docs/prd/prd-<number>-<short-name>.md`:
+- `docs/product/feature-system.csv` status update:
 - `docs/testing/`:
 - `docs/bug-fixes/` if applicable:

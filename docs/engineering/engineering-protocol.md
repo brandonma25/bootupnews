@@ -6,6 +6,7 @@
 - `test-checklist.md` = validation reference
 - `prd-template.md` = planning standard
 - `pull_request_template.md` = merge enforcement
+- `docs/product/feature-system.csv` = feature control layer and build order source of truth
 
 ## 1. Core Operating Model
 - The user is the PM and architect.
@@ -130,7 +131,8 @@
 - Decision rule: "Does this help a future maintainer more than an attacker?"
 
 ## 13. Expected Docs Structure
-- `docs/prd-summaries/`
+- `docs/product/`
+- `docs/prd/`
 - `docs/bug-fixes/`
 - `docs/testing/`
 

@@ -61,3 +61,53 @@ Before ANY substantial implementation work, you MUST read:
 
 ## 8. Merge Conditions
 - Do not recommend merge unless build passes, local validation is complete, preview validation is confirmed, and docs are updated.
+
+## DOCUMENTATION SYSTEM RULE (MANDATORY)
+
+This repository uses a strict documentation system to prevent bloat and maintain clarity.
+
+### Source of Truth
+- `/docs/product/feature-system.csv` is the ONLY source of truth for:
+  - feature list
+  - priority
+  - status
+  - build order
+  - decision (build / delay / kill)
+  - dependencies
+
+### PRD Rules
+- Each feature has ONLY ONE canonical PRD file:
+  `/docs/prd/prd-<number>-<short-name>.md`
+- DO NOT create multiple PRD versions (no v2, final, updated files)
+- If a PRD needs changes, UPDATE the existing file instead of creating a new one
+
+### When to Create a PRD
+Create a PRD ONLY if:
+- the feature is system-level or multi-file
+- the feature affects architecture or logic
+
+DO NOT create PRDs for:
+- UI tweaks
+- copy changes
+- minor fixes
+
+### Feature Execution Rules
+Before implementing ANY feature:
+1. Read `/docs/product/feature-system.csv`
+2. Select the next feature where:
+   - `decision = build`
+   - lowest `build_order`
+
+After implementation:
+1. Update:
+   - status → Built
+   - last_updated
+2. Commit the updated CSV
+
+### Anti-Bloat Rule
+- DO NOT create redundant documentation
+- DO NOT duplicate feature descriptions across files
+- DO NOT create “summary”, “final”, or “v2” files
+
+### Principle
+One feature = one source of truth
