@@ -22,6 +22,12 @@
 - One task should stay scoped to one layer unless the user explicitly approves cross-layer work.
 
 ## 3. PRD Standard
+- PRD identity is governed by a unique `PRD-XX` ID, and that ID is the single source of truth for a feature across the repo.
+- Before creating a PRD, Codex must check both `docs/prd/` and `docs/product/feature-system.csv` for an existing `PRD-XX`.
+- If the PRD ID already exists, Codex must update the existing document instead of creating a new file.
+- If the feature is new, Codex must assign the next sequential `PRD-XX`, create exactly one canonical file at `docs/prd/prd-XX-<feature-name>.md`, and register the mapping in `docs/product/feature-system.csv`.
+- `docs/product/feature-system.csv` must include `prd_id` and `prd_file` so every feature maps to exactly one PRD file.
+- `docs/prd/` is reserved for canonical PRDs only. Architecture notes, system briefs, and supporting implementation docs belong in `docs/engineering/` unless they are part of the canonical PRD itself.
 - Every PRD must include:
 - Objective
 - Scope

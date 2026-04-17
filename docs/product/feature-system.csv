@@ -1,6 +1,6 @@
 # WARNING: This file contains product roadmap and prioritization logic.
 # Do not expose sensitive strategic details if this repo is public.
-layer,feature_name,priority,status,description,owner,dependency,build_order,decision,last_updated
-Intelligence,Ingestion reliability fallbacks,High,Built,Resilient multi-source ingestion and fallback behavior,Codex,None,11,keep,2026-04-18
-Intelligence,Why this matters,High,Built,Canonical PRD consolidates the analytical generation path and follow-up precision fixes,Codex,Ingestion reliability fallbacks,12,keep,2026-04-18
-Intelligence,Signal filtering layer,High,Built,Deterministic filtering before clustering and ranking,Codex,Ingestion reliability fallbacks,13,keep,2026-04-18
+layer,feature_name,prd_id,prd_file,priority,status,description,owner,dependency,build_order,decision,last_updated
+Intelligence,Ingestion reliability fallbacks,PRD-11,docs/prd/prd-11-ingestion-reliability-fallbacks.md,High,Built,Resilient multi-source ingestion and fallback behavior,Codex,None,11,keep,2026-04-18
+Intelligence,Why this matters,PRD-12,docs/prd/prd-12-why-this-matters.md,High,Built,Canonical PRD consolidates the analytical generation path and follow-up precision fixes,Codex,Ingestion reliability fallbacks,12,keep,2026-04-18
+Intelligence,Signal filtering layer,PRD-13,docs/prd/prd-13-signal-filtering-layer.md,High,Built,Deterministic filtering before clustering and ranking,Codex,Ingestion reliability fallbacks,13,keep,2026-04-18

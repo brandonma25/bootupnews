@@ -1,4 +1,4 @@
-# PRD 12 — Why This Matters
+# PRD-12 — Why This Matters
 
 ## Objective
 - Generate concise, causal `why_it_matters` explanations that stay specific to the event.

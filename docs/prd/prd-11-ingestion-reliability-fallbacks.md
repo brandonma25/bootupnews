@@ -1,4 +1,4 @@
-# PRD 11 — Ingestion Reliability Fallbacks
+# PRD-11 — Ingestion Reliability Fallbacks
 
 ## Objective
 - Keep Finance, Politics, and Tech sections from rendering blank.

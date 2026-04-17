@@ -1,4 +1,4 @@
-# PRD 13: Signal Filtering Layer
+# PRD-13 — Signal Filtering Layer
 
 ## Objective
 - Add a deterministic filtering layer between ingestion/normalization and clustering/ranking so low-value stories are less likely to reach briefing surfaces.
