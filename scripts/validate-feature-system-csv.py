@@ -23,15 +23,16 @@ EXPECTED_HEADER = [
     "prd_id",
     "prd_file",
 ]
-
-PRD_ID_RE = re.compile(r"^PRD-\d+$")
+EXPECTED_COLUMN_COUNT = len(EXPECTED_HEADER)
+PRD_ID_RE = re.compile(r"^PRD-(\d+)$")
+PRD_FILE_RE = re.compile(r"^docs/prd/prd-(\d+)-[a-z0-9-]+\.md$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def is_valid_date(value: str) -> bool:
     if value == "":
         return True
-    if not DATE_RE.match(value):
+    if not DATE_RE.fullmatch(value):
         return False
     try:
         datetime.strptime(value, "%Y-%m-%d")
@@ -40,131 +41,159 @@ def is_valid_date(value: str) -> bool:
     return True
 
 
-def main() -> int:
-    repo_root = Path(__file__).resolve().parent.parent
-    csv_path = repo_root / "docs" / "product" / "feature-system.csv"
+def fail(errors: list[str], message: str) -> None:
+    errors.append(f"FAIL: {message}")
 
-    schema_ok = True
-    row_integrity_ok = True
-    prd_id_uniqueness_ok = True
-    prd_file_existence_ok = True
-    date_format_ok = True
-    feature_name_uniqueness_ok = True
-    parse_ok = True
-    total_rows = 0
-    errors: list[str] = []
 
+def load_rows(csv_path: Path, errors: list[str]) -> list[list[str]]:
     try:
         with csv_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.reader(handle, strict=True)
-            rows = list(reader)
+            return list(reader)
     except (csv.Error, OSError) as exc:
-        parse_ok = False
-        errors.append(f"Invalid CSV parsing: {exc}")
-        rows = []
+        fail(
+            errors,
+            f"Unable to parse docs/product/feature-system.csv because the CSV is malformed. "
+            f"Fix malformed quoting or row structure. Parser error: {exc}",
+        )
+        return []
 
-    if parse_ok:
-        if not rows:
-            schema_ok = False
-            row_integrity_ok = False
-            errors.append("CSV is empty.")
+
+def validate_header(rows: list[list[str]], errors: list[str]) -> bool:
+    if not rows:
+        fail(
+            errors,
+            "docs/product/feature-system.csv is empty. Add the exact 12-column header row and at least one data row.",
+        )
+        return False
+
+    header = rows[0]
+    if header != EXPECTED_HEADER:
+        fail(
+            errors,
+            "CSV header does not match the required 12-column schema and order. "
+            f"Expected exactly: {', '.join(EXPECTED_HEADER)}",
+        )
+        return False
+
+    return True
+
+
+def validate_rows(repo_root: Path, rows: list[list[str]], errors: list[str]) -> None:
+    seen_prd_ids: dict[str, int] = {}
+    seen_prd_files: dict[str, int] = {}
+    seen_feature_names: dict[str, int] = {}
+
+    for row_number, row in enumerate(rows[1:], start=2):
+        if row == EXPECTED_HEADER:
+            fail(
+                errors,
+                f"Duplicate header row found at line {row_number}. Remove repeated header rows so only the first line is the header.",
+            )
+            continue
+
+        if len(row) != EXPECTED_COLUMN_COUNT:
+            fail(
+                errors,
+                f"Row {row_number} has {len(row)} columns instead of {EXPECTED_COLUMN_COUNT}. "
+                "Fix quoting or delimiters so every row has exactly 12 columns.",
+            )
+            continue
+
+        feature_name = row[1].strip()
+        last_updated = row[9].strip()
+        prd_id = row[10].strip()
+        prd_file = row[11].strip()
+
+        if feature_name in seen_feature_names:
+            fail(
+                errors,
+                f"Feature Name '{feature_name}' is duplicated on lines {seen_feature_names[feature_name]} and {row_number}. "
+                "Use one unique Feature Name per row.",
+            )
         else:
-            header = rows[0]
-            if header != EXPECTED_HEADER:
-                schema_ok = False
-                errors.append(
-                    "Header mismatch. Expected: " + ", ".join(EXPECTED_HEADER)
+            seen_feature_names[feature_name] = row_number
+
+        prd_id_match = PRD_ID_RE.fullmatch(prd_id)
+        if not prd_id_match:
+            fail(
+                errors,
+                f"prd_id '{prd_id}' on line {row_number} is invalid. Use the format PRD-[number], for example PRD-14.",
+            )
+        elif prd_id in seen_prd_ids:
+            fail(
+                errors,
+                f"prd_id '{prd_id}' is duplicated on lines {seen_prd_ids[prd_id]} and {row_number}. "
+                "Each PRD ID must appear exactly once in the CSV.",
+            )
+        else:
+            seen_prd_ids[prd_id] = row_number
+
+        prd_file_match = PRD_FILE_RE.fullmatch(prd_file)
+        if not prd_file_match:
+            fail(
+                errors,
+                f"prd_file '{prd_file}' on line {row_number} is invalid. "
+                "Use docs/prd/prd-[number]-<slug>.md.",
+            )
+        else:
+            if prd_file in seen_prd_files:
+                fail(
+                    errors,
+                    f"prd_file '{prd_file}' is duplicated on lines {seen_prd_files[prd_file]} and {row_number}. "
+                    "Each canonical PRD file must map to exactly one CSV row.",
+                )
+            else:
+                seen_prd_files[prd_file] = row_number
+
+            prd_path = repo_root / prd_file
+            if not prd_path.is_file():
+                fail(
+                    errors,
+                    f"prd_file '{prd_file}' on line {row_number} does not exist in the repo. "
+                    "Create the canonical PRD file or fix the CSV path.",
                 )
 
-            seen_prd_ids: dict[str, int] = {}
-            seen_feature_names: dict[str, int] = {}
+        if prd_id_match and prd_file_match:
+            prd_id_number = prd_id_match.group(1)
+            prd_file_number = prd_file_match.group(1)
+            if prd_id_number != prd_file_number:
+                fail(
+                    errors,
+                    f"prd_id {prd_id} does not match prd_file {prd_file} on line {row_number}. "
+                    f"Use a file whose numeric prefix matches {prd_id}.",
+                )
 
-            for row_number, row in enumerate(rows[1:], start=2):
-                total_rows += 1
+        if not is_valid_date(last_updated):
+            fail(
+                errors,
+                f"Last Updated '{last_updated}' on line {row_number} is invalid. "
+                "Use YYYY-MM-DD or leave the field empty.",
+            )
 
-                if len(row) != len(EXPECTED_HEADER):
-                    row_integrity_ok = False
-                    errors.append(
-                        f"Row {row_number} has {len(row)} columns; expected {len(EXPECTED_HEADER)}."
-                    )
-                    continue
 
-                feature_name = row[1].strip()
-                status = row[3].strip()
-                last_updated = row[9].strip()
-                prd_id = row[10].strip()
-                prd_file = row[11].strip()
+def main() -> int:
+    repo_root = Path(__file__).resolve().parent.parent
+    csv_path = repo_root / "docs" / "product" / "feature-system.csv"
+    errors: list[str] = []
+    rows = load_rows(csv_path, errors)
 
-                if feature_name in seen_feature_names:
-                    feature_name_uniqueness_ok = False
-                    errors.append(
-                        f"Duplicate feature name '{feature_name}' on rows {seen_feature_names[feature_name]} and {row_number}."
-                    )
-                else:
-                    seen_feature_names[feature_name] = row_number
+    header_ok = validate_header(rows, errors) if rows else False
+    if rows and header_ok:
+        validate_rows(repo_root, rows, errors)
 
-                requires_prd_mapping = status == "Built"
+    data_row_count = max(len(rows) - 1, 0)
+    print(f"row count: {data_row_count}")
+    print(f"header columns: {EXPECTED_COLUMN_COUNT}")
+    print(f"schema enforced: {'PASS' if not errors else 'FAIL'}")
 
-                if prd_id:
-                    if not PRD_ID_RE.match(prd_id):
-                        row_integrity_ok = False
-                        errors.append(
-                            f"Row {row_number} has invalid prd_id '{prd_id}'. Expected PRD-[number]."
-                        )
-                    elif prd_id in seen_prd_ids:
-                        prd_id_uniqueness_ok = False
-                        errors.append(
-                            f"Duplicate prd_id '{prd_id}' on rows {seen_prd_ids[prd_id]} and {row_number}."
-                        )
-                    else:
-                        seen_prd_ids[prd_id] = row_number
-                elif requires_prd_mapping:
-                    row_integrity_ok = False
-                    errors.append(f"Row {row_number} is Built but missing prd_id.")
-
-                if prd_file:
-                    prd_path = repo_root / prd_file
-                    if not prd_path.is_file():
-                        prd_file_existence_ok = False
-                        errors.append(
-                            f"Row {row_number} references missing prd_file '{prd_file}'."
-                        )
-                elif requires_prd_mapping:
-                    prd_file_existence_ok = False
-                    errors.append(f"Row {row_number} is Built but missing prd_file.")
-
-                if not is_valid_date(last_updated):
-                    date_format_ok = False
-                    errors.append(
-                        f"Row {row_number} has invalid Last Updated '{last_updated}'. Expected YYYY-MM-DD or empty."
-                    )
-
-    overall_ok = all(
-        [
-            parse_ok,
-            schema_ok,
-            row_integrity_ok,
-            prd_id_uniqueness_ok,
-            prd_file_existence_ok,
-            date_format_ok,
-            feature_name_uniqueness_ok,
-        ]
-    )
-
-    print(f"total rows: {total_rows}")
-    print(f"schema match: {'PASS' if schema_ok and parse_ok else 'FAIL'}")
-    print(f"row integrity: {'PASS' if row_integrity_ok and parse_ok else 'FAIL'}")
-    print(f"prd_id uniqueness: {'PASS' if prd_id_uniqueness_ok and parse_ok else 'FAIL'}")
-    print(f"prd_file existence: {'PASS' if prd_file_existence_ok and parse_ok else 'FAIL'}")
-    print(f"feature name uniqueness: {'PASS' if feature_name_uniqueness_ok and parse_ok else 'FAIL'}")
-    print(f"date format: {'PASS' if date_format_ok and parse_ok else 'FAIL'}")
-
-    if not overall_ok:
+    if errors:
         print("")
         for error in errors:
-            print(f"ERROR: {error}")
+            print(error)
         return 1
 
+    print("PASS: docs/product/feature-system.csv matches the strict 12-column schema and semantic PRD mapping rules.")
     return 0
 
 

@@ -24,8 +24,8 @@ RELEVANT_DOC_PREFIXES = (
     "docs/bug-fixes/",
     "docs/engineering/",
 )
-CANONICAL_PRD_PREFIX = "docs/prd/prd-"
 CSV_PATH = "docs/product/feature-system.csv"
+PRD_DIR = "docs/prd"
 TRIVIAL_MAX_CHANGED_LINES = 15
 
 
@@ -132,7 +132,7 @@ def is_test_file(path: str) -> bool:
 
 
 def is_canonical_prd(path: str) -> bool:
-    return path.startswith(CANONICAL_PRD_PREFIX) and path.endswith(".md")
+    return path.startswith("docs/prd/prd-") and path.endswith(".md")
 
 
 def classify_pr(changes: dict[str, Change]) -> tuple[str, list[Change], list[Change], list[str]]:
@@ -186,6 +186,45 @@ def load_csv_mappings(repo_root: Path) -> dict[str, str]:
     return mappings
 
 
+def load_repo_prd_files(repo_root: Path) -> list[str]:
+    prd_root = repo_root / PRD_DIR
+    return sorted(
+        str(path.relative_to(repo_root)).replace("\\", "/")
+        for path in prd_root.glob("prd-*.md")
+        if path.is_file()
+    )
+
+
+def validate_prd_csv_consistency(repo_root: Path) -> list[str]:
+    errors: list[str] = []
+    csv_mappings = load_csv_mappings(repo_root)
+    repo_prd_files = load_repo_prd_files(repo_root)
+
+    for prd_file, prd_id in sorted(csv_mappings.items()):
+        prd_path = repo_root / prd_file
+        if not prd_path.is_file():
+            errors.append(
+                f"FAIL: CSV entry {prd_id} references missing prd_file {prd_file}. "
+                "Create the canonical PRD file or fix the CSV path."
+            )
+
+    for prd_file in repo_prd_files:
+        if prd_file not in csv_mappings:
+            errors.append(
+                f"FAIL: Orphan PRD {prd_file} is not mapped in docs/product/feature-system.csv. "
+                "Add a matching CSV row with prd_id and prd_file."
+            )
+
+    for prd_file in csv_mappings:
+        if prd_file not in repo_prd_files:
+            errors.append(
+                f"FAIL: Orphan CSV entry references {prd_file}, but that canonical PRD file does not exist. "
+                "Create the file or remove/fix the CSV row."
+            )
+
+    return errors
+
+
 def fail(message: str, extra: str | None = None) -> int:
     print(f"FAIL: {message}")
     if extra:
@@ -199,57 +238,78 @@ def main() -> int:
     repo_root = args.repo_root.resolve()
     diff_range = get_diff_range(args.base_sha, args.head_sha)
 
+    csv_ok, csv_output = run_csv_validator(repo_root)
+    if not csv_ok:
+        return fail(
+            "docs/product/feature-system.csv failed strict schema validation.",
+            csv_output,
+        )
+
     try:
         changes = load_changes(repo_root, diff_range)
     except RuntimeError as exc:
         return fail(f"Unable to inspect PR diff for range {diff_range}", str(exc))
 
-    csv_ok, csv_output = run_csv_validator(repo_root)
-    if not csv_ok:
-        return fail("docs/product/feature-system.csv validation failed", csv_output)
+    consistency_errors = validate_prd_csv_consistency(repo_root)
+    if consistency_errors:
+        return fail(
+            "PRD and CSV consistency checks failed.",
+            "\n".join(consistency_errors),
+        )
 
     classification, monitored_changes, non_test_monitored, new_prd_files = classify_pr(changes)
     changed_paths = sorted(changes)
     relevant_doc_updates = [path for path in changed_paths if is_relevant_doc_file(path)]
-    csv_changed = CSV_PATH in changes
+    full_validation_triggered = CSV_PATH in changes or any(
+        path.startswith("docs/prd/") for path in changed_paths
+    )
 
     print(f"classification: {classification}")
+    print(f"full validation: {'triggered' if full_validation_triggered else 'always-on baseline checks only'}")
     if changed_paths:
         print("changed files:")
         for path in changed_paths:
             print(f"- {path}")
 
     if classification == "docs-only":
-        print("PASS: Docs-only change")
+        print("PASS: Docs-only change with valid CSV schema and PRD/CSV consistency.")
         return 0
 
     if classification == "trivial-code-change":
-        print("PASS: Trivial code change with no governance artifacts required")
+        print("PASS: Trivial code change with valid governance artifacts.")
         return 0
 
     if classification == "new-feature-or-system":
         if not new_prd_files:
-            return fail("New feature/system change detected but no canonical PRD found in docs/prd/")
-        if not csv_changed:
-            return fail("PRD added but feature-system.csv was not updated")
+            return fail(
+                "New feature or system change detected, but no canonical PRD was added in docs/prd/.",
+                "How to fix: add one canonical docs/prd/prd-XX-<slug>.md file and map it in docs/product/feature-system.csv.",
+            )
 
         csv_mappings = load_csv_mappings(repo_root)
         for prd_file in new_prd_files:
             if prd_file not in csv_mappings:
                 return fail(
-                    f"PRD added but feature-system.csv is missing a mapping for {prd_file}"
+                    f"New PRD file {prd_file} is missing from docs/product/feature-system.csv.",
+                    "How to fix: add a CSV row with the matching prd_id and prd_file.",
                 )
 
         if not relevant_doc_updates:
-            return fail("New feature/system change detected but no supporting docs were updated")
+            return fail(
+                "New feature or system change detected, but no supporting governance docs were updated.",
+                "How to fix: add the canonical PRD and any supporting docs required for the change scope.",
+            )
 
-        print("PASS: New feature/system change includes PRD, CSV alignment, and supporting docs")
+        print("PASS: New feature/system change includes canonical PRD mapping and supporting docs.")
         return 0
 
     if monitored_changes and not relevant_doc_updates:
-        return fail("Material feature change detected but no supporting docs were updated")
+        return fail(
+            "Material feature change detected, but no supporting docs were updated.",
+            "How to fix: update docs/prd, docs/testing, docs/bug-fixes, or docs/engineering to reflect the change.",
+        )
 
-    print("PASS: Material feature change includes required supporting docs and valid governance artifacts")
+    print("PASS: Material feature change includes required supporting docs and strict governance checks passed.")
     return 0
 
 
