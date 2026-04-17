@@ -8,43 +8,51 @@
 - `npm run lint`
 - `npm run build`
 - `npm run test`
+- `pwd`
+- `ps aux | rg "next dev|node .*3000|npm run dev"`
+- `lsof -iTCP:3000 -sTCP:LISTEN -n -P`
+- `kill 35841 35860 35861`
+- `npm run dev -- --hostname 127.0.0.1`
 - `npx playwright test`
-- `npm run dev`
-- `curl -I -s http://localhost:3000`
-- `curl -I -s http://localhost:3000/dashboard`
 
 ## Results
 - `npm install`
-  Passed. One high-severity vulnerability remains in the dependency audit output.
+  Passed. Dependency audit still reports `1 high severity vulnerability`.
 - `npm run lint`
-  Failed with known `react-hooks/set-state-in-effect` errors in `src/components/app-shell.tsx`.
+  Passed.
 - `npm run build`
-  Passed after each accepted merge step and in the final branch state.
+  Passed.
 - `npm run test`
-  Failed.
-  Persistent failing areas:
-  - `src/lib/data.auth.test.ts`
-  - `src/components/auth/auth-modal.test.tsx`
-  - `src/lib/data.test.ts`
+  Passed.
+  - `24` test files passed
+  - `113` tests passed
 - `npx playwright test`
-  Failed in this environment because Chromium/Firefox/WebKit could not launch under local macOS sandbox restrictions.
+  Passed once the repo dev server was running on port `3000`.
+  - `9` tests passed across Chromium, Firefox, and WebKit
 - Local dev run
   Passed.
   Local URL:
-  - `http://localhost:3000`
+  - `http://127.0.0.1:3000`
 - Local smoke
-  - `/` returned HTTP `200`
-  - `/dashboard` terminal curl check did not complete successfully in this environment
+  Passed through Playwright route coverage:
+  - homepage `/`
+  - signed-out dashboard `/dashboard`
+  - homepage sign-in entry flow
 
 ## Validation Status
 - Install: Passed
-- Lint: Failed
+- Lint: Passed
 - Build: Passed
-- Tests: Failed
-- Playwright / E2E: Failed in environment
+- Tests: Passed
+- Playwright / E2E: Passed
 - Local run: Passed
-- Local smoke: Passed with limitation
+- Local smoke: Passed
 
-## Preview / Production Notes
-- Preview validation was not run in this session.
-- Auth-, redirect-, session-, SSR-, and env-sensitive work still require preview and human validation before any merge-to-main recommendation.
+## Playwright Note
+- This repo does not auto-start its web server for Playwright unless `PLAYWRIGHT_MANAGED_WEBSERVER` is set.
+- Without a running dev server, `npx playwright test` fails with connection-refused errors rather than app assertions.
+
+## Final Merge Gate Status
+- Local merge gate: Passed
+- Preview validation in this session: Not run
+- Final merge decision in this report: Deferred to repo operating rules for preview confirmation

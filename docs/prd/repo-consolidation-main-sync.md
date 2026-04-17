@@ -12,6 +12,8 @@
   Added follow-up precision/routing fixes for the `why-it-matters` generation path.
 - `feature/signal-filtering-layer`
   Added the PRD 13 signal-filtering layer, tests, docs, and a schema migration.
+- Stabilization pass
+  Fixed the post-consolidation lint blocker in `app-shell`, aligned stale data-layer tests with the consolidated implementation, and reran the full local validation workflow.
 
 ## Intentionally Excluded
 - `feature/auth-preview-host-fix`
@@ -24,7 +26,14 @@
   Current feature work is still uncommitted in another worktree and was not safe to consolidate.
 
 ## Current Merge Readiness
-- This branch is a controlled consolidation checkpoint, not a merge-to-main recommendation yet.
-- Local build passes.
-- Local lint and unit tests still report unresolved failures.
-- Preview validation remains required for auth- or env-sensitive branches that were intentionally excluded.
+- This branch is now locally stable:
+  - build passes
+  - lint passes
+  - unit tests pass
+  - local Playwright passes
+- Intentionally excluded branches remain excluded:
+  - `feature/auth-preview-host-fix`
+  - `feature/importance-scoring-engine-v1`
+- Main branch update in this pass:
+  - not yet performed in this document
+- Preview validation remains the only repo-process question left for a final merge-to-main decision.

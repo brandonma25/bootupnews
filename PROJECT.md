@@ -218,6 +218,38 @@ When updating this file:
 - `README.md`
 - `QA-LIVE-TEST-2026-04-15.md`
 - `src/components/auth/auth-modal.test.tsx`
+
+### [2026-04-17 11:01] — Consolidation Branch Stabilization Pass
+
+**Agent:**
+- Codex
+
+**Problem addressed:**
+- The consolidation branch was blocked from merge review by one lint failure in the app shell, stale data-layer tests, and unclear local Playwright execution behavior.
+
+**Root cause:**
+- `src/components/app-shell.tsx` restored UI state and closed mobile navigation by setting state inside effects, which tripped the repo's hook lint rules.
+- `src/lib/data.test.ts` still asserted older fallback retry behavior and relied on legacy `__testing__` helpers that are no longer exported after the consolidation merges.
+- Playwright was configured to use an already-running local dev server unless `PLAYWRIGHT_MANAGED_WEBSERVER` is set, so ad hoc reruns without a server produced connection-refused failures.
+
+**Change made:**
+- Replaced the app-shell sidebar hydration effect with a lazy browser-only state initializer and removed the redundant hydration state.
+- Removed the route-change mobile-close effect and relied on the existing mobile navigation close handlers.
+- Updated `src/lib/data.test.ts` to match the consolidated fallback fetch behavior and removed obsolete tests tied to legacy helper exports.
+- Re-ran the full local validation workflow, including lint, build, unit tests, local dev run, and Playwright smoke coverage across Chromium, Firefox, and WebKit.
+- Refreshed the consolidation bug-fix, testing, and PRD summary documents with the stabilized branch status.
+
+**Files modified:**
+- `src/components/app-shell.tsx`
+- `src/lib/data.test.ts`
+- `docs/bug-fixes/repo-consolidation-main-sync.md`
+- `docs/testing/repo-consolidation-main-sync.md`
+- `docs/prd/repo-consolidation-main-sync.md`
+- `PROJECT.md`
+
+**Remaining risks / next steps:**
+- Dependency audit output still reports one high-severity vulnerability that was not changed in this pass.
+- Final merge-to-main should still respect the repo operating rule around preview confirmation before a release recommendation.
 - `docs/bug-fixes/repo-hygiene-sanity-check.md`
 - `PROJECT.md`
 

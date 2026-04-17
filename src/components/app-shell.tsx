@@ -36,6 +36,14 @@ const navItems = [
 
 const DESKTOP_SIDEBAR_KEY = "daily-intel-sidebar-collapsed";
 
+function getInitialDesktopCollapsed() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(DESKTOP_SIDEBAR_KEY) === "true";
+}
+
 export function AppShell({
   children,
   currentPath,
@@ -47,25 +55,12 @@ export function AppShell({
   mode: "demo" | "live" | "public";
   account?: ViewerAccount | null;
 }) {
-  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(getInitialDesktopCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(DESKTOP_SIDEBAR_KEY);
-    setDesktopCollapsed(stored === "true");
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
     window.localStorage.setItem(DESKTOP_SIDEBAR_KEY, String(desktopCollapsed));
-  }, [desktopCollapsed, hydrated]);
-
-  // Close mobile nav on route change / resize
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [currentPath]);
+  }, [desktopCollapsed]);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1440px] gap-4 px-4 py-4 lg:px-6">
