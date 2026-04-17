@@ -44,6 +44,12 @@ create table if not exists public.articles (
   summary_text text,
   published_at timestamptz,
   dedupe_key text,
+  source_tier text check (source_tier in ('tier1', 'tier2', 'tier3', 'unknown')),
+  headline_quality text check (headline_quality in ('strong', 'medium', 'weak')),
+  event_type text,
+  filter_decision text check (filter_decision in ('pass', 'suppress', 'reject')),
+  filter_reasons jsonb not null default '[]'::jsonb,
+  filter_evaluated_at timestamptz,
   created_at timestamptz not null default now()
 );
 

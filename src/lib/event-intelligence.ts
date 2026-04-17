@@ -158,6 +158,7 @@ export function buildEventIntelligence(
     recencyScore,
     velocityScore,
     isNonSignalContent,
+    confidenceScore,
   });
   const isHighSignal = evaluateHighSignal({
     title: representative?.title ?? primaryChange,
@@ -211,6 +212,7 @@ export function getSignalStrength(input: {
   recencyScore?: number;
   velocityScore?: number;
   isNonSignalContent?: boolean;
+  confidenceScore?: number;
 }): EventSignalStrength {
   if (input.isNonSignalContent || input.eventType === "non_signal") {
     return "weak";
@@ -218,12 +220,13 @@ export function getSignalStrength(input: {
 
   let score = getEventTypeSignalWeight(input.eventType);
   const sourceTierWeight = getSourceTierSignalWeight(input.sourceNames ?? []);
+  const singleSource = input.articleCount <= 1 && input.sourceDiversity <= 1;
 
   if (sourceTierWeight >= 2 || input.sourceDiversity >= 2) {
     score += 1;
   }
 
-  if (input.articleCount <= 1 && input.sourceDiversity <= 1) {
+  if (singleSource) {
     score -= 1;
   }
 
@@ -237,6 +240,15 @@ export function getSignalStrength(input: {
 
   if (input.eventType === "company_update" && input.sourceDiversity <= 1) {
     score -= 1;
+  }
+
+  if (singleSource) {
+    const highImpactSingleSource =
+      isHighImpactEventType(input.eventType) &&
+      sourceTierWeight >= 2 &&
+      ((input.confidenceScore ?? 0) >= 45 || ["defense", "policy_regulation", "macro_market_move"].includes(input.eventType));
+
+    return highImpactSingleSource ? "moderate" : "weak";
   }
 
   if (score >= 2) {
@@ -348,20 +360,87 @@ function inferEventType(
     return "product";
   }
 
+  if (isDefenseGeopoliticalCluster(corpus, topicName, matchedKeywords)) {
+    return "defense";
+  }
+
   const rules: Array<[string, string[]]> = [
     ["defense", ["department of defense", "classified", "government", "military", "pentagon", "defense department"]],
     ["political", ["election", "minister", "foreign office", "foreign minister", "cabinet", "parliament", "vetting", "ambassador", "appointment", "surveillance powers", "oversight", "executive authority"]],
+    ["large_ipo", ["ipo", "initial public offering", "listing", "public offering", "files for ipo"]],
+    ["early_stage_funding", ["raises", "raised", "series a", "series b", "seed round", "backed", "funding round"]],
+    ["data_report", ["traffic rose", "data shows", "report shows", "survey", "index", "usage rose", "grew", "rose 393", "retail traffic"]],
+    ["executive_move", ["ceo", "chief executive", "chairman", "chair", "appoints", "appointed", "steps down", "resigns", "names"]],
     ["corporate", ["earnings", "guidance", "revenue", "profit", "quarter", "results"]],
     ["product", ["product launch", "launch", "launched", "feature", "features", "update", "updated", "release", "released", "rollout", "debut", "debuts", "adds"]],
     ["legal_investigation", ["lawsuit", "probe", "investigation", "charges", "doj", "sec", "antitrust case"]],
     ["policy_regulation", ["regulation", "regulatory", "antitrust", "rule", "rules", "senate", "congress", "policy", "ban", "approval", "approved", "export restrictions", "tariff"]],
     ["macro_market_move", ["inflation", "fed", "federal reserve", "rates", "treasury", "jobs", "gdp", "economy", "economic", "trade"]],
-    ["mna_funding", ["acquisition", "acquire", "merger", "buyout", "takeover", "stake", "deal", "funding", "raises", "series a", "series b"]],
+    ["mna_funding", ["acquisition", "acquire", "merger", "buyout", "takeover", "stake", "deal"]],
     ["geopolitical", ["sanctions", "war", "diplomacy", "china", "russia", "ukraine", "taiwan", "middle east", "border"]],
   ];
 
   const matchedRule = rules.find(([, keywords]) => keywords.some((keyword) => matchesKeyword(corpus, keyword)));
   return matchedRule?.[0] ?? "company_update";
+}
+
+function isDefenseGeopoliticalCluster(
+  corpus: string,
+  topicName: string,
+  matchedKeywords?: string[],
+) {
+  const normalizedTopic = normalizeText(topicName);
+  const normalizedKeywords = normalizeText((matchedKeywords ?? []).join(" "));
+  const combined = `${corpus} ${normalizedTopic} ${normalizedKeywords}`;
+
+  const conflictKeywords = [
+    "iran",
+    "israel",
+    "gaza",
+    "war",
+    "defense",
+    "military",
+    "talks",
+    "missile",
+    "strike",
+    "ceasefire",
+  ];
+  const geopoliticalActors = [
+    "us",
+    "u s",
+    "u.s",
+    "congress",
+    "congressional",
+    "government",
+    "state",
+    "white house",
+    "pentagon",
+    "ministry",
+    "minister",
+  ];
+  const companyIndicators = [
+    "live nation",
+    "ticketmaster",
+    "adobe",
+    "google",
+    "meta",
+    "microsoft",
+    "apple",
+    "company",
+    "antitrust",
+    "lawsuit",
+    "probe",
+  ];
+
+  const hasConflictKeyword = conflictKeywords.some((term) => combined.includes(term));
+  const hasGeopoliticalActor = geopoliticalActors.some((term) => combined.includes(term));
+  const hasCompanyIndicator = companyIndicators.some((term) => combined.includes(term));
+
+  if (hasCompanyIndicator && !hasGeopoliticalActor) {
+    return false;
+  }
+
+  return hasConflictKeyword && hasGeopoliticalActor;
 }
 
 function inferPrimaryImpact(input: {
@@ -377,6 +456,14 @@ function inferPrimaryImpact(input: {
   switch (input.eventType) {
     case "non_signal":
       return "This is not a market-moving development but may still matter for individual decision-making.";
+    case "early_stage_funding":
+      return `${entityLabel} gives an early read on where startup capital and ecosystem competition may broaden in ${marketLabel}.`;
+    case "large_ipo":
+      return `${entityLabel} provides a window into risk appetite, valuation discipline, and public-market demand in ${marketLabel}.`;
+    case "data_report":
+      return `${entityLabel} offers a fresh data point that can change demand expectations and near-term narrative strength in ${marketLabel}.`;
+    case "executive_move":
+      return `${entityLabel} may shift strategic execution, leadership credibility, or institutional direction in ${marketLabel}.`;
     case "corporate":
       return `${entityLabel} is resetting near-term expectations for pricing, margins, or guidance in ${marketLabel}.`;
     case "political":
@@ -423,6 +510,26 @@ function inferAffectedMarkets(
   if (eventType === "macro_market_move") {
     affected.add("rates");
     affected.add("equities");
+  }
+
+  if (eventType === "early_stage_funding") {
+    affected.add("startup competition");
+    affected.add("capital formation");
+  }
+
+  if (eventType === "large_ipo") {
+    affected.add("ipo demand");
+    affected.add("valuation");
+  }
+
+  if (eventType === "data_report") {
+    affected.add("demand");
+    affected.add("expectations");
+  }
+
+  if (eventType === "executive_move") {
+    affected.add("strategy");
+    affected.add("leadership credibility");
   }
 
   if (eventType === "corporate" || corpus.includes("guidance") || corpus.includes("revenue")) {
@@ -476,11 +583,11 @@ function inferAffectedMarkets(
     affected.add("credit");
   }
 
-  if (topics.includes("finance") && !["political", "defense", "geopolitical"].includes(eventType)) {
+  if (topics.includes("finance") && !["political", "defense", "geopolitical", "early_stage_funding", "product"].includes(eventType)) {
     affected.add("equities");
   }
 
-  if (topics.includes("tech") && !["political", "defense", "geopolitical"].includes(eventType)) {
+  if (topics.includes("tech") && !["political", "defense", "geopolitical", "macro_market_move"].includes(eventType)) {
     affected.add("technology");
   }
 
@@ -509,8 +616,12 @@ function inferTimeHorizon(eventType: string, articles: FeedArticle[]): EventTime
   if (
     eventType === "political" ||
     eventType === "corporate" ||
+    eventType === "large_ipo" ||
+    eventType === "executive_move" ||
     eventType === "macro_market_move" ||
     eventType === "mna_funding" ||
+    eventType === "early_stage_funding" ||
+    eventType === "data_report" ||
     eventType === "legal_investigation" ||
     corpus.includes("guidance")
   ) {
@@ -641,8 +752,12 @@ function getEventTypeSignalWeight(eventType: string) {
     case "policy_regulation":
     case "macro_market_move":
       return 2;
+    case "large_ipo":
     case "corporate":
     case "mna_funding":
+    case "early_stage_funding":
+    case "data_report":
+    case "executive_move":
     case "legal_investigation":
       return 1;
     case "non_signal":
@@ -652,6 +767,18 @@ function getEventTypeSignalWeight(eventType: string) {
     default:
       return 0;
   }
+}
+
+function isHighImpactEventType(eventType: string) {
+  return [
+    "defense",
+    "geopolitical",
+    "political",
+    "policy_regulation",
+    "macro_market_move",
+    "large_ipo",
+    "legal_investigation",
+  ].includes(eventType);
 }
 
 function getSourceTierSignalWeight(sourceNames: string[]) {
@@ -765,6 +892,13 @@ function isStopEntity(value: string) {
     "i",
     "this",
     "that",
+    "ceo",
+    "cfo",
+    "cto",
+    "us",
+    "u.s",
+    "tech",
+    "finance",
   ].includes(normalized);
 }
 

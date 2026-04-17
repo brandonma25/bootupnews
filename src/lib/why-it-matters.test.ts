@@ -299,6 +299,19 @@ describe("why-it-matters", () => {
   });
 
   it("reduces malformed entity phrases to a clean subject anchor", async () => {
+    const anchor = __testing__.extractPrimaryAnchor(
+      createIntelligence({
+        title: "Trump Urges Extending Foreign Surveillance Powers",
+        summary: "The policy push could revive debate around surveillance oversight and executive priorities.",
+        entities: ["Trump Urges Extending Foreign Surveillance"],
+        keyEntities: ["Trump Urges Extending Foreign Surveillance"],
+        eventType: "policy_regulation",
+        affectedMarkets: ["policy risk"],
+        topics: ["politics"],
+        signalStrength: "moderate",
+        confidenceScore: 48,
+      }),
+    );
     const text = await generateWhyThisMatters(
       createIntelligence({
         title: "Trump Urges Extending Foreign Surveillance Powers",
@@ -313,7 +326,8 @@ describe("why-it-matters", () => {
       }),
     );
 
-    expect(text.startsWith("Trump")).toBe(true);
+    expect(anchor?.label).toBe("Trump");
+    expect(text).toContain("Trump");
     expect(text).not.toContain("Trump Urges Extending");
   });
 
@@ -399,5 +413,171 @@ describe("why-it-matters", () => {
     expect(text.startsWith("Madison Air")).toBe(true);
     expect(text.startsWith("It is")).toBe(false);
     expect(text.startsWith("This is")).toBe(false);
+  });
+
+  it("rejects role-word anchors like CEO", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "CEO departs after board review at Adobe",
+        summary: "Adobe said its chief executive will leave after a board review.",
+        entities: ["CEO", "Adobe"],
+        keyEntities: ["CEO", "Adobe"],
+        eventType: "executive_move",
+        affectedMarkets: ["strategy", "leadership credibility"],
+        topics: ["business", "tech"],
+        signalStrength: "weak",
+        confidenceScore: 42,
+      }),
+    );
+
+    expect(text.startsWith("Adobe")).toBe(true);
+    expect(text.startsWith("CEO")).toBe(false);
+  });
+
+  it("rejects US as a weak subject when a better entity exists", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "Adobe signs software deal with U.S. agencies",
+        summary: "The agreement expands Adobe's government footprint.",
+        entities: ["US", "Adobe"],
+        keyEntities: ["US", "Adobe"],
+        eventType: "corporate",
+        affectedMarkets: ["financials"],
+        topics: ["business", "tech"],
+        signalStrength: "weak",
+        confidenceScore: 44,
+      }),
+    );
+
+    expect(text.startsWith("Adobe")).toBe(true);
+    expect(text.startsWith("US")).toBe(false);
+  });
+
+  it("keeps AI startup funding out of housing or macro language", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "InsightFinder raises $15M to help companies monitor AI agents",
+        summary: "The startup raised funding to expand its AI reliability platform.",
+        entities: ["InsightFinder"],
+        keyEntities: ["InsightFinder"],
+        eventType: "early_stage_funding",
+        affectedMarkets: ["startup competition", "capital formation"],
+        topics: ["tech", "business"],
+        signalStrength: "weak",
+        confidenceScore: 46,
+      }),
+    );
+
+    expect(text.toLowerCase()).toMatch(/capital|ecosystem|startup|competition/);
+    expect(text.toLowerCase()).not.toMatch(/housing|mortgage|rates|inflation/);
+  });
+
+  it("blocks housing-domain contamination from non-macro stories", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "InsightFinder raises $15M to help companies monitor AI agents",
+        summary:
+          "The startup raised funding to expand its AI reliability platform. Mortgage markets were unchanged.",
+        primaryChange: "InsightFinder raised $15M to expand its AI reliability platform",
+        entities: ["InsightFinder"],
+        keyEntities: ["InsightFinder"],
+        eventType: "early_stage_funding",
+        affectedMarkets: ["startup competition", "capital formation"],
+        topics: ["tech", "business"],
+        signalStrength: "weak",
+        confidenceScore: 46,
+      }),
+    );
+
+    expect(text.toLowerCase()).not.toContain("how borrowing conditions feed into housing demand");
+    expect(text.toLowerCase()).not.toMatch(/housing demand|mortgage/);
+  });
+
+  it("differentiates funding and IPO explanations", async () => {
+    const funding = await generateWhyThisMatters(
+      createIntelligence({
+        id: "funding-diff",
+        eventType: "early_stage_funding",
+        affectedMarkets: ["startup competition", "capital formation"],
+        entities: ["InsightFinder"],
+        keyEntities: ["InsightFinder"],
+      }),
+    );
+    const ipo = await generateWhyThisMatters(
+      createIntelligence({
+        id: "ipo-diff",
+        title: "Madison Air files for IPO",
+        summary: "The filing gives investors an early look at the HVAC supplier's growth plans.",
+        primaryChange: "Madison Air filed for an IPO",
+        entities: ["Madison Air"],
+        keyEntities: ["Madison Air"],
+        eventType: "large_ipo",
+        affectedMarkets: ["ipo demand", "valuation"],
+        topics: ["business"],
+        signalStrength: "weak",
+        confidenceScore: 48,
+      }),
+    );
+
+    expect(funding.toLowerCase()).toMatch(/capital|startup|ecosystem/);
+    expect(ipo.toLowerCase()).toMatch(/ipo|valuation|public-market/);
+    expect(funding).not.toBe(ipo);
+  });
+
+  it("deduplicates repeated clauses inside one sentence", () => {
+    const cleaned = __testing__.dedupeRepeatedClauses(
+      "Adobe changes demand assumptions, Adobe changes demand assumptions, so it could move expectations.",
+    );
+
+    expect(cleaned).toBe("Adobe changes demand assumptions, so it could move expectations.");
+  });
+
+  it("removes repeated market phrases inside one sentence", () => {
+    const cleaned = __testing__.dedupeRepeatedClauses(
+      "Adobe changes demand assumptions in equities and technology, so it could move expectations in equities and technology.",
+    );
+
+    expect(cleaned).toBe(
+      "Adobe changes demand assumptions in equities and technology, so it could move expectations.",
+    );
+  });
+
+  it("falls back from malformed headline fragments like House Effort", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "House Effort to tighten chip export rules advances",
+        summary: "Lawmakers are moving a new policy effort tied to export controls.",
+        entities: ["House Effort"],
+        keyEntities: ["House Effort"],
+        eventType: "policy_regulation",
+        affectedMarkets: ["policy-sensitive sectors"],
+        topics: ["politics", "tech"],
+        signalStrength: "weak",
+        confidenceScore: 35,
+      }),
+    );
+
+    expect(text.startsWith("The House vote") || text.startsWith("This policy move")).toBe(true);
+    expect(text.startsWith("House Effort")).toBe(false);
+  });
+
+  it("keeps sentence ordering as subject to mechanism to impact", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "Adobe says AI retail traffic rose 393% in Q1",
+        summary: "The company says AI traffic growth is lifting retailer revenue expectations.",
+        primaryChange: "Adobe said AI retail traffic rose 393% in Q1",
+        entities: ["Adobe"],
+        keyEntities: ["Adobe"],
+        eventType: "data_report",
+        affectedMarkets: ["demand", "expectations"],
+        topics: ["tech", "business"],
+        signalStrength: "weak",
+        confidenceScore: 49,
+      }),
+    );
+
+    const normalized = text.toLowerCase();
+    expect(normalized.indexOf("because")).toBeLessThan(normalized.indexOf("so it could"));
   });
 });

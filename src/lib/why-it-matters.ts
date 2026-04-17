@@ -15,6 +15,10 @@ type NormalizedReasoningCategory =
   | "policy_regulation"
   | "corporate"
   | "mna_funding"
+  | "early_stage_funding"
+  | "large_ipo"
+  | "data_report"
+  | "executive_move"
   | "product"
   | "political"
   | "defense_geopolitical"
@@ -77,6 +81,12 @@ const INVALID_ANCHORS = new Set([
   "update",
   "launch",
   "product",
+  "ceo",
+  "cfo",
+  "cto",
+  "us",
+  "u.s.",
+  "u.s",
 ]);
 
 const INVALID_ANCHOR_PARTS = new Set([
@@ -112,136 +122,204 @@ const REASONING_TEMPLATES: Record<NormalizedReasoningCategory, PatternTemplate[]
     {
       key: "implication_first",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} matters because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "policy_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} matters for policy risk because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
+        `${anchor} changes the policy backdrop because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} still matters before the full policy response is clear because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+        `${anchor} is already affecting policy assumptions because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   corporate: [
     {
       key: "implication_first",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} resets the corporate baseline because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "financial_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} matters for financial expectations because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for financial expectations because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} is still company-specific, but it could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} is company-specific, but ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   mna_funding: [
     {
       key: "allocation_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the competitive picture because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
+        `${anchor} changes the deal landscape because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "competitive_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} is changing market structure because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} is partly a capital story, but it could still ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} is partly a capital story, and ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+  ],
+  early_stage_funding: [
+    {
+      key: "ecosystem_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} gives an early ecosystem signal because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "capital_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} widens the startup capital picture because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "competition_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} points to competitive expansion because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+  ],
+  large_ipo: [
+    {
+      key: "ipo_window",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} opens an IPO window read because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "risk_appetite",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} tests public-market appetite because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "valuation_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} sharpens valuation discipline because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+  ],
+  data_report: [
+    {
+      key: "data_signal",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} adds a fresh data signal because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "demand_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} changes the demand read because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "expectation_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} reframes near-term expectations because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+  ],
+  executive_move: [
+    {
+      key: "leadership_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} changes the leadership picture because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "execution_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} alters execution expectations because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
+    },
+    {
+      key: "governance_frame",
+      build: ({ anchor, mechanism, impact, horizonLabel }) =>
+        `${anchor} shifts governance credibility because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   product: [
     {
       key: "adoption_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} changes product adoption expectations because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "competitive_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the feature benchmark buyers compare against because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+        `${anchor} changes the feature benchmark buyers compare against because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} is a product story rather than a policy one, but it could still ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} is a product story, and ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   political: [
     {
       key: "governance_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} affects governance expectations because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "credibility_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} matters for governance credibility because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for governance credibility because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} is not an equity story by default; it matters because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
+        `${anchor} belongs in a governance frame because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   defense_geopolitical: [
     {
       key: "defense_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} matters for defense and international relations because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for defense and international relations because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "policy_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} changes geopolitical assumptions because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} should be read through a geopolitical lens, not a valuation lens, because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
+        `${anchor} should be read through a geopolitical lens because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   legal_investigation: [
     {
       key: "liability_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} raises legal risk because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "operations_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} matters for operational risk because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for operational risk because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} even if the legal outcome is still unfolding because ${mechanism}.`,
+        `${anchor} is still unfolding legally, but ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   macro_market_move: [
     {
       key: "implication_first",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} could ${impact} over the ${horizonLabel} because ${mechanism}.`,
+        `${anchor} changes the macro baseline because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "market_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} matters for the macro backdrop because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+        `${anchor} matters for the macro backdrop because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
     {
       key: "contrast_frame",
       build: ({ anchor, mechanism, impact, horizonLabel }) =>
-        `${anchor} changes the macro baseline rather than just the headline because ${mechanism}, and that could ${impact} over the ${horizonLabel}.`,
+        `${anchor} moves beyond a one-off headline because ${mechanism}, so it could ${impact} over the ${horizonLabel}.`,
     },
   ],
   non_signal: [
@@ -351,7 +429,7 @@ function buildGroundedWhyThisMatters(
     return buildLowConfidenceFallback(intelligence, previousOutputs);
   }
 
-  const anchorLabel = getAnchorLabel(intelligence);
+  const anchorLabel = getSubjectLabel(intelligence);
   const marketLabel = intelligence.affectedMarkets.slice(0, 2).join(" and ");
   const horizonLabel = getTimeHorizonLabel(intelligence.timeHorizon);
   const mechanism = buildMechanism(intelligence, marketLabel);
@@ -379,11 +457,7 @@ function buildGroundedWhyThisMatters(
 }
 
 function extractPrimaryAnchor(intelligence: NormalizedIntelligence) {
-  const candidates = [
-    ...extractHeadlineCandidates(intelligence.title),
-    ...(intelligence.entities ?? []),
-    ...(intelligence.keyEntities ?? []),
-  ];
+  const candidates = rankAnchorCandidates(intelligence);
 
   for (const candidate of candidates) {
     const normalized = sanitizeAnchorCandidate(candidate);
@@ -401,11 +475,16 @@ function getAnchorLabel(intelligence: NormalizedIntelligence) {
     return anchor.label;
   }
 
-  const titleCandidates = extractHeadlineCandidates(intelligence.title).filter((candidate) =>
-    isMeaningfulAnchor(candidate),
+  const leadEntityMatch = intelligence.title.match(
+    /^([A-Z][A-Za-z0-9.&'-]+(?:\s+[A-Z][A-Za-z0-9.&'-]+){0,2})(?=\s+(?:urges|extends|files|raises|adds|launches|wins|appoints|resigns|signals|reports|says)\b)/i,
   );
-  if (titleCandidates.length) {
-    return titleCandidates[0];
+  if (leadEntityMatch?.[1] && isMeaningfulAnchor(leadEntityMatch[1])) {
+    return leadEntityMatch[1];
+  }
+
+  const nounPhrase = buildStrongNounPhrase(intelligence);
+  if (nounPhrase) {
+    return nounPhrase;
   }
 
   const companyMatch = intelligence.title.match(
@@ -416,6 +495,108 @@ function getAnchorLabel(intelligence: NormalizedIntelligence) {
   }
 
   return buildEventLabel(intelligence);
+}
+
+function getSubjectLabel(intelligence: NormalizedIntelligence) {
+  const anchor = getAnchorLabel(intelligence);
+  const delta = buildHeadlineDeltaPhrase(intelligence);
+
+  if (!delta) {
+    return anchor;
+  }
+
+  if (intelligence.reasoningCategory === "product") {
+    return `${anchor} in ${delta.replace(/^how\s+/i, "").replace(/^the\s+/i, "")}`;
+  }
+
+  if (intelligence.reasoningCategory === "data_report") {
+    return `${anchor} from ${delta.replace(/^how\s+/i, "")}`;
+  }
+
+  return anchor;
+}
+
+function rankAnchorCandidates(intelligence: NormalizedIntelligence) {
+  const leadEntity = extractLeadTitleEntity(intelligence.title);
+  const titleEntities = extractHeadlineCandidates(intelligence.title).filter((candidate) =>
+    isMeaningfulAnchor(candidate),
+  );
+  const extractedEntities = [...(intelligence.entities ?? []), ...(intelligence.keyEntities ?? [])].filter(
+    (candidate, index, array) =>
+      array.findIndex((entry) => entry.toLowerCase() === candidate.toLowerCase()) === index &&
+      isMeaningfulAnchor(sanitizeAnchorCandidate(candidate)),
+  );
+
+  return [leadEntity, ...titleEntities, ...extractedEntities].filter(
+    (candidate, index, array): candidate is string =>
+      Boolean(candidate) &&
+      array.findIndex((entry) => entry?.toLowerCase() === candidate?.toLowerCase()) === index,
+  );
+}
+
+function extractLeadTitleEntity(title: string) {
+  const match = title.match(
+    /^([A-Z][A-Za-z0-9.&'-]+(?:\s+[A-Z][A-Za-z0-9.&'-]+){0,2})(?=\s+(?:urges|extends|files|raises|adds|launches|wins|appoints|resigns|signals|reports|says)\b)/i,
+  );
+  return match?.[1] ?? "";
+}
+
+function buildStrongNounPhrase(intelligence: NormalizedIntelligence) {
+  if (isGenericHeadlineFragment(getAnchorLabelCandidateFromTitle(intelligence.title))) {
+    if (/house|congress|congressional/.test(intelligence.title.toLowerCase())) {
+      return "The House vote";
+    }
+
+    if (intelligence.reasoningCategory === "policy_regulation") {
+      return "This policy move";
+    }
+
+    return "This development";
+  }
+
+  switch (intelligence.reasoningCategory) {
+    case "large_ipo":
+      return "the IPO";
+    case "policy_regulation":
+      return "the policy move";
+    case "product":
+      return "the product change";
+    case "data_report":
+      return "the data signal";
+    case "executive_move":
+      return "the leadership change";
+    default:
+      return "";
+  }
+}
+
+function getAnchorLabelCandidateFromTitle(title: string) {
+  return extractHeadlineCandidates(title)[0] ?? "";
+}
+
+function isGenericHeadlineFragment(value: string) {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  const words = normalized.split(/\s+/);
+  if (words.length !== 2) {
+    return false;
+  }
+
+  const genericWords = new Set([
+    "house",
+    "effort",
+    "breaking",
+    "news",
+    "market",
+    "watch",
+    "update",
+    "report",
+  ]);
+
+  return words.every((word) => genericWords.has(word));
 }
 
 function sanitizeAnchorCandidate(value: string) {
@@ -459,6 +640,10 @@ function isMeaningfulAnchor(value: string) {
     return false;
   }
 
+  if (isGenericHeadlineFragment(value)) {
+    return false;
+  }
+
   if (value.split(/\s+/).some((word) => INVALID_ANCHORS.has(word.toLowerCase()))) {
     return false;
   }
@@ -468,6 +653,10 @@ function isMeaningfulAnchor(value: string) {
   }
 
   if (/^\d+$/.test(normalized)) {
+    return false;
+  }
+
+  if (/^(ceo|cfo|cto|us|u\.s\.|tech|finance)$/i.test(value)) {
     return false;
   }
 
@@ -494,6 +683,14 @@ function buildEventLabel(intelligence: NormalizedIntelligence) {
       return "This corporate update";
     case "mna_funding":
       return "This deal or funding round";
+    case "early_stage_funding":
+      return "This funding round";
+    case "large_ipo":
+      return "This IPO filing";
+    case "data_report":
+      return "This data release";
+    case "executive_move":
+      return "This leadership move";
     case "product":
       return "This product move";
     case "political":
@@ -530,7 +727,10 @@ function buildHeadlineDeltaPhrase(intelligence: NormalizedIntelligence) {
     return "how governance credibility and diplomatic scrutiny evolve";
   }
 
-  if (/mortgage|rates|refinancing|housing/.test(corpus)) {
+  if (
+    intelligence.reasoningCategory === "macro_market_move" &&
+    /mortgage|rates|refinancing|housing/.test(corpus)
+  ) {
     return "how borrowing conditions feed into housing demand";
   }
 
@@ -545,8 +745,26 @@ function buildHeadlineDeltaPhrase(intelligence: NormalizedIntelligence) {
   return "";
 }
 
+function sanitizeDeltaPhrase(
+  intelligence: NormalizedIntelligence,
+  delta: string,
+) {
+  if (!delta) {
+    return "";
+  }
+
+  if (
+    intelligence.reasoningCategory !== "macro_market_move" &&
+    /housing|mortgage|refinancing|borrowing conditions/.test(delta.toLowerCase())
+  ) {
+    return "";
+  }
+
+  return delta;
+}
+
 function buildMechanism(intelligence: NormalizedIntelligence, marketLabel: string) {
-  const delta = buildHeadlineDeltaPhrase(intelligence);
+  const delta = sanitizeDeltaPhrase(intelligence, buildHeadlineDeltaPhrase(intelligence));
   const deltaSuffix = delta ? `, especially in ${delta}` : "";
 
   switch (intelligence.reasoningCategory) {
@@ -556,6 +774,14 @@ function buildMechanism(intelligence: NormalizedIntelligence, marketLabel: strin
       return `this changes revenue, margin, or guidance expectations tied to ${marketLabel}${deltaSuffix}`;
     case "mna_funding":
       return `this changes capital availability, competitive positioning, or market structure in ${marketLabel}${deltaSuffix}`;
+    case "early_stage_funding":
+      return `this changes startup capital availability, ecosystem breadth, and early competitive pressure in ${marketLabel}${deltaSuffix}`;
+    case "large_ipo":
+      return `this reveals how public investors are valuing new issuance and balancing risk appetite in ${marketLabel}${deltaSuffix}`;
+    case "data_report":
+      return `this adds a concrete data point that can reset demand assumptions in ${marketLabel}${deltaSuffix}`;
+    case "executive_move":
+      return `this changes leadership continuity, strategic direction, and execution confidence in ${marketLabel}${deltaSuffix}`;
     case "product":
       return `this changes adoption expectations, product comparison, and feature benchmarks in ${marketLabel}${deltaSuffix}`;
     case "political":
@@ -574,7 +800,7 @@ function buildMechanism(intelligence: NormalizedIntelligence, marketLabel: strin
 }
 
 function buildImpact(intelligence: NormalizedIntelligence, marketLabel: string) {
-  const delta = buildHeadlineDeltaPhrase(intelligence);
+  const delta = sanitizeDeltaPhrase(intelligence, buildHeadlineDeltaPhrase(intelligence));
   const deltaSuffix = delta ? `, with the clearest effect in ${delta}` : "";
 
   switch (intelligence.reasoningCategory) {
@@ -584,6 +810,14 @@ function buildImpact(intelligence: NormalizedIntelligence, marketLabel: string) 
       return `move financial expectations, guidance credibility, or valuation in ${marketLabel}${deltaSuffix}`;
     case "mna_funding":
       return `reshape competition, capital allocation, or market structure in ${marketLabel}${deltaSuffix}`;
+    case "early_stage_funding":
+      return `expand startup competition, partner activity, or ecosystem experimentation in ${marketLabel}${deltaSuffix}`;
+    case "large_ipo":
+      return `shift valuation expectations, IPO sentiment, or capital-markets confidence in ${marketLabel}${deltaSuffix}`;
+    case "data_report":
+      return `move demand expectations, revenue assumptions, or narrative momentum in ${marketLabel}${deltaSuffix}`;
+    case "executive_move":
+      return `shift strategy confidence, governance scrutiny, or execution expectations in ${marketLabel}${deltaSuffix}`;
     case "product":
       return `change adoption patterns, user behavior, or competitive feature dynamics in ${marketLabel}${deltaSuffix}`;
     case "political":
@@ -606,7 +840,7 @@ function buildLowConfidenceFallback(
   previousOutputs: string[] = [],
 ) {
   const marketLabel = intelligence.affectedMarkets.slice(0, 2).join(" and ");
-  const anchorLabel = getAnchorLabel(intelligence);
+  const anchorLabel = getSubjectLabel(intelligence);
 
   if (intelligence.reasoningCategory === "non_signal") {
     const templates = [
@@ -706,12 +940,66 @@ function formatWhyThisMatters(text: string, signalStrength: EventIntelligence["s
 }
 
 function postProcessGrammar(value: string) {
-  return value
+  return dedupeRepeatedClauses(
+    value
     .replace(/\bbecause changes\b/gi, "because this changes")
     .replace(/\bwhere this changes\b/gi, "where this changes")
     .replace(/\s+/g, " ")
     .replace(/\s+([,.;!?])/g, "$1")
-    .trim();
+    .trim(),
+  );
+}
+
+function dedupeRepeatedClauses(value: string) {
+  const clauses = value
+    .split(/,\s*/)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+  const deduped: string[] = [];
+
+  for (const clause of clauses) {
+    const normalized = clause.toLowerCase();
+    if (!deduped.some((existing) => existing.toLowerCase() === normalized)) {
+      deduped.push(clause);
+    }
+  }
+
+  const joined = deduped
+    .join(", ")
+    .replace(/\b(and)\s+\1\b/gi, "$1")
+    .replace(/\b(this changes [^,.;]+)\s+\1\b/gi, "$1");
+
+  return removeRepeatedPhrasePatterns(joined);
+}
+
+function removeRepeatedPhrasePatterns(value: string) {
+  let result = value;
+  const phrasePatterns = [
+    /(in\s+[a-z][a-z\s-]+?)(?=,?\s+so it could [^,.!?]+?\s+\1)/gi,
+    /(across\s+[a-z][a-z\s-]+?)(?=,?\s+so it could [^,.!?]+?\s+\1)/gi,
+    /(around\s+[a-z][a-z\s-]+?)(?=,?\s+so it could [^,.!?]+?\s+\1)/gi,
+  ];
+
+  for (const pattern of phrasePatterns) {
+    const match = pattern.exec(result);
+    if (!match?.[1]) {
+      pattern.lastIndex = 0;
+      continue;
+    }
+
+    const repeatedPhrase = match[1];
+    result = result.replace(
+      new RegExp(`(so it could [^,.!?]+?)\\s+${escapeRegExp(repeatedPhrase)}`, "i"),
+      "$1",
+    );
+    pattern.lastIndex = 0;
+  }
+
+  return result.replace(/\s+/g, " ").replace(/\s+([,.;!?])/g, "$1").trim();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function countPatternUsage(previousOutputs: string[]) {
@@ -742,6 +1030,16 @@ function getPatternKey(output: string) {
   if (normalized.includes("not a market-moving development")) return "non_signal_statement";
   if (normalized.includes("consumer or personal guidance")) return "non_signal_consumer";
   if (normalized.includes("individual decision-making frame")) return "non_signal_specific";
+  if (normalized.includes("early ecosystem signal")) return "ecosystem_frame";
+  if (normalized.includes("startup capital picture")) return "capital_frame";
+  if (normalized.includes("competitive expansion")) return "competition_frame";
+  if (normalized.includes("ipo window read")) return "ipo_window";
+  if (normalized.includes("public-market appetite")) return "risk_appetite";
+  if (normalized.includes("valuation discipline")) return "valuation_frame";
+  if (normalized.includes("fresh data signal")) return "data_signal";
+  if (normalized.includes("demand read")) return "demand_frame";
+  if (normalized.includes("near-term expectations")) return "expectation_frame";
+  if (normalized.includes("leadership picture")) return "leadership_frame";
   if (normalized.includes("points to an early shift")) return "specific_shift";
   if (normalized.includes("already touches")) return "specific_implication";
   if (normalized.includes("suggests pressure on")) return "specific_causal";
@@ -763,12 +1061,35 @@ function isTooSimilar(candidate: string, previousOutputs: string[]) {
 }
 
 function similarityScore(left: string, right: string) {
-  const leftWords = new Set(normalizeForSimilarity(left).split(" ").filter(Boolean));
-  const rightWords = new Set(normalizeForSimilarity(right).split(" ").filter(Boolean));
+  const leftWords = new Set(normalizeForSimilarityTokens(left).split(" ").filter(Boolean));
+  const rightWords = new Set(normalizeForSimilarityTokens(right).split(" ").filter(Boolean));
   const overlap = [...leftWords].filter((word) => rightWords.has(word)).length;
   const union = new Set([...leftWords, ...rightWords]).size;
   return union === 0 ? 0 : overlap / union;
 }
+
+const SIMILARITY_STOPWORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "this",
+  "that",
+  "it",
+  "because",
+  "so",
+  "could",
+  "over",
+  "next",
+  "few",
+  "quarters",
+  "sessions",
+  "changes",
+  "change",
+  "matters",
+  "story",
+  "google",
+  "chrome",
+]);
 
 function normalizeForSimilarity(value: string) {
   return value
@@ -777,6 +1098,13 @@ function normalizeForSimilarity(value: string) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeForSimilarityTokens(value: string) {
+  return normalizeForSimilarity(value)
+    .split(" ")
+    .filter((word) => word && !SIMILARITY_STOPWORDS.has(word))
+    .join(" ");
 }
 
 function ensureSentence(value: string) {
@@ -840,6 +1168,14 @@ function mapReasoningCategory(eventType: string): NormalizedReasoningCategory {
     case "mna_funding":
     case "m&a":
       return "mna_funding";
+    case "early_stage_funding":
+      return "early_stage_funding";
+    case "large_ipo":
+      return "large_ipo";
+    case "data_report":
+      return "data_report";
+    case "executive_move":
+      return "executive_move";
     case "product":
     case "product_launch_major":
       return "product";
@@ -866,6 +1202,10 @@ function deriveLegacyEventType(intelligence: EventIntelligence) {
   const corpus = `${intelligence.title} ${intelligence.summary} ${intelligence.topics?.join(" ") ?? ""}`.toLowerCase();
 
   if (/advice|q&a|qa|how to|should i|should you|moneyist|personal finance|lifestyle/.test(corpus)) return "non_signal";
+  if (/ipo|initial public offering|listing|public offering/.test(corpus)) return "large_ipo";
+  if (/series [a-z]|seed round|funding|raises|raised/.test(corpus)) return "early_stage_funding";
+  if (/traffic rose|data shows|report shows|survey|index|usage rose/.test(corpus)) return "data_report";
+  if (/ceo|chief executive|appoints|appointed|steps down|resigns/.test(corpus)) return "executive_move";
   if (
     (corpus.includes("chrome") || corpus.includes("ai mode")) &&
     (corpus.includes("lets you") || corpus.includes("open links") || corpus.includes("side-by-side"))
@@ -888,6 +1228,7 @@ export const __testing__ = {
   buildLowConfidenceFallback,
   buildHeadlineDeltaPhrase,
   postProcessGrammar,
+  dedupeRepeatedClauses,
   getPatternKey,
   isMeaningfulAnchor,
   isLowDataScenario,

@@ -113,8 +113,9 @@ describe("buildEventIntelligence", () => {
         sourceNames: ["Reuters"],
         recencyScore: 72,
         velocityScore: 20,
+        confidenceScore: 48,
       }),
-    ).toBe("moderate");
+    ).toBe("weak");
 
     expect(
       getSignalStrength({
@@ -127,8 +128,9 @@ describe("buildEventIntelligence", () => {
         sourceNames: ["Reuters"],
         recencyScore: 85,
         velocityScore: 64,
+        confidenceScore: 67,
       }),
-    ).toBe("strong");
+    ).toBe("moderate");
 
     expect(
       getSignalStrength({
@@ -262,6 +264,107 @@ describe("buildEventIntelligence", () => {
     expect(defense.affectedMarkets).not.toContain("equities");
     expect(political.eventType).toBe("political");
     expect(political.affectedMarkets).not.toContain("technology");
+  });
+
+  it("differentiates early funding, IPO, and data-report company events", () => {
+    const funding = buildEventIntelligence(
+      [
+        createArticle({
+          title: "InsightFinder raises $15M to help companies monitor AI agents",
+          summaryText: "The startup raised funding to expand its AI reliability platform.",
+          sourceName: "TechCrunch",
+        }),
+      ],
+      { topicName: "Tech" },
+    );
+    const ipo = buildEventIntelligence(
+      [
+        createArticle({
+          title: "Madison Air files for IPO",
+          summaryText: "The filing gives investors an early look at the HVAC supplier's growth plans.",
+          sourceName: "Reuters",
+        }),
+      ],
+      { topicName: "Business" },
+    );
+    const dataReport = buildEventIntelligence(
+      [
+        createArticle({
+          title: "Adobe says AI retail traffic rose 393% in Q1",
+          summaryText: "The company says AI traffic growth is lifting revenue expectations for retailers.",
+          sourceName: "Reuters",
+        }),
+      ],
+      { topicName: "Tech" },
+    );
+
+    expect(funding.eventType).toBe("early_stage_funding");
+    expect(funding.affectedMarkets).toContain("capital formation");
+    expect(ipo.eventType).toBe("large_ipo");
+    expect(ipo.affectedMarkets).toContain("ipo demand");
+    expect(dataReport.eventType).toBe("data_report");
+    expect(dataReport.affectedMarkets).toContain("demand");
+  });
+
+  it("blocks strong labels for single-source stories", () => {
+    expect(
+      getSignalStrength({
+        eventType: "policy_regulation",
+        affectedMarkets: ["policy-sensitive sectors"],
+        sourceDiversity: 1,
+        articleCount: 1,
+        rankingScore: 78,
+        topics: ["politics"],
+        sourceNames: ["Reuters"],
+        recencyScore: 90,
+        velocityScore: 60,
+        confidenceScore: 70,
+      }),
+    ).toBe("moderate");
+  });
+
+  it("keeps same-event Iran conflict stories in the defense/geopolitical domain", () => {
+    const cluster = buildEventIntelligence(
+      [
+        createArticle({
+          title: "Iran war talks intensify after regional strike",
+          summaryText: "Diplomats and defense officials are weighing the next steps.",
+          sourceName: "Reuters",
+        }),
+        createArticle({
+          title: "Congressional vote sharpens Iran conflict response debate",
+          summaryText: "Lawmakers are preparing a vote as defense planning continues.",
+          sourceName: "Associated Press",
+        }),
+        createArticle({
+          title: "Military planners review Iran defense posture after talks stall",
+          summaryText: "Officials are reassessing regional posture after talks broke down.",
+          sourceName: "Financial Times",
+        }),
+      ],
+      { topicName: "World", matchedKeywords: ["Iran", "war", "talks", "defense"] },
+    );
+
+    expect(cluster.eventType).toBe("defense");
+    expect(cluster.affectedMarkets).toContain("defense posture");
+    expect(cluster.affectedMarkets).toContain("international relations");
+  });
+
+  it("does not route company antitrust stories into the geopolitical override", () => {
+    const story = buildEventIntelligence(
+      [
+        createArticle({
+          title: "Live Nation faces new antitrust effort in House committee",
+          summaryText: "Lawmakers advanced a competition probe into ticketing practices.",
+          sourceName: "Reuters",
+        }),
+      ],
+      { topicName: "Business", matchedKeywords: ["Live Nation", "antitrust", "House"] },
+    );
+
+    expect(story.eventType).not.toBe("defense");
+    expect(story.eventType).not.toBe("geopolitical");
+    expect(story.affectedMarkets).not.toContain("defense posture");
   });
 });
 
