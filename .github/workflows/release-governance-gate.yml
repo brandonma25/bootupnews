@@ -1,0 +1,42 @@
+name: release-governance-gate
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-governance-gate:
+    name: release-governance-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run release governance gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "merge_group" ]]; then
+            BASE_SHA="${{ github.event.merge_group.base_sha }}"
+            HEAD_SHA="${{ github.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          python scripts/release-governance-gate.py --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA"

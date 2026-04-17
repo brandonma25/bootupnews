@@ -1,0 +1,24 @@
+name: Feature System CSV Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  merge_group:
+
+jobs:
+  feature-system-csv-validation:
+    name: feature-system-csv-validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run validator
+        run: python scripts/validate-feature-system-csv.py

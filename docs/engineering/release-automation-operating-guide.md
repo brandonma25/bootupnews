@@ -34,7 +34,23 @@
   - `pr-build`
   - `pr-e2e-chromium`
   - `pr-summary`
+  - `release-governance-gate`
 - These jobs automate install, lint, build, unit/integration tests, Chromium Playwright smoke coverage, artifact upload, and PR summary generation.
+
+### 2a. Release Governance Gate
+- Workflow: [release-governance-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/release-governance-gate.yml)
+- Script entrypoint: `python scripts/release-governance-gate.py`
+- Reuses the feature-system CSV validator and inspects the PR diff.
+- Classification:
+  - docs-only
+  - trivial-code-change
+  - material-feature-change
+  - new-feature-or-system
+- Enforcement:
+  - docs-only changes pass when CSV validation still passes
+  - trivial code changes pass when CSV validation still passes
+  - material feature or system changes require at least one supporting docs update in `docs/prd/`, `docs/testing/`, `docs/bug-fixes/`, or `docs/engineering/`
+  - new feature or system changes require a canonical `PRD-XX` file plus a matching `docs/product/feature-system.csv` mapping
 
 ### 3. Preview Gate
 - Workflow: [preview-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/preview-gate.yml)

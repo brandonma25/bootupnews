@@ -4,8 +4,12 @@ This repository uses a controlled documentation system. The goal is to keep docs
 
 ## Core Rules
 - `docs/product/feature-system.csv` is the control layer and source of truth for feature tracking.
-- The CSV schema is:
-  `layer, feature_name, priority, status, description, owner, dependency, build_order, decision, last_updated`
+- The CSV is the product control layer and its schema is locked to exactly 12 columns in this exact order:
+  `Layer, Feature Name, Priority, Status, Description, Owner, Dependency, Build Order, Decision, Last Updated, prd_id, prd_file`
+- No additional columns are allowed.
+- No missing columns are allowed.
+- PRD mapping is enforced through `prd_id` and `prd_file`.
+- Any schema change requires an explicit update to `scripts/validate-feature-system-csv.py`.
 - Allowed `status` values are:
   `Not Built`, `In Progress`, `In Review`, `Built`, `Deprecated`
 - Status meanings:
