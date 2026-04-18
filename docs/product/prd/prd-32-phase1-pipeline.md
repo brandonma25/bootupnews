@@ -35,7 +35,8 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
 - `src/lib/pipeline/clustering/index.ts` now uses weighted similarity plus anti-merge guardrails instead of a single loose overlap rule.
 - `src/lib/scoring/scoring-engine.ts` centralizes ranking math.
 - `src/lib/observability/pipeline-run.ts` records run counts, failures, and scoring logs.
-- `src/adapters/donors/` defines the 4 donor families and their default RSS feeds.
+- `src/adapters/donors/` now defines donor registry entries, contract states, and default feed metadata.
+- `src/lib/integration/` formalizes canonical subsystem contracts, donor mappings, and pipeline stage ownership.
 - `src/lib/data.ts` uses the new digest pipeline for public dashboard briefing generation while leaving auth-sensitive flows intact.
 
 ## Dependencies / Risks
@@ -72,6 +73,21 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
 - Topic assignment for public digest cards is heuristic in Phase 1.
 - Observability currently logs to runtime output instead of a persistent analytics store.
 - Homepage rail variety now uses deterministic semantic suppression, but live-feed quality still limits how diverse the visible event mix can become in sparse runs.
+- Donor integrations are adapter-based and intentionally partial; most subsystem logic remains canonical until later integration passes.
+
+## Donor Integration Framework Note
+
+- `openclaw-newsroom` is the active ingestion donor:
+  - contributes feed transport and source metadata boundaries
+- `after-market-agent` is the active clustering-support donor:
+  - contributes support strategies and representative-selection boundaries
+- `FINANCIAL-NEWS-SUMMARIZER` is the active ranking-feature donor:
+  - contributes source-quality metadata that flows into deterministic scoring
+- `Horizon` is future-ready only:
+  - exposes a stub-safe enrichment contract without entering the critical path
+- Adapter rule:
+  - donor modules translate into canonical contracts
+  - canonical pipeline modules remain the only runtime owners of app-wide models and output shapes
 
 ## Clustering Upgrade Note
 

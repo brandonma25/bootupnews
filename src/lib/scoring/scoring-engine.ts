@@ -1,3 +1,4 @@
+import { getCanonicalSourceMetadata, getRankingFeatureProviders } from "@/adapters/donors";
 import type { RankedSignal } from "@/lib/models/ranked-signal";
 import type { SignalCluster } from "@/lib/models/signal-cluster";
 import type { ClusterScoreLog } from "@/lib/observability/pipeline-run";
@@ -18,8 +19,24 @@ const SOURCE_CREDIBILITY: Record<string, number> = {
   "the verge": 74,
 };
 
+function getSourceCredibilityMap() {
+  const donorSourceEntries = getCanonicalSourceMetadata().map((source) => [source.source.toLowerCase(), source.credibility]);
+  return {
+    ...SOURCE_CREDIBILITY,
+    ...Object.fromEntries(donorSourceEntries),
+  };
+}
+
+function getProviderCredibilityHints(cluster: SignalCluster) {
+  const providers = getRankingFeatureProviders();
+  return providers.flatMap(({ provider }) => provider.mapClusterFeatures(cluster).credibilityWeights);
+}
+
 function getCredibilityScore(cluster: SignalCluster) {
-  const scores = cluster.articles.map((article) => SOURCE_CREDIBILITY[article.source.toLowerCase()] ?? 68);
+  const sourceCredibilityMap = getSourceCredibilityMap();
+  const sourceScores = cluster.articles.map((article) => sourceCredibilityMap[article.source.toLowerCase()] ?? 68);
+  const providerHints = getProviderCredibilityHints(cluster);
+  const scores = providerHints.length ? [...sourceScores, ...providerHints] : sourceScores;
   return average(scores);
 }
 

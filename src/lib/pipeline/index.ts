@@ -1,5 +1,6 @@
 import type { Source } from "@/lib/types";
 import { logPipelineEvent } from "@/lib/observability/logger";
+import { getPipelineIntegrationSnapshot } from "@/lib/integration/pipeline-config";
 import { clusterNormalizedArticles } from "@/lib/pipeline/clustering";
 import { deduplicateArticles } from "@/lib/pipeline/dedup";
 import { buildDigestOutput, type DigestOutput } from "@/lib/pipeline/digest";
@@ -20,6 +21,10 @@ export async function runClusterFirstPipeline(options: {
 } = {}): Promise<ClusterFirstPipelineResult> {
   const runId = `pipeline-${Date.now()}`;
   const run = createEmptyPipelineRun(runId);
+  const integrationSnapshot = getPipelineIntegrationSnapshot();
+
+  logPipelineEvent("info", "Pipeline integration snapshot", integrationSnapshot);
+
   const ingestion = await ingestRawItems(options);
   run.feed_failures = ingestion.failures;
   run.used_seed_fallback = ingestion.usedSeedFallback;

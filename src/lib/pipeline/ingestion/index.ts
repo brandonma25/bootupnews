@@ -1,5 +1,10 @@
 import type { Source } from "@/lib/types";
-import { getDefaultDonorFeeds, type DonorFeed } from "@/adapters/donors";
+import {
+  getDefaultDonorFeeds,
+  getDonorRegistrySnapshot,
+  getIngestionAdapter,
+  type DonorFeed,
+} from "@/adapters/donors";
 import type { RawItem } from "@/lib/models/raw-item";
 import { logPipelineEvent } from "@/lib/observability/logger";
 import { fetchFeedArticles } from "@/lib/rss";
@@ -35,29 +40,42 @@ function feedsFromSources(sources?: Source[]): DonorFeed[] {
       homepageUrl: source.homepageUrl ?? source.feedUrl,
       topic: source.topicName === "Finance" ? "Finance" : source.topicName === "World" ? "World" : "Tech",
       credibility: source.topicName === "Finance" ? 80 : 76,
+      reliability: source.topicName === "Finance" ? 0.8 : 0.76,
+      sourceClass: source.topicName === "Finance" ? "business_press" : "specialist_press",
     }));
 }
 
 async function fetchFeedWithStageRetry(feed: DonorFeed) {
-  let lastError: Error | null = null;
+  const adapter = getIngestionAdapter(feed.donor);
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      return await fetchFeedArticles(feed.feedUrl, feed.source, {
-        timeoutMs: 4_500 + attempt * 1_500,
-        retryCount: 1,
-      });
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-    }
+  if (!adapter) {
+    throw new Error(`No ingestion adapter registered for donor ${feed.donor}`);
   }
 
-  throw lastError ?? new Error(`Unknown ingestion error for ${feed.source}`);
+  const items = await adapter.fetchItems([feed], {
+    fetchFeed: fetchFeedArticles,
+    timeoutMs: 4_500,
+    retryCount: 1,
+  });
+
+  return items.map((entry) => entry.article);
 }
 
 export async function ingestRawItems(options: { sources?: Source[] } = {}): Promise<IngestionResult> {
   const feeds = feedsFromSources(options.sources);
+  const donorSnapshot = getDonorRegistrySnapshot();
   const failures: IngestionFailure[] = [];
+
+  logPipelineEvent("info", "Ingestion adapters resolved", {
+    donor_registry: donorSnapshot,
+    active_feed_sources: feeds.map((feed) => ({
+      donor: feed.donor,
+      source: feed.source,
+      sourceClass: feed.sourceClass,
+      topic: feed.topic,
+    })),
+  });
+
   const batches = await Promise.all(
     feeds.map(async (feed) => {
       try {
