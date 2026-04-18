@@ -141,6 +141,13 @@ def get_diff_range(base_sha: str, head_sha: str) -> str:
     return f"{base_sha}...{head_sha}"
 
 
+def is_generated_python_artifact(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    if "/__pycache__/" in f"/{normalized}/":
+        return True
+    return normalized.endswith((".pyc", ".pyo"))
+
+
 def merge_diff_output(repo_root: Path, changes: dict[str, Change], *diff_args: str) -> None:
     name_status_output = run_git(repo_root, "diff", "--name-status", *diff_args)
     for raw_line in name_status_output.splitlines():
@@ -149,6 +156,8 @@ def merge_diff_output(repo_root: Path, changes: dict[str, Change], *diff_args: s
         parts = raw_line.split("\t")
         status = parts[0]
         path = parts[-1]
+        if is_generated_python_artifact(path):
+            continue
         existing = changes.get(path)
         if existing is None or existing.status == "M":
             changes[path] = Change(path=path, status=status, added=existing.added if existing else 0, deleted=existing.deleted if existing else 0)
@@ -161,6 +170,8 @@ def merge_diff_output(repo_root: Path, changes: dict[str, Change], *diff_args: s
         if len(parts) < 3:
             continue
         added_text, deleted_text, path = parts[0], parts[1], parts[-1]
+        if is_generated_python_artifact(path):
+            continue
         added = int(added_text) if added_text.isdigit() else 0
         deleted = int(deleted_text) if deleted_text.isdigit() else 0
         change = changes.get(path, Change(path=path, status="M"))
@@ -184,6 +195,8 @@ def load_changes(repo_root: Path, diff_range: str) -> dict[str, Change]:
         path = raw_line[3:]
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
+        if is_generated_python_artifact(path):
+            continue
         normalized_status = "A" if status == "??" else (status[:1] or "M")
         changes.setdefault(path, Change(path=path, status=normalized_status))
 
