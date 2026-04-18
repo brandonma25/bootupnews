@@ -378,21 +378,28 @@ export function buildTrustLayerPresentation(
     rankingSignals?: string[];
   },
 ): TrustLayerPresentation {
+  const preferredBody =
+    typeof fallback.whyItMatters === "string" &&
+    isUsableWhyItMattersText(fallback.whyItMatters, {
+      title: fallback.title,
+    })
+    ? fallback.whyItMatters.trim()
+    : "";
+
   if (!intelligence) {
     return {
       tier: "medium",
       heading: "Why this is here",
-      body: fallback.whyItMatters || `Tracked in ${fallback.topicName} because it cleared the current briefing filters.`,
+      body: preferredBody || `Tracked in ${fallback.topicName} because it cleared the current briefing filters.`,
       supportingSignals: fallback.rankingSignals?.slice(0, 2) ?? [],
     };
   }
 
   const tier = intelligence.confidenceScore >= 72 ? "high" : intelligence.confidenceScore >= 45 ? "medium" : "low";
   const normalized = normalizeIntelligence(intelligence);
-  const body = formatWhyThisMatters(
-    buildGroundedWhyThisMatters(normalized, []),
-    normalized.signalStrength,
-  );
+  const body =
+    preferredBody ||
+    formatWhyThisMatters(buildGroundedWhyThisMatters(normalized, []), normalized.signalStrength);
 
   return {
     tier,
@@ -419,6 +426,37 @@ function buildSignalChips(intelligence: NormalizedIntelligence) {
 
 export function generateWhyThisMattersHeuristically(intelligence: EventIntelligence) {
   return buildGroundedWhyThisMatters(normalizeIntelligence(intelligence), []);
+}
+
+export function isUsableWhyItMattersText(
+  value: unknown,
+  context: {
+    title?: string;
+    whatHappened?: string;
+  } = {},
+) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalized = stripSignalSuffix(value).trim();
+  if (normalized.length < 24 || normalized.split(/\s+/).length < 5) {
+    return false;
+  }
+
+  if (/^(it matters because|this matters because|why it matters)/i.test(normalized)) {
+    return false;
+  }
+
+  if (context.title && similarityScore(normalized, context.title) > 0.92) {
+    return false;
+  }
+
+  if (context.whatHappened && similarityScore(normalized, context.whatHappened) > 0.92) {
+    return false;
+  }
+
+  return true;
 }
 
 function buildGroundedWhyThisMatters(
@@ -452,8 +490,8 @@ function buildGroundedWhyThisMatters(
     .sort((left, right) => left.usage - right.usage);
 
   const chosen = chooseBestCandidate(rankedTemplates, previousOutputs);
-
-  return chosen?.text ?? buildLowConfidenceFallback(intelligence, previousOutputs);
+  const body = chosen?.text ?? buildLowConfidenceFallback(intelligence, previousOutputs);
+  return appendSupportingContext(body, intelligence);
 }
 
 function extractPrimaryAnchor(intelligence: NormalizedIntelligence) {
@@ -873,7 +911,7 @@ function buildLowConfidenceFallback(
       });
 
     const chosen = chooseBestCandidate(rankedTemplates, previousOutputs);
-    return chosen?.text ?? templates[0].text;
+    return appendSupportingContext(chosen?.text ?? templates[0].text, intelligence);
   }
 
   const horizonLabel = getTimeHorizonLabel(intelligence.timeHorizon);
@@ -908,8 +946,146 @@ function buildLowConfidenceFallback(
       return left.index - right.index;
     });
   const chosen = chooseBestCandidate(rankedTemplates, previousOutputs);
+  return appendSupportingContext(
+    chosen?.text ?? templates[getFallbackVariantIndex(intelligence)]?.text ?? templates[0].text,
+    intelligence,
+  );
+}
 
-  return chosen?.text ?? templates[getFallbackVariantIndex(intelligence)]?.text ?? templates[0].text;
+function appendSupportingContext(base: string, intelligence: NormalizedIntelligence) {
+  const evidence = buildEvidenceSentence(intelligence);
+  if (!evidence) {
+    return base;
+  }
+
+  if (base.includes(evidence)) {
+    return base;
+  }
+
+  return `${base} ${evidence}`;
+}
+
+function buildEvidenceSentence(intelligence: NormalizedIntelligence) {
+  const eventType = getEvidenceEventLabel(intelligence.reasoningCategory);
+  const sourceEvidence = buildSourceEvidence(intelligence.signals.articleCount, intelligence.signals.sourceDiversity);
+  const entityEvidence = buildEntityEvidence(intelligence);
+  const rankingEvidence = buildRankingEvidence(intelligence.rankingReason);
+  const deltaEvidence = buildDeltaEvidence(intelligence);
+
+  if (!sourceEvidence && !entityEvidence && !rankingEvidence && !deltaEvidence) {
+    return "";
+  }
+
+  const details = [sourceEvidence, entityEvidence, deltaEvidence, rankingEvidence].filter(Boolean).join("; ");
+  if (!details) {
+    return "";
+  }
+
+  return `It ranks as a ${eventType} because ${details}.`;
+}
+
+function getEvidenceEventLabel(reasoningCategory: NormalizedReasoningCategory) {
+  switch (reasoningCategory) {
+    case "policy_regulation":
+      return "policy signal";
+    case "corporate":
+      return "corporate signal";
+    case "mna_funding":
+      return "deal signal";
+    case "early_stage_funding":
+      return "funding signal";
+    case "large_ipo":
+      return "IPO signal";
+    case "data_report":
+      return "data signal";
+    case "executive_move":
+      return "leadership signal";
+    case "product":
+      return "product signal";
+    case "political":
+      return "governance signal";
+    case "defense_geopolitical":
+      return "geopolitical signal";
+    case "legal_investigation":
+      return "legal-risk signal";
+    case "macro_market_move":
+      return "macro signal";
+    case "non_signal":
+      return "consumer-decision story";
+    default:
+      return "company signal";
+  }
+}
+
+function buildSourceEvidence(articleCount: number, sourceDiversity: number) {
+  if (articleCount > 1 && sourceDiversity > 1) {
+    return `${articleCount} articles from ${sourceDiversity} sources picked up the same development`;
+  }
+
+  if (articleCount > 1) {
+    return `${articleCount} articles tracked the same development`;
+  }
+
+  if (sourceDiversity > 1) {
+    return `${sourceDiversity} sources independently picked it up`;
+  }
+
+  if (articleCount === 1 || sourceDiversity === 1) {
+    return "early coverage is already pointing to the same shift";
+  }
+
+  return "";
+}
+
+function buildEntityEvidence(intelligence: NormalizedIntelligence) {
+  const entities = intelligence.keyEntities.length ? intelligence.keyEntities : intelligence.entities.filter(Boolean);
+  const uniqueEntities = entities
+    .map((entity) => sanitizeAnchorCandidate(entity))
+    .filter(
+      (entity, index, array): entity is string =>
+        Boolean(entity) &&
+        isMeaningfulAnchor(entity) &&
+        array.findIndex((candidate) => candidate.toLowerCase() === entity.toLowerCase()) === index,
+    );
+  const labels = uniqueEntities.slice(0, 2);
+
+  if (!labels.length) {
+    const anchor = getAnchorLabel(intelligence);
+    if (!anchor || anchor.startsWith("This ")) {
+      return "";
+    }
+
+    return `${anchor} is the key entity in view`;
+  }
+
+  if (labels.length === 1) {
+    return `${labels[0]} is the key entity in view`;
+  }
+
+  return `${labels[0]} and ${labels[1]} are the key entities in view`;
+}
+
+function buildRankingEvidence(rankingReason: string) {
+  const cleaned = rankingReason.replace(/\.$/, "").trim();
+  if (!cleaned) {
+    return "";
+  }
+
+  const compact = cleaned.length > 92 ? `${cleaned.slice(0, 89).trimEnd()}...` : cleaned;
+  return `ranking favored it because ${compact.charAt(0).toLowerCase()}${compact.slice(1)}`;
+}
+
+function buildDeltaEvidence(intelligence: NormalizedIntelligence) {
+  const delta = sanitizeDeltaPhrase(intelligence, buildHeadlineDeltaPhrase(intelligence));
+  if (!delta) {
+    return "";
+  }
+
+  return `the clearest shift is in ${delta.replace(/^how\s+/i, "")}`;
+}
+
+function stripSignalSuffix(value: string) {
+  return value.replace(/\s*\(Signal:\s*[^)]+\)\s*$/i, "");
 }
 
 function isLowDataScenario(intelligence: NormalizedIntelligence) {
@@ -1089,6 +1265,25 @@ const SIMILARITY_STOPWORDS = new Set([
   "story",
   "google",
   "chrome",
+  "rank",
+  "ranks",
+  "signal",
+  "article",
+  "articles",
+  "source",
+  "sources",
+  "ranking",
+  "favored",
+  "coverage",
+  "focused",
+  "picked",
+  "development",
+  "key",
+  "entity",
+  "entities",
+  "view",
+  "clearest",
+  "shift",
 ]);
 
 function normalizeForSimilarity(value: string) {

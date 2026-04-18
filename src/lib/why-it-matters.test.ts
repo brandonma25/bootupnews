@@ -4,6 +4,7 @@ import {
   __testing__,
   generateWhyThisMatters,
   generateWhyThisMattersHeuristically,
+  isUsableWhyItMattersText,
 } from "@/lib/why-it-matters";
 import type { EventIntelligence } from "@/lib/types";
 
@@ -262,6 +263,51 @@ describe("why-it-matters", () => {
     expect(text.toLowerCase()).not.toContain("watch for");
   });
 
+  it("grounds heuristic output in source coverage, ranking reason, and key entities", () => {
+    const text = generateWhyThisMattersHeuristically(
+      createIntelligence({
+        title: "Google adds AI Mode to Chrome",
+        summary: "The feature extends browser-integrated AI navigation inside Chrome.",
+        primaryChange: "Google added AI Mode to Chrome",
+        entities: ["Google", "Chrome"],
+        keyEntities: ["Google", "Chrome"],
+        eventType: "product",
+        affectedMarkets: ["adoption", "competitive feature dynamics"],
+        rankingReason: "Broad coverage centered on Chrome's AI-assisted browsing changes.",
+        signals: {
+          articleCount: 4,
+          sourceDiversity: 3,
+          recencyScore: 88,
+          velocityScore: 74,
+        },
+      }),
+    );
+
+    expect(text.toLowerCase()).toContain("product signal");
+    expect(text).toContain("4 articles from 3 sources");
+    expect(text).toContain("Google and Chrome");
+    expect(text.toLowerCase()).toContain("ranking favored it because broad coverage centered on chrome's ai-assisted browsing changes");
+  });
+
+  it("rejects malformed why-it-matters text that just repeats the summary", () => {
+    expect(
+      isUsableWhyItMattersText("Lead summary", {
+        title: "Lead story",
+        whatHappened: "Lead summary",
+      }),
+    ).toBe(false);
+
+    expect(
+      isUsableWhyItMattersText(
+        "Google's browser update matters because 4 articles from 3 sources tie Google and Chrome to a change in browsing behavior.",
+        {
+          title: "Google adds AI Mode to Chrome",
+          whatHappened: "The feature extends browser-integrated AI navigation inside Chrome.",
+        },
+      ),
+    ).toBe(true);
+  });
+
   it("enforces grammar fixes and rejects stray-token subjects", () => {
     const anchor = __testing__.extractPrimaryAnchor(
       createIntelligence({
@@ -346,6 +392,7 @@ describe("why-it-matters", () => {
         topics: ["tech"],
         signalStrength: "moderate",
         confidenceScore: 55,
+        rankingReason: "Coverage focused on browsing behavior changes inside Chrome.",
       }),
       { previousOutputs },
     );
@@ -364,6 +411,7 @@ describe("why-it-matters", () => {
         topics: ["tech"],
         signalStrength: "moderate",
         confidenceScore: 55,
+        rankingReason: "Coverage focused on how Chrome users open links inside AI Mode.",
       }),
       { previousOutputs },
     );

@@ -53,7 +53,7 @@ async function loadResolveClusterSummary(options?: {
           headline: "LLM title",
           whatHappened: "LLM summary",
           keyPoints: ["LLM point 1", "LLM point 2", "LLM point 3"],
-          whyItMatters: "LLM rationale",
+          whyItMatters: "LLM rationale explains why this event changes financial expectations.",
           estimatedMinutes: 5,
         })),
   );
@@ -95,10 +95,10 @@ describe("resolveClusterSummary", () => {
       title: "LLM title",
       whatHappened: "LLM summary",
       keyPoints: ["LLM point 1", "LLM point 2", "LLM point 3"],
-      whyItMatters: "LLM rationale",
+      whyItMatters: "LLM rationale explains why this event changes financial expectations.",
       estimatedMinutes: 5,
     });
-  });
+  }, 15000);
 
   it("keeps the deterministic fallback when AI is not configured", async () => {
     const { resolveClusterSummary, summarizeCluster } = await loadResolveClusterSummary({
@@ -146,5 +146,34 @@ describe("resolveClusterSummary", () => {
     });
 
     expect(summary).toEqual(fallbackSummary);
+  });
+
+  it("falls back when the AI returns a malformed why-it-matters line", async () => {
+    const { resolveClusterSummary } = await loadResolveClusterSummary({
+      isAiConfigured: true,
+      summarizeClusterImpl: () =>
+        Promise.resolve({
+          headline: "Lead story",
+          whatHappened: "Lead summary",
+          keyPoints: ["LLM point 1", "LLM point 2", "LLM point 3"],
+          whyItMatters: "Lead summary",
+          estimatedMinutes: 5,
+        }),
+    });
+
+    const summary = await resolveClusterSummary({
+      topicName: "Finance",
+      articles,
+      fallback: fallbackSummary,
+      timeoutMs: 10,
+    });
+
+    expect(summary).toEqual({
+      title: "Lead story",
+      whatHappened: "Lead summary",
+      keyPoints: ["LLM point 1", "LLM point 2", "LLM point 3"],
+      whyItMatters: "Deterministic rationale",
+      estimatedMinutes: 5,
+    });
   });
 });

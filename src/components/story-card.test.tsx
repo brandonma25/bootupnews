@@ -98,6 +98,12 @@ describe("StoryCard timeline", () => {
             title: "Fed signals rates will stay elevated",
             summary: "Markets are repricing after the latest Fed signal.",
             primaryChange: "Fed signaled rates will stay elevated",
+            entities: ["Federal Reserve"],
+            eventType: "macro_market_move",
+            primaryImpact: "The signal could change rate expectations and sector pricing.",
+            affectedMarkets: ["rates", "equities"],
+            timeHorizon: "medium",
+            signalStrength: "strong",
             keyEntities: ["Federal Reserve"],
             topics: ["finance"],
             signals: {
@@ -124,5 +130,46 @@ describe("StoryCard timeline", () => {
     ).toBeGreaterThan(0);
     expect(screen.getByText("Covered by 5 articles")).toBeInTheDocument();
     expect(screen.getByText("Seen across 3 sources")).toBeInTheDocument();
+  });
+
+  it("prefers the mapped why-it-matters copy when event intelligence is present", () => {
+    render(
+      <StoryCard
+        item={createItem({
+          whyItMatters: "Google's Chrome rollout matters because 4 articles from 3 sources tie Google and Chrome to a measurable shift in browsing behavior.",
+          eventIntelligence: {
+            id: "intel-2",
+            title: "Google adds AI Mode to Chrome",
+            summary: "The feature extends browser-integrated AI navigation inside Chrome.",
+            primaryChange: "Google added AI Mode to Chrome",
+            entities: ["Google", "Chrome"],
+            eventType: "product",
+            primaryImpact: "The change could alter search behavior and Chrome engagement.",
+            affectedMarkets: ["adoption", "competitive feature dynamics"],
+            timeHorizon: "medium",
+            signalStrength: "moderate",
+            keyEntities: ["Google", "Chrome"],
+            topics: ["tech"],
+            signals: {
+              articleCount: 4,
+              sourceDiversity: 3,
+              recencyScore: 81,
+              velocityScore: 62,
+            },
+            rankingScore: 72,
+            rankingReason: "Broad coverage centered on Chrome's AI-assisted browsing changes.",
+            confidenceScore: 79,
+            isHighSignal: true,
+            createdAt: "2026-04-19T08:00:00.000Z",
+          },
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Google's Chrome rollout matters because 4 articles from 3 sources tie Google and Chrome to a measurable shift in browsing behavior.",
+      ),
+    ).toBeInTheDocument();
   });
 });

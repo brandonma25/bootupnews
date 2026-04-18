@@ -33,7 +33,11 @@ import type {
   Topic,
   ViewerAccount,
 } from "@/lib/types";
-import { buildTrustLayerPresentation, generateWhyThisMatters } from "@/lib/why-it-matters";
+import {
+  buildTrustLayerPresentation,
+  generateWhyThisMatters,
+  isUsableWhyItMattersText,
+} from "@/lib/why-it-matters";
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
@@ -1002,7 +1006,11 @@ async function resolveClusterSummary(input: {
       title: summary.headline.trim() || input.fallback.title,
       whatHappened: summary.whatHappened.trim() || input.fallback.whatHappened,
       keyPoints: normalizeSummaryKeyPoints(summary.keyPoints, input.fallback.keyPoints),
-      whyItMatters: summary.whyItMatters.trim() || input.fallback.whyItMatters,
+      whyItMatters: normalizeWhyItMatters(summary.whyItMatters, {
+        fallback: input.fallback.whyItMatters,
+        title: summary.headline.trim() || input.fallback.title,
+        whatHappened: summary.whatHappened.trim() || input.fallback.whatHappened,
+      }),
       estimatedMinutes: normalizeEstimatedMinutes(summary.estimatedMinutes, input.fallback.estimatedMinutes),
     };
   } catch {
@@ -1055,6 +1063,28 @@ function normalizeEstimatedMinutes(value: number, fallback: number) {
   }
 
   return Math.min(6, Math.max(3, Math.round(value)));
+}
+
+function normalizeWhyItMatters(
+  value: unknown,
+  input: {
+    fallback: string;
+    title: string;
+    whatHappened: string;
+  },
+) {
+  const text = typeof value === "string" ? value.trim() : "";
+
+  if (
+    isUsableWhyItMattersText(text, {
+      title: input.title,
+      whatHappened: input.whatHappened,
+    })
+  ) {
+    return text;
+  }
+
+  return input.fallback;
 }
 
 export async function persistRawArticles(
