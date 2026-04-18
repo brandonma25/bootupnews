@@ -122,10 +122,27 @@
   - no known blockers remain
 
 ## Required External Configuration
-- GitHub branch protection should require the PR checks listed above.
+- GitHub branch protection must require the PR checks listed above.
 - Vercel preview automation must provide a preview URL to the Preview Gate workflow.
 - GitHub repo variable `PRODUCTION_BASE_URL` should point at the canonical production URL for automatic post-merge verification.
 - No secrets are stored in repo scripts or workflows; placeholder env values are used for build-safe automation.
+
+## Branch Protection Verification Checklist
+- Open the GitHub branch protection or ruleset configuration for `main`.
+- Confirm that these checks are required with the exact names shown in PR checks:
+  - `feature-system-csv-validation`
+  - `pr-lint`
+  - `pr-unit-tests`
+  - `pr-build`
+  - `pr-e2e-chromium`
+  - `pr-summary`
+  - `release-governance-gate`
+- Confirm the rule applies to pull requests targeting `main`.
+- Confirm a failing required check blocks merge instead of allowing a maintainer merge-through by default.
+- Re-verify on a real pull request by checking that the merge box reports required checks and refuses merge when one required check is failing.
+- Repo evidence note:
+  - PR #34 proved that the workflow could fail without blocking merge before branch protection was aligned.
+  - PR #46 proved the corrected workflow and classifier ran successfully after the governance patch merged.
 
 ## Documentation Placement
 - Release automation is governed as engineering documentation, not as a standalone PRD family.

@@ -32,3 +32,17 @@
 - `.github/workflows/release-governance-gate.yml` runs the gate on `pull_request`.
 - `docs/product/feature-system.csv` includes the PRD mapping for this governance gate.
 - Repo-safe documentation explains the new release governance gate.
+
+## Current Completion Note
+- Repo-side implementation is merged on `main`, and post-PR-46 audit evidence confirms that `release-governance-gate` runs on real pull requests with the expected check name.
+- Final closure still depends on one external GitHub setting that cannot be verified or changed from repo code alone: branch protection for `main` must require `release-governance-gate` alongside the other PR Gate checks.
+- Until that GitHub setting is verified, PRD-23 should be treated as `In Review` rather than fully closed.
+
+## Evidence and Confidence
+- Repo evidence used:
+  - merged commit `5064935` from PR #46 on `origin/main`
+  - live PR check evidence from PRs #34, #45, and #46
+  - local classifier probes for docs-only, tests-only, `package.json`, new script, and auth-route changes
+- Confidence:
+  - High confidence that the repo-side implementation is correct
+  - Medium confidence on merge-blocking enforcement until GitHub branch protection is verified externally
