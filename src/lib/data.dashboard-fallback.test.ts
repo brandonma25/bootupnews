@@ -316,6 +316,8 @@ describe("getDashboardData fallback behavior", () => {
     expect(lead.whatHappened).toContain("Federal Reserve");
     expect(lead.whyItMatters.toLowerCase()).toMatch(/fed|rates|market/);
     expect(lead.rankingSignals?.[0]).not.toContain("Credibility");
+    expect(lead.keyPoints.join(" ").toLowerCase()).not.toContain("cluster evidence");
+    expect(lead.keyPoints.join(" ").toLowerCase()).not.toContain("weighted similarity");
     expect(lead.relatedArticles?.[0]?.title).toContain("Fed signals rates");
   });
 });

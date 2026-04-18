@@ -60,7 +60,7 @@ function createData(items: BriefingItem[]): DashboardData {
 }
 
 describe("buildHomepageViewModel", () => {
-  it("keeps a ranked finance event visible without duplicating it into the top-ranked rail", () => {
+  it("keeps a featured finance event out of downstream rails", () => {
     const financeItem = createItem({
       id: "finance-1",
       topicId: "finance",
@@ -79,8 +79,8 @@ describe("buildHomepageViewModel", () => {
 
     expect(model.featured?.id).toBe("finance-1");
     expect(model.topRanked.map((event) => event.id)).not.toContain("finance-1");
-    expect(financeSection?.events.map((event) => event.id)).toContain("finance-1");
-    expect(financeSection?.state).toBe("sparse");
+    expect(financeSection?.events).toHaveLength(0);
+    expect(model.debug.semanticDuplicateSuppressedCount).toBeGreaterThan(0);
   });
 
   it("maps geopolitics coverage into the politics category", () => {
@@ -97,7 +97,8 @@ describe("buildHomepageViewModel", () => {
     const model = buildHomepageViewModel(createData([politicsItem]));
     const politicsSection = model.categorySections.find((section) => section.key === "politics");
 
-    expect(politicsSection?.events.map((event) => event.id)).toContain("politics-1");
+    expect(model.featured?.id).toBe("politics-1");
+    expect(politicsSection?.events).toHaveLength(0);
   });
 
   it("renders an empty category only when no eligible events exist", () => {
@@ -133,8 +134,8 @@ describe("buildHomepageViewModel", () => {
     const model = buildHomepageViewModel(createData([financeItem]));
     const financeSection = model.categorySections.find((section) => section.key === "finance");
 
-    expect(financeSection?.state).toBe("sparse");
-    expect(financeSection?.placeholderCount).toBe(1);
+    expect(model.featured?.id).toBe("finance-thin");
+    expect(financeSection?.state).toBe("empty");
   });
 
   it("keeps early signals in their primary category instead of duplicating them into unrelated empty rails", () => {
@@ -155,7 +156,7 @@ describe("buildHomepageViewModel", () => {
     const financeSection = model.categorySections.find((section) => section.key === "finance");
 
     expect(model.featured?.id).toBe("early-tech");
-    expect(techSection?.events.map((event) => event.id)).toContain("early-tech");
+    expect(techSection?.events).toHaveLength(0);
     expect(financeSection?.fallbackEvents).toHaveLength(0);
   });
 
@@ -230,8 +231,69 @@ describe("buildHomepageViewModel", () => {
       ...model.trending.map((event) => event.id),
     ].filter((eventId): eventId is string => Boolean(eventId));
 
-    expect(new Set(surfacedIds).size).toBe(surfacedIds.length - 1);
+    expect(new Set(surfacedIds).size).toBe(surfacedIds.length);
     expect(model.debug.surfacedDuplicateCount).toBe(0);
+  });
+
+  it("suppresses semantically near-duplicate stories across rails", () => {
+    const firstStory = createItem({
+      id: "apple-1",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Apple delays Vision Pro launch timeline",
+      whatHappened: "Multiple outlets say Apple is pushing back the Vision Pro schedule.",
+      matchedKeywords: ["apple", "vision pro", "launch"],
+      sourceCount: 4,
+    });
+    const secondStory = createItem({
+      id: "apple-2",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Apple pushes back Vision Pro rollout plans",
+      whatHappened: "A second cluster candidate describes the same Apple headset delay.",
+      matchedKeywords: ["apple", "vision pro", "rollout"],
+      sourceCount: 3,
+    });
+    const thirdStory = createItem({
+      id: "rates-1",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Treasury yields climb after inflation surprise",
+      matchedKeywords: ["treasury", "inflation", "yields"],
+      sourceCount: 4,
+    });
+
+    const model = buildHomepageViewModel(createData([firstStory, secondStory, thirdStory]));
+    const surfacedIds = [
+      model.featured?.id,
+      ...model.topRanked.map((event) => event.id),
+      ...model.categorySections.flatMap((section) => section.events.map((event) => event.id)),
+      ...model.trending.map((event) => event.id),
+    ].filter((eventId): eventId is string => Boolean(eventId));
+
+    expect(surfacedIds).toContain("apple-1");
+    expect(surfacedIds).not.toContain("apple-2");
+    expect(model.debug.semanticDuplicateSuppressedCount).toBeGreaterThan(0);
+  });
+
+  it("keeps ranking explanations free of junk debug phrases", () => {
+    const item = createItem({
+      id: "politics-clean-copy",
+      topicId: "politics",
+      topicName: "Politics",
+      title: "White House weighs new sanctions package",
+      whatHappened: "Multiple outlets report a sanctions package is under active review.",
+      matchedKeywords: ["white house", "sanctions", "policy"],
+      sourceCount: 4,
+    });
+
+    const model = buildHomepageViewModel(createData([item]));
+    const event = model.featured;
+
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("triggered by");
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("weighted similarity");
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("cluster evidence");
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("signal like");
   });
 
   it("keeps single-source items out of the top-ranked event rail", () => {

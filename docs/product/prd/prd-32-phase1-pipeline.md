@@ -71,6 +71,7 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
 - The dashboard summary is deterministic and intentionally basic.
 - Topic assignment for public digest cards is heuristic in Phase 1.
 - Observability currently logs to runtime output instead of a persistent analytics store.
+- Homepage rail variety now uses deterministic semantic suppression, but live-feed quality still limits how diverse the visible event mix can become in sparse runs.
 
 ## Clustering Upgrade Note
 
@@ -89,6 +90,12 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
 - Inspectability:
   - clusters now keep merge decisions, prevented-merge counts, and representative selection reasons
   - pipeline runs now expose average cluster size, singleton count, prevented merges, and sample cluster rationale
+
+## Homepage Quality Note
+
+- Semantic dedup now suppresses repeated event families across the hero, top-event rail, category rails, and watchlist where possible.
+- `Why this ranks here` now describes source confirmation, freshness, and likely impact in user-facing language instead of keyword-trigger or debug-style phrasing.
+- The low-value `Trigger / Earlier / Shift` timeline block was removed from homepage cards because current Phase 1 data quality does not support a reliable user-facing timeline narrative.
 
 ## Evidence and Confidence
 

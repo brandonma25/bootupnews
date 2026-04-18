@@ -571,9 +571,7 @@ export async function generateDailyBriefing(
       sourceName: article.source,
       note: articleIndex === 0 ? "Lead coverage" : "Corroborating coverage",
     }));
-    const mergeReason =
-      cluster.cluster_debug.merge_decisions.find((decision) => decision.decision === "merged")?.reasons[0] ??
-      "multiple articles reinforced the same event signature";
+    const corroborationWindow = getClusterCorroborationWindow(cluster.articles.map((article) => article.published_at));
 
     return {
       id: `generated-${cluster.cluster_id}`,
@@ -582,9 +580,9 @@ export async function generateDailyBriefing(
       title: intelligence.title,
       whatHappened: intelligence.summary,
       keyPoints: [
-        `${cluster.cluster_size} related articles across ${sourceCount} ${sourceCount === 1 ? "source" : "sources"} converged on this event.`,
-        `Cluster evidence centered on ${cluster.topic_keywords.slice(0, 4).join(", ")} with ${mergeReason}.`,
-        `Deterministic score ${ranked.score}/100 from credibility ${Math.round(ranked.score_breakdown.credibility)}, urgency ${Math.round(ranked.score_breakdown.urgency)}, and reinforcement ${Math.round(ranked.score_breakdown.reinforcement)}.`,
+        `${cluster.cluster_size} article${cluster.cluster_size === 1 ? "" : "s"} from ${sourceCount} ${sourceCount === 1 ? "source" : "sources"} are covering the same development.`,
+        `Coverage lined up ${corroborationWindow} around the representative report.`,
+        `The event ranked highly because credibility, recency, and cross-source confirmation all cleared the current briefing threshold.`,
       ],
       whyItMatters: trustLayer.body,
       sources: relatedArticles.map((article) => ({
@@ -602,10 +600,9 @@ export async function generateDailyBriefing(
       importanceScore: ranked.score,
       importanceLabel: ranked.score >= 80 ? "Critical" : ranked.score >= 65 ? "High" : "Watch",
       rankingSignals: [
-        intelligence.rankingReason,
-        `Deterministic score ${ranked.score}/100.`,
-        `Novelty ${Math.round(ranked.score_breakdown.novelty)}/100.`,
-        `Reinforcement ${Math.round(ranked.score_breakdown.reinforcement)}/100 across ${sourceCount} ${sourceCount === 1 ? "source" : "sources"}.`,
+        buildPublicRankingSignal(cluster.cluster_size, sourceCount, intelligence),
+        `Recent coverage and source agreement kept this event near the top of the briefing.`,
+        `The event still looks fresh enough to matter now, rather than as background context.`,
       ],
       eventIntelligence: intelligence,
     };
@@ -733,6 +730,49 @@ function selectPublicBriefingItems(items: BriefingItem[], limit = 5) {
   }
 
   return selected;
+}
+
+function buildPublicRankingSignal(
+  clusterSize: number,
+  sourceCount: number,
+  intelligence: ReturnType<typeof buildEventIntelligence>,
+) {
+  if (sourceCount >= 3) {
+    return `Ranked high because multiple credible sources converged on the same development while it was still fresh.`;
+  }
+
+  if (clusterSize >= 2) {
+    return `Ranked highly because the development already has corroborating coverage and could still move the story further.`;
+  }
+
+  if (intelligence.isHighSignal) {
+    return `Ranked for likely impact even though coverage is still early.`;
+  }
+
+  return `Ranked as a watch item because it is recent and potentially meaningful, but still lightly confirmed.`;
+}
+
+function getClusterCorroborationWindow(publishedAtValues: string[]) {
+  const timestamps = publishedAtValues
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => right - left);
+
+  if (timestamps.length < 2) {
+    return "around the same reporting window";
+  }
+
+  const spreadHours = Math.max(0, (timestamps[0] - timestamps[timestamps.length - 1]) / (1000 * 60 * 60));
+
+  if (spreadHours < 1) {
+    return "within the same hour";
+  }
+
+  if (spreadHours < 24) {
+    return `within roughly ${Math.round(spreadHours)} hours`;
+  }
+
+  return `within roughly ${Math.round(spreadHours / 24)} days`;
 }
 
 export async function syncTopicMatches(
