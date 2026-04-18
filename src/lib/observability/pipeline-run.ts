@@ -1,10 +1,14 @@
 export type ClusterScoreLog = {
   cluster_id: string;
+  provider: string;
   credibility: number;
   novelty: number;
   urgency: number;
+  reinforcement: number;
   cluster_size: number;
   final_score: number;
+  diversity_action: string;
+  diversity_reason: string;
 };
 
 export type PipelineRun = {
@@ -18,6 +22,15 @@ export type PipelineRun = {
   prevented_merge_count: number;
   top_scores: number[];
   scoring_breakdown: ClusterScoreLog[];
+  ranking_provider: string | null;
+  diversity_provider: string | null;
+  suppressed_ranked_clusters: Array<{
+    cluster_id: string;
+    action: string;
+    reason: string;
+    score_delta: number;
+    related_cluster_id?: string;
+  }>;
   sample_cluster_rationale: Array<{
     cluster_id: string;
     representative_title: string;
@@ -61,6 +74,9 @@ export function createEmptyPipelineRun(runId: string): PipelineRun {
     prevented_merge_count: 0,
     top_scores: [],
     scoring_breakdown: [],
+    ranking_provider: null,
+    diversity_provider: null,
+    suppressed_ranked_clusters: [],
     sample_cluster_rationale: [],
     feed_failures: [],
     active_sources: [],

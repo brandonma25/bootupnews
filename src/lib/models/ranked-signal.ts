@@ -1,3 +1,5 @@
+import type { RankingDebug } from "@/lib/integration/subsystem-contracts";
+
 export interface RankedSignal {
   cluster_id: string;
   score: number;
@@ -7,4 +9,5 @@ export interface RankedSignal {
     urgency: number;
     reinforcement: number;
   };
+  ranking_debug: RankingDebug;
 }

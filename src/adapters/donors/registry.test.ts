@@ -46,6 +46,7 @@ describe("donor registry", () => {
     expect(registry.find((entry) => entry.donor === "horizon")?.contractStates.enrichment).toBe("future_ready");
     expect(registry.find((entry) => entry.donor === "after_market_agent")?.clusteringCapabilities?.provider).toBe("after_market_agent");
     expect(registry.find((entry) => entry.donor === "fns")?.diversitySupportAvailable).toBe(true);
+    expect(registry.find((entry) => entry.donor === "fns")?.rankingFeatureSupport?.provider).toBe("fns");
   });
 
   it("normalizes donor feed metadata through the canonical ingestion contract", async () => {
@@ -88,16 +89,21 @@ describe("donor registry", () => {
       topic_keywords: ["policy", "market", "impact"],
       cluster_size: 1,
       cluster_debug: {
+        provider: "after_market_agent",
+        clustering_capabilities: ["title_overlap"],
+        candidate_snapshots: [],
         merge_decisions: [],
         prevented_merge_count: 0,
         representative_selection_reason: "only article",
         representative_scores: [{ article_id: "article-1", score: 1, reasons: ["only article"] }],
+        diversity_support_available: true,
       },
     };
 
     expect(provider).toBeDefined();
     expect(provider!.getKnownSources().map((entry) => entry.source)).toContain("Associated Press");
-    expect(provider!.mapClusterFeatures(cluster).credibilityWeights).toContain(88);
+    expect(provider!.describeFeatureSupport().supportedFeatures).toContain("source_credibility");
+    expect(provider!.mapClusterToRankingFeatures(cluster, [cluster]).source_credibility).toBe(88);
     expect(getCanonicalSourceMetadata().map((entry) => entry.source)).toContain("Reuters World");
   });
 
@@ -114,9 +120,43 @@ describe("donor registry", () => {
   it("exposes after-market-agent clustering support and future-ready FNS diversity support", () => {
     const clusteringSupport = getClusteringSupportAdapters().find((entry) => entry.donor === "after_market_agent");
     const diversitySupport = getDiversitySupports().find((entry) => entry.donor === "fns");
+    const cluster: SignalCluster = {
+      cluster_id: "cluster-1",
+      articles: [createArticle()],
+      representative_article: createArticle(),
+      topic_keywords: ["policy", "market", "impact"],
+      cluster_size: 1,
+      cluster_debug: {
+        provider: "after_market_agent",
+        clustering_capabilities: ["title_overlap"],
+        candidate_snapshots: [],
+        merge_decisions: [],
+        prevented_merge_count: 0,
+        representative_selection_reason: "only article",
+        representative_scores: [{ article_id: "article-1", score: 1, reasons: ["only article"] }],
+        diversity_support_available: true,
+      },
+    };
 
     expect(clusteringSupport).toBeDefined();
     expect(clusteringSupport!.support.describeCapabilities().similaritySignals).toContain("source_confirmation");
     expect(diversitySupport?.support.available).toBe(true);
+    expect(diversitySupport?.support.evaluateDiversityAdjustment([
+      {
+        cluster,
+        features: {
+          source_credibility: 88,
+          trust_tier: 90,
+          source_confirmation: 50,
+          recency: 80,
+          urgency: 80,
+          novelty: 70,
+          reinforcement: 68,
+          cluster_size: 1,
+          representative_quality: 72,
+        },
+        baseScore: 80,
+      },
+    ])[0]?.action).toBe("none");
   });
 });

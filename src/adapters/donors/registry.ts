@@ -13,9 +13,11 @@ import type {
   ClusterCandidate,
   ClusteringSupport,
   DiversitySupport,
+  DiversityAdjustment,
   EnrichmentSupport,
   IngestionAdapter,
   MergeDecisionSupport,
+  RankingFeatureSet,
   RankingFeatureProvider,
   RepresentativeSelectionSupport,
   SimilaritySignals,
@@ -349,7 +351,42 @@ const afterMarketAgentClusteringSupport: ClusteringSupport = {
 const fnsDiversitySupport: DiversitySupport = {
   available: true,
   describeRole() {
-    return "Future-ready post-cluster diversity support can operate after canonical SignalCluster assembly.";
+    return "Active post-cluster diversity support can penalize overcrowded near-duplicate ranked outputs after canonical scoring.";
+  },
+  evaluateDiversityAdjustment(rankedClusters) {
+    const seenFingerprints: Array<{ clusterId: string; fingerprint: Set<string> }> = [];
+
+    return rankedClusters.map((entry) => {
+      const fingerprint = new Set([
+        ...entry.cluster.topic_keywords.slice(0, 4),
+        ...entry.cluster.representative_article.normalized_entities.slice(0, 2),
+      ]);
+
+      const collision = seenFingerprints.find((seen) => {
+        const overlap = [...fingerprint].filter((token) => seen.fingerprint.has(token)).length;
+        const union = new Set([...fingerprint, ...seen.fingerprint]).size || 1;
+        return overlap / union >= 0.45;
+      });
+
+      seenFingerprints.push({ clusterId: entry.cluster.cluster_id, fingerprint });
+
+      if (!collision) {
+        return {
+          cluster_id: entry.cluster.cluster_id,
+          action: "none",
+          scoreDelta: 0,
+          reason: "No diversity penalty applied.",
+        } satisfies DiversityAdjustment;
+      }
+
+      return {
+        cluster_id: entry.cluster.cluster_id,
+        action: "penalize",
+        scoreDelta: entry.baseScore > 82 ? -4.5 : -6,
+        reason: "Penalized because a higher-ranked cluster already covers a similar event family.",
+        relatedClusterId: collision.clusterId,
+      } satisfies DiversityAdjustment;
+    });
   },
 };
 
@@ -358,23 +395,52 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
   const sourceIndex = new Map(knownSources.map((source) => [source.source.toLowerCase(), source]));
 
   return {
+    describeFeatureSupport() {
+      return {
+        provider: donor,
+        supportedFeatures: [
+          "source_credibility",
+          "trust_tier",
+          "source_confirmation",
+          "representative_quality",
+          "reinforcement",
+        ] satisfies Array<keyof RankingFeatureSet>,
+        trustSignals: ["source metadata", "trust tier", "source diversity"],
+      };
+    },
     getKnownSources() {
       return knownSources;
     },
-    mapClusterFeatures(cluster: SignalCluster) {
+    mapClusterToRankingFeatures(cluster: SignalCluster) {
       const matches = cluster.articles
         .map((article) => sourceIndex.get(article.source.toLowerCase()))
         .filter((entry): entry is CanonicalSourceMetadata => Boolean(entry));
+      const trustTier =
+        matches.length === 0
+          ? 68
+          : matches.reduce((sum, entry) => {
+              if (entry.trustTier === "tier_1") return sum + 92;
+              if (entry.trustTier === "tier_2") return sum + 78;
+              return sum + 64;
+            }, 0) / matches.length;
+      const sourceConfirmation = Math.min(100, new Set(cluster.articles.map((article) => article.source)).size * 24);
+      const representativeQuality = Math.min(
+        100,
+        58 + cluster.representative_article.keywords.length * 4 + cluster.representative_article.entities.length * 5,
+      );
+      const reinforcement = Math.min(
+        100,
+        32 + cluster.cluster_size * 18 + new Set(cluster.articles.map((article) => article.source)).size * 10,
+      );
 
       return {
-        credibilityWeights: matches.map((entry) => entry.credibility),
-        sourceClasses: [...new Set(matches.map((entry) => entry.sourceClass))],
-        notes: matches.length
-          ? [
-              `${donor} matched ${matches.length} canonical source metadata entries.`,
-              `Source classes: ${[...new Set(matches.map((entry) => entry.sourceClass))].join(", ")}`,
-            ]
-          : [`${donor} found no canonical source metadata matches for this cluster.`],
+        source_credibility: matches.length
+          ? Number((matches.reduce((sum, entry) => sum + entry.credibility, 0) / matches.length).toFixed(2))
+          : undefined,
+        trust_tier: Number(trustTier.toFixed(2)),
+        source_confirmation: Number(sourceConfirmation.toFixed(2)),
+        representative_quality: Number(representativeQuality.toFixed(2)),
+        reinforcement: Number(reinforcement.toFixed(2)),
       };
     },
   };
@@ -429,6 +495,7 @@ export function getDonorRegistrySnapshot() {
     feedCount: entry.feeds.length,
     ingestionCapabilities: entry.ingestionAdapter.describeCapabilities(),
     clusteringCapabilities: entry.clusteringSupport?.describeCapabilities(),
+    rankingFeatureSupport: entry.rankingFeatureProvider?.describeFeatureSupport(),
     diversitySupportAvailable: entry.diversitySupport?.available ?? false,
   }));
 }

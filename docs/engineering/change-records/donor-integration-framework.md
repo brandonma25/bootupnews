@@ -21,9 +21,9 @@ The website repo now owns a formal donor integration framework for the cluster-f
   - future/stubbed: ingestion, ranking, enrichment
   - boundary: candidate preparation, similarity-signal support, merge-decision support, and representative-selection support
 - `FINANCIAL-NEWS-SUMMARIZER`
-  - active now: ranking feature provider
+  - active now: ranking feature provider and diversity support owner
   - future/stubbed: ingestion, clustering execution, enrichment
-  - boundary: deterministic source-quality feature mapping only
+  - boundary: deterministic ranking feature mapping and post-cluster diversity support only
 - `Horizon`
   - active now: secondary ingestion/source-breadth donor
   - future-ready: enrichment support
@@ -44,8 +44,9 @@ The website repo now owns a formal donor integration framework for the cluster-f
   - candidate fingerprint helper
   - representative selection support
 - `DiversitySupport`
-  - optional post-cluster diversity hook only
+  - post-cluster diversity adjustment hook
 - `RankingFeatureProvider`
+  - feature support description
   - known-source metadata
   - cluster feature mapping into deterministic scoring inputs
 - `EnrichmentSupport`
@@ -61,7 +62,7 @@ The website repo now owns a formal donor integration framework for the cluster-f
 - Donor-assisted now:
   - ingestion source registry, feed metadata, and transport boundary
   - clustering support boundary
-  - ranking source-feature mapping
+  - ranking feature mapping and post-cluster diversity adjustment
 - Stubbed / future-ready:
   - Horizon enrichment execution
 

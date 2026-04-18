@@ -22,6 +22,8 @@ describe("runClusterFirstPipeline", () => {
     expect(result.run.prevented_merge_count).toBeGreaterThan(0);
     expect(result.run.active_sources.length).toBeGreaterThan(0);
     expect(result.run.source_contributions.length).toBeGreaterThan(0);
+    expect(result.run.ranking_provider).toBeTruthy();
+    expect(result.run.diversity_provider).toBeTruthy();
     expect(result.run.sample_cluster_rationale.length).toBeGreaterThan(0);
     expect(result.digest.most_important_now).toHaveLength(5);
     expect(new Set(result.digest.most_important_now.map((item) => item.score)).size).toBeGreaterThan(1);

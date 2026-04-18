@@ -145,17 +145,58 @@ export interface ClusteringSupport {
 }
 
 export interface RankingFeatureProvider {
-  getKnownSources(): CanonicalSourceMetadata[];
-  mapClusterFeatures(cluster: SignalCluster): {
-    credibilityWeights: number[];
-    sourceClasses: SourceClass[];
-    notes: string[];
+  describeFeatureSupport(): {
+    provider: string;
+    supportedFeatures: Array<keyof RankingFeatureSet>;
+    trustSignals: string[];
   };
+  getKnownSources(): CanonicalSourceMetadata[];
+  mapClusterToRankingFeatures(cluster: SignalCluster, allClusters: SignalCluster[]): Partial<RankingFeatureSet>;
 }
 
 export interface DiversitySupport {
   available: boolean;
   describeRole(): string;
+  evaluateDiversityAdjustment(
+    rankedClusters: Array<{
+      cluster: SignalCluster;
+      features: RankingFeatureSet;
+      baseScore: number;
+    }>,
+  ): DiversityAdjustment[];
+}
+
+export interface RankingFeatureSet {
+  source_credibility: number;
+  trust_tier: number;
+  source_confirmation: number;
+  recency: number;
+  urgency: number;
+  novelty: number;
+  reinforcement: number;
+  cluster_size: number;
+  representative_quality: number;
+}
+
+export interface DiversityAdjustment {
+  cluster_id: string;
+  action: "none" | "penalize";
+  scoreDelta: number;
+  reason: string;
+  relatedClusterId?: string;
+}
+
+export interface RankingDebug {
+  provider: string;
+  features: RankingFeatureSet;
+  feature_weights: {
+    credibility: number;
+    novelty: number;
+    urgency: number;
+    reinforcement: number;
+  };
+  diversity: DiversityAdjustment;
+  notes: string[];
 }
 
 export interface EnrichmentSupport {

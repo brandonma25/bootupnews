@@ -59,6 +59,18 @@ export async function runClusterFirstPipeline(options: {
   run.prevented_merge_count = preventedMergeCount;
   run.top_scores = rankedClusters.slice(0, 5).map((entry) => entry.ranked.score);
   run.scoring_breakdown = rankedClusters.map((entry) => entry.scoringLog);
+  run.ranking_provider = rankedClusters[0]?.ranked.ranking_debug.provider ?? null;
+  run.diversity_provider = rankedClusters.find((entry) => entry.ranked.ranking_debug.diversity.action !== "none")
+    ?.ranked.ranking_debug.provider ?? rankedClusters[0]?.ranked.ranking_debug.provider ?? null;
+  run.suppressed_ranked_clusters = rankedClusters
+    .filter((entry) => entry.ranked.ranking_debug.diversity.action !== "none")
+    .map((entry) => ({
+      cluster_id: entry.cluster.cluster_id,
+      action: entry.ranked.ranking_debug.diversity.action,
+      reason: entry.ranked.ranking_debug.diversity.reason,
+      score_delta: entry.ranked.ranking_debug.diversity.scoreDelta,
+      related_cluster_id: entry.ranked.ranking_debug.diversity.relatedClusterId,
+    }));
   run.sample_cluster_rationale = rankedClusters.slice(0, 3).map((entry) => ({
     cluster_id: entry.cluster.cluster_id,
     representative_title: entry.cluster.representative_article.title,
@@ -77,6 +89,9 @@ export async function runClusterFirstPipeline(options: {
     avg_cluster_size: run.avg_cluster_size,
     singleton_count: run.singleton_count,
     prevented_merge_count: run.prevented_merge_count,
+    ranking_provider: run.ranking_provider,
+    diversity_provider: run.diversity_provider,
+    suppressed_ranked_clusters: run.suppressed_ranked_clusters,
     sample_cluster_rationale: run.sample_cluster_rationale,
   });
 

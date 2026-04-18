@@ -66,6 +66,20 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
 - `urgency`: rewards fresher stories and explicit urgent event language
 - `reinforcement`: rewards cluster size and source diversity
 
+## Ranking and Diversity Note
+
+- ranking now uses a canonical `RankingFeatureSet` that includes:
+  - source credibility
+  - trust tier
+  - source confirmation
+  - recency / urgency
+  - novelty
+  - reinforcement
+  - representative quality
+- FNS is the active ranking support owner for donor-backed feature mapping
+- diversity adjustments now run after canonical base scoring to reduce overcrowded near-duplicate outputs
+- final score calculation and ranked output remain canonical website logic
+
 ## Known Limitations
 
 - Clustering is materially stricter, but adjacent macro or policy stories can still require threshold tuning as feed mix changes.
@@ -84,7 +98,7 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
 - `after-market-agent` is the active clustering-support donor:
   - contributes cluster candidate preparation, similarity-signal support, merge-decision support, and representative-selection support
 - `FINANCIAL-NEWS-SUMMARIZER` is the active ranking-feature donor:
-  - contributes source-quality metadata that flows into deterministic scoring
+  - contributes canonical ranking feature mapping and post-cluster diversity support
 - `Horizon` enrichment is future-ready only:
   - exposes a stub-safe enrichment contract without entering the critical path
 - Adapter rule:
@@ -130,7 +144,7 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
   - representative selection support
 - after-market-agent is the active clustering support owner
 - final `SignalCluster` assembly remains canonical website logic
-- FNS diversity-aware post-cluster support is future-ready only
+- FNS diversity-aware post-cluster support is now active and deterministic
 
 ## Homepage Quality Note
 
