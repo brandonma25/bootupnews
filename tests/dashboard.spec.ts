@@ -37,4 +37,38 @@ test.describe("dashboard", () => {
       page.getByRole("alert").getByText(/sign-in callback could not be completed/i),
     ).toBeVisible();
   });
+
+  test("toggles the mobile navigation drawer and closes it on outside click or route change", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/dashboard");
+
+    const navToggle = page.locator('button[aria-controls="mobile-navigation-drawer"]');
+    const mobileDrawer = page.locator("#mobile-navigation-drawer");
+    await expect(navToggle).toBeVisible();
+    await expect(navToggle).toHaveAttribute("aria-expanded", "false");
+
+    await navToggle.click();
+
+    await expect(navToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(mobileDrawer.getByRole("link", { name: /^Topics$/ })).toBeVisible();
+
+    await page.mouse.click(370, 120);
+
+    await expect(mobileDrawer.getByRole("link", { name: /^Topics$/ })).toBeHidden();
+    await expect(navToggle).toHaveAttribute("aria-expanded", "false");
+
+    await navToggle.click();
+    await mobileDrawer.getByRole("link", { name: /^Topics$/ }).click();
+
+    await expect(page).toHaveURL(/\/topics$/);
+    await expect(navToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("heading", { name: /choose the areas that deserve attention/i })).toBeVisible();
+  });
+
+  test("keeps the mobile drawer hidden on desktop viewports", async ({ page }) => {
+    await page.goto("/dashboard");
+
+    await expect(page.locator('button[aria-controls="mobile-navigation-drawer"]')).toBeHidden();
+    await expect(page.getByRole("link", { name: /^Today$/ })).toBeVisible();
+  });
 });

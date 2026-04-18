@@ -57,44 +57,86 @@ export function AppShell({
 }) {
   const [desktopCollapsed, setDesktopCollapsed] = useState(getInitialDesktopCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileDrawerId = "mobile-navigation-drawer";
 
   useEffect(() => {
     window.localStorage.setItem(DESKTOP_SIDEBAR_KEY, String(desktopCollapsed));
   }, [desktopCollapsed]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    function handleDesktopViewportChange(event: MediaQueryListEvent | MediaQueryList) {
+      if (event.matches) {
+        setMobileOpen(false);
+      }
+    }
+
+    handleDesktopViewportChange(mediaQuery);
+    mediaQuery.addEventListener("change", handleDesktopViewportChange);
+
+    return () => mediaQuery.removeEventListener("change", handleDesktopViewportChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [mobileOpen]);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1440px] gap-4 px-4 py-4 lg:px-6">
       {/* Mobile hamburger */}
       <button
         type="button"
-        aria-label="Open navigation"
-        className="fixed left-4 top-4 z-40 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--foreground)] shadow-[0_12px_32px_rgba(19,26,34,0.12)] lg:hidden"
-        onClick={() => setMobileOpen(true)}
+        aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
+        aria-controls={mobileDrawerId}
+        aria-expanded={mobileOpen}
+        className="fixed left-4 top-4 z-[60] inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--foreground)] shadow-[0_12px_32px_rgba(19,26,34,0.12)] transition-colors lg:hidden"
+        onClick={() => setMobileOpen((value) => !value)}
       >
-        <Menu className="h-5 w-5" />
+        {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
       {/* Mobile overlay */}
-      {mobileOpen ? (
+      <div
+        className={cn(
+          "fixed inset-0 z-50 bg-[rgba(19,26,34,0.24)] backdrop-blur-[2px] transition-opacity duration-200 lg:hidden",
+          mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+        )}
+        aria-hidden={!mobileOpen}
+        onClick={() => setMobileOpen(false)}
+      >
         <div
-          className="fixed inset-0 z-50 bg-[rgba(19,26,34,0.24)] backdrop-blur-[2px] lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          className={cn(
+            "flex h-full max-w-[320px] p-4 transition-transform duration-200 ease-out",
+            mobileOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+          onClick={(event) => event.stopPropagation()}
         >
-          <div
-            className="flex h-full max-w-[320px] p-4"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <SidebarPanel
-              currentPath={currentPath}
-              mode={mode}
-              account={account}
-              collapsed={false}
-              mobile
-              onClose={() => setMobileOpen(false)}
-            />
-          </div>
+          <SidebarPanel
+            id={mobileDrawerId}
+            currentPath={currentPath}
+            mode={mode}
+            account={account}
+            collapsed={false}
+            mobile
+            onClose={() => setMobileOpen(false)}
+          />
         </div>
-      ) : null}
+      </div>
 
       {/* Desktop sidebar */}
       <aside
@@ -256,6 +298,7 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
 }
 
 function SidebarPanel({
+  id,
   currentPath,
   mode,
   account,
@@ -264,6 +307,7 @@ function SidebarPanel({
   onClose,
   onToggleCollapse,
 }: {
+  id?: string;
   currentPath: string;
   mode: "demo" | "live" | "public";
   account?: ViewerAccount | null;
@@ -277,9 +321,15 @@ function SidebarPanel({
     public: "Public briefing. Live feeds are active now, and signing in unlocks personalized topics, saved history, and custom alerts.",
     live: "Live mode. Your topics, sources, and briefings are connected.",
   }[mode];
+  const handleMobileNavigation = mobile
+    ? () => {
+        window.setTimeout(() => onClose?.(), 0);
+      }
+    : undefined;
 
   return (
     <Panel
+      id={id}
       className={cn(
         "flex w-full flex-col justify-between p-4 transition-all duration-300",
         mobile ? "min-h-full" : "sticky top-4 min-h-[calc(100vh-2rem)] lg:p-5",
@@ -353,7 +403,7 @@ function SidebarPanel({
                     ? "bg-[var(--foreground)] text-white"
                     : "text-[var(--foreground)] hover:bg-white/60",
                 )}
-                onClick={mobile ? onClose : undefined}
+                onClick={handleMobileNavigation}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {collapsed && !mobile ? null : item.label}
@@ -400,7 +450,7 @@ function SidebarPanel({
                 <Link
                   href="/#email-access"
                   className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] hover:underline"
-                  onClick={onClose}
+                  onClick={handleMobileNavigation}
                 >
                   Sign in to personalize →
                 </Link>
@@ -438,7 +488,7 @@ function SidebarPanel({
                 <Link
                   href="/settings"
                   className="mt-2 inline-flex text-xs font-semibold text-[var(--accent)] hover:underline"
-                  onClick={mobile ? onClose : undefined}
+                  onClick={handleMobileNavigation}
                 >
                   Go to Settings →
                 </Link>
