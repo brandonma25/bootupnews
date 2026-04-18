@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Bell, Clock3, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FeaturePlaceholder } from "@/components/feature-placeholder";
 import { Panel } from "@/components/ui/panel";
 import {
   buildPersonalizationSummary,
@@ -183,44 +185,12 @@ export function SettingsPreferences({
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-[var(--foreground)]">Display name</span>
-          <input
-            value={preferences.displayName}
-            onChange={(event) => updatePreference("displayName", event.target.value)}
-            className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
-            placeholder="Brandon"
-          />
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-[var(--foreground)]">Default landing page</span>
-          <select
-            value={preferences.landingPage}
-            onChange={(event) =>
-              updatePreference("landingPage", event.target.value as BriefingPersonalizationProfile["landingPage"])
-            }
-            className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
-          >
-            <option value="/dashboard">Today</option>
-            <option value="/topics">Topics</option>
-            <option value="/sources">Sources</option>
-          </select>
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-[var(--foreground)]">Reading density</span>
-          <select
-            value={preferences.readingDensity}
-            onChange={(event) =>
-              updatePreference("readingDensity", event.target.value as BriefingPersonalizationProfile["readingDensity"])
-            }
-            className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
-          >
-            <option value="comfortable">Comfortable</option>
-            <option value="compact">Compact</option>
-          </select>
-        </label>
+        <FeaturePlaceholder
+          icon={UserRound}
+          title="Profile details"
+          description="Display name, default landing page, and reading layout stay read-only until account-backed settings are ready."
+          note="These profile controls are intentionally hidden for now so the page only shows settings that already do something."
+        />
 
         <div className="rounded-[22px] border border-[var(--line)] bg-white/70 p-4">
           <div className="flex items-start justify-between gap-4">
@@ -247,55 +217,19 @@ export function SettingsPreferences({
           </div>
         </div>
 
-        <div className="space-y-3 rounded-[22px] border border-[var(--line)] bg-white/70 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-[var(--foreground)]">Daily digest emails</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                Keep reminders and briefing delivery active.
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-pressed={preferences.digestEnabled}
-              onClick={() => updatePreference("digestEnabled", !preferences.digestEnabled)}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                preferences.digestEnabled ? "bg-[var(--foreground)]" : "bg-[var(--line)]"
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  preferences.digestEnabled ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
+        <FeaturePlaceholder
+          icon={Bell}
+          title="Delivery cadence"
+          description="Digest timing, reminder schedules, and delivery preferences are still being built."
+          note="We removed inactive toggles here so the page no longer implies email or refresh automation is live today."
+        />
 
-        <div className="space-y-3 rounded-[22px] border border-[var(--line)] bg-white/70 p-4 md:col-span-2">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-[var(--foreground)]">Auto-refresh live feeds</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                Keep the dashboard tuned to new public stories as they arrive.
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-pressed={preferences.autoRefresh}
-              onClick={() => updatePreference("autoRefresh", !preferences.autoRefresh)}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                preferences.autoRefresh ? "bg-[var(--foreground)]" : "bg-[var(--line)]"
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  preferences.autoRefresh ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
+        <FeaturePlaceholder
+          icon={Clock3}
+          title="Feed refresh controls"
+          description="Automatic refresh timing and live polling controls are planned for a later release."
+          note="Live feed updates still follow the existing product defaults until those controls are wired end to end."
+        />
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">

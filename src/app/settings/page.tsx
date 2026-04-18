@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { FeaturePlaceholder } from "@/components/feature-placeholder";
 import { SettingsPreferences } from "@/components/settings-preferences";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -65,8 +66,7 @@ const accountSettingsFeatures = [
     icon: User,
     title: "Profile details",
     description: "Name, preferred email, and the account identity shown across the app.",
-    href: null as string | null,
-    hrefLabel: null as string | null,
+    comingSoonNote: "Profile editing and account identity sync are still in development, so there are no editable fields here yet.",
   },
   {
     icon: Sparkles,
@@ -78,16 +78,16 @@ const accountSettingsFeatures = [
   {
     icon: Rss,
     title: "Source controls",
-    description: "Saved feeds, paused publishers, import defaults, and source health visibility.",
+    description: "Add and review RSS feeds that power your briefing today.",
     href: "/sources",
     hrefLabel: "Manage sources",
+    supportingNote: "Source editing, pause or resume controls, and feed health tools are still in development.",
   },
   {
     icon: Bell,
     title: "Delivery cadence",
     description: "Email digests, refresh timing, and notification reminders for the daily briefing window.",
-    href: null,
-    hrefLabel: null,
+    comingSoonNote: "Delivery timing, digest scheduling, and reminder controls are not wired up yet, so this section stays in placeholder mode.",
   },
 ];
 
@@ -96,11 +96,13 @@ const accountManagementFeatures = [
     icon: Shield,
     title: "Security and sessions",
     description: "Magic-link login activity, sign-out from other devices, and account verification status.",
+    comingSoonNote: "Session history, device management, and broader security controls are planned but not available yet.",
   },
   {
     icon: Database,
     title: "Data controls",
     description: "Export briefing history, clear saved reads, and request account deletion when needed.",
+    comingSoonNote: "Export, deletion, and account-level data controls need backend support before they can be offered safely.",
   },
 ];
 
@@ -249,6 +251,19 @@ export default async function SettingsPage() {
           <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {accountSettingsFeatures.map((item) => {
               const Icon = item.icon;
+              if ("comingSoonNote" in item) {
+                return (
+                  <FeaturePlaceholder
+                    key={item.title}
+                    icon={Icon}
+                    title={item.title}
+                    description={item.description}
+                    note={item.comingSoonNote ?? ""}
+                    compact
+                  />
+                );
+              }
+
               return (
                 <div
                   key={item.title}
@@ -266,6 +281,11 @@ export default async function SettingsPage() {
                   <p className="mt-1.5 flex-1 text-xs leading-5 text-[var(--muted)]">
                     {item.description}
                   </p>
+                  {"supportingNote" in item ? (
+                    <p className="mt-3 rounded-[16px] border border-[var(--line)] bg-[var(--panel)]/45 px-3 py-2 text-xs leading-5 text-[var(--foreground)]">
+                      {item.supportingNote}
+                    </p>
+                  ) : null}
                   {viewer && item.href ? (
                     <Link
                       href={item.href}
@@ -306,23 +326,14 @@ export default async function SettingsPage() {
             {accountManagementFeatures.map((item) => {
               const Icon = item.icon;
               return (
-                <div
+                <FeaturePlaceholder
                   key={item.title}
-                  className="flex flex-col rounded-[20px] border border-[var(--line)] bg-white/60 p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--warm)]">
-                      <Icon className="h-4 w-4 text-[var(--muted)]" />
-                    </span>
-                    {!viewer && <Lock className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />}
-                  </div>
-                  <h3 className="mt-3 text-sm font-semibold text-[var(--foreground)]">
-                    {item.title}
-                  </h3>
-                  <p className="mt-1.5 flex-1 text-xs leading-5 text-[var(--muted)]">
-                    {item.description}
-                  </p>
-                </div>
+                  icon={Icon}
+                  title={item.title}
+                  description={item.description}
+                  note={item.comingSoonNote}
+                  compact
+                />
               );
             })}
           </div>

@@ -32,6 +32,10 @@ describe("SettingsPreferences", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /track tech/i }));
 
+    expect(screen.getByText(/profile details/i)).toBeInTheDocument();
+    expect(screen.getByText(/delivery cadence/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/display name/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /daily digest emails/i })).not.toBeInTheDocument();
     expect(screen.getAllByText(/changes not saved yet/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/save to apply these changes on this browser/i)).toBeInTheDocument();
 

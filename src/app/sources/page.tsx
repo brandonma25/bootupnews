@@ -4,6 +4,7 @@ import { ExternalLink, Info, Rss } from "lucide-react";
 
 import { createSourceAction } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { FeaturePlaceholder } from "@/components/feature-placeholder";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,14 @@ export default async function SourcesPage({
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
               Your saved sources
             </p>
+            <div className="mb-3">
+              <FeaturePlaceholder
+                icon={Rss}
+                title="Source editing and pause controls"
+                description="Source pause or resume actions, feed editing, and source health controls are still in development."
+                note="You can review current sources and add new ones today, but advanced source management stays in an honest placeholder state until the backend exists."
+              />
+            </div>
             <div className="grid gap-3">
               {activeSources.map((source) => (
                 <Panel key={source.id} className="p-4">
