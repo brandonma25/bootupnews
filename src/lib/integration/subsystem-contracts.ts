@@ -10,6 +10,14 @@ export type SourceClass =
   | "global_wire"
   | "general_newswire";
 
+export type TrustTier = "tier_1" | "tier_2" | "tier_3";
+
+export type SourceStatus = "active" | "inactive";
+
+export type SourceAvailability = "default" | "demo" | "custom";
+
+export type SourceProvenance = "primary_reporting" | "aggregated_wire" | "specialist_analysis";
+
 export type ContractState = "active" | "stubbed" | "future_ready";
 
 export type PipelineSubsystem =
@@ -22,6 +30,7 @@ export type PipelineSubsystem =
 export type StageOwnership = "canonical" | "donor_assisted";
 
 export interface CanonicalSourceMetadata {
+  sourceId: string;
   donor: string;
   source: string;
   homepageUrl: string;
@@ -29,11 +38,28 @@ export interface CanonicalSourceMetadata {
   credibility: number;
   reliability: number;
   sourceClass: SourceClass;
+  trustTier: TrustTier;
+  provenance: SourceProvenance;
+  status: SourceStatus;
+  availability: SourceAvailability;
+}
+
+export interface SourceFetchConfig {
+  feedUrl: string;
+  timeoutMs?: number;
+  retryCount?: number;
+  maxItems?: number;
+}
+
+export interface SourceDefinition extends CanonicalSourceMetadata {
+  fetch: SourceFetchConfig;
+  adapterOwner: string;
 }
 
 export interface FetchedSourceItem {
   donor: string;
-  feedUrl: string;
+  sourceId: string;
+  sourceDefinition: SourceDefinition;
   sourceMetadata: CanonicalSourceMetadata;
   article: FeedArticle;
 }
@@ -52,9 +78,14 @@ export interface IngestionFetchContext {
   retryCount: number;
 }
 
-export interface IngestionAdapter<TFeedConfig extends CanonicalSourceMetadata = CanonicalSourceMetadata> {
-  fetchItems(feeds: TFeedConfig[], context: IngestionFetchContext): Promise<FetchedSourceItem[]>;
-  normalizeSourceMetadata(feed: TFeedConfig): CanonicalSourceMetadata;
+export interface IngestionAdapter<TSourceDefinition = SourceDefinition> {
+  fetchItems(sources: TSourceDefinition[], context: IngestionFetchContext): Promise<FetchedSourceItem[]>;
+  normalizeSourceMetadata(source: TSourceDefinition): CanonicalSourceMetadata;
+  describeCapabilities(): {
+    supportedSourceClasses: SourceClass[];
+    supportsRetry: boolean;
+    supportsSourceContext: boolean;
+  };
 }
 
 export interface NormalizationAdapter<TInput = unknown> {

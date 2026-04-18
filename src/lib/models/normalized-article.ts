@@ -1,3 +1,5 @@
+import type { CanonicalSourceMetadata } from "@/lib/integration/subsystem-contracts";
+
 export interface NormalizedArticle {
   id: string;
   title: string;
@@ -10,4 +12,5 @@ export interface NormalizedArticle {
   keywords: string[];
   title_tokens: string[];
   content_tokens: string[];
+  source_metadata?: CanonicalSourceMetadata;
 }

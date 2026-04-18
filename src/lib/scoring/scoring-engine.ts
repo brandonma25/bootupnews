@@ -34,7 +34,14 @@ function getProviderCredibilityHints(cluster: SignalCluster) {
 
 function getCredibilityScore(cluster: SignalCluster) {
   const sourceCredibilityMap = getSourceCredibilityMap();
-  const sourceScores = cluster.articles.map((article) => sourceCredibilityMap[article.source.toLowerCase()] ?? 68);
+  const sourceScores = cluster.articles.map((article) => {
+    if (article.source_metadata) {
+      const reliabilityWeight = article.source_metadata.reliability * 100;
+      return Number(((article.source_metadata.credibility + reliabilityWeight) / 2).toFixed(2));
+    }
+
+    return sourceCredibilityMap[article.source.toLowerCase()] ?? 68;
+  });
   const providerHints = getProviderCredibilityHints(cluster);
   const scores = providerHints.length ? [...sourceScores, ...providerHints] : sourceScores;
   return average(scores);

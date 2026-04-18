@@ -31,6 +31,21 @@ export type PipelineRun = {
     feedUrl: string;
     error: string;
   }>;
+  active_sources: Array<{
+    source_id: string;
+    source: string;
+    donor: string;
+    source_class: string;
+    trust_tier: string;
+  }>;
+  source_contributions: Array<{
+    source_id: string;
+    source: string;
+    donor: string;
+    source_class: string;
+    trust_tier: string;
+    item_count: number;
+  }>;
   used_seed_fallback: boolean;
 };
 
@@ -48,6 +63,8 @@ export function createEmptyPipelineRun(runId: string): PipelineRun {
     scoring_breakdown: [],
     sample_cluster_rationale: [],
     feed_failures: [],
+    active_sources: [],
+    source_contributions: [],
     used_seed_fallback: false,
   };
 }

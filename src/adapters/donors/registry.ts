@@ -6,6 +6,7 @@ import type {
   DonorFeed,
   DonorId,
   DonorModule,
+  SourceRegistryEntry,
 } from "@/adapters/donors/types";
 import type {
   CanonicalSourceMetadata,
@@ -13,12 +14,14 @@ import type {
   EnrichmentSupport,
   IngestionAdapter,
   RankingFeatureProvider,
+  SourceDefinition,
 } from "@/lib/integration/subsystem-contracts";
 import type { SignalCluster } from "@/lib/models/signal-cluster";
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
 
 function normalizeFeedMetadata(feed: DonorFeed): CanonicalSourceMetadata {
   return {
+    sourceId: feed.id,
     donor: feed.donor,
     source: feed.source,
     homepageUrl: feed.homepageUrl,
@@ -26,26 +29,50 @@ function normalizeFeedMetadata(feed: DonorFeed): CanonicalSourceMetadata {
     credibility: feed.credibility,
     reliability: feed.reliability,
     sourceClass: feed.sourceClass,
+    trustTier: feed.trustTier,
+    provenance: feed.provenance,
+    status: feed.status,
+    availability: feed.availability,
+  };
+}
+
+function buildSourceDefinition(feed: DonorFeed): SourceDefinition {
+  return {
+    ...normalizeFeedMetadata(feed),
+    fetch: feed.fetch,
+    adapterOwner: feed.donor,
   };
 }
 
 function createRssIngestionAdapter(donor: DonorId): IngestionAdapter<DonorFeed> {
   return {
-    normalizeSourceMetadata(feed) {
-      return normalizeFeedMetadata(feed);
+    describeCapabilities() {
+      return {
+        supportedSourceClasses: donor === "horizon"
+          ? ["global_wire", "business_press", "general_newswire"]
+          : donor === "openclaw"
+            ? ["specialist_press", "business_press"]
+            : ["general_newswire", "business_press", "global_wire", "specialist_press"],
+        supportsRetry: true,
+        supportsSourceContext: donor === "horizon" || donor === "openclaw",
+      };
     },
-    async fetchItems(feeds, context) {
+    normalizeSourceMetadata(source) {
+      return normalizeFeedMetadata(source);
+    },
+    async fetchItems(sources, context) {
       const batches = await Promise.all(
-        feeds.map(async (feed) => {
-          const articles = await context.fetchFeed(feed.feedUrl, feed.source, {
-            timeoutMs: context.timeoutMs,
-            retryCount: context.retryCount,
+        sources.map(async (source) => {
+          const articles = await context.fetchFeed(source.fetch.feedUrl, source.source, {
+            timeoutMs: source.fetch.timeoutMs ?? context.timeoutMs,
+            retryCount: source.fetch.retryCount ?? context.retryCount,
           });
 
           return articles.map((article) => ({
             donor,
-            feedUrl: feed.feedUrl,
-            sourceMetadata: normalizeFeedMetadata(feed),
+            sourceId: source.id,
+            sourceDefinition: buildSourceDefinition(source),
+            sourceMetadata: normalizeFeedMetadata(source),
             article,
           }));
         }),
@@ -154,6 +181,7 @@ export function getDonorRegistrySnapshot() {
     transformationBoundary: entry.transformationBoundary,
     contractStates: entry.contractStates,
     feedCount: entry.feeds.length,
+    ingestionCapabilities: entry.ingestionAdapter.describeCapabilities(),
   }));
 }
 
@@ -165,6 +193,7 @@ export function getDefaultDonorFeeds(): DonorFeed[] {
   return donorRegistry
     .filter((entry) => entry.contractStates.ingestion === "active")
     .flatMap((entry) => entry.feeds)
+    .filter((source) => source.status === "active" && source.availability !== "custom")
     .slice(0, 5);
 }
 
@@ -203,4 +232,31 @@ export function getCanonicalSourceMetadata() {
   return donorRegistry.flatMap((entry) =>
     entry.feeds.map((feed) => entry.ingestionAdapter.normalizeSourceMetadata(feed)),
   );
+}
+
+export function getSourceRegistry(): SourceRegistryEntry[] {
+  return donorRegistry.flatMap((entry) => entry.feeds.map(buildSourceDefinition));
+}
+
+export function getActiveSourceRegistry(): SourceRegistryEntry[] {
+  return getSourceRegistry().filter((source) => source.status === "active");
+}
+
+export function getSourceRegistrySnapshot() {
+  return getSourceRegistry().map((source) => ({
+    sourceId: source.sourceId,
+    source: source.source,
+    donor: source.donor,
+    adapterOwner: source.adapterOwner,
+    sourceClass: source.sourceClass,
+    trustTier: source.trustTier,
+    provenance: source.provenance,
+    status: source.status,
+    availability: source.availability,
+    feedUrl: source.fetch.feedUrl,
+  }));
+}
+
+export function getSourceDefinition(sourceId: string) {
+  return getSourceRegistry().find((source) => source.sourceId === sourceId);
 }

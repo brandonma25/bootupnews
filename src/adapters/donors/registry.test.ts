@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  getActiveSourceRegistry,
   getCanonicalSourceMetadata,
   getDonorModule,
   getDonorRegistrySnapshot,
   getRankingFeatureProviders,
+  getSourceRegistrySnapshot,
 } from "@/adapters/donors";
 import type { SignalCluster } from "@/lib/models/signal-cluster";
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
@@ -66,8 +68,10 @@ describe("donor registry", () => {
 
     expect(fetchFeed).toHaveBeenCalledTimes(1);
     expect(fetchedItems[0]?.donor).toBe("openclaw");
+    expect(fetchedItems[0]?.sourceId).toBe("openclaw-the-verge");
     expect(fetchedItems[0]?.sourceMetadata.sourceClass).toBe("specialist_press");
     expect(fetchedItems[0]?.sourceMetadata.topic).toBe("Tech");
+    expect(fetchedItems[0]?.sourceMetadata.trustTier).toBe("tier_2");
   });
 
   it("maps donor-derived ranking features into canonical source credibility data", () => {
@@ -91,5 +95,15 @@ describe("donor registry", () => {
     expect(provider!.getKnownSources().map((entry) => entry.source)).toContain("Associated Press");
     expect(provider!.mapClusterFeatures(cluster).credibilityWeights).toContain(88);
     expect(getCanonicalSourceMetadata().map((entry) => entry.source)).toContain("Reuters World");
+  });
+
+  it("exposes a source registry with donor ownership, trust tier, and active status", () => {
+    const sourceRegistry = getSourceRegistrySnapshot();
+    const activeSources = getActiveSourceRegistry();
+
+    expect(sourceRegistry.some((source) => source.sourceId === "openclaw-the-verge" && source.donor === "openclaw")).toBe(true);
+    expect(sourceRegistry.some((source) => source.sourceId === "horizon-reuters-world" && source.donor === "horizon")).toBe(true);
+    expect(sourceRegistry.some((source) => source.trustTier === "tier_1" && source.provenance === "aggregated_wire")).toBe(true);
+    expect(activeSources.every((source) => source.status === "active")).toBe(true);
   });
 });

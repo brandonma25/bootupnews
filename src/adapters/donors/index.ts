@@ -1,4 +1,5 @@
 export {
+  getActiveSourceRegistry,
   getCanonicalSourceMetadata,
   getClusteringSupportAdapters,
   getDefaultDonorFeeds,
@@ -8,6 +9,9 @@ export {
   getEnrichmentSupports,
   getIngestionAdapter,
   getRankingFeatureProviders,
+  getSourceDefinition,
+  getSourceRegistry,
+  getSourceRegistrySnapshot,
 } from "@/adapters/donors/registry";
 
 export type {

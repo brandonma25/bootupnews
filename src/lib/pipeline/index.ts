@@ -27,6 +27,14 @@ export async function runClusterFirstPipeline(options: {
 
   const ingestion = await ingestRawItems(options);
   run.feed_failures = ingestion.failures;
+  run.active_sources = ingestion.sources.map((source) => ({
+    source_id: source.sourceId,
+    source: source.source,
+    donor: source.donor,
+    source_class: source.sourceClass,
+    trust_tier: source.trustTier,
+  }));
+  run.source_contributions = ingestion.source_contributions;
   run.used_seed_fallback = ingestion.usedSeedFallback;
 
   const normalized = normalizeRawItems(ingestion.items);

@@ -26,6 +26,7 @@ export function normalizeRawItems(items: RawItem[]): NormalizedArticle[] {
       keywords: extractKeywords(`${title} ${content}`, 10),
       title_tokens: tokenize(title),
       content_tokens: tokenize(content),
+      source_metadata: item.source_metadata,
     };
   });
 }

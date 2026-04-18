@@ -25,15 +25,16 @@ The website repo now owns a formal donor integration framework for the cluster-f
   - future/stubbed: ingestion, clustering, enrichment
   - boundary: deterministic source-quality feature mapping only
 - `Horizon`
-  - active now: no mandatory runtime behavior
+  - active now: secondary ingestion/source-breadth donor
   - future-ready: enrichment support
-  - boundary: optional enrichment packet preparation only
+  - boundary: source-context metadata now, optional enrichment packet preparation later
 
 ## Canonical Contracts
 
 - `IngestionAdapter`
   - `fetchItems()`
   - `normalizeSourceMetadata()`
+  - `describeCapabilities()`
 - `NormalizationAdapter`
   - `convertToCanonicalArticle()`
 - `ClusteringSupport`
@@ -54,7 +55,7 @@ The website repo now owns a formal donor integration framework for the cluster-f
   - digest assembly
   - final deterministic scoring formula
 - Donor-assisted now:
-  - ingestion feed metadata and transport boundary
+  - ingestion source registry, feed metadata, and transport boundary
   - clustering support strategy boundary
   - ranking source-feature mapping
 - Stubbed / future-ready:
@@ -63,5 +64,5 @@ The website repo now owns a formal donor integration framework for the cluster-f
 ## Remaining Limitations
 
 - Donor contracts are now explicit, but most subsystem behavior still lives in canonical local code by design.
-- Horizon remains stub-safe and intentionally non-blocking.
+- Horizon enrichment remains stub-safe and intentionally non-blocking.
 - This change clarifies integration boundaries; it does not attempt a donor-quality optimization pass.

@@ -14,14 +14,24 @@ export const afterMarketAgentDefinition: DonorDefinition = {
   },
   feeds: [
     {
+      id: "after-market-agent-marketwatch",
       donor: "after_market_agent",
       source: "MarketWatch",
-      feedUrl: "https://feeds.content.dowjones.io/public/rss/mw_topstories",
       homepageUrl: "https://www.marketwatch.com",
       topic: "Finance",
       credibility: 78,
       reliability: 0.78,
       sourceClass: "business_press",
+      trustTier: "tier_2",
+      provenance: "specialist_analysis",
+      status: "active",
+      availability: "default",
+      fetch: {
+        feedUrl: "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+        timeoutMs: 5000,
+        retryCount: 1,
+        maxItems: 6,
+      },
     },
   ],
 };

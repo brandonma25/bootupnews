@@ -79,15 +79,29 @@ The product needs an end-to-end intelligence path that can ingest live news, nor
 
 - `openclaw-newsroom` is the active ingestion donor:
   - contributes feed transport and source metadata boundaries
+- `Horizon` is now the secondary ingestion/source-breadth donor:
+  - contributes Reuters-backed source definitions and richer canonical source context
 - `after-market-agent` is the active clustering-support donor:
   - contributes support strategies and representative-selection boundaries
 - `FINANCIAL-NEWS-SUMMARIZER` is the active ranking-feature donor:
   - contributes source-quality metadata that flows into deterministic scoring
-- `Horizon` is future-ready only:
+- `Horizon` enrichment is future-ready only:
   - exposes a stub-safe enrichment contract without entering the critical path
 - Adapter rule:
   - donor modules translate into canonical contracts
   - canonical pipeline modules remain the only runtime owners of app-wide models and output shapes
+
+## Ingestion Source Note
+
+- ingestion now resolves canonical source definitions rather than raw feed rows
+- canonical source metadata includes:
+  - source id
+  - donor origin
+  - source class
+  - trust tier
+  - provenance
+  - availability/status
+- that metadata now flows from source registry into `RawItem` and `NormalizedArticle`
 
 ## Clustering Upgrade Note
 
