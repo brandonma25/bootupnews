@@ -14,7 +14,6 @@ type Props = {
 export default function AuthModal({ open, onClose, errorMessage }: Props) {
   const [googlePending, setGooglePending] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const redirectTo = useMemo(() => getGoogleRedirectTo(), []);
   const authDiagnostics = useMemo(() => getSupabasePublicEnvDiagnostics(), []);
   const authConfigured = isSupabaseConfigured;
   const configErrorMessage = authConfigured
@@ -26,6 +25,7 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
 
   async function handleGoogleSignIn() {
     const supabase = createSupabaseBrowserClient();
+    const redirectTo = getGoogleRedirectTo();
 
     console.info("[auth] Google button clicked", {
       redirectFlow: "full-page redirect",
@@ -142,7 +142,8 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
         <div className="space-y-3">
           <GoogleAuthButton pending={googlePending} onClick={handleGoogleSignIn} disabled={!authConfigured} />
           <p className="text-xs leading-5 text-[var(--muted)]">
-            Google uses a full-page redirect flow. Redirect target for this page: <span className="font-medium text-[var(--foreground)]">{redirectTo}</span>
+            Google uses a full-page redirect flow through{" "}
+            <span className="font-medium text-[var(--foreground)]">/auth/callback</span>.
           </p>
         </div>
 

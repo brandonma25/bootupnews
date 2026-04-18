@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import PersonalizedDashboard from "@/components/dashboard/personalized-dashboard";
 import { getDashboardPageState } from "@/lib/data";
+import { isAiConfigured } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "Today's Briefing — Daily Intelligence",
@@ -22,6 +23,7 @@ export default async function DashboardPage({
       searchParams={params}
       data={pageState.data}
       viewer={pageState.viewer}
+      isAiConfigured={isAiConfigured}
     />
   );
 }

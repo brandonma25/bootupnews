@@ -12,7 +12,6 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { buildEventIntelligenceSignals, isTopEventEligible } from "@/lib/event-intelligence";
-import { isAiConfigured } from "@/lib/env";
 import { getDisplayStateLabel, getDisplayStateTone } from "@/lib/habit-loop";
 import {
   buildPersonalizationMatch,
@@ -33,12 +32,14 @@ type PersonalizedDashboardProps = {
   searchParams: { generated?: string; allread?: string };
   data: DashboardData;
   viewer: ViewerAccount | null;
+  isAiConfigured: boolean;
 };
 
 export default function PersonalizedDashboard({
   searchParams: params,
   data,
   viewer,
+  isAiConfigured,
 }: PersonalizedDashboardProps) {
   const isSignedIn = Boolean(viewer);
   const personalizationPayload = useSyncExternalStore(

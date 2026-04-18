@@ -46,7 +46,7 @@ Minimum required validation:
 - lint
 - build
 - tests
-- Playwright/e2e when technically appropriate
+- Chromium and WebKit Playwright smoke when technically appropriate
 - local smoke validation
 
 ### Gate 2 — Preview Gate
@@ -131,7 +131,7 @@ Codex must not pretend these are fully automated if they are not.
 
 Human-only checks include:
 - real provider login
-- real callback truth
+- real provider callback truth
 - real session persistence
 - real sign-out correctness
 - subjective UX judgment where appropriate

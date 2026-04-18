@@ -2,6 +2,8 @@
 
 Use this checklist for every release that can affect auth, cookies, redirects, SSR, or session behavior.
 
+Automated Chromium and WebKit smoke may cover signed-out truth, auth entry surfaces, and callback-error handling, but they do not replace this preview gate for real provider behavior.
+
 ## Required Human Checks
 - Google OAuth sign-in succeeds from the signed-out homepage or auth modal.
 - Email/password sign-in succeeds if that flow is enabled for the release.
@@ -17,4 +19,3 @@ Use this checklist for every release that can affect auth, cookies, redirects, S
 - Date:
 - Result:
 - Notes:
-

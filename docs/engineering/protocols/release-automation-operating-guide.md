@@ -22,6 +22,7 @@
   - `npm run build`
   - Dev Server Rule on port `3000`
   - `npx playwright test --project=chromium`
+  - `npx playwright test --project=webkit`
   - route probes for `/` and `/dashboard`
 - Build failure is blocking.
 - Lint, unit-test, and Playwright failures are reported explicitly and still return a non-zero exit code.
@@ -45,10 +46,11 @@
   - `pr-unit-tests`
   - `pr-build`
   - `pr-e2e-chromium`
+  - `pr-e2e-webkit`
   - `pr-summary`
   - `release-governance-gate`
 - GitHub branch protection must separately require those checks; the repo workflows alone do not make them blocking.
-- These jobs automate install, lint, build, unit/integration tests, Chromium Playwright smoke coverage, artifact upload, and PR summary generation.
+- These jobs automate install, lint, build, unit/integration tests, Chromium plus WebKit Playwright smoke coverage, artifact upload, and PR summary generation.
 
 ### 2a. Release Governance Gate
 - Workflow: [release-governance-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/release-governance-gate.yml)
@@ -78,12 +80,13 @@
   - expected signed-out markers
   - absence of obvious `500` or framework error pages
 - This gate is intended to run once the Vercel preview URL is known.
+- It remains required for merge readiness because PR CI cannot prove real preview cookies, SSR, redirects, or environment truth by itself.
 
 ### 4. Human Auth/Session Gate
 - Checklist: [human-auth-session-gate.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/protocols/human-auth-session-gate.md)
 - Human-only truth remains required for:
   - Google OAuth/provider login
-  - callback redirect correctness
+  - real-provider callback redirect correctness
   - session persistence after refresh
   - signed-in versus signed-out truth across navigation
   - sign-out correctness
@@ -113,6 +116,8 @@
 - unit/integration tests
 - build
 - local Chromium Playwright smoke
+- local WebKit Playwright smoke
+- deterministic auth entry, signed-out refresh, and callback-error redirect smoke
 - preview route probe
 - production route probe
 - PR summary generation
@@ -121,7 +126,7 @@
 
 ### Human
 - provider/OAuth truth
-- callback truth
+- real-provider callback truth
 - session persistence after refresh
 - sign-out truth
 - final merge approval
@@ -151,6 +156,7 @@
   - `pr-unit-tests`
   - `pr-build`
   - `pr-e2e-chromium`
+  - `pr-e2e-webkit`
   - `pr-summary`
   - `release-governance-gate`
 - Confirm the rule applies to pull requests targeting `main`.

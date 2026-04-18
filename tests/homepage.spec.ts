@@ -27,4 +27,17 @@ test.describe("homepage", () => {
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /sign in with email/i })).toBeVisible();
   });
+
+  test("surfaces callback error state without losing the auth entry flow", async ({ page }) => {
+    await page.goto("/?auth=callback-error");
+
+    await expect(
+      page.getByRole("alert").getByText(/sign-in callback could not be completed/i),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /continue to daily intelligence/i }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /continue with google/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /sign in with email/i })).toBeVisible();
+  });
 });

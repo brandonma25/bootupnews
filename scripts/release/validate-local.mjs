@@ -45,7 +45,10 @@ function envForAppBootstrap(baseUrl) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const installMode = args.install || "if-needed";
-  const e2eProject = args["e2e-project"] || "chromium";
+  const e2eProjects = String(args["e2e-project"] || "chromium,webkit")
+    .split(",")
+    .map((project) => project.trim())
+    .filter(Boolean);
   const baseUrl = args["base-url"] || DEFAULT_LOCAL_BASE_URL;
   const env = envForLocalRun();
   const appEnv = envForAppBootstrap(baseUrl);
@@ -55,10 +58,16 @@ async function main() {
     createStep("unit tests", { soft: true }),
     createStep("build"),
     createStep("dev server rule"),
-    createStep(`playwright (${e2eProject})`, { soft: true }),
+    ...e2eProjects.map((project) => createStep(`playwright (${project})`, { soft: true })),
     createStep("local smoke routes"),
   ];
-  const [installStep, lintStep, testStep, buildStep, devStep, playwrightStep, smokeStep] = steps;
+  const installStep = steps[0];
+  const lintStep = steps[1];
+  const testStep = steps[2];
+  const buildStep = steps[3];
+  const devStep = steps[4];
+  const playwrightSteps = steps.slice(5, 5 + e2eProjects.length);
+  const smokeStep = steps.at(-1);
   let devServer;
 
   try {
@@ -124,11 +133,13 @@ async function main() {
         ? `Freed port ${DEFAULT_PORT} from PID(s): ${portOwners.join(", ")}`
         : `Dev server ready at ${baseUrl}`;
 
-    runCommand("npx", ["playwright", "test", "--project", e2eProject], {
-      step: playwrightStep,
-      allowFailure: true,
-      env: appEnv,
-    });
+    for (const [index, project] of e2eProjects.entries()) {
+      runCommand("npx", ["playwright", "test", "--project", project], {
+        step: playwrightSteps[index],
+        allowFailure: true,
+        env: appEnv,
+      });
+    }
 
     const smokeStartedAt = Date.now();
     const smokeResults = await probeRoutes({

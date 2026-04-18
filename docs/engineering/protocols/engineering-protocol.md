@@ -90,8 +90,10 @@
 - `npm run dev`
 - Playwright is the default local E2E and functional automation layer for UI flows.
 - After coding is complete, Codex should run the local Playwright workflow when technically possible.
-- Minimum required local Playwright path is `npx playwright test --project=chromium`.
+- Minimum required local Playwright paths are `npx playwright test --project=chromium` and `npx playwright test --project=webkit`.
 - Codex should broaden to `npx playwright test` when the feature scope meaningfully affects multiple UI flows.
+- Release-sensitive browser coverage should prioritize Chromium baseline correctness plus WebKit smoke coverage for Safari-class behavior.
+- Deterministic auth/session smoke should cover signed-out truth, auth entry state, and callback-error or redirect handling when those checks are safely automatable.
 - basic smoke validation
 - a concise test report
 - a repo-safe docs update
