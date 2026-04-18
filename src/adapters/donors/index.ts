@@ -2,6 +2,7 @@ export {
   getActiveSourceRegistry,
   getCanonicalSourceMetadata,
   getClusteringSupportAdapters,
+  getConnectionSupports,
   getDefaultDonorFeeds,
   getDiversitySupports,
   getDonorModule,

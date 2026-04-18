@@ -140,6 +140,37 @@ export function StoryCard({ item }: { item: BriefingItem }) {
           ) : null}
         </section>
 
+        {item.explanationPacket?.connection_layer ? (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                Connections
+              </p>
+              <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-2.5 py-1 text-xs font-medium text-[var(--muted)]">
+                {item.explanationPacket.connection_layer.connection_confidence} confidence
+              </span>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                  What led to this
+                </p>
+                <p className="mt-1 text-sm leading-7 text-[var(--foreground)]">
+                  {item.explanationPacket.connection_layer.what_led_to_this}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                  What it connects to
+                </p>
+                <p className="mt-1 text-sm leading-7 text-[var(--foreground)]">
+                  {item.explanationPacket.connection_layer.what_it_connects_to}
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         <section className="space-y-2" data-trust-tier={trustLayer.tier}>
           <p
             className={cn(

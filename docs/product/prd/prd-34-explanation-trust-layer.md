@@ -45,6 +45,7 @@ The product can already rank clusters, but explanation quality and trust visibil
 - Explanation packets are deterministic and grounded in actual ranking, cluster, and source state.
 - Explanation mode is explicit: deterministic, enriched, or fallback.
 - Explanation packets can safely carry role-oriented output hints such as top signal versus context signal without changing ranking truth.
+- Explanation packets can safely carry bounded connection-layer fields such as what led to this and what it connects to without turning enrichment into the truth owner.
 - Trust debug shows evidence used, material ranking features, and enrichment status.
 - Horizon enrichment can be prepared safely and skipped without breaking pipeline continuity.
 - Homepage and dashboard remain populated in signed-out mode.

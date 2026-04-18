@@ -3,13 +3,14 @@ import type { DonorDefinition } from "@/adapters/donors/types";
 export const horizonDefinition: DonorDefinition = {
   donor: "horizon",
   displayName: "Horizon",
-  summary: "Optional enrichment donor that now exposes a safe schema-bound explanation enrichment boundary.",
+  summary: "Optional enrichment donor that now exposes a safe schema-bound explanation and connection enrichment boundary.",
   transformationBoundary:
-    "Horizon contributes an optional schema-safe enrichment boundary; canonical ranking, explanation assembly, and rendering remain deterministic by default.",
+    "Horizon contributes an optional schema-safe enrichment boundary for explanation and connection context; canonical ranking, explanation assembly, and rendering remain deterministic by default.",
   contractStates: {
     ingestion: "active",
     clustering: "stubbed",
     ranking: "stubbed",
+    connection: "future_ready",
     enrichment: "active",
   },
   feeds: [

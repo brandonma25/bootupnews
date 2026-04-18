@@ -12,6 +12,9 @@ import type {
   CanonicalSourceMetadata,
   ClusterCandidate,
   ClusteringSupport,
+  ConnectionEvidenceInput,
+  ConnectionLayerPacket,
+  ConnectionSupport,
   DiversitySupport,
   DiversityAdjustment,
   EnrichmentSupport,
@@ -122,6 +125,43 @@ function average(values: number[]) {
   }
 
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function buildConnectionFallback(input: ConnectionEvidenceInput): ConnectionLayerPacket {
+  return {
+    what_led_to_this: "Too early to say with confidence what set this up beyond the immediate report.",
+    what_it_connects_to:
+      input.signalRole === "watch"
+        ? "For now, it reads as a narrow update rather than a broader system signal."
+        : "The current reporting suggests some broader relevance, but the system-level link is still tentative.",
+    connection_confidence: "low",
+    connection_mode: "fallback",
+    connection_evidence_summary:
+      "Connection output stayed conservative because source support or system-level evidence was limited.",
+    connection_unknowns: [
+      "The reporting does not yet show a clear prior trigger.",
+      "It is still unclear how far the effects extend beyond the immediate story.",
+    ],
+  };
+}
+
+function buildConnectionCorpus(input: ConnectionEvidenceInput) {
+  return [
+    input.title,
+    input.summary,
+    input.topicName,
+    input.eventType,
+    ...input.affectedMarkets,
+    ...input.topics,
+    ...input.entities,
+    ...input.keywords,
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function includesAny(corpus: string, terms: string[]) {
+  return terms.some((term) => corpus.includes(term));
 }
 
 function buildClusterCandidate(article: NormalizedArticle): ClusterCandidate {
@@ -356,6 +396,118 @@ const afterMarketAgentClusteringSupport: ClusteringSupport = {
   },
 };
 
+const afterMarketAgentConnectionSupport: ConnectionSupport = {
+  describeCapabilities() {
+    return {
+      provider: "after_market_agent",
+      bounded: true,
+      deterministic_first: true,
+      supportedFields: [
+        "what_led_to_this",
+        "what_it_connects_to",
+        "connection_confidence",
+        "connection_mode",
+        "connection_evidence_summary",
+        "connection_unknowns",
+      ],
+    };
+  },
+  buildConnectionLayer(input) {
+    const corpus = buildConnectionCorpus(input);
+    const structuralImpact = input.rankingFeatures?.structural_impact ?? 0;
+    const downstreamConsequence = input.rankingFeatures?.downstream_consequence ?? 0;
+    const crossDomainRelevance = input.rankingFeatures?.cross_domain_relevance ?? 0;
+    const actionability = input.rankingFeatures?.actionability_or_decision_value ?? 0;
+    const persistence = input.rankingFeatures?.persistence_or_endurance ?? 0;
+    const weakEvidence =
+      input.signalRole === "watch"
+      || input.sourceCount <= 1
+      || input.confidenceScore < 42
+      || input.signalStrength === "weak";
+
+    if (weakEvidence) {
+      return {
+        packet: buildConnectionFallback(input),
+        debugNotes: [
+          "Connection layer declined stronger inference because the signal was thin or weakly confirmed.",
+        ],
+        status: "fallback",
+      };
+    }
+
+    let ledTo = "This appears tied to earlier pressure that had already been building around the same topic.";
+    let connectsTo = "It connects to broader operating conditions beyond the immediate headline.";
+    const evidenceSummaryParts: string[] = [];
+    const unknowns: string[] = [];
+
+    if (includesAny(corpus, ["fed", "federal reserve", "inflation", "rates", "central bank", "treasury", "yield"])) {
+      ledTo = "This appears to follow earlier inflation, rate, and central-bank pressure that was already reshaping expectations.";
+      connectsTo = "It connects to borrowing costs, market pricing, and corporate demand assumptions.";
+      evidenceSummaryParts.push("macro and central-bank terms");
+    } else if (includesAny(corpus, ["tariff", "trade", "export", "sanction", "strait", "hormuz", "military", "missile", "security", "border"])) {
+      ledTo = "This appears to follow earlier trade friction, policy tightening, or geopolitical pressure rather than a one-off update.";
+      connectsTo = "It connects to supply chains, policy risk, cross-border pricing, and security exposure.";
+      evidenceSummaryParts.push("trade or geopolitical terms");
+    } else if (includesAny(corpus, ["ai", "chip", "semiconductor", "cloud", "data center", "platform", "compute"])) {
+      ledTo = "This appears tied to earlier AI demand, compute-capacity pressure, and platform competition.";
+      connectsTo = "It connects to cloud spending, semiconductor capacity, enterprise deployment, and platform power.";
+      evidenceSummaryParts.push("AI, platform, or infrastructure terms");
+    } else if (includesAny(corpus, ["regulation", "policy", "regulatory", "congress", "sec", "doj", "white house", "executive order"])) {
+      ledTo = "This appears to follow earlier regulatory or policy scrutiny that was already building.";
+      connectsTo = "It connects to compliance costs, market structure, and business planning decisions.";
+      evidenceSummaryParts.push("policy or regulatory terms");
+    } else if (includesAny(corpus, ["earnings", "guidance", "layoff", "acquisition", "merger", "funding", "revenue"])) {
+      ledTo = "This appears to follow earlier growth, capital-allocation, or competitive pressure inside the sector.";
+      connectsTo = "It connects to hiring, pricing, investment, and broader sector sentiment.";
+      evidenceSummaryParts.push("corporate pressure terms");
+    } else if (input.affectedMarkets.length >= 2 || input.topics.length >= 2) {
+      ledTo = "This appears to follow a broader shift that had already been showing up across adjacent coverage.";
+      connectsTo = `It connects to ${[...input.affectedMarkets, ...input.topics].slice(0, 3).join(", ")} rather than a single narrow beat.`;
+      evidenceSummaryParts.push("cross-topic spillover");
+    } else {
+      unknowns.push("The reporting shows a plausible connection pattern, but not a single clear prior trigger.");
+    }
+
+    if (structuralImpact >= 72 || downstreamConsequence >= 68) {
+      evidenceSummaryParts.push("high structural-impact signals");
+    }
+
+    if (crossDomainRelevance >= 62) {
+      evidenceSummaryParts.push("cross-domain relevance");
+    }
+
+    if (actionability >= 64 || persistence >= 66) {
+      evidenceSummaryParts.push("decision-useful persistence");
+    }
+
+    const connectionConfidence: ConnectionLayerPacket["connection_confidence"] =
+      input.sourceCount >= 3 && input.confidenceScore >= 68 && structuralImpact >= 68
+        ? "high"
+        : input.sourceCount >= 2 && input.confidenceScore >= 50
+          ? "medium"
+          : "low";
+
+    if (connectionConfidence === "low") {
+      unknowns.push("The broader connection is still tentative and could narrow as reporting develops.");
+    }
+
+    return {
+      packet: {
+        what_led_to_this: ledTo,
+        what_it_connects_to: connectsTo,
+        connection_confidence: connectionConfidence,
+        connection_mode: "deterministic",
+        connection_evidence_summary: `Built from ${evidenceSummaryParts.join(", ") || "current topic and ranking evidence"}, ${input.sourceCount} source${input.sourceCount === 1 ? "" : "s"}, and ${input.signalRole} signal classification.`,
+        connection_unknowns: unknowns,
+      },
+      debugNotes: [
+        `Connection layer used ${evidenceSummaryParts.join(", ") || "generic evidence"} from the current signal.`,
+      ],
+      status: "available",
+    };
+  },
+};
+
 const fnsDiversitySupport: DiversitySupport = {
   available: true,
   describeRole() {
@@ -559,7 +711,7 @@ const horizonEnrichmentSupport: EnrichmentSupport = {
       provider: "horizon",
       bounded: true,
       schema_safe: true,
-      output_fields: ["why_it_matters", "what_to_watch", "unknowns"],
+      output_fields: ["why_it_matters", "what_to_watch", "unknowns", "connection_layer"],
     };
   },
   prepareEnrichmentPacket(input) {
@@ -569,6 +721,7 @@ const horizonEnrichmentSupport: EnrichmentSupport = {
       summary: input.cluster.representative_article.content.slice(0, 220),
       what_to_watch: input.deterministicExplanation.what_to_watch,
       why_it_matters: input.deterministicExplanation.why_it_matters,
+      connection_layer: input.deterministicExplanation.connection_layer,
       source_count: input.cluster.cluster_size,
       material_ranking_features: input.rankingDebug.active_features.slice(0, 6),
       unknowns: input.deterministicExplanation.unknowns,
@@ -594,6 +747,7 @@ const donorRegistry: DonorModule[] = [
     ...afterMarketAgentDefinition,
     ingestionAdapter: createRssIngestionAdapter("after_market_agent"),
     clusteringSupport: afterMarketAgentClusteringSupport,
+    connectionSupport: afterMarketAgentConnectionSupport,
   },
   {
     ...fnsDefinition,
@@ -622,6 +776,7 @@ export function getDonorRegistrySnapshot() {
     feedCount: entry.feeds.length,
     ingestionCapabilities: entry.ingestionAdapter.describeCapabilities(),
     clusteringCapabilities: entry.clusteringSupport?.describeCapabilities(),
+    connectionCapabilities: entry.connectionSupport?.describeCapabilities(),
     rankingFeatureSupport: entry.rankingFeatureProvider?.describeFeatureSupport(),
     diversitySupportAvailable: entry.diversitySupport?.available ?? false,
     enrichmentCapabilities: entry.enrichmentSupport?.describeCapabilities(),
@@ -659,6 +814,15 @@ export function getDiversitySupports() {
     .map((entry) => ({
       donor: entry.donor,
       support: entry.diversitySupport as DiversitySupport,
+    }));
+}
+
+export function getConnectionSupports() {
+  return donorRegistry
+    .filter((entry) => entry.contractStates.connection === "active" && entry.connectionSupport)
+    .map((entry) => ({
+      donor: entry.donor,
+      support: entry.connectionSupport as ConnectionSupport,
     }));
 }
 

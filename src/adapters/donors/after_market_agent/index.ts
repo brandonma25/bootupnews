@@ -3,12 +3,13 @@ import type { DonorDefinition } from "@/adapters/donors/types";
 export const afterMarketAgentDefinition: DonorDefinition = {
   donor: "after_market_agent",
   displayName: "after-market-agent",
-  summary: "Cluster-first architecture donor that informs clustering and representative selection boundaries.",
+  summary: "Cluster-first architecture donor that informs clustering, representative selection, and structured connection boundaries.",
   transformationBoundary:
-    "after-market-agent contributes clustering-support patterns and finance-oriented feed hints without replacing canonical clustering logic.",
+    "after-market-agent contributes clustering and connection-support patterns without replacing canonical clustering, explanation assembly, or runtime ranking logic.",
   contractStates: {
     ingestion: "stubbed",
     clustering: "active",
+    connection: "active",
     ranking: "stubbed",
     enrichment: "future_ready",
   },

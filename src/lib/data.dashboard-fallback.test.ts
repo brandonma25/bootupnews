@@ -392,6 +392,8 @@ describe("getDashboardData fallback behavior", () => {
     expect(lead.whyItMatters.toLowerCase()).toMatch(/fed|rates|market/);
     expect(lead.explanationPacket?.explanation_mode).toBe("deterministic");
     expect(lead.explanationPacket?.why_this_ranks_here.toLowerCase()).toContain("structural importance");
+    expect(lead.explanationPacket?.connection_layer?.what_led_to_this.length).toBeGreaterThan(20);
+    expect(lead.explanationPacket?.connection_layer?.what_it_connects_to.length).toBeGreaterThan(20);
     expect(lead.trustDebug?.enrichment.status).toBe("skipped");
     expect(lead.rankingSignals?.[0]).not.toContain("Credibility");
     expect(lead.keyPoints.join(" ").toLowerCase()).not.toContain("cluster evidence");

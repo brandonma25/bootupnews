@@ -10,6 +10,7 @@ export const openclawDefinition: DonorDefinition = {
     ingestion: "active",
     clustering: "stubbed",
     ranking: "stubbed",
+    connection: "stubbed",
     enrichment: "future_ready",
   },
   feeds: [

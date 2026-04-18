@@ -17,6 +17,7 @@ const CANONICAL_OWNERS: Record<PipelineSubsystem, string> = {
   normalization: "src/lib/pipeline/normalization/index.ts",
   clustering: "src/lib/pipeline/clustering/index.ts",
   ranking: "src/lib/scoring/scoring-engine.ts",
+  connection: "src/lib/explanation-support.ts",
   enrichment: "src/lib/data.ts",
 };
 
@@ -41,6 +42,13 @@ export function getDonorSubsystemMappings(): DonorSubsystemMapping[] {
       subsystem: "ranking" as const,
       state: entry.contractStates.ranking,
       canonicalOwner: CANONICAL_OWNERS.ranking,
+      boundary: entry.transformationBoundary,
+    },
+    {
+      donor: entry.donor,
+      subsystem: "connection" as const,
+      state: entry.contractStates.connection,
+      canonicalOwner: CANONICAL_OWNERS.connection,
       boundary: entry.transformationBoundary,
     },
     {

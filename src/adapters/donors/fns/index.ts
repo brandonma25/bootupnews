@@ -10,6 +10,7 @@ export const fnsDefinition: DonorDefinition = {
     ingestion: "stubbed",
     clustering: "stubbed",
     ranking: "active",
+    connection: "stubbed",
     enrichment: "future_ready",
   },
   feeds: [

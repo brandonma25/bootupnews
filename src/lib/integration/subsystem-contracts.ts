@@ -25,6 +25,7 @@ export type PipelineSubsystem =
   | "normalization"
   | "clustering"
   | "ranking"
+  | "connection"
   | "enrichment";
 
 export type StageOwnership = "canonical" | "donor_assisted";
@@ -214,6 +215,45 @@ export interface RankingDebug {
 
 export type ExplanationMode = "deterministic" | "enriched" | "fallback";
 
+export interface ConnectionLayerPacket {
+  what_led_to_this: string;
+  what_it_connects_to: string;
+  connection_confidence: "high" | "medium" | "low";
+  connection_mode: ExplanationMode;
+  connection_evidence_summary: string;
+  connection_unknowns: string[];
+}
+
+export interface ConnectionEvidenceInput {
+  title: string;
+  topicName: string;
+  summary: string;
+  eventType: string;
+  affectedMarkets: string[];
+  topics: string[];
+  entities: string[];
+  keywords: string[];
+  signalStrength: "weak" | "moderate" | "strong";
+  confidenceScore: number;
+  sourceCount: number;
+  signalRole: "core" | "context" | "watch";
+  rankingFeatures?: Partial<RankingFeatureSet>;
+}
+
+export interface ConnectionSupport {
+  describeCapabilities(): {
+    provider: string;
+    bounded: boolean;
+    deterministic_first: boolean;
+    supportedFields: Array<keyof ConnectionLayerPacket>;
+  };
+  buildConnectionLayer(input: ConnectionEvidenceInput): {
+    packet: ConnectionLayerPacket;
+    debugNotes: string[];
+    status: "available" | "fallback" | "declined";
+  };
+}
+
 export interface CitationSupportSummary {
   source_count: number;
   source_names: string[];
@@ -226,6 +266,7 @@ export interface ExplanationPacket {
   why_it_matters: string;
   why_this_ranks_here: string;
   what_to_watch: string;
+  connection_layer?: ConnectionLayerPacket;
   signal_role: "core" | "context" | "watch";
   confidence: "high" | "medium" | "low";
   unknowns: string[];
@@ -237,6 +278,13 @@ export interface TrustLayerDebug {
   evidence_used: string[];
   material_ranking_features: Array<keyof RankingFeatureSet>;
   explanation_mode: ExplanationMode;
+  connection: {
+    provider: string | null;
+    status: "available" | "fallback" | "declined" | "unused";
+    mode: ExplanationMode;
+    reason: string;
+    evidence_used: string[];
+  };
   confidence_notes: string[];
   uncertainty_notes: string[];
   deterministic_path_reason: string;
@@ -253,6 +301,7 @@ export interface EnrichmentRequest {
   summary: string;
   what_to_watch: string;
   why_it_matters: string;
+  connection_layer?: ConnectionLayerPacket;
   source_count: number;
   material_ranking_features: Array<keyof RankingFeatureSet>;
   unknowns: string[];
@@ -261,7 +310,7 @@ export interface EnrichmentRequest {
 export interface EnrichmentResult {
   provider: string;
   status: "used" | "skipped" | "unavailable";
-  output?: Partial<Pick<ExplanationPacket, "why_it_matters" | "what_to_watch" | "unknowns">>;
+  output?: Partial<Pick<ExplanationPacket, "why_it_matters" | "what_to_watch" | "unknowns" | "connection_layer">>;
   notes: string[];
 }
 
@@ -271,7 +320,7 @@ export interface EnrichmentSupport {
     provider: string;
     bounded: boolean;
     schema_safe: boolean;
-    output_fields: Array<keyof Pick<ExplanationPacket, "why_it_matters" | "what_to_watch" | "unknowns">>;
+    output_fields: Array<keyof Pick<ExplanationPacket, "why_it_matters" | "what_to_watch" | "unknowns" | "connection_layer">>;
   };
   prepareEnrichmentPacket(input: {
     cluster: SignalCluster;

@@ -1,4 +1,5 @@
 import { getEnrichmentSupports } from "@/adapters/donors";
+import { assembleConnectionLayer } from "@/lib/connection-support";
 import type {
   ExplanationPacket,
   RankingDebug,
@@ -172,6 +173,14 @@ export function assembleExplanationPacket(
     sources: options.sourceNames.map((sourceName) => ({ title: sourceName, url: "https://example.com" })),
     eventIntelligence: options.intelligence,
   });
+  const connection = assembleConnectionLayer({
+    topicName: options.topicName,
+    intelligence: options.intelligence,
+    sourceCount: options.sourceCount,
+    signalRole,
+    rankingDebug: options.rankingDebug,
+    cluster: options.cluster,
+  });
   const packet: ExplanationPacket = {
     what_happened: clipSentence(options.intelligence.summary, 220),
     why_it_matters: clipSentence(options.whyItMatters, 220),
@@ -184,6 +193,12 @@ export function assembleExplanationPacket(
       200,
     ),
     what_to_watch: clipSentence(buildWhatToWatch(options.intelligence, options.sourceCount, options.rankingDebug), 200),
+    connection_layer: {
+      ...connection.packet,
+      what_led_to_this: clipSentence(connection.packet.what_led_to_this, 200),
+      what_it_connects_to: clipSentence(connection.packet.what_it_connects_to, 200),
+      connection_evidence_summary: clipSentence(connection.packet.connection_evidence_summary, 180),
+    },
     signal_role: signalRole,
     confidence,
     unknowns,
@@ -207,6 +222,13 @@ export function assembleExplanationPacket(
     ),
     material_ranking_features: materialRankingFeatures,
     explanation_mode: packet.explanation_mode,
+    connection: {
+      provider: connection.provider,
+      status: connection.status,
+      mode: packet.connection_layer?.connection_mode ?? "fallback",
+      reason: connection.reason,
+      evidence_used: connection.evidenceUsed,
+    },
     confidence_notes: [
       `Explanation confidence is ${confidence}.`,
       `Source support is ${packet.citation_support_summary.corroboration === "multi_source" ? "multi-source" : "single-source"}.`,
@@ -243,6 +265,13 @@ export function assembleExplanationPacket(
       Object.assign(packet, {
         why_it_matters: enrichment.output.why_it_matters ?? packet.why_it_matters,
         what_to_watch: enrichment.output.what_to_watch ?? packet.what_to_watch,
+        connection_layer: enrichment.output.connection_layer
+          ? {
+              ...packet.connection_layer,
+              ...enrichment.output.connection_layer,
+              connection_mode: "enriched",
+            }
+          : packet.connection_layer,
         unknowns: mergedUnknowns,
         explanation_mode: "enriched" as const,
       });
@@ -251,6 +280,10 @@ export function assembleExplanationPacket(
     trustDebug = {
       ...trustDebug,
       explanation_mode: packet.explanation_mode,
+      connection: {
+        ...trustDebug.connection,
+        mode: packet.connection_layer?.connection_mode ?? trustDebug.connection.mode,
+      },
       enrichment: {
         provider: enrichment.provider,
         status: enrichment.status,

@@ -426,6 +426,16 @@ async function getPipelineBackedDashboardData(input: {
     counts[status] = (counts[status] ?? 0) + 1;
     return counts;
   }, {});
+  const connectionModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
+    const mode = item.explanationPacket?.connection_layer?.connection_mode ?? "missing";
+    counts[mode] = (counts[mode] ?? 0) + 1;
+    return counts;
+  }, {});
+  const connectionStatuses = briefing.items.reduce<Record<string, number>>((counts, item) => {
+    const status = item.trustDebug?.connection.status ?? "missing";
+    counts[status] = (counts[status] ?? 0) + 1;
+    return counts;
+  }, {});
 
   logServerEvent("info", "Dashboard pipeline path resolved", {
     route: input.route,
@@ -439,6 +449,8 @@ async function getPipelineBackedDashboardData(input: {
     pipelineClusterCount: pipelineRun.num_clusters,
     explanationModes,
     enrichmentStatuses,
+    connectionModes,
+    connectionStatuses,
   });
 
   return {

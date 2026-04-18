@@ -160,9 +160,14 @@ describe("assembleExplanationPacket", () => {
     expect(result.packet.signal_role).toBe("core");
     expect(result.packet.why_this_ranks_here).toContain("structural importance");
     expect(result.packet.why_this_ranks_here.toLowerCase()).toContain("top signal");
+    expect(result.packet.connection_layer?.what_led_to_this.toLowerCase()).toContain("inflation");
+    expect(result.packet.connection_layer?.what_it_connects_to.toLowerCase()).toContain("borrowing costs");
+    expect(result.packet.connection_layer?.connection_mode).toBe("deterministic");
     expect(result.packet.citation_support_summary.corroboration).toBe("multi_source");
     expect(result.packet.citation_support_summary.strongest_trust_tier).toBe("tier_1");
     expect(result.trustDebug.material_ranking_features).toContain("structural_impact");
+    expect(result.trustDebug.connection.provider).toBe("after_market_agent");
+    expect(result.trustDebug.connection.status).toBe("available");
     expect(result.trustDebug.enrichment.status).toBe("skipped");
   });
 
@@ -180,7 +185,10 @@ describe("assembleExplanationPacket", () => {
     expect(result.packet.explanation_mode).toBe("fallback");
     expect(result.packet.signal_role).toBe("watch");
     expect(result.packet.confidence).toBe("low");
+    expect(result.packet.connection_layer?.connection_mode).toBe("fallback");
+    expect(result.packet.connection_layer?.what_led_to_this.toLowerCase()).toContain("too early");
     expect(result.packet.unknowns.join(" ")).toContain("Cross-source confirmation");
     expect(result.trustDebug.deterministic_path_reason).toContain("fallback");
+    expect(result.trustDebug.connection.status).toBe("fallback");
   });
 });

@@ -4,6 +4,7 @@ import {
   getActiveSourceRegistry,
   getCanonicalSourceMetadata,
   getClusteringSupportAdapters,
+  getConnectionSupports,
   getDiversitySupports,
   getDonorModule,
   getDonorRegistrySnapshot,
@@ -42,9 +43,11 @@ describe("donor registry", () => {
     ]);
     expect(registry.find((entry) => entry.donor === "openclaw")?.contractStates.ingestion).toBe("active");
     expect(registry.find((entry) => entry.donor === "after_market_agent")?.contractStates.clustering).toBe("active");
+    expect(registry.find((entry) => entry.donor === "after_market_agent")?.contractStates.connection).toBe("active");
     expect(registry.find((entry) => entry.donor === "fns")?.contractStates.ranking).toBe("active");
     expect(registry.find((entry) => entry.donor === "horizon")?.contractStates.enrichment).toBe("active");
     expect(registry.find((entry) => entry.donor === "after_market_agent")?.clusteringCapabilities?.provider).toBe("after_market_agent");
+    expect(registry.find((entry) => entry.donor === "after_market_agent")?.connectionCapabilities?.provider).toBe("after_market_agent");
     expect(registry.find((entry) => entry.donor === "fns")?.diversitySupportAvailable).toBe(true);
     expect(registry.find((entry) => entry.donor === "fns")?.rankingFeatureSupport?.provider).toBe("fns");
     expect(registry.find((entry) => entry.donor === "horizon")?.enrichmentCapabilities?.provider).toBe("horizon");
@@ -124,6 +127,7 @@ describe("donor registry", () => {
 
   it("exposes after-market-agent clustering support and future-ready FNS diversity support", () => {
     const clusteringSupport = getClusteringSupportAdapters().find((entry) => entry.donor === "after_market_agent");
+    const connectionSupport = getConnectionSupports().find((entry) => entry.donor === "after_market_agent");
     const diversitySupport = getDiversitySupports().find((entry) => entry.donor === "fns");
     const cluster: SignalCluster = {
       cluster_id: "cluster-1",
@@ -144,6 +148,30 @@ describe("donor registry", () => {
     };
 
     expect(clusteringSupport).toBeDefined();
+    expect(connectionSupport?.support.describeCapabilities().supportedFields).toContain("what_led_to_this");
+    expect(
+      connectionSupport?.support.buildConnectionLayer({
+        title: "Federal Reserve signals rates will stay elevated",
+        topicName: "Finance",
+        summary: "Markets are repricing after fresh Federal Reserve guidance.",
+        eventType: "policy_regulation",
+        affectedMarkets: ["rates", "equities"],
+        topics: ["finance", "policy"],
+        entities: ["Federal Reserve"],
+        keywords: ["rates", "inflation", "policy"],
+        signalStrength: "strong",
+        confidenceScore: 74,
+        sourceCount: 2,
+        signalRole: "core",
+        rankingFeatures: {
+          structural_impact: 82,
+          downstream_consequence: 74,
+          cross_domain_relevance: 70,
+          actionability_or_decision_value: 72,
+          persistence_or_endurance: 71,
+        },
+      }).packet.what_it_connects_to.toLowerCase(),
+    ).toContain("borrowing costs");
     expect(clusteringSupport!.support.describeCapabilities().similaritySignals).toContain("source_confirmation");
     expect(diversitySupport?.support.available).toBe(true);
     expect(diversitySupport?.support.evaluateDiversityAdjustment([
@@ -176,12 +204,21 @@ describe("donor registry", () => {
 
     expect(horizon?.enrichmentSupport?.enabled).toBe(true);
     expect(horizon?.enrichmentSupport?.describeCapabilities().schema_safe).toBe(true);
+    expect(horizon?.enrichmentSupport?.describeCapabilities().output_fields).toContain("connection_layer");
     expect(horizon?.enrichmentSupport?.getStructuredEnrichment({
       cluster_id: "cluster-1",
       title: "Policy shift",
       summary: "Policy shift summary",
       what_to_watch: "Watch for confirmation.",
       why_it_matters: "It matters because policy expectations are changing.",
+      connection_layer: {
+        what_led_to_this: "It appears to follow earlier rate pressure.",
+        what_it_connects_to: "It connects to borrowing costs and market pricing.",
+        connection_confidence: "medium",
+        connection_mode: "deterministic",
+        connection_evidence_summary: "Built from macro terms and source confirmation.",
+        connection_unknowns: [],
+      },
       source_count: 2,
       material_ranking_features: ["structural_impact", "source_confirmation"],
       unknowns: [],

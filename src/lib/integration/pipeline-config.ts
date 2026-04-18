@@ -50,6 +50,13 @@ export const PIPELINE_STAGE_CONFIG: PipelineStageConfig[] = [
     notes: "Deterministic scoring remains canonical and accepts donor-mapped ranking features.",
   },
   {
+    stage: "connection",
+    ownership: "donor_assisted",
+    canonicalModule: "src/lib/explanation-support.ts",
+    donorIds: ["after_market_agent", "horizon"],
+    notes: "Canonical explanation assembly remains local while after-market-agent supports deterministic connection fields and Horizon stays optional for future bounded enrichment.",
+  },
+  {
     stage: "digest",
     ownership: "canonical",
     canonicalModule: "src/lib/pipeline/digest/index.ts",
@@ -92,6 +99,7 @@ export function getContractStateSummary() {
       summary.normalization.push("stubbed");
       summary.clustering.push(entry.contractStates.clustering);
       summary.ranking.push(entry.contractStates.ranking);
+      summary.connection.push(entry.contractStates.connection);
       summary.enrichment.push(entry.contractStates.enrichment);
       return summary;
     },
@@ -100,6 +108,7 @@ export function getContractStateSummary() {
       normalization: [],
       clustering: [],
       ranking: [],
+      connection: [],
       enrichment: [],
     },
   );
