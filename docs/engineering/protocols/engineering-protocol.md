@@ -182,6 +182,7 @@ git push origin --delete feature/<name>
 - Hotspot changes should be short-lived and should sync with `origin/main` immediately before PR creation and again before merge.
 - Avoid parallel hotspot branches when possible; if overlap exists, prefer rebasing or stacking on the latest branch instead of letting both drift.
 - If a hotspot PR becomes stale, it should usually be superseded by port-forwarding the still-needed logic into a fresh branch from `main` instead of force-merging the stale branch.
+- See `docs/engineering/protocols/governance-gate-map.md` for governance tiering, hotspot ownership, and file responsibility boundaries.
 
 ## 11. Merge Checklist
 - Branch is correct and isolated.
@@ -234,3 +235,4 @@ git push origin --delete feature/<name>
 - docs are missing
 - build is broken
 - known blockers remain
+- For bug-fix-signaled work, the truthful documentation lane is usually `docs/engineering/bug-fixes/`; see `docs/engineering/protocols/bug-tracking-governance.md`.

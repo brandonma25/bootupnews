@@ -49,6 +49,8 @@ git push origin --delete feature/<name>
 
 ## GOVERNANCE HOTSPOT RULES
 
+Detailed gate ownership lives in `docs/engineering/protocols/governance-gate-map.md`.
+
 The following files are serialized hotspot files:
 
 - `docs/product/feature-system.csv`

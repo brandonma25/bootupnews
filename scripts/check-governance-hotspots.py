@@ -2,71 +2,47 @@
 
 from __future__ import annotations
 
-import subprocess
 import sys
-from pathlib import Path
+
+from governance_common import (
+    HOTSPOT_FILES,
+    inspect_branch_freshness,
+    load_changes,
+    parse_common_args,
+    resolve_branch_name,
+)
 
 
-HOTSPOT_FILES = [
-    "docs/product/feature-system.csv",
-    "AGENTS.md",
-    "docs/engineering/protocols/engineering-protocol.md",
-    "docs/engineering/protocols/prd-template.md",
-    "docs/product/documentation-rules.md",
-]
-
-
-def run_git(repo_root: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
+def parse_args():
+    parser = parse_common_args("Inspect serialized governance hotspot state.")
+    parser.add_argument(
+        "--require-fresh",
+        action="store_true",
+        help="Fail when hotspot work does not contain the latest origin/main commit.",
     )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "git command failed")
-    return result.stdout.strip()
-
-
-def parse_status_paths(status_output: str) -> list[str]:
-    paths: list[str] = []
-    for line in status_output.splitlines():
-        if not line.strip():
-            continue
-        entry = line[3:]
-        if " -> " in entry:
-            entry = entry.split(" -> ", 1)[1]
-        paths.append(entry)
-    return paths
+    return parser.parse_args()
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parent.parent
+    args = parse_args()
+    repo_root = args.repo_root.resolve()
 
     try:
-        branch = run_git(repo_root, "branch", "--show-current")
-        changed_output = run_git(repo_root, "diff", "--name-only", "origin/main...HEAD")
-        status_output = run_git(repo_root, "status", "--porcelain")
-        merge_base = run_git(repo_root, "merge-base", "HEAD", "origin/main")
-        origin_main_sha = run_git(repo_root, "rev-parse", "origin/main")
+        branch = resolve_branch_name(repo_root, args.branch_name)
+        changes = load_changes(repo_root, f"{args.base_sha}...{args.head_sha}")
+        is_fresh, merge_base, origin_main_sha = inspect_branch_freshness(repo_root)
     except RuntimeError as exc:
         print(f"FAIL: Unable to inspect governance hotspot state.\n{exc}")
         return 1
 
-    changed_files = sorted(
-        {
-            *[line for line in changed_output.splitlines() if line.strip()],
-            *parse_status_paths(status_output),
-        }
-    )
+    changed_files = sorted(changes)
     touched_hotspots = [path for path in HOTSPOT_FILES if path in changed_files]
     hotspot_branch = bool(touched_hotspots) or any(
         token in branch for token in ("governance", "hotspot")
     )
 
     print(f"branch: {branch}")
-    print("diff base: origin/main...HEAD")
+    print(f"diff base: {args.base_sha}...{args.head_sha}")
     print(f"changed files: {len(changed_files)}")
 
     if touched_hotspots:
@@ -86,10 +62,16 @@ def main() -> int:
         print("")
         print("PASS: No serialized governance hotspot files are touched on this branch.")
 
-    if merge_base != origin_main_sha:
+    if not is_fresh:
         print("")
         print("WARNING: HEAD does not currently contain the latest origin/main commit.")
+        print(f"merge-base: {merge_base}")
+        print(f"origin/main: {origin_main_sha}")
         print("Sync with origin/main before opening or merging a PR that touches hotspot files.")
+        if args.require_fresh and hotspot_branch:
+            print("")
+            print("FAIL: Hotspot branch freshness is required but HEAD is stale.")
+            return 1
 
     return 0
 

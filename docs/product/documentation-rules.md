@@ -31,6 +31,8 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - Incident records belong in `docs/engineering/incidents/` only when they capture a meaningful governance, process, release, or workflow failure.
 - Change records belong in `docs/engineering/change-records/` when the work is primarily an audit, migration, consolidation, normalization, or repo-structure change.
 - Rules, checklists, and templates belong in `docs/engineering/protocols/`.
+- Governance tier ownership lives in `docs/engineering/protocols/governance-gate-map.md`.
+- Bug-fix requirement details live in `docs/engineering/protocols/bug-tracking-governance.md`.
 
 ## Visibility Note
 - `docs/product/feature-system.csv` is visible if this repository is public.
@@ -96,6 +98,7 @@ This repository uses a controlled documentation system. The goal is to keep docs
 1. If the work defines or scopes meaningful product behavior, create or update a brief in `docs/product/briefs/`.
 2. If the work is numbered feature work, create or update the canonical PRD in `docs/product/prd/`.
 3. If the work fixes a real defect, create or update `docs/engineering/bug-fixes/`.
+   Use `docs/engineering/protocols/bug-tracking-governance.md` for the bug-fix threshold and template guidance.
 4. If the work records a meaningful process, governance, release, or workflow failure, use `docs/engineering/incidents/`.
 5. If the work primarily records an audit, migration, normalization, taxonomy cleanup, or repo-structure repair, use `docs/engineering/change-records/`.
 6. If the work records meaningful validation performed, use `docs/engineering/testing/`.

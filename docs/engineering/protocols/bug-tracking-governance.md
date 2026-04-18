@@ -1,0 +1,44 @@
+# Bug Tracking Governance
+
+## Purpose
+- Define the lightweight repo-safe path from bug discovery to bug-fix documentation to governance enforcement.
+- Make bug-fix work traceable without forcing every small fix into a new product PRD.
+
+## Canonical Bug-Fix Lane
+- Defect records live in `docs/engineering/bug-fixes/`.
+- Use one bug-fix record per meaningful defect or tightly related defect family.
+- Prefer updating the existing bug-fix record instead of creating `v2`, `final`, `follow-up`, or duplicate files for the same root cause.
+
+## When a Bug-Fix Record Is Required
+- A branch or PR is explicitly framed as a fix, bug, hotfix, or regression repair.
+- A non-trivial defect changes runtime, data, automation, workflow, or release behavior.
+- The fix has a root cause, risk, or follow-up expectation that future maintainers should understand.
+
+## When a Bug-Fix Record Is Usually Not Required
+- Pure docs-only corrections.
+- Tiny typo-only code changes with no real defect narrative.
+- Structural repo cleanup that truthfully belongs in `docs/engineering/change-records/`.
+- A new system or feature that should be documented primarily through a PRD instead of a bug record.
+
+## Required Minimum Content
+- Problem addressed.
+- Root cause.
+- Exact fix applied.
+- Validation performed.
+- Remaining risks or follow-up.
+
+## Cross-Reference Rules
+- If the bug repair materially changes an existing numbered feature, reference the canonical `PRD-XX` inside the bug-fix record.
+- If the work changes a governance rule or release behavior, also update the relevant protocol or change-record doc.
+- Do not copy the same narrative into the PRD, bug-fix record, and testing note; keep each document truthful to its job.
+
+## Enforcement Link
+- `scripts/validate-documentation-coverage.py` detects fix-signaled work and requires a `bug-fix` documentation lane update for meaningful non-test changes.
+- `scripts/release-governance-gate.py` reuses that same coverage logic for blocking enforcement.
+
+## Naming Guidance
+- Prefer concise kebab-case file names that describe the defect, for example `oauth-session-persistence.md`.
+- If the defect is tightly tied to a canonical PRD, `prd-XX-<slug>.md` is acceptable when it makes the relationship clearer.
+
+## Template
+- Use `docs/engineering/bug-fixes/templates/bug-fix-record-template.md` for new meaningful bug-fix records.

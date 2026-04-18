@@ -55,18 +55,29 @@
 ### 2a. Release Governance Gate
 - Workflow: [release-governance-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/release-governance-gate.yml)
 - Script entrypoint: `python scripts/release-governance-gate.py`
+- Shared classifier: `python scripts/governance_common.py` consumers
+- Audit companion: `python scripts/pr-governance-audit.py`
+- Standalone coverage validator: `python scripts/validate-documentation-coverage.py`
 - Reuses the feature-system CSV validator and inspects the PR diff.
 - Monitored change areas include `src/`, `supabase/`, `scripts/`, `.github/workflows/`, and key root config files such as `package.json`, `next.config.ts`, `playwright.config.ts`, and `tsconfig.json`.
 - Classification:
   - docs-only
   - trivial-code-change
+  - bug-fix
   - material-feature-change
   - new-feature-or-system
+- Governance tiers:
+  - baseline
+  - documented
+  - promoted
+  - hotspot
 - Enforcement:
   - docs-only changes pass when CSV validation still passes
   - trivial code changes pass when CSV validation still passes
+  - bug-fix changes require the `docs/engineering/bug-fixes/` lane
   - material feature or system changes require at least one supporting docs update in `docs/product/briefs/`, `docs/product/prd/`, `docs/engineering/bug-fixes/`, `docs/engineering/incidents/`, `docs/engineering/change-records/`, `docs/engineering/testing/`, `docs/engineering/protocols/`, `docs/product/documentation-rules.md`, or `AGENTS.md`
   - new feature or system changes require a canonical `PRD-XX` file in `docs/product/prd/` plus a matching `docs/product/feature-system.csv` mapping
+  - material hotspot work must also update governance-facing documentation and contain the latest `origin/main` commit
   - new scripts or workflow files are treated as material governance changes by default, not as new feature/system declarations by themselves
 
 ### 3. Preview Gate

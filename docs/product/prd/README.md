@@ -27,3 +27,11 @@ All PRD filenames must use `prd-XX-short-kebab-case-title.md`, with zero-padded 
 21. `PRD-21` — `prd-21-reading-window-anchor.md`
 22. `PRD-22` — `prd-22-release-automation-system.md`
 23. `PRD-23` — `prd-23-release-governance-gate.md`
+24. `PRD-24` — `prd-24-github-sheets-governance-automation.md`
+25. `PRD-25` — `prd-25-bug-tracking-system-integration.md`
+26. `PRD-26` — `prd-26-governance-gate-promotion.md`
+27. `PRD-27` — `prd-27-hotspot-enforcement-gate.md`
+28. `PRD-28` — `prd-28-pr-classification-audit-layer.md`
+29. `PRD-29` — `prd-29-branch-freshness-guard.md`
+30. `PRD-30` — `prd-30-documentation-coverage-validator.md`
+31. `PRD-31` — `prd-31-governance-file-decomposition.md`
