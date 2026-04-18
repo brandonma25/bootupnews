@@ -114,6 +114,8 @@ type IngestionRunSummary = {
   degradedSourceNames: string[];
 };
 
+type DashboardDataPath = "public_pipeline" | "personalized_query" | "personalized_fallback_to_public";
+
 function createEmptyBriefing(): DailyBriefing {
   return {
     id: `generated-empty-${Date.now()}`,
@@ -200,6 +202,12 @@ export async function getDashboardData(
   const resolvedAuthState = authState ?? (await getRequestAuthState(route));
   const { supabase, user, sessionCookiePresent } = resolvedAuthState;
 
+  logServerEvent("info", "Dashboard data request received", {
+    route: resolvedAuthState.route,
+    sessionExists: Boolean(user),
+    sessionCookiePresent,
+  });
+
   if (!supabase || !user) {
     if (sessionCookiePresent) {
       logServerEvent("warn", "Dashboard SSR fell back to public mode", {
@@ -207,7 +215,12 @@ export async function getDashboardData(
         sessionCookiePresent,
       });
     }
-    return getPublicDashboardData();
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "public_pipeline",
+      mode: "public",
+      sessionExists: false,
+    });
   }
 
   const dashboardQueryResults = await withServerFallback(
@@ -235,7 +248,14 @@ export async function getDashboardData(
       userId: user.id,
       reason: "query bundle failed",
     });
-    return getPublicDashboardData();
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public",
+      mode: "live",
+      sessionExists: true,
+      userId: user.id,
+      fallbackReason: "query bundle failed",
+    });
   }
 
   const [topicsResult, sourcesResult] = dashboardQueryResults;
@@ -247,7 +267,14 @@ export async function getDashboardData(
       topicsError: topicsResult.error?.message,
       sourcesError: sourcesResult.error?.message,
     });
-    return getPublicDashboardData();
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public",
+      mode: "live",
+      sessionExists: true,
+      userId: user.id,
+      fallbackReason: "user-scoped query error",
+    });
   }
 
   const topics: Topic[] =
@@ -275,6 +302,16 @@ export async function getDashboardData(
       createdAt: source.created_at,
     })) ?? [];
 
+  logServerEvent("info", "Dashboard personalized query resolved", {
+    route: resolvedAuthState.route,
+    path: "personalized_query" satisfies DashboardDataPath,
+    sessionExists: true,
+    userId: user.id,
+    topicCount: topics.length,
+    sourceCount: sources.length,
+    activeSourceCount: sources.filter((source) => source.status === "active").length,
+  });
+
   const ingestionSummary = await persistRawArticles(
     supabase,
     user.id,
@@ -286,6 +323,43 @@ export async function getDashboardData(
   await syncEventClusters(supabase, user.id, topics, sources);
 
   const briefing = await buildMatchedBriefing(supabase, user.id, topics, sources);
+  const shouldFallbackToPipeline =
+    topics.length === 0 ||
+    sources.filter((source) => source.status === "active").length === 0 ||
+    briefing.items.length === 0;
+
+  if (shouldFallbackToPipeline) {
+    const fallbackReason =
+      topics.length === 0
+        ? "no personalized topics"
+        : sources.filter((source) => source.status === "active").length === 0
+          ? "no active personalized sources"
+          : "personalized briefing returned no items";
+
+    logServerEvent("warn", "Signed-in dashboard fell back to pipeline briefing", {
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public" satisfies DashboardDataPath,
+      sessionExists: true,
+      userId: user.id,
+      topicCount: topics.length,
+      sourceCount: sources.length,
+      activeSourceCount: sources.filter((source) => source.status === "active").length,
+      personalizedItemsCount: briefing.items.length,
+      fallbackReason,
+    });
+
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public",
+      mode: "live",
+      sessionExists: true,
+      userId: user.id,
+      topics,
+      sources,
+      fallbackReason,
+    });
+  }
+
   const homepageDiagnostics = await buildHomepageDiagnostics(
     supabase,
     user.id,
@@ -319,14 +393,37 @@ export async function getDashboardPageState(route: string): Promise<{
   };
 }
 
-async function getPublicDashboardData(): Promise<DashboardData> {
-  const { briefing, pipelineRun } = await generateDailyBriefing(demoTopics, demoSources);
+async function getPipelineBackedDashboardData(input: {
+  route: string;
+  path: DashboardDataPath;
+  mode: DashboardData["mode"];
+  sessionExists: boolean;
+  userId?: string;
+  topics?: Topic[];
+  sources?: Source[];
+  fallbackReason?: string;
+}): Promise<DashboardData> {
+  const fallbackTopics = input.topics?.length ? input.topics : demoTopics;
+  const fallbackSources = input.sources?.length ? input.sources : demoSources;
+  const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources);
+
+  logServerEvent("info", "Dashboard pipeline path resolved", {
+    route: input.route,
+    path: input.path,
+    sessionExists: input.sessionExists,
+    userId: input.userId,
+    fallbackReason: input.fallbackReason,
+    topicCount: fallbackTopics.length,
+    sourceCount: fallbackSources.length,
+    generatedItemsCount: briefing.items.length,
+    pipelineClusterCount: pipelineRun.num_clusters,
+  });
 
   return {
-    mode: "public",
+    mode: input.mode,
     briefing,
-    topics: demoTopics,
-    sources: demoSources,
+    topics: fallbackTopics,
+    sources: fallbackSources,
     homepageDiagnostics: {
       totalArticlesFetched: pipelineRun.num_raw_items,
       totalCandidateEvents: pipelineRun.num_clusters,
@@ -335,7 +432,7 @@ async function getPublicDashboardData(): Promise<DashboardData> {
       failedSourceCount: pipelineRun.feed_failures.length,
       fallbackSourceCount: pipelineRun.used_seed_fallback ? 1 : 0,
       degradedSourceNames: pipelineRun.feed_failures.map((failure) => failure.source),
-      sourceCountsByCategory: countSourcesByHomepageCategory(demoSources),
+      sourceCountsByCategory: countSourcesByHomepageCategory(fallbackSources),
     },
   };
 }
@@ -757,6 +854,14 @@ export async function buildMatchedBriefing(
   sources: Source[],
 ): Promise<DailyBriefing> {
   if (!topics.length) {
+    logServerEvent("info", "Matched briefing skipped because no personalized topics exist", {
+      route: "/dashboard",
+      path: "personalized_query" satisfies DashboardDataPath,
+      sessionExists: true,
+      userId,
+      topicCount: 0,
+      sourceCount: sources.length,
+    });
     return createEmptyBriefing();
   }
 
@@ -788,6 +893,17 @@ export async function buildMatchedBriefing(
   const articles = (articleResult.data ?? []) as StoredArticle[];
   const events = (eventResult.data ?? []) as StoredEvent[];
   const matches = (matchResult.data ?? []) as StoredArticleTopic[];
+  logServerEvent("info", "Matched briefing personalized rows loaded", {
+    route: "/dashboard",
+    path: "personalized_query" satisfies DashboardDataPath,
+    sessionExists: true,
+    userId,
+    personalizedArticleCount: articles.length,
+    personalizedEventCount: events.length,
+    personalizedMatchCount: matches.length,
+    topicCount: topics.length,
+    sourceCount: sources.length,
+  });
   const eventById = new Map(events.map((event) => [event.id, event]));
   const sourceById = new Map(sources.map((source) => [source.id, source]));
   const topicById = new Map(topics.map((topic) => [topic.id, topic]));
@@ -921,6 +1037,17 @@ export async function buildMatchedBriefing(
     }));
 
   if (!items.length) {
+    logServerEvent("warn", "Matched briefing produced zero visible items", {
+      route: "/dashboard",
+      path: "personalized_query" satisfies DashboardDataPath,
+      sessionExists: true,
+      userId,
+      personalizedArticleCount: articles.length,
+      personalizedEventCount: events.length,
+      personalizedMatchCount: matches.length,
+      topicCount: topics.length,
+      sourceCount: sources.length,
+    });
     return createEmptyBriefing();
   }
 
