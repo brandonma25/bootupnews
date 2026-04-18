@@ -24,6 +24,17 @@ test.describe("dashboard", () => {
     await expect(page.getByRole("link", { name: /unlock full briefing/i })).toBeVisible();
   });
 
+  test("renders the capped signal briefing with visible tier labels", async ({ page }) => {
+    await page.goto("/dashboard");
+
+    await expect(page.getByRole("heading", { name: /today's signal briefing/i })).toBeVisible();
+    await expect(page.getByText(/the dashboard renders at most five ranked signals/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /core signals/i })).toBeVisible();
+    const tierBadges = page.locator("span").filter({ hasText: /^(Core Signal|Context Signal)$/ });
+    await expect(tierBadges.first()).toBeVisible();
+    expect(await tierBadges.count()).toBeLessThanOrEqual(5);
+  });
+
   test("returns provider callback errors to the homepage callback-error state", async ({ page }) => {
     await page.goto(
       "/auth/callback?error=access_denied&error_code=otp_expired&error_description=User%20denied%20access",

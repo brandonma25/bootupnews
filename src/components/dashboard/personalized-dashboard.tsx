@@ -11,7 +11,7 @@ import { GuestValuePreview } from "@/components/guest-value-preview";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
-import { buildEventIntelligenceSignals, isTopEventEligible } from "@/lib/event-intelligence";
+import { buildEventIntelligenceSignals } from "@/lib/event-intelligence";
 import { getDisplayStateLabel, getDisplayStateTone } from "@/lib/habit-loop";
 import {
   buildPersonalizationMatch,
@@ -20,10 +20,10 @@ import {
   getStoredPersonalizationPayload,
   hasActivePersonalization,
   parsePersonalizationProfile,
-  sortBriefingItemsByPersonalization,
   subscribeToPersonalizationStore,
   type PersonalizationMatch,
 } from "@/lib/personalization";
+import { compareBriefingItemsByRanking } from "@/lib/ranking";
 import { formatReadingDelta, formatReadingWindow } from "@/lib/reading-window";
 import type { BriefingItem, DashboardData, ViewerAccount } from "@/lib/types";
 import { cn, formatBriefingDate, minutesToLabel } from "@/lib/utils";
@@ -34,6 +34,9 @@ type PersonalizedDashboardProps = {
   viewer: ViewerAccount | null;
   isAiConfigured: boolean;
 };
+
+const MAX_DISPLAY_SIGNALS = 5;
+const CORE_SIGNAL_COUNT = 3;
 
 export default function PersonalizedDashboard({
   searchParams: params,
@@ -52,22 +55,17 @@ export default function PersonalizedDashboard({
     [isSignedIn, personalizationPayload, viewer?.email],
   );
   const personalizationActive = isSignedIn && hasActivePersonalization(personalizationProfile);
-  const sortedItems = useMemo(
-    () => sortBriefingItemsByPersonalization(data.briefing.items, personalizationProfile),
-    [data.briefing.items, personalizationProfile],
+  const rankedItems = useMemo(
+    () => data.briefing.items.slice().sort(compareBriefingItemsByRanking),
+    [data.briefing.items],
   );
-
-  const topEvents = sortedItems.filter((item) => isTopEventEligible(item)).slice(0, 4);
-  const topEventIds = new Set(topEvents.map((item) => item.id));
-  const earlySignals = sortedItems.filter((item) => !isTopEventEligible(item));
-  const topicBriefs = data.topics.map((topic) => {
-    const items = sortedItems.filter((item) => item.topicId === topic.id && !topEventIds.has(item.id));
-    return {
-      topic,
-      confirmed: items.filter((item) => isTopEventEligible(item)).slice(0, 2),
-      early: items.filter((item) => !isTopEventEligible(item)).slice(0, 2),
-    };
-  });
+  const displaySignals = useMemo(
+    () => rankedItems.slice(0, MAX_DISPLAY_SIGNALS),
+    [rankedItems],
+  );
+  const coreSignals = displaySignals.slice(0, CORE_SIGNAL_COUNT);
+  const contextSignals = displaySignals.slice(CORE_SIGNAL_COUNT);
+  const hiddenSignalCount = Math.max(rankedItems.length - displaySignals.length, 0);
 
   const trackableItems = data.briefing.items.filter(
     (item) => item.continuityKey && item.continuityFingerprint,
@@ -175,17 +173,17 @@ export default function PersonalizedDashboard({
               {isSignedIn ? "Unlocked view" : "Public briefing"}
             </p>
             <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
-              {isSignedIn ? "The structured briefing starts here" : "What signing in unlocks"}
+              {isSignedIn ? "The capped signal briefing starts here" : "What signing in unlocks"}
             </h2>
             <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
               {isSignedIn
-                ? "The dashboard keeps the event-centric scan, topic briefings, reading window, and session status together so the product feels like a working intelligence surface instead of a feed."
+                ? "The main dashboard now stays intentionally brief: a maximum of five ranked signals, with the top three framed as Core Signals and the next two framed as Context Signals."
                 : "Preview the ranked public briefing here, then sign in to unlock personalized topics, saved history, custom alerts, and the complete dashboard workflow."}
             </p>
           </Panel>
           <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
             <StateMetric label="Ranked events" value={data.briefing.items.length} />
-            <StateMetric label="Top events" value={topEvents.length} />
+            <StateMetric label="Displayed signals" value={displaySignals.length} />
             <StateMetric label="Topics active" value={data.topics.length} />
           </div>
         </section>
@@ -262,17 +260,17 @@ export default function PersonalizedDashboard({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                  Priority scan
+                  Main briefing
                 </p>
                 <h2 className="mt-1.5 text-xl font-semibold text-[var(--foreground)]">
-                  Top events today
+                  Today&apos;s signal briefing
                 </h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  Only event clusters with corroborating source coverage appear here.
+                  The dashboard renders at most five ranked signals. Core Signals come first, followed by up to two Context Signals.
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge>{topEvents.length} {topEvents.length === 1 ? "event" : "events"}</Badge>
+                <Badge>{displaySignals.length} {displaySignals.length === 1 ? "signal" : "signals"}</Badge>
                 {canTrackProgress && !isCaughtUp ? (
                   <form action={markAllReadAction}>
                     <input type="hidden" name="briefingId" value={data.briefing.id} />
@@ -288,20 +286,33 @@ export default function PersonalizedDashboard({
                 ) : null}
               </div>
             </div>
-            <div className="mt-5 grid gap-4">
-              {topEvents.length ? (
-                topEvents.map((event) => (
-                  <DashboardEventCard
-                    key={event.id}
-                    item={event}
-                    tone="confirmed"
-                    personalization={buildPersonalizationMatch(event, personalizationProfile)}
-                    personalizationEnabled={personalizationActive}
-                  />
-                ))
+            <div className="mt-5 space-y-5">
+              {displaySignals.length ? (
+                <>
+                  {coreSignals.length ? (
+                    <SignalTierSection
+                      title="Core Signals"
+                      description="The three highest-ranked signals on the dashboard right now."
+                      items={coreSignals}
+                      tier="core"
+                      personalizationProfile={personalizationProfile}
+                      personalizationEnabled={personalizationActive}
+                    />
+                  ) : null}
+                  {contextSignals.length ? (
+                    <SignalTierSection
+                      title="Context Signals"
+                      description="Additional ranked context that still made the capped dashboard view."
+                      items={contextSignals}
+                      tier="context"
+                      personalizationProfile={personalizationProfile}
+                      personalizationEnabled={personalizationActive}
+                    />
+                  ) : null}
+                </>
               ) : (
                 <Panel className="border-dashed border-[var(--line)] bg-white/40 p-5 text-sm leading-7 text-[var(--muted)]">
-                  No multi-source event clusters qualified yet. Early signals will remain below until more corroborating coverage arrives.
+                  No signals qualified for this briefing yet. Refresh the briefing or adjust your tracked topics and sources to repopulate the dashboard.
                 </Panel>
               )}
             </div>
@@ -310,124 +321,19 @@ export default function PersonalizedDashboard({
           <div className="xl:sticky xl:top-4 xl:self-start">
             <Panel className="p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                Coverage map
+                Display rules
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Topic-by-topic event posture for today&apos;s briefing
+                The pipeline keeps the full ranked list. This view deliberately shows only the highest-signal slice.
               </p>
               <div className="mt-4 space-y-3">
-                {topicBriefs.map(({ topic, confirmed, early }) => (
-                  <a
-                    key={topic.id}
-                    href={`#topic-${topic.id}`}
-                    className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--line)] bg-white/60 px-4 py-3 transition-colors hover:bg-white"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: topic.color }}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[var(--foreground)]">{topic.name}</p>
-                        <p className="truncate text-xs text-[var(--muted)]">{topic.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge>{confirmed.length} confirmed</Badge>
-                      {early.length ? <Badge className="text-[#8a5a11]">{early.length} early</Badge> : null}
-                    </div>
-                  </a>
-                ))}
+                <StateMetric label="Core signals" value={coreSignals.length} />
+                <StateMetric label="Context signals" value={contextSignals.length} />
+                <StateMetric label="Hidden beyond cap" value={hiddenSignalCount} />
               </div>
             </Panel>
           </div>
         </section>
-
-        <section className="space-y-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-              Topic briefings
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">
-              Compact event view by topic
-            </h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Each topic is capped so the dashboard stays high-signal rather than turning into a feed.
-            </p>
-          </div>
-          {topicBriefs.map(({ topic, confirmed, early }) => (
-            <Panel key={topic.id} id={`topic-${topic.id}`} className="scroll-mt-6 p-5">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: topic.color }} />
-                  <div>
-                    <h2 className="display-font text-2xl text-[var(--foreground)]">{topic.name}</h2>
-                    <p className="text-sm text-[var(--muted)]">{topic.description}</p>
-                  </div>
-                </div>
-                <div className="flex max-w-full flex-wrap gap-2">
-                  <Badge>{confirmed.length} confirmed events</Badge>
-                  {early.length ? <Badge className="text-[#8a5a11]">{early.length} early signals</Badge> : null}
-                </div>
-              </div>
-
-              {confirmed.length || early.length ? (
-                <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                  {confirmed.map((item) => (
-                    <DashboardEventCard
-                      key={item.id}
-                      item={item}
-                      tone="confirmed"
-                      compact
-                      personalization={buildPersonalizationMatch(item, personalizationProfile)}
-                      personalizationEnabled={personalizationActive}
-                    />
-                  ))}
-                  {early.map((item) => (
-                    <DashboardEventCard
-                      key={item.id}
-                      item={item}
-                      tone="early"
-                      compact
-                      personalization={buildPersonalizationMatch(item, personalizationProfile)}
-                      personalizationEnabled={personalizationActive}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] bg-white/40 p-5 text-sm leading-7 text-[var(--muted)]">
-                  No updates yet — check back shortly.
-                </div>
-              )}
-            </Panel>
-          ))}
-        </section>
-
-        {earlySignals.length ? (
-          <Panel className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-              Early signals
-            </p>
-            <h2 className="mt-1 text-xl font-semibold text-[var(--foreground)]">
-              Single-source developments held out of Top Events
-            </h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              These stay on the dashboard for awareness, but they are clearly marked until more sources confirm the event cluster.
-            </p>
-            <div className="mt-5 grid gap-4 xl:grid-cols-2">
-              {earlySignals.slice(0, 4).map((item) => (
-                <DashboardEventCard
-                  key={item.id}
-                  item={item}
-                  tone="early"
-                  compact
-                  personalization={buildPersonalizationMatch(item, personalizationProfile)}
-                  personalizationEnabled={personalizationActive}
-                />
-              ))}
-            </div>
-          </Panel>
-        ) : null}
 
         {canTrackProgress ? (
           <Panel className="p-6">
@@ -462,13 +368,13 @@ export default function PersonalizedDashboard({
 
 function DashboardEventCard({
   item,
-  tone,
+  tier,
   compact = false,
   personalization,
   personalizationEnabled = false,
 }: {
   item: BriefingItem;
-  tone: "confirmed" | "early";
+  tier: "core" | "context";
   compact?: boolean;
   personalization?: PersonalizationMatch;
   personalizationEnabled?: boolean;
@@ -476,15 +382,23 @@ function DashboardEventCard({
   const intelligence = buildEventIntelligenceSignals(item);
   const primarySourceUrl = item.relatedArticles?.[0]?.url ?? item.sources.find((source) => isValidStoryUrl(source.url))?.url;
   const displayStateLabel = getDisplayStateLabel(item.displayState);
+  const tierLabel = tier === "core" ? "Core Signal" : "Context Signal";
 
   return (
-    <div className={cn("overflow-hidden rounded-[22px] border bg-white/65 p-5", tone === "early" ? "border-[rgba(138,90,17,0.18)]" : "border-[var(--line)]")}>
+    <div
+      className={cn(
+        "overflow-hidden rounded-[22px] border bg-white/65 p-5",
+        tier === "core"
+          ? "border-[rgba(31,79,70,0.22)] bg-[rgba(31,79,70,0.04)]"
+          : "border-[rgba(41,79,134,0.18)] bg-[rgba(41,79,134,0.04)]",
+      )}
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             <Badge>{item.topicName}</Badge>
-            <Badge className={tone === "early" ? "text-[#8a5a11]" : "text-[var(--accent)]"}>
-              {tone === "early" ? "Early Signal" : "Top Event"}
+            <Badge className={tier === "core" ? "text-[var(--accent)]" : "text-[#294f86]"}>
+              {tierLabel}
             </Badge>
             {displayStateLabel ? (
               <Badge className={getDisplayStateTone(item.displayState)}>{displayStateLabel}</Badge>
@@ -630,6 +544,45 @@ function DashboardEventCard({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function SignalTierSection({
+  title,
+  description,
+  items,
+  tier,
+  personalizationProfile,
+  personalizationEnabled,
+}: {
+  title: string;
+  description: string;
+  items: BriefingItem[];
+  tier: "core" | "context";
+  personalizationProfile: ReturnType<typeof parsePersonalizationProfile> | null;
+  personalizationEnabled: boolean;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">{title}</h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
+        </div>
+        <Badge>{items.length} {items.length === 1 ? "signal" : "signals"}</Badge>
+      </div>
+      <div className="grid gap-4">
+        {items.map((item) => (
+          <DashboardEventCard
+            key={item.id}
+            item={item}
+            tier={tier}
+            personalization={buildPersonalizationMatch(item, personalizationProfile)}
+            personalizationEnabled={personalizationEnabled}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
