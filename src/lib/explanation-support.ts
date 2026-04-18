@@ -6,6 +6,7 @@ import type {
   TrustLayerDebug,
 } from "@/lib/integration/subsystem-contracts";
 import type { SignalCluster } from "@/lib/models/signal-cluster";
+import { classifyBriefingSignalRole } from "@/lib/output-sanity";
 import type { EventIntelligence } from "@/lib/types";
 import { clipSentence } from "@/lib/pipeline/shared/text";
 
@@ -163,11 +164,27 @@ export function assembleExplanationPacket(
     ?? options.rankingSignals?.[0]
     ?? "Ranked using the current deterministic signal and trust model.";
   const unknowns = buildUnknowns(options.intelligence, options.sourceCount, options.rankingDebug);
+  const signalRole = classifyBriefingSignalRole({
+    importanceScore: options.intelligence.rankingScore,
+    importanceLabel:
+      options.intelligence.rankingScore >= 80 ? "Critical" : options.intelligence.rankingScore >= 65 ? "High" : "Watch",
+    sourceCount: options.sourceCount,
+    sources: options.sourceNames.map((sourceName) => ({ title: sourceName, url: "https://example.com" })),
+    eventIntelligence: options.intelligence,
+  });
   const packet: ExplanationPacket = {
     what_happened: clipSentence(options.intelligence.summary, 220),
     why_it_matters: clipSentence(options.whyItMatters, 220),
-    why_this_ranks_here: clipSentence(rankingReason, 200),
+    why_this_ranks_here: clipSentence(
+      signalRole === "core"
+        ? rankingReason.replace(/^Ranked /, "Classified as a top signal and ranked ")
+        : signalRole === "context"
+          ? rankingReason.replace(/^Ranked /, "Classified as a context signal and ranked ")
+          : rankingReason,
+      200,
+    ),
     what_to_watch: clipSentence(buildWhatToWatch(options.intelligence, options.sourceCount, options.rankingDebug), 200),
+    signal_role: signalRole,
     confidence,
     unknowns,
     citation_support_summary: {

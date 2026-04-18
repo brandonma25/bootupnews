@@ -634,6 +634,7 @@ export async function generateDailyBriefing(
       eventIntelligence: intelligence,
       explanationPacket: packet,
       trustDebug,
+      signalRole: packet.signal_role,
     };
   });
   const items = selectPublicBriefingItems(candidateItems).map((item, index) => ({
@@ -1246,6 +1247,7 @@ export async function buildMatchedBriefing(
         eventIntelligence: intelligence,
         explanationPacket: packet,
         trustDebug,
+        signalRole: packet.signal_role,
       } satisfies BriefingItem;
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))

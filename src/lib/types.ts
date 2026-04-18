@@ -2,6 +2,7 @@ import type {
   ExplanationPacket,
   TrustLayerDebug,
 } from "@/lib/integration/subsystem-contracts";
+import type { SignalRole } from "@/lib/output-sanity";
 
 export type Topic = {
   id: string;
@@ -115,6 +116,7 @@ export type BriefingItem = {
   eventIntelligence?: EventIntelligence;
   explanationPacket?: ExplanationPacket;
   trustDebug?: TrustLayerDebug;
+  signalRole?: SignalRole;
   displayState?: EventDisplayState;
   continuityKey?: string;
   continuityFingerprint?: string;

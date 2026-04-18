@@ -226,6 +226,7 @@ export interface ExplanationPacket {
   why_it_matters: string;
   why_this_ranks_here: string;
   what_to_watch: string;
+  signal_role: "core" | "context" | "watch";
   confidence: "high" | "medium" | "low";
   unknowns: string[];
   citation_support_summary: CitationSupportSummary;

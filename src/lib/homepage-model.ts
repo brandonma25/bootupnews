@@ -15,6 +15,7 @@ import {
 } from "@/lib/event-intelligence";
 import { buildTrustLayerPresentation, type TrustLayerPresentation } from "@/lib/why-it-matters";
 import { buildRankingDisplaySignals, getBriefingRankSnapshot } from "@/lib/ranking";
+import { classifyBriefingSignalRole, type SignalRole } from "@/lib/output-sanity";
 import { firstSentence } from "@/lib/utils";
 import {
   buildPersonalizationMatch,
@@ -51,6 +52,7 @@ export type HomepageEvent = {
   rankingDisplaySignals: string[];
   matchedKeywords: string[];
   priority: BriefingItem["priority"];
+  signalRole: SignalRole;
   rankScore: number;
   sourceCount: number;
   classification: HomepageCategoryClassification;
@@ -80,6 +82,9 @@ export type HomepageDebugModel = {
   surfacedDuplicateCount: number;
   semanticDuplicateSuppressedCount: number;
   hiddenLowQualityTimelineSignalsCount: number;
+  coreSignalCount: number;
+  contextSignalCount: number;
+  visibleSelectionAdjustmentsCount: number;
   categoryCounts: Record<HomepageCategoryKey, number>;
   sourceCountsByCategory: Record<HomepageCategoryKey, number>;
   lastSuccessfulFetchTime?: string;
@@ -145,13 +150,15 @@ export function buildHomepageViewModel(
   const earlySignals = events.filter((event) => event.intelligence.isEarlySignal);
   const featured = confirmedEvents[0] ?? events[0] ?? null;
   const featuredContext = featured ? [featured] : [];
-  const topRankedSelection = selectDistinctEvents(
+  const topRankedSelection = selectTopVisibleEvents(
     confirmedEvents.filter((event) => event.id !== featured?.id),
     featuredContext,
     TOP_EVENTS_LIMIT,
+    featured,
   );
   const topRanked = topRankedSelection.events;
   let semanticDuplicateSuppressedCount = topRankedSelection.suppressedCount;
+  const visibleSelectionAdjustmentsCount = topRankedSelection.adjustmentsCount;
   const surfacedEvents = [...featuredContext, ...topRanked];
   const sectionDrafts = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
     const eligibleEvents = events.filter(
@@ -233,6 +240,7 @@ export function buildHomepageViewModel(
   const sourceCountsByCategory =
     data.homepageDiagnostics?.sourceCountsByCategory ?? countSourcesByHomepageCategory(data.sources);
   const hiddenLowQualityTimelineSignalsCount = events.filter((event) => event.timeline.length > 0).length;
+  const visibleTopSet = [featured, ...topRanked].filter((event): event is HomepageEvent => Boolean(event));
 
   return {
     featured,
@@ -256,6 +264,9 @@ export function buildHomepageViewModel(
       ),
       semanticDuplicateSuppressedCount,
       hiddenLowQualityTimelineSignalsCount,
+      coreSignalCount: visibleTopSet.filter((event) => event.signalRole === "core").length,
+      contextSignalCount: visibleTopSet.filter((event) => event.signalRole === "context").length,
+      visibleSelectionAdjustmentsCount,
       categoryCounts: {
         tech: events.filter((event) => event.classification.primaryCategory === "tech").length,
         finance: events.filter((event) => event.classification.primaryCategory === "finance").length,
@@ -300,6 +311,7 @@ export function buildHomepageEvents(
       );
       const sourceCount = intelligence.sourceCount;
       const whyItMatters = sanitizeWhyItMatters(item.whyItMatters, item.title);
+      const signalRole = item.signalRole ?? item.explanationPacket?.signal_role ?? classifyBriefingSignalRole(item);
 
       const personalization = buildPersonalizationMatch(item, profile);
 
@@ -325,6 +337,7 @@ export function buildHomepageEvents(
         rankingDisplaySignals: buildRankingDisplaySignals(item),
         matchedKeywords: item.matchedKeywords ?? [],
         priority: item.priority,
+        signalRole,
         rankScore: getRankScore(item) - index * 0.01,
         sourceCount,
         classification,
@@ -412,9 +425,18 @@ function buildWhyThisIsHere(
   const hasBroadConfirmation = sourceCount >= TOP_EVENT_SOURCE_THRESHOLD;
   const likelyImpact = item.importanceLabel?.toLowerCase() ?? intelligence.impactLabel.toLowerCase();
   const recency = intelligence.recencyLabel.toLowerCase();
+  const signalRole = item.signalRole ?? item.explanationPacket?.signal_role ?? classifyBriefingSignalRole(item);
 
   if (intelligence.isEarlySignal) {
     return `Visible in ${primaryCategory} because it may matter, but only ${sourceCount} ${sourceCount === 1 ? "source has" : "sources have"} reported it so far. It stays below the confirmed-event rail until broader coverage arrives.`;
+  }
+
+  if (signalRole === "core" && hasBroadConfirmation) {
+    return `Top signal in ${primaryCategory} because multiple sources converged on a development with broader consequences ${recency}, making it one of the clearest things readers should understand first.`;
+  }
+
+  if (signalRole === "context") {
+    return `Context signal in ${primaryCategory} because it helps explain what the lead stories may change next, even if it is less central than the strongest system-level events.`;
   }
 
   if (hasBroadConfirmation && likelyImpact.includes("high")) {
@@ -469,6 +491,48 @@ function getExclusionReason(event: HomepageEvent, categoryKey: HomepageCategoryK
 function getRankScore(item: BriefingItem) {
   const snapshot = getBriefingRankSnapshot(item);
   return snapshot.rankingScore + snapshot.confidenceScore / 1000 + snapshot.freshestTimestamp / 1_000_000_000_000;
+}
+
+function selectTopVisibleEvents(
+  candidates: HomepageEvent[],
+  surfacedEvents: HomepageEvent[],
+  limit: number,
+  featured: HomepageEvent | null,
+) {
+  const baselineIds = new Set(candidates.slice(0, limit).map((event) => event.id));
+  const featuredCoreCount = featured?.signalRole === "core" ? 1 : 0;
+  const featuredContextCount = featured?.signalRole === "context" ? 1 : 0;
+  const targetCoreCount = Math.max(0, Math.min(limit, 3 - featuredCoreCount));
+  const targetContextCount = Math.max(0, Math.min(limit - targetCoreCount, 2 - featuredContextCount));
+
+  const coreSelection = selectDistinctEvents(
+    candidates.filter((event) => event.signalRole === "core"),
+    surfacedEvents,
+    targetCoreCount,
+  );
+  const contextSelection = selectDistinctEvents(
+    candidates.filter((event) => event.signalRole === "context" && !coreSelection.events.some((selected) => selected.id === event.id)),
+    [...surfacedEvents, ...coreSelection.events],
+    targetContextCount,
+  );
+  const fillSelection = selectDistinctEvents(
+    candidates.filter(
+      (event) =>
+        !coreSelection.events.some((selected) => selected.id === event.id)
+        && !contextSelection.events.some((selected) => selected.id === event.id),
+    ),
+    [...surfacedEvents, ...coreSelection.events, ...contextSelection.events],
+    Math.max(0, limit - coreSelection.events.length - contextSelection.events.length),
+  );
+
+  const events = [...coreSelection.events, ...contextSelection.events, ...fillSelection.events];
+
+  return {
+    events,
+    suppressedCount:
+      coreSelection.suppressedCount + contextSelection.suppressedCount + fillSelection.suppressedCount,
+    adjustmentsCount: events.filter((event) => !baselineIds.has(event.id)).length,
+  };
 }
 
 function summarize(value: string, maxSentences: number) {

@@ -160,6 +160,140 @@ describe("buildHomepageViewModel", () => {
     expect(financeSection?.fallbackEvents).toHaveLength(0);
   });
 
+  it("keeps the top visible set anchored around core signals before context signals when enough candidates exist", () => {
+    const coreOne = createItem({
+      id: "core-1",
+      title: "Federal Reserve signals broader policy reset",
+      importanceScore: 92,
+      importanceLabel: "Critical",
+      sourceCount: 4,
+      explanationPacket: {
+        what_happened: "Policy reset.",
+        why_it_matters: "It matters for rates and risk assets.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to broader consequences.",
+        what_to_watch: "Watch the next policy meeting.",
+        signal_role: "core",
+        confidence: "high",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 4,
+          source_names: ["Reuters", "AP"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const coreTwo = createItem({
+      id: "core-2",
+      topicId: "politics",
+      topicName: "Geopolitics",
+      title: "Export controls threaten chip supply chain",
+      importanceScore: 88,
+      importanceLabel: "Critical",
+      sourceCount: 3,
+      explanationPacket: {
+        what_happened: "Export controls broadened.",
+        why_it_matters: "It matters for supply chains.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to cross-domain impact.",
+        what_to_watch: "Watch retaliatory steps.",
+        signal_role: "core",
+        confidence: "high",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 3,
+          source_names: ["Reuters", "FT"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const coreThree = createItem({
+      id: "core-3",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Cloud capacity crunch changes AI deployment plans",
+      importanceScore: 84,
+      importanceLabel: "Critical",
+      sourceCount: 3,
+      explanationPacket: {
+        what_happened: "Capacity crunch.",
+        why_it_matters: "It matters for AI deployment.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to platform-level consequences.",
+        what_to_watch: "Watch capital spending and delivery timelines.",
+        signal_role: "core",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 3,
+          source_names: ["Reuters", "The Verge"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const contextOne = createItem({
+      id: "context-1",
+      title: "Regional bank funding costs edge higher",
+      importanceScore: 72,
+      importanceLabel: "High",
+      sourceCount: 2,
+      explanationPacket: {
+        what_happened: "Funding costs rose.",
+        why_it_matters: "It adds context to broader rate pressure.",
+        why_this_ranks_here: "Classified as a context signal and ranked because it helps explain the lead event.",
+        what_to_watch: "Watch bank guidance.",
+        signal_role: "context",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 2,
+          source_names: ["Reuters", "WSJ"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const contextTwo = createItem({
+      id: "context-2",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Supplier commentary hints at slower component deliveries",
+      importanceScore: 69,
+      importanceLabel: "High",
+      sourceCount: 2,
+      explanationPacket: {
+        what_happened: "Supplier commentary shifted.",
+        why_it_matters: "It adds context to the platform capacity story.",
+        why_this_ranks_here: "Classified as a context signal and ranked because it sharpens the main implications.",
+        what_to_watch: "Watch follow-on guidance.",
+        signal_role: "context",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 2,
+          source_names: ["Reuters", "Bloomberg"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+
+    const model = buildHomepageViewModel(createData([contextOne, coreThree, contextTwo, coreTwo, coreOne]));
+    const topSetRoles = [
+      model.featured?.signalRole,
+      ...model.topRanked.map((event) => event.signalRole),
+    ].filter((role): role is "core" | "context" | "watch" => Boolean(role));
+
+    expect(topSetRoles.filter((role) => role === "core").length).toBeGreaterThanOrEqual(3);
+    expect(topSetRoles.filter((role) => role === "context").length).toBeGreaterThanOrEqual(1);
+    expect(model.debug.coreSignalCount).toBeGreaterThanOrEqual(3);
+  });
+
   it("does not repeat the same fallback card across multiple empty rails or reuse top-ranked cards", () => {
     const financeEvent = createItem({
       id: "finance-fallback",
@@ -294,6 +428,60 @@ describe("buildHomepageViewModel", () => {
     expect(event?.whyThisIsHere.toLowerCase()).not.toContain("weighted similarity");
     expect(event?.whyThisIsHere.toLowerCase()).not.toContain("cluster evidence");
     expect(event?.whyThisIsHere.toLowerCase()).not.toContain("signal like");
+  });
+
+  it("labels core and context signals explicitly in the visible explanation text", () => {
+    const coreItem = createItem({
+      id: "core-label",
+      title: "Federal Reserve policy shift drives top signal",
+      importanceScore: 90,
+      importanceLabel: "Critical",
+      sourceCount: 4,
+      explanationPacket: {
+        what_happened: "A major policy signal emerged.",
+        why_it_matters: "It matters because rates and risk assets may reset.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to strong structural importance.",
+        what_to_watch: "Watch official confirmation.",
+        signal_role: "core",
+        confidence: "high",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 4,
+          source_names: ["Reuters", "AP"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const contextItem = createItem({
+      id: "context-label",
+      title: "Regional data sharpens the main policy read",
+      importanceScore: 71,
+      importanceLabel: "High",
+      sourceCount: 2,
+      explanationPacket: {
+        what_happened: "A regional data point followed.",
+        why_it_matters: "It matters because it sharpens the main story.",
+        why_this_ranks_here: "Classified as a context signal and ranked because it helps explain the lead event.",
+        what_to_watch: "Watch whether this spreads.",
+        signal_role: "context",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 2,
+          source_names: ["Reuters", "FT"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+
+    const model = buildHomepageViewModel(createData([contextItem, coreItem]));
+
+    expect(model.featured?.whyThisIsHere).toContain("Top signal");
+    expect(model.topRanked[0]?.whyThisIsHere).toContain("Context signal");
   });
 
   it("keeps single-source items out of the top-ranked event rail", () => {
