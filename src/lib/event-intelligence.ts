@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 
 import { classifyHomepageCategory, getHomepageCategoryLabel } from "@/lib/homepage-taxonomy";
 import type { FeedArticle } from "@/lib/rss";
+import { classifySourcePreference } from "@/lib/source-policy";
 import type {
   BriefingItem,
   EventIntelligence,
@@ -792,13 +793,13 @@ function getBestSourceTier(sourceNames: string[]) {
   let best = 0;
 
   for (const name of sourceNames) {
-    const normalized = name.toLowerCase();
-    if (/(reuters|financial times|bloomberg|associated press|ap news|bbc|wall street journal)/.test(normalized)) {
+    const tier = classifySourcePreference({ sourceName: name });
+    if (tier === "tier1") {
       best = Math.max(best, 3);
       continue;
     }
 
-    if (/(techcrunch|the verge|axios|cnbc|semafor|ars technica)/.test(normalized)) {
+    if (tier === "tier2") {
       best = Math.max(best, 2);
       continue;
     }

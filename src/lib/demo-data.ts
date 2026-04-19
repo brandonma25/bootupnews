@@ -114,6 +114,35 @@ export const demoSources: Source[] = [
     : []),
 ];
 
+export const MVP_DEFAULT_PUBLIC_SOURCE_IDS = [
+  "source-verge",
+  "source-ars",
+  "source-tldr-tech",
+  "source-techcrunch",
+  "source-ft",
+] as const;
+
+export function getMvpDefaultPublicSources(): Source[] {
+  const sourcesById = new Map(demoSources.map((source) => [source.id, source]));
+
+  return MVP_DEFAULT_PUBLIC_SOURCE_IDS.map((sourceId) => {
+    const source = sourcesById.get(sourceId);
+
+    if (!source) {
+      throw new Error(`MVP default public source ${sourceId} is not defined in demoSources`);
+    }
+
+    return source;
+  });
+}
+
+export function areMvpDefaultPublicSources(sources: Source[]): boolean {
+  return (
+    sources.length === MVP_DEFAULT_PUBLIC_SOURCE_IDS.length &&
+    sources.every((source, index) => source.id === MVP_DEFAULT_PUBLIC_SOURCE_IDS[index])
+  );
+}
+
 export const demoBriefing: DailyBriefing = {
   id: "briefing-today",
   briefingDate: today,
@@ -203,5 +232,5 @@ export const demoDashboardData: DashboardData = {
   mode: "demo",
   briefing: demoBriefing,
   topics: demoTopics,
-  sources: demoSources,
+  sources: getMvpDefaultPublicSources(),
 };
