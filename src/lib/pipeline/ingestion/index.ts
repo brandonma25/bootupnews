@@ -2,8 +2,6 @@ import type { Source } from "@/lib/types";
 import {
   getActiveSourceRegistry,
   getDefaultDonorFeeds,
-  getDonorRegistrySnapshot,
-  getSourceRegistrySnapshot,
   getIngestionAdapter,
   getProbationaryRuntimeFeeds,
   type DonorFeed,
@@ -11,6 +9,10 @@ import {
 import type { SourceDefinition } from "@/lib/integration/subsystem-contracts";
 import type { RawItem } from "@/lib/models/raw-item";
 import { logPipelineEvent } from "@/lib/observability/logger";
+import {
+  buildRuntimeSourceResolutionSnapshot,
+  type RuntimeSourceResolutionSnapshot,
+} from "@/lib/observability/pipeline-run";
 import { fetchFeedArticles } from "@/lib/rss";
 import { cleanText, stableId } from "@/lib/pipeline/shared/text";
 
@@ -27,6 +29,7 @@ type IngestionResult = {
   failures: IngestionFailure[];
   usedSeedFallback: boolean;
   sources: SourceDefinition[];
+  source_resolution: RuntimeSourceResolutionSnapshot;
   source_contributions: Array<{
     source_id: string;
     source: string;
@@ -137,23 +140,13 @@ function toRawItem(entry: Awaited<ReturnType<typeof fetchSourceWithAdapter>>[num
 
 export async function ingestRawItems(options: { sources?: Source[] } = {}): Promise<IngestionResult> {
   const sources = resolveIngestionSources(options.sources);
-  const donorSnapshot = getDonorRegistrySnapshot();
-  const sourceRegistrySnapshot = getSourceRegistrySnapshot();
+  const sourceResolution = buildRuntimeSourceResolutionSnapshot({
+    resolutionMode: options.sources?.length ? "supplied_sources" : "no_argument_runtime",
+    resolvedSources: sources,
+  });
   const failures: IngestionFailure[] = [];
 
-  logPipelineEvent("info", "Ingestion adapters resolved", {
-    donor_registry: donorSnapshot,
-    source_registry: sourceRegistrySnapshot,
-    active_ingestion_sources: sources.map((source) => ({
-      sourceId: source.sourceId,
-      donor: source.donor,
-      source: source.source,
-      sourceClass: source.sourceClass,
-      trustTier: source.trustTier,
-      availability: source.availability,
-      topic: source.topic,
-    })),
-  });
+  logPipelineEvent("info", "Runtime source resolution snapshot", sourceResolution);
 
   const batches = await Promise.all(
     sources.map(async (source) => {
@@ -195,6 +188,7 @@ export async function ingestRawItems(options: { sources?: Source[] } = {}): Prom
       failures,
       usedSeedFallback: false,
       sources,
+      source_resolution: sourceResolution,
       source_contributions: sourceContributions,
     };
   }
@@ -208,6 +202,7 @@ export async function ingestRawItems(options: { sources?: Source[] } = {}): Prom
     failures,
     usedSeedFallback: true,
     sources,
+    source_resolution: sourceResolution,
     source_contributions: sourceContributions,
   };
 }

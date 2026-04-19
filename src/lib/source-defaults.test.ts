@@ -12,6 +12,7 @@ import {
   getMvpDefaultPublicSources,
   MVP_DEFAULT_PUBLIC_SOURCE_IDS,
 } from "@/lib/demo-data";
+import { buildRuntimeSourceResolutionSnapshot } from "@/lib/observability/pipeline-run";
 import { recommendedSources } from "@/lib/source-catalog";
 
 describe("MVP default source governance", () => {
@@ -68,6 +69,48 @@ describe("MVP default source governance", () => {
     expect(getProbationaryRuntimeFeeds().map((source) => source.id)).toEqual(["mit-technology-review"]);
     expect(getProbationaryRuntimeFeeds().map((source) => source.availability)).toEqual(["probationary"]);
     expect(getProbationaryRuntimeFeeds().map((source) => source.source)).toEqual(["MIT Technology Review"]);
+  });
+
+  it("builds a safe no-argument runtime source resolution snapshot", () => {
+    const snapshot = buildRuntimeSourceResolutionSnapshot({
+      resolutionMode: "no_argument_runtime",
+      resolvedSources: [
+        ...getDefaultDonorFeeds(),
+        ...getProbationaryRuntimeFeeds(),
+      ].map((feed) => ({
+        sourceId: feed.id,
+        donor: feed.donor,
+        source: feed.source,
+        homepageUrl: feed.homepageUrl,
+        topic: feed.topic,
+        credibility: feed.credibility,
+        reliability: feed.reliability,
+        sourceClass: feed.sourceClass,
+        trustTier: feed.trustTier,
+        provenance: feed.provenance,
+        status: feed.status,
+        availability: feed.availability,
+        fetch: feed.fetch,
+        adapterOwner: feed.donor,
+      })),
+    });
+
+    expect(snapshot).toEqual({
+      resolution_mode: "no_argument_runtime",
+      mvp_default_public_source_ids: [...MVP_DEFAULT_PUBLIC_SOURCE_IDS],
+      donor_fallback_default_ids: [...DEFAULT_DONOR_FEED_IDS],
+      probationary_runtime_source_ids: ["mit-technology-review"],
+      resolved_runtime_source_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+        "mit-technology-review",
+      ],
+      resolved_default_donor_source_ids: [...DEFAULT_DONOR_FEED_IDS],
+      resolved_probationary_source_ids: ["mit-technology-review"],
+      resolved_other_source_ids: [],
+    });
   });
 
   it("does not activate other onboarded sources through the probationary path", () => {

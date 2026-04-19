@@ -27,6 +27,7 @@ export async function runClusterFirstPipeline(options: {
 
   const ingestion = await ingestRawItems(options);
   run.feed_failures = ingestion.failures;
+  run.source_resolution = ingestion.source_resolution;
   run.active_sources = ingestion.sources.map((source) => ({
     source_id: source.sourceId,
     source: source.source,

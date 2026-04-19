@@ -35,6 +35,32 @@ describe("ingestRawItems", () => {
       donor: "openclaw",
     });
     expect(result.source_contributions.length).toBeGreaterThan(0);
+    expect(result.source_resolution).toMatchObject({
+      resolution_mode: "no_argument_runtime",
+      mvp_default_public_source_ids: [
+        "source-verge",
+        "source-ars",
+        "source-tldr-tech",
+        "source-techcrunch",
+        "source-ft",
+      ],
+      donor_fallback_default_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+      ],
+      probationary_runtime_source_ids: ["mit-technology-review"],
+      resolved_runtime_source_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+        "mit-technology-review",
+      ],
+      resolved_probationary_source_ids: ["mit-technology-review"],
+      resolved_other_source_ids: [],
+    });
     expect(firstItem?.source_metadata).toBeDefined();
     expect(firstItem?.source_metadata?.sourceId).toBeTruthy();
     expect(firstItem?.source_metadata?.donor).toBeTruthy();
@@ -46,6 +72,16 @@ describe("ingestRawItems", () => {
   it("ingests only the explicit public MVP defaults when public sources are supplied", async () => {
     const result = await ingestRawItems({ sources: getMvpDefaultPublicSources() });
 
+    expect(result.source_resolution.resolution_mode).toBe("supplied_sources");
+    expect(result.source_resolution.resolved_runtime_source_ids).toEqual([
+      "custom-source-verge",
+      "custom-source-ars",
+      "custom-source-tldr-tech",
+      "custom-source-techcrunch",
+      "custom-source-ft",
+    ]);
+    expect(result.source_resolution.resolved_default_donor_source_ids).toEqual([]);
+    expect(result.source_resolution.resolved_probationary_source_ids).toEqual([]);
     expect(result.sources.map((source) => source.sourceId)).toEqual([
       "custom-source-verge",
       "custom-source-ars",
@@ -67,5 +103,34 @@ describe("ingestRawItems", () => {
 
     expect(result.sources.map((source) => source.sourceId)).not.toContain("mit-technology-review");
     expect(result.sources.map((source) => source.source)).not.toContain("MIT Technology Review");
+  });
+
+  it("logs a safe source-resolution snapshot without feed URLs or registry dumps", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    let resolutionLog: Record<string, unknown> | undefined;
+
+    try {
+      await ingestRawItems();
+      resolutionLog = infoSpy.mock.calls
+        .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+        .find((entry) => entry.message === "Runtime source resolution snapshot");
+    } finally {
+      infoSpy.mockRestore();
+    }
+
+    expect(resolutionLog).toMatchObject({
+      resolved_runtime_source_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+        "mit-technology-review",
+      ],
+      resolved_probationary_source_ids: ["mit-technology-review"],
+    });
+    expect(JSON.stringify(resolutionLog)).not.toContain("feedUrl");
+    expect(JSON.stringify(resolutionLog)).not.toContain("https://");
+    expect(resolutionLog).not.toHaveProperty("donor_registry");
+    expect(resolutionLog).not.toHaveProperty("source_registry");
   });
 });

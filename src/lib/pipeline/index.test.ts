@@ -20,6 +20,25 @@ describe("runClusterFirstPipeline", () => {
     expect(result.run.avg_cluster_size).toBe(2);
     expect(result.run.singleton_count).toBe(0);
     expect(result.run.prevented_merge_count).toBeGreaterThan(0);
+    expect(result.run.source_resolution).toMatchObject({
+      resolution_mode: "no_argument_runtime",
+      donor_fallback_default_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+      ],
+      probationary_runtime_source_ids: ["mit-technology-review"],
+      resolved_runtime_source_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+        "mit-technology-review",
+      ],
+      resolved_probationary_source_ids: ["mit-technology-review"],
+      resolved_other_source_ids: [],
+    });
     expect(result.run.active_sources.length).toBeGreaterThan(0);
     expect(result.run.source_contributions.length).toBeGreaterThan(0);
     expect(result.run.ranking_provider).toBeTruthy();
