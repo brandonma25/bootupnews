@@ -145,17 +145,6 @@ export const recommendedSources: RecommendedSource[] = [
     importStatus: "ready",
   },
   {
-    id: "bbc-news",
-    name: "BBC News",
-    topicLabel: "Geopolitics",
-    description: "Global headlines and breaking developments from BBC News.",
-    homepageUrl: "https://www.bbc.com/news",
-    feedUrl: "https://feeds.bbci.co.uk/news/rss.xml",
-    cadence: "Daily",
-    sourceType: "news",
-    importStatus: "ready",
-  },
-  {
     id: "the-news-api-top",
     name: "TheNewsAPI Top News",
     topicLabel: "Markets",

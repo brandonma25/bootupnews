@@ -61,8 +61,6 @@ const SOURCE_TIER_RULES: Array<{
     hosts: [
       "reuters.com",
       "apnews.com",
-      "bbc.com",
-      "bbc.co.uk",
       "ft.com",
       "bloomberg.com",
       "wsj.com",
@@ -83,7 +81,6 @@ const SOURCE_TIER_RULES: Array<{
       "reuters",
       "associated press",
       "ap news",
-      "bbc",
       "financial times",
       "bloomberg",
       "wall street journal",
@@ -101,7 +98,6 @@ const SOURCE_TIER_RULES: Array<{
     hosts: [
       "techcrunch.com",
       "arstechnica.com",
-      "cnbc.com",
       "theinformation.com",
       "semafor.com",
       "axios.com",
@@ -113,7 +109,6 @@ const SOURCE_TIER_RULES: Array<{
     names: [
       "techcrunch",
       "ars technica",
-      "cnbc",
       "the information",
       "semafor",
       "axios",

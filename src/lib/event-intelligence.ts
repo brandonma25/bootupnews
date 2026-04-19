@@ -793,12 +793,12 @@ function getBestSourceTier(sourceNames: string[]) {
 
   for (const name of sourceNames) {
     const normalized = name.toLowerCase();
-    if (/(reuters|financial times|bloomberg|associated press|ap news|bbc|wall street journal)/.test(normalized)) {
+    if (/(reuters|financial times|bloomberg|associated press|ap news|wall street journal)/.test(normalized)) {
       best = Math.max(best, 3);
       continue;
     }
 
-    if (/(techcrunch|the verge|axios|cnbc|semafor|ars technica)/.test(normalized)) {
+    if (/(techcrunch|the verge|axios|semafor|ars technica)/.test(normalized)) {
       best = Math.max(best, 2);
       continue;
     }
