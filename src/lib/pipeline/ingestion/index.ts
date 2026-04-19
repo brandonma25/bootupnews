@@ -5,6 +5,7 @@ import {
   getDonorRegistrySnapshot,
   getSourceRegistrySnapshot,
   getIngestionAdapter,
+  getProbationaryRuntimeFeeds,
   type DonorFeed,
 } from "@/adapters/donors";
 import type { SourceDefinition } from "@/lib/integration/subsystem-contracts";
@@ -64,15 +65,26 @@ function resolveIngestionSources(sources?: Source[]): SourceDefinition[] {
   if (!sources?.length) {
     const sourceRegistryById = new Map(getActiveSourceRegistry().map((source) => [source.sourceId, source]));
 
-    return getDefaultDonorFeeds().map((feed) => {
-      const source = sourceRegistryById.get(feed.id);
+    return [
+      ...getDefaultDonorFeeds().map((feed) => {
+        const source = sourceRegistryById.get(feed.id);
 
-      if (!source) {
-        throw new Error(`Default donor feed ${feed.id} is not present in the active source registry`);
-      }
+        if (!source) {
+          throw new Error(`Default donor feed ${feed.id} is not present in the active source registry`);
+        }
 
-      return source;
-    });
+        return source;
+      }),
+      ...getProbationaryRuntimeFeeds().map((feed) => {
+        const source = sourceRegistryById.get(feed.id);
+
+        if (!source) {
+          throw new Error(`Probationary runtime feed ${feed.id} is not present in the active source registry`);
+        }
+
+        return source;
+      }),
+    ];
   }
 
   return sources

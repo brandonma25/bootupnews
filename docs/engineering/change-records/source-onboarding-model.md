@@ -9,6 +9,7 @@ The source system has separate layers:
 - Public default ingestion is configured by explicit source IDs in `MVP_DEFAULT_PUBLIC_SOURCE_IDS`.
 - Donor-backed source definitions live in the donor registry and are used when the pipeline is called without explicit sources.
 - Donor fallback defaults are configured by explicit source IDs in `DEFAULT_DONOR_FEED_IDS`.
+- Probationary runtime activations are configured separately by explicit source IDs in `PROBATIONARY_RUNTIME_FEED_IDS`.
 - User-created sources live in Supabase `sources` rows and are treated as custom RSS inputs.
 - The source catalog is an optional import surface. A catalog entry is not active ingestion.
 - Source preference logic is centralized in `src/lib/source-policy.ts` and consumed by filtering and event-intelligence scoring.
@@ -26,6 +27,23 @@ The current public MVP default ingestion set is:
 These are resolved from `src/lib/demo-data.ts` through `MVP_DEFAULT_PUBLIC_SOURCE_IDS` and `getMvpDefaultPublicSources()`. Adding another `demoSources` entry or adding a source catalog entry does not promote that source into public default ingestion.
 
 The donor fallback path uses `DEFAULT_DONOR_FEED_IDS` in `src/adapters/donors/registry.ts`. This prevents registry ordering from silently changing the no-argument pipeline default.
+
+## Probationary Runtime Activation
+
+The controlled probationary path is separate from both public MVP defaults and donor fallback defaults.
+
+Current probationary runtime activation:
+
+- MIT Technology Review
+
+This source participates in no-argument runtime ingestion through `PROBATIONARY_RUNTIME_FEED_IDS` in `src/adapters/donors/registry.ts` and the resolver in `src/lib/pipeline/ingestion/index.ts`.
+
+This is not a default-source expansion:
+
+- `MVP_DEFAULT_PUBLIC_SOURCE_IDS` remains unchanged.
+- `DEFAULT_DONOR_FEED_IDS` remains unchanged.
+- Source catalog metadata remains optional/importable metadata, not an activation switch.
+- Source-policy tiers and boosts remain unchanged.
 
 ## Source States
 
@@ -65,6 +83,14 @@ To promote a source into public default ingestion:
 5. Update tests that assert the exact MVP default set.
 
 Do not use catalog presence, `importStatus: "ready"`, or source-policy preference as a proxy for default runtime activation.
+
+To add a future probationary runtime activation:
+
+1. Choose exactly one evaluated source unless the product owner explicitly approves a broader experiment.
+2. Add a donor-backed source definition with `availability: "probationary"`.
+3. Add only that source ID to `PROBATIONARY_RUNTIME_FEED_IDS`.
+4. Keep `MVP_DEFAULT_PUBLIC_SOURCE_IDS`, `DEFAULT_DONOR_FEED_IDS`, and source-policy rules unchanged unless the task explicitly asks for those changes.
+5. Add tests proving only the approved source enters the probationary path.
 
 ## Adding New Candidate Sources
 

@@ -769,6 +769,10 @@ export const DEFAULT_DONOR_FEED_IDS = [
   "horizon-reuters-business",
 ] as const;
 
+export const PROBATIONARY_RUNTIME_FEED_IDS = [
+  "mit-technology-review",
+] as const;
+
 export function getDonorRegistry() {
   return donorRegistry;
 }
@@ -799,7 +803,7 @@ export function getDefaultDonorFeeds(): DonorFeed[] {
     donorRegistry
       .filter((entry) => entry.contractStates.ingestion === "active")
       .flatMap((entry) => entry.feeds)
-      .filter((source) => source.status === "active" && source.availability !== "custom")
+      .filter((source) => source.status === "active" && source.availability === "default")
       .map((source) => [source.id, source]),
   );
 
@@ -808,6 +812,26 @@ export function getDefaultDonorFeeds(): DonorFeed[] {
 
     if (!source) {
       throw new Error(`Default donor feed ${sourceId} is not active in the donor registry`);
+    }
+
+    return source;
+  });
+}
+
+export function getProbationaryRuntimeFeeds(): DonorFeed[] {
+  const activeProbationaryFeeds = new Map(
+    donorRegistry
+      .filter((entry) => entry.contractStates.ingestion === "active")
+      .flatMap((entry) => entry.feeds)
+      .filter((source) => source.status === "active" && source.availability === "probationary")
+      .map((source) => [source.id, source]),
+  );
+
+  return PROBATIONARY_RUNTIME_FEED_IDS.map((sourceId) => {
+    const source = activeProbationaryFeeds.get(sourceId);
+
+    if (!source) {
+      throw new Error(`Probationary runtime feed ${sourceId} is not active in the donor registry`);
     }
 
     return source;
