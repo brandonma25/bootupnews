@@ -16,6 +16,11 @@
 - Preview gate:
 - Production verification gate:
 
+## Tracker Closeout
+- Google Sheets tracker update:
+- Verified row / item:
+- Fallback tracker-sync file, if direct Sheets update was unavailable:
+
 ## Human Auth / Session Results
 - Google OAuth:
 - Email/password:
@@ -25,4 +30,3 @@
 
 ## Remaining Risks
 - 
-

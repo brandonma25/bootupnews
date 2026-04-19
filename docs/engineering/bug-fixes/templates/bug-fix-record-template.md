@@ -12,5 +12,9 @@
 - Automated checks:
 - Human checks:
 
+## Tracker Closeout
+- Google Sheets tracker row updated and verified:
+- Fallback tracker-sync file, if direct Sheets update was unavailable:
+
 ## Remaining Risks / Follow-up
 - 

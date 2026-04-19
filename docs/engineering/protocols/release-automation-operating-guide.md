@@ -32,12 +32,14 @@
 - Script entrypoint: `node scripts/github-sheets-sync.mjs --event pr-merge --payload-file <path>`
 - Permanent rules:
   - Google Sheets workbook `Features Table` is the live feature-tracking system.
+  - Tracker update is part of Definition of Done for feature, fix, refactor, UX, and governance work.
   - `Sheet1` is the governed table for approved mapped work.
   - `Intake Queue` is the only destination for unmapped, spontaneous, or ambiguous merged work.
   - `Record ID` in `Sheet1` is immutable and may only be used as the exact-match lookup key.
   - The automation must validate the expected headers before writing and may update only approved automation-managed columns.
   - A merge to `main` may update one exact `Record ID` match to `Merged`.
   - A merge must never auto-create a new governed `Sheet1` row.
+  - Codex closeout must verify a live sheet update, or create a fallback tracker-sync markdown file in `docs/operations/tracker-sync/` with the exact manual update payload.
 
 ### 2. PR Gate
 - Workflow: [ci.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/ci.yml)
@@ -119,6 +121,17 @@
   - [docs/engineering/testing/templates/release-testing-report-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/testing/templates/release-testing-report-template.md)
   - [docs/engineering/bug-fixes/templates/release-bug-fix-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/bug-fixes/templates/release-bug-fix-template.md)
   - [docs/product/briefs/templates/release-brief-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/product/briefs/templates/release-brief-template.md)
+
+### 7. Closeout Checklist
+- Scope completed.
+- Tests run and results recorded.
+- Local validation complete.
+- Preview validation complete when applicable.
+- Production sanity check run only after preview is good.
+- PRD summary stored in repo when applicable.
+- Bug-fix report stored in repo when applicable.
+- Google Sheets tracker updated and verified.
+- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/`.
 
 ## Automated Versus Human
 ### Automated

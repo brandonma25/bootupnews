@@ -22,3 +22,14 @@
 ## Evidence and Confidence
 - Repo evidence used:
 - Confidence:
+
+## Closeout Checklist
+- Scope completed:
+- Tests run:
+- Local validation complete:
+- Preview validation complete, if applicable:
+- Production sanity check complete, only after preview is good:
+- PRD summary stored in repo:
+- Bug-fix report stored in repo, if applicable:
+- Google Sheets tracker updated and verified:
+- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual update payload:
