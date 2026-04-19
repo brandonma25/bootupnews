@@ -208,24 +208,25 @@ export default async function SourcesPage({
           )}
         </Panel>
 
-        {/* Recommended sources — clearly labelled as suggestions */}
+        {/* Source catalog — clearly labelled as optional import support */}
         <div>
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-              Recommended sources to import
+              Source catalog
             </p>
             <span className="rounded-full border border-[var(--line)] bg-white/60 px-2 py-0.5 text-xs text-[var(--muted)]">
-              {recommendedSources.filter((s) => s.importStatus === "ready").length} RSS ready
+              {recommendedSources.filter((s) => s.importStatus === "ready").length} importable
             </span>
           </div>
           <p className="mb-4 text-sm text-[var(--muted)]">
-            These are curated feeds you don&apos;t have saved yet. Sources marked{" "}
-            <span className="font-medium text-[var(--foreground)]">Manual setup</span> don&apos;t
-            have a public RSS feed and can&apos;t be auto-imported.
+            Catalog entries are optional imports, not active default ingestion. Sources marked{" "}
+            <span className="font-medium text-[var(--foreground)]">Manual setup</span> need a fresh
+            endpoint check or credentials before import.
           </p>
           <div className="grid gap-4 xl:grid-cols-2">
             {recommendedSources.map((source) => {
               const isManual = source.importStatus === "manual";
+              const isImportable = source.importStatus === "ready" && Boolean(source.feedUrl);
               return (
                 <Panel
                   key={source.id}
@@ -237,8 +238,12 @@ export default async function SourcesPage({
                     </h3>
                     <Badge>{source.topicLabel}</Badge>
                     <Badge>{source.cadence}</Badge>
+                    <Badge>{source.lifecycleStatus.replace("_", " ")}</Badge>
                     <Badge className={!isManual ? "text-[var(--accent)]" : ""}>
-                      {isManual ? "Manual setup" : "RSS ready"}
+                      {isManual ? "Manual setup" : "Importable"}
+                    </Badge>
+                    <Badge>
+                      {source.validationStatus.replace("_", " ")}
                     </Badge>
                   </div>
 
@@ -264,7 +269,7 @@ export default async function SourcesPage({
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
 
-                    {source.feedUrl && viewer ? (
+                    {isImportable && viewer ? (
                       <form action={createSourceAction} className="flex items-end gap-3">
                         <input type="hidden" name="name" value={source.name} />
                         <input type="hidden" name="feedUrl" value={source.feedUrl} />
@@ -291,7 +296,7 @@ export default async function SourcesPage({
                           Import
                         </Button>
                       </form>
-                    ) : source.feedUrl ? (
+                    ) : isImportable ? (
                       <Link
                         href="/?auth=1#email-access"
                         className="text-sm font-medium text-[var(--foreground)] underline underline-offset-2"

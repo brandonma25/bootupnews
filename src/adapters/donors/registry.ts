@@ -762,6 +762,13 @@ const donorRegistry: DonorModule[] = [
   },
 ];
 
+export const DEFAULT_DONOR_FEED_IDS = [
+  "openclaw-the-verge",
+  "openclaw-ars-technica",
+  "horizon-reuters-world",
+  "horizon-reuters-business",
+] as const;
+
 export function getDonorRegistry() {
   return donorRegistry;
 }
@@ -788,11 +795,23 @@ export function getDonorModule(donor: DonorId) {
 }
 
 export function getDefaultDonorFeeds(): DonorFeed[] {
-  return donorRegistry
-    .filter((entry) => entry.contractStates.ingestion === "active")
-    .flatMap((entry) => entry.feeds)
-    .filter((source) => source.status === "active" && source.availability !== "custom")
-    .slice(0, 5);
+  const activeDefaultFeeds = new Map(
+    donorRegistry
+      .filter((entry) => entry.contractStates.ingestion === "active")
+      .flatMap((entry) => entry.feeds)
+      .filter((source) => source.status === "active" && source.availability !== "custom")
+      .map((source) => [source.id, source]),
+  );
+
+  return DEFAULT_DONOR_FEED_IDS.map((sourceId) => {
+    const source = activeDefaultFeeds.get(sourceId);
+
+    if (!source) {
+      throw new Error(`Default donor feed ${sourceId} is not active in the donor registry`);
+    }
+
+    return source;
+  });
 }
 
 export function getIngestionAdapter(donor: DonorId) {

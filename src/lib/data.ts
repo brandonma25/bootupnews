@@ -1,7 +1,13 @@
 import { createHash } from "crypto";
 import { formatISO } from "date-fns";
 
-import { demoDashboardData, demoHistory, demoSources, demoTopics } from "@/lib/demo-data";
+import {
+  areMvpDefaultPublicSources,
+  demoDashboardData,
+  demoHistory,
+  demoTopics,
+  getMvpDefaultPublicSources,
+} from "@/lib/demo-data";
 import { assembleExplanationPacket } from "@/lib/explanation-support";
 import { isAiConfigured } from "@/lib/env";
 import { buildEventIntelligence } from "@/lib/event-intelligence";
@@ -427,7 +433,7 @@ async function getPipelineBackedDashboardData(input: {
   fallbackReason?: string;
 }): Promise<DashboardData> {
   const fallbackTopics = input.topics?.length ? input.topics : demoTopics;
-  const fallbackSources = input.sources?.length ? input.sources : demoSources;
+  const fallbackSources = input.sources?.length ? input.sources : getMvpDefaultPublicSources();
   const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources);
   const explanationModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
     const mode = item.explanationPacket?.explanation_mode ?? "missing";
@@ -575,7 +581,7 @@ export async function getHistoryPageState(route = "/history") {
 
 export async function generateDailyBriefing(
   topics: Topic[] = demoTopics,
-  sources: Source[] = demoSources,
+  sources: Source[] = getMvpDefaultPublicSources(),
 ): Promise<{ briefing: DailyBriefing; pipelineRun: Awaited<ReturnType<typeof runClusterFirstPipeline>>["run"] }> {
   const { run, ranked_clusters } = await runClusterFirstPipeline({ sources });
   const topicFallback = topics[0] ?? demoTopics[0];
@@ -677,7 +683,7 @@ export async function generateDailyBriefing(
           readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
           items,
         }
-      : topics === demoTopics && sources === demoSources
+      : topics === demoTopics && areMvpDefaultPublicSources(sources)
         ? demoDashboardData.briefing
         : createEmptyBriefing();
 
