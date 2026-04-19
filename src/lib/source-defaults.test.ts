@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_DONOR_FEED_IDS, getDefaultDonorFeeds } from "@/adapters/donors";
+import {
+  DEFAULT_DONOR_FEED_IDS,
+  PROBATIONARY_RUNTIME_FEED_IDS,
+  getDefaultDonorFeeds,
+  getProbationaryRuntimeFeeds,
+} from "@/adapters/donors";
 import {
   areMvpDefaultPublicSources,
   demoSources,
@@ -10,6 +15,16 @@ import {
 import { recommendedSources } from "@/lib/source-catalog";
 
 describe("MVP default source governance", () => {
+  const guardedBatchOneSourceIds = [
+    "financial-times-global-economy",
+    "foreign-affairs",
+    "the-diplomat",
+    "npr-world",
+    "foreign-policy",
+    "guardian-world",
+    "hacker-news-best",
+  ];
+
   it("declares the public MVP default source set explicitly", () => {
     expect(MVP_DEFAULT_PUBLIC_SOURCE_IDS).toEqual([
       "source-verge",
@@ -46,5 +61,22 @@ describe("MVP default source governance", () => {
       "horizon-reuters-business",
     ]);
     expect(getDefaultDonorFeeds().map((source) => source.id)).toEqual([...DEFAULT_DONOR_FEED_IDS]);
+  });
+
+  it("declares the probationary runtime activation set explicitly", () => {
+    expect(PROBATIONARY_RUNTIME_FEED_IDS).toEqual(["mit-technology-review"]);
+    expect(getProbationaryRuntimeFeeds().map((source) => source.id)).toEqual(["mit-technology-review"]);
+    expect(getProbationaryRuntimeFeeds().map((source) => source.availability)).toEqual(["probationary"]);
+    expect(getProbationaryRuntimeFeeds().map((source) => source.source)).toEqual(["MIT Technology Review"]);
+  });
+
+  it("does not activate other onboarded sources through the probationary path", () => {
+    const probationaryRuntimeSourceIds = new Set(PROBATIONARY_RUNTIME_FEED_IDS);
+
+    for (const sourceId of guardedBatchOneSourceIds) {
+      expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
+    }
+    expect(probationaryRuntimeSourceIds.has("bbc")).toBe(false);
+    expect(probationaryRuntimeSourceIds.has("cnbc")).toBe(false);
   });
 });

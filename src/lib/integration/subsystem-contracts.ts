@@ -14,7 +14,7 @@ export type TrustTier = "tier_1" | "tier_2" | "tier_3";
 
 export type SourceStatus = "active" | "inactive";
 
-export type SourceAvailability = "default" | "demo" | "custom";
+export type SourceAvailability = "default" | "probationary" | "demo" | "custom";
 
 export type SourceProvenance = "primary_reporting" | "aggregated_wire" | "specialist_analysis";
 

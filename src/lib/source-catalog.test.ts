@@ -56,6 +56,17 @@ describe("source catalog governance", () => {
     }
   });
 
+  it("keeps MIT Technology Review catalog support separate from default activation metadata", () => {
+    const source = recommendedSources.find((entry) => entry.id === "mit-technology-review");
+
+    expect(source).toBeDefined();
+    expect(source?.importStatus).toBe("ready");
+    expect(source?.validationStatus).toBe("validated");
+    expect(source?.mvpDefaultAllowed).toBe(false);
+    expect(source?.editorialPreference).toBe("none");
+    expect(source?.lifecycleStatus).toBe("active_optional");
+  });
+
   it("does not duplicate existing or failed batch-one candidates", () => {
     const feedUrls = recommendedSources.flatMap((source) => (source.feedUrl ? [source.feedUrl] : []));
     const duplicateFeedUrls = feedUrls.filter((feedUrl, index) => feedUrls.indexOf(feedUrl) !== index);

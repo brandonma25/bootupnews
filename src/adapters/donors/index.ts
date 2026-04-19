@@ -1,5 +1,6 @@
 export {
   DEFAULT_DONOR_FEED_IDS,
+  PROBATIONARY_RUNTIME_FEED_IDS,
   getActiveSourceRegistry,
   getCanonicalSourceMetadata,
   getClusteringSupportAdapters,
@@ -11,6 +12,7 @@ export {
   getDonorRegistrySnapshot,
   getEnrichmentSupports,
   getIngestionAdapter,
+  getProbationaryRuntimeFeeds,
   getRankingFeatureProviders,
   getSourceDefinition,
   getSourceRegistry,

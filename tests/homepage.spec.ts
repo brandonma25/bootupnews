@@ -19,7 +19,16 @@ test.describe("homepage", () => {
   test("opens the sign-in entry flow for signed-out visitors", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByRole("button", { name: /personalize briefing/i }).click();
+    const personalizeButton = page.getByRole("button", { name: /personalize briefing/i });
+
+    await expect(
+      page.getByRole("heading", {
+        name: /preview a structured intelligence briefing before you unlock the full workspace/i,
+      }),
+    ).toBeVisible();
+    await expect(personalizeButton).toBeVisible();
+    await expect(personalizeButton).toBeEnabled();
+    await personalizeButton.click();
 
     await expect(
       page.getByRole("heading", { name: /continue to daily intelligence/i }),

@@ -27,7 +27,13 @@ describe("ingestRawItems", () => {
       "openclaw-ars-technica",
       "horizon-reuters-world",
       "horizon-reuters-business",
+      "mit-technology-review",
     ]);
+    expect(result.sources.find((source) => source.sourceId === "mit-technology-review")).toMatchObject({
+      source: "MIT Technology Review",
+      availability: "probationary",
+      donor: "openclaw",
+    });
     expect(result.source_contributions.length).toBeGreaterThan(0);
     expect(firstItem?.source_metadata).toBeDefined();
     expect(firstItem?.source_metadata?.sourceId).toBeTruthy();
@@ -54,5 +60,12 @@ describe("ingestRawItems", () => {
       "TechCrunch",
       "Financial Times",
     ]);
+  });
+
+  it("keeps probationary runtime activation out of supplied public MVP defaults", async () => {
+    const result = await ingestRawItems({ sources: getMvpDefaultPublicSources() });
+
+    expect(result.sources.map((source) => source.sourceId)).not.toContain("mit-technology-review");
+    expect(result.sources.map((source) => source.source)).not.toContain("MIT Technology Review");
   });
 });

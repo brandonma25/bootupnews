@@ -53,6 +53,7 @@ test.describe("dashboard", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/dashboard");
 
+    await expect(page.getByRole("heading", { name: /today's public briefing/i })).toBeVisible();
     const navToggle = page.locator('button[aria-controls="mobile-navigation-drawer"]');
     const mobileDrawer = page.locator("#mobile-navigation-drawer");
     await expect(navToggle).toBeVisible();
@@ -69,7 +70,10 @@ test.describe("dashboard", () => {
     await expect(navToggle).toHaveAttribute("aria-expanded", "false");
 
     await navToggle.click();
-    await mobileDrawer.getByRole("link", { name: /^Topics$/ }).click();
+    await Promise.all([
+      page.waitForURL(/\/topics$/),
+      mobileDrawer.getByRole("link", { name: /^Topics$/ }).click(),
+    ]);
 
     await expect(page).toHaveURL(/\/topics$/);
     await expect(navToggle).toHaveAttribute("aria-expanded", "false");
