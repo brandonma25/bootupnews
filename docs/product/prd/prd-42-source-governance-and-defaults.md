@@ -41,6 +41,7 @@ The product needs a narrow high-signal source mix. If catalog additions, fallbac
 - `src/lib/observability/pipeline-run.ts` builds a safe runtime source-resolution snapshot with governed source IDs only.
 - `src/lib/pipeline/ingestion/index.ts` emits an ID-only structured log for runtime source resolution and attaches the same snapshot to pipeline-run metadata for local/test inspection.
 - `src/lib/data.ts` attaches an ID-only no-argument runtime source-resolution audit snapshot to the existing server-side dashboard/homepage request log so deployed audits can verify resolution without adding a public debug route.
+- `.github/workflows/mit-probationary-review.yml` and `scripts/mit-probationary-review.mjs` collect daily repo-safe evidence for MIT Technology Review's probationary runtime review and post the agreed template to GitHub Issue #70 without changing source activation policy.
 - `src/app/sources/page.tsx` presents catalog state as optional/importable rather than default ingestion.
 
 ## Dependencies / Risks
@@ -57,6 +58,7 @@ The product needs a narrow high-signal source mix. If catalog additions, fallbac
 - Probationary runtime activation is controlled by an explicit source-ID allowlist and can be evaluated or rolled back without changing MVP public defaults.
 - Runtime source observability separates MVP public defaults, donor fallback defaults, probationary runtime IDs, and resolved no-argument runtime IDs without exposing feed URLs or registry dumps.
 - Deployed route logs include an ID-only no-argument source-resolution audit snapshot while preserving the supplied MVP public source path used for dashboard rendering.
+- Daily MIT probationary review automation posts evidence only; it does not activate, deactivate, promote, or rank sources by policy.
 - Source preference treatment is granted only through the shared source-policy module.
 - Tests assert exact public defaults, donor defaults, and BBC/CNBC exclusion.
 - Repo-safe documentation explains source onboarding, validation states, default promotion, and the difference between supported, importable, preferred, and active-default sources.

@@ -1,0 +1,127 @@
+name: MIT Probationary Runtime Review
+
+on:
+  schedule:
+    - cron: "20 13 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Generate the review payload without posting an issue comment
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: mit-probationary-runtime-review-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect-and-comment:
+    name: collect-and-comment
+    runs-on: ubuntu-latest
+    env:
+      ISSUE_NUMBER: "70"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Collect MIT review evidence
+        run: |
+          node scripts/mit-probationary-review.mjs \
+            --output "$RUNNER_TEMP/mit-probationary-review.md" \
+            --json-output "$RUNNER_TEMP/mit-probationary-review.json"
+
+      - name: Validate issue comment payload safety
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const body = fs.readFileSync(`${process.env.RUNNER_TEMP}/mit-probationary-review.md`, "utf8");
+          const forbiddenPatterns = [
+            /https?:\/\//i,
+            /feedUrl/i,
+            /feed_url/i,
+            /credential/i,
+            /authorization/i,
+            /headers/i,
+            /cookie/i,
+            /token/i,
+            /email/i,
+            /userId/i,
+            /user_id/i,
+            /registry dump/i,
+          ];
+          const hit = forbiddenPatterns.find((pattern) => pattern.test(body));
+
+          if (hit) {
+            throw new Error(`Review comment payload matched restricted pattern: ${hit}`);
+          }
+
+          if (!body.includes("### Review entry") || !body.includes("### Decision reminder")) {
+            throw new Error("Review comment payload is missing required sections.");
+          }
+          NODE
+
+      - name: Publish dry-run summary
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+        run: |
+          {
+            echo "## MIT probationary runtime review dry run"
+            echo ""
+            cat "$RUNNER_TEMP/mit-probationary-review.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post review comment to Issue 70
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run != true }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("node:fs");
+            const issue_number = Number(process.env.ISSUE_NUMBER);
+            const body = fs.readFileSync(`${process.env.RUNNER_TEMP}/mit-probationary-review.md`, "utf8");
+            const today = new Date().toISOString().slice(0, 10);
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const duplicate = comments.find(
+              (comment) =>
+                comment.user?.type === "Bot" &&
+                comment.body?.includes("### Review entry") &&
+                comment.body?.includes(`- Date/time: ${today}`),
+            );
+
+            if (duplicate) {
+              core.notice(`Issue #${issue_number} already has an automated MIT review entry for ${today}; skipping duplicate comment.`);
+              await core.summary
+                .addHeading("MIT probationary runtime review")
+                .addRaw(`Skipped duplicate issue comment for ${today}.`)
+                .write();
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body,
+            });
+            await core.summary
+              .addHeading("MIT probationary runtime review")
+              .addRaw(`Posted a new review comment to issue #${issue_number}.`)
+              .write();
