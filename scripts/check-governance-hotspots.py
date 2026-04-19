@@ -7,7 +7,7 @@ import sys
 from governance_common import (
     HOTSPOT_FILES,
     inspect_branch_freshness,
-    load_changes,
+    load_changes_for_args,
     parse_common_args,
     resolve_branch_name,
 )
@@ -29,7 +29,7 @@ def main() -> int:
 
     try:
         branch = resolve_branch_name(repo_root, args.branch_name)
-        changes = load_changes(repo_root, f"{args.base_sha}...{args.head_sha}")
+        changes = load_changes_for_args(repo_root, args)
         is_fresh, merge_base, origin_main_sha = inspect_branch_freshness(repo_root)
     except RuntimeError as exc:
         print(f"FAIL: Unable to inspect governance hotspot state.\n{exc}")

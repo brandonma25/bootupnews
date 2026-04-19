@@ -7,11 +7,12 @@ import sys
 
 from governance_common import (
     CSV_PATH,
+    GovernanceContext,
     describe_required_doc_groups,
     find_missing_doc_groups,
     has_documentation_coverage,
     inspect_branch_freshness,
-    load_changes,
+    load_changes_for_args,
     load_csv_mappings,
     parse_common_args,
     resolve_branch_name,
@@ -46,6 +47,76 @@ def fail(message: str, extra: str | None = None) -> int:
     return 1
 
 
+def bullet_list(items: list[str]) -> str:
+    return "\n".join(f"- {item}" for item in items)
+
+
+def explain_classification(context: GovernanceContext) -> str:
+    details = [
+        f"Classification: {context.classification}",
+        f"Governance tier: {context.gate_tier}",
+    ]
+    if context.added_new_feature_files:
+        details.append("New system/feature file trigger(s):\n" + bullet_list(context.added_new_feature_files))
+    if context.new_prd_files:
+        details.append("New PRD file(s):\n" + bullet_list(context.new_prd_files))
+    if context.hotspot_files_touched:
+        details.append("Hotspot file(s) touched:\n" + bullet_list(context.hotspot_files_touched))
+    if context.fix_signal_reasons:
+        details.append("Fix signal(s):\n" + bullet_list(context.fix_signal_reasons))
+    return "\n\n".join(details)
+
+
+def format_missing_doc_failure(context: GovernanceContext, missing_doc_groups: list[tuple[str, ...]]) -> str:
+    base = [
+        explain_classification(context),
+        "Required documentation lane(s):\n"
+        + bullet_list(describe_required_doc_groups(missing_doc_groups)),
+        "Observed documentation lane(s):\n"
+        + (bullet_list(context.doc_lanes_updated) if context.doc_lanes_updated else "- none"),
+    ]
+
+    if any(set(group) == {"protocol", "change-record", "governance-root"} for group in missing_doc_groups):
+        base.append(
+            "Fastest valid fix: this PR changes a governance hotspot. Add or update one governance-facing "
+            "document, usually a concise `docs/engineering/change-records/...` note, a relevant protocol update, "
+            "or `AGENTS.md` when the operating rule itself changed."
+        )
+    elif context.classification == "bug-fix":
+        base.append(
+            "Fastest valid fix: add a concise bug-fix record under `docs/engineering/bug-fixes/` "
+            "or explain why the change should be reclassified."
+        )
+    else:
+        base.append(
+            "Fastest valid fix: add the smallest truthful supporting document in one of the required lanes."
+        )
+
+    return "\n\n".join(base)
+
+
+def format_new_feature_without_prd_failure(context: GovernanceContext) -> str:
+    return (
+        explain_classification(context)
+        + "\n\nWhy this failed: the PR adds non-test `src/` or `supabase/` files, which the gate treats as "
+        "new system/feature surface unless it is mapped to a canonical PRD."
+        + "\n\nFastest valid fix: add one canonical `docs/product/prd/prd-XX-<slug>.md` file, zero-pad "
+        "1-9 as `prd-01` through `prd-09`, and map the same `prd_id` and `prd_file` in "
+        "`docs/product/feature-system.csv`. If this is not actually feature/system work, split or rename "
+        "the change so the diff reflects the narrower scope."
+    )
+
+
+def format_prd_csv_missing_failure(context: GovernanceContext, prd_file: str) -> str:
+    return (
+        explain_classification(context)
+        + f"\n\nWhy this failed: `{prd_file}` is a new canonical PRD file, but "
+        "`docs/product/feature-system.csv` does not contain a matching `prd_file` row."
+        + "\n\nFastest valid fix: add exactly one CSV row with the matching `prd_id` and `prd_file`, "
+        "or remove the PRD file if it was created accidentally."
+    )
+
+
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
@@ -59,7 +130,7 @@ def main() -> int:
         )
 
     try:
-        changes = load_changes(repo_root, diff_range)
+        changes = load_changes_for_args(repo_root, args)
         branch = resolve_branch_name(repo_root, args.branch_name)
     except RuntimeError as exc:
         return fail(f"Unable to inspect PR diff for range {diff_range}", str(exc))
@@ -107,7 +178,7 @@ def main() -> int:
         if not context.new_prd_files:
             return fail(
                 "New feature or system change detected, but no canonical PRD was added in docs/product/prd/.",
-                "How to fix: add one canonical docs/product/prd/prd-XX-<slug>.md file, zero-pad 1-9 as prd-01 through prd-09, and map it in docs/product/feature-system.csv.",
+                format_new_feature_without_prd_failure(context),
             )
 
         csv_mappings = load_csv_mappings(repo_root)
@@ -115,7 +186,7 @@ def main() -> int:
             if prd_file not in csv_mappings:
                 return fail(
                     f"New PRD file {prd_file} is missing from docs/product/feature-system.csv.",
-                    "How to fix: add a CSV row with the matching prd_id and prd_file.",
+                    format_prd_csv_missing_failure(context, prd_file),
                 )
 
             if not (repo_root / prd_file).is_file():
@@ -128,17 +199,18 @@ def main() -> int:
         if alignment_errors:
             return fail(
                 "New PRD file and CSV entry do not refer to the same PRD ID.",
-                "\n".join(alignment_errors),
+                explain_classification(context)
+                + "\n\nWhy this failed: a new canonical PRD and its feature-system row must refer to "
+                "the same numeric `PRD-XX` identity.\n\n"
+                + "\n".join(alignment_errors)
+                + "\n\nFastest valid fix: make the PRD filename number and CSV `prd_id` match.",
             )
 
     missing_doc_groups = find_missing_doc_groups(context)
     if missing_doc_groups:
         return fail(
             "Documentation coverage requirements are not satisfied for this change.",
-            "Required documentation lanes:\n"
-            + "\n".join(f"- {description}" for description in describe_required_doc_groups(missing_doc_groups))
-            + "\n\nObserved lanes:\n"
-            + ("\n".join(f"- {lane}" for lane in context.doc_lanes_updated) if context.doc_lanes_updated else "- none"),
+            format_missing_doc_failure(context, missing_doc_groups),
         )
 
     if context.gate_tier == "hotspot" and context.non_test_monitored:

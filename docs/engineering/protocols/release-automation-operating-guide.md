@@ -61,6 +61,7 @@
 - Audit companion: `python scripts/pr-governance-audit.py`
 - Standalone coverage validator: `python scripts/validate-documentation-coverage.py`
 - Reuses the feature-system CSV validator and inspects the PR diff.
+- In CI PR mode, the gate inspects only the explicit `base...head` PR diff so generated or untracked runner artifacts cannot change classification. Local validation remains allowed to include staged, unstaged, and untracked working-tree changes when run intentionally.
 - Monitored change areas include `src/`, `supabase/`, `scripts/`, `.github/workflows/`, and key root config files such as `package.json`, `next.config.ts`, `playwright.config.ts`, and `tsconfig.json`.
 - Classification:
   - docs-only

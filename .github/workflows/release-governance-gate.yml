@@ -62,7 +62,8 @@ jobs:
             --base-sha "$BASE_SHA" \
             --head-sha "$HEAD_SHA" \
             --pr-title "$PR_TITLE" \
-            --branch-name "$BRANCH_NAME" >> "$GITHUB_STEP_SUMMARY"
+            --branch-name "$BRANCH_NAME" \
+            --diff-mode ci-pr >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run release governance gate
         shell: bash
@@ -72,4 +73,5 @@ jobs:
             --base-sha "$BASE_SHA" \
             --head-sha "$HEAD_SHA" \
             --pr-title "$PR_TITLE" \
-            --branch-name "$BRANCH_NAME"
+            --branch-name "$BRANCH_NAME" \
+            --diff-mode ci-pr

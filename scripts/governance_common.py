@@ -83,6 +83,7 @@ class GovernanceContext:
     changed_paths: list[str]
     monitored_changes: list[Change]
     non_test_monitored: list[Change]
+    added_new_feature_files: list[str]
     new_prd_files: list[str]
     classification: str
     gate_tier: str
@@ -121,6 +122,15 @@ def parse_common_args(description: str) -> argparse.ArgumentParser:
         default="",
         help="Optional PR title or change title to improve fix classification.",
     )
+    parser.add_argument(
+        "--diff-mode",
+        choices=("local", "ci-pr"),
+        default="local",
+        help=(
+            "Change loading mode. 'ci-pr' inspects only the supplied base...head diff; "
+            "'local' also includes staged, unstaged, and untracked working-tree changes."
+        ),
+    )
     return parser
 
 
@@ -134,7 +144,7 @@ def run_git(repo_root: Path, *args: str) -> str:
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "git command failed")
-    return result.stdout.strip()
+    return result.stdout.rstrip("\n")
 
 
 def get_diff_range(base_sha: str, head_sha: str) -> str:
@@ -180,14 +190,17 @@ def merge_diff_output(repo_root: Path, changes: dict[str, Change], *diff_args: s
         changes[path] = change
 
 
-def load_changes(repo_root: Path, diff_range: str) -> dict[str, Change]:
+def load_changes(repo_root: Path, diff_range: str, include_worktree: bool = True) -> dict[str, Change]:
     changes: dict[str, Change] = {}
     merge_diff_output(repo_root, changes, diff_range)
+
+    if not include_worktree:
+        return changes
 
     # Local validation should see staged and unstaged edits in addition to the branch diff.
     merge_diff_output(repo_root, changes, "HEAD")
 
-    status_output = run_git(repo_root, "status", "--porcelain")
+    status_output = run_git(repo_root, "status", "--porcelain", "--untracked-files=all")
     for raw_line in status_output.splitlines():
         if not raw_line.strip():
             continue
@@ -201,6 +214,14 @@ def load_changes(repo_root: Path, diff_range: str) -> dict[str, Change]:
         changes.setdefault(path, Change(path=path, status=normalized_status))
 
     return changes
+
+
+def load_changes_for_args(repo_root: Path, args: argparse.Namespace) -> dict[str, Change]:
+    return load_changes(
+        repo_root,
+        f"{args.base_sha}...{args.head_sha}",
+        include_worktree=args.diff_mode == "local",
+    )
 
 
 def parse_status_paths(status_output: str) -> list[str]:
@@ -345,6 +366,7 @@ def classify_changes(changes: dict[str, Change], branch: str, pr_title: str) -> 
         changed_paths=changed_paths,
         monitored_changes=monitored_changes,
         non_test_monitored=non_test_monitored,
+        added_new_feature_files=sorted(change.path for change in added_new_feature_files),
         new_prd_files=new_prd_files,
         classification=classification,
         gate_tier=gate_tier,
