@@ -23,7 +23,7 @@ The product needs a narrow high-signal source mix. If catalog additions, fallbac
 
 ## Non-Goals
 
-- No new source additions.
+- No new runtime-default or promoted source additions without explicit governance; catalog-only validated onboarding is allowed only when it does not alter defaults, editorial preferences, or source-tier boosts.
 - No broad ingestion pipeline redesign.
 - No auth, session, or Supabase schema changes.
 - No relaxation of source-governance or release-governance requirements.
