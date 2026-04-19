@@ -86,6 +86,15 @@ Minimum production verification:
 ### Gate 6 — Documentation Gate
 For every serious feature, fix, consolidation, or release, Codex must update concise repo-safe docs.
 
+### Gate 7 — Tracker Closeout Gate
+Before a task is considered complete, Codex must update the Google Sheets workbook `Features Table`.
+
+Required tracker closeout:
+- If direct Sheets access is available, update the existing mapped row and verify the row after writing.
+- If the work is unmapped or ambiguous, route it to the appropriate review lane instead of creating a duplicate governed row.
+- If direct Sheets access is unavailable, create a concise fallback tracker-sync markdown file in `docs/operations/tracker-sync/` with the exact manual update payload.
+- Do not mark the task complete until the live sheet is verified or the fallback file exists.
+
 ---
 
 ## 4. Required Commands and Entrypoints
@@ -172,11 +181,17 @@ For serious implementation or release work, Codex should report in a structured 
 3. validation performed
 4. preview status
 5. human-only checks still needed
-6. merge decision
-7. exact git result
-8. docs updated
+6. Google Sheets tracker status or fallback tracker-sync file
+7. merge decision
+8. exact git result
+9. docs updated
 
 ---
 
-## 11. Failure Rule
+## 11. Reusable Codex Closeout Block
+Before closing this task, update the Google Sheets tracker. If direct update is unavailable, create a tracker-sync markdown file in the repo with the exact manual update payload. Do not mark the task complete until one of these two paths is done.
+
+---
+
+## 12. Failure Rule
 If Codex skips these release gates, any merge recommendation is invalid.

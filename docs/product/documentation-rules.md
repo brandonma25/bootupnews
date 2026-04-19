@@ -7,6 +7,7 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - `Sheet1` is the governed approved feature table and `Intake Queue` is the quarantine lane for unmapped or ambiguous work.
 - `Record ID` in `Sheet1` is immutable and may only be used as the governed lookup key for automation.
 - Automation must never write formula/computed columns or silently overwrite human-managed fields in Google Sheets.
+- Tracker closeout is part of Definition of Done: update and verify the live Google Sheet, or create a fallback tracker-sync file in `docs/operations/tracker-sync/` with the exact manual update payload.
 - `docs/product/feature-system.csv` is the repo-side control layer for PRD mapping, build order, and durable governance metadata.
 - The CSV is the product control layer and its schema is locked to exactly 12 columns in this exact order:
   `Layer, Feature Name, Priority, Status, Description, Owner, Dependency, Build Order, Decision, Last Updated, prd_id, prd_file`
@@ -57,6 +58,7 @@ This repository uses a controlled documentation system. The goal is to keep docs
 7. During active branch work, set `status = In Progress`.
 8. When implementation is complete but awaiting merge or review, set `status = In Review`.
 9. After merge or explicit user acceptance, set `status = Built`, `decision = keep`, and update `last_updated`.
+10. Before closeout, verify the Google Sheets tracker row or create a fallback tracker-sync markdown file with the exact manual update payload.
 
 ## Change Control
 - Do not implement features marked `delay` or `kill`.
@@ -83,6 +85,8 @@ This repository uses a controlled documentation system. The goal is to keep docs
   Concise validation notes and test reports
 - `docs/engineering/protocols/`:
   Operating rules, templates, checklists, and governance standards
+- `docs/operations/tracker-sync/`:
+  Fallback tracker-sync payloads when direct Google Sheets updates are unavailable
 
 ## Meaningful Documentation Threshold
 - Use the smallest truthful documentation set that preserves future understanding.
