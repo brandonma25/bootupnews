@@ -3,6 +3,17 @@ import { describe, expect, it } from "vitest";
 import { recommendedSources } from "@/lib/source-catalog";
 
 describe("source catalog governance", () => {
+  const batchOneSourceIds = [
+    "financial-times-global-economy",
+    "mit-technology-review",
+    "foreign-affairs",
+    "the-diplomat",
+    "npr-world",
+    "foreign-policy",
+    "guardian-world",
+    "hacker-news-best",
+  ];
+
   it("keeps BBC and CNBC out of the onboarding catalog", () => {
     const serialized = JSON.stringify(recommendedSources).toLowerCase();
 
@@ -28,5 +39,33 @@ describe("source catalog governance", () => {
           source.validationStatus !== "manual_only",
       ),
     ).toBe(true);
+  });
+
+  it("keeps batch-one onboarded sources out of default and preference treatment", () => {
+    const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
+
+    for (const sourceId of batchOneSourceIds) {
+      const source = sourcesById.get(sourceId);
+
+      expect(source).toBeDefined();
+      expect(source?.importStatus).toBe("ready");
+      expect(source?.validationStatus).toBe("validated");
+      expect(source?.mvpDefaultAllowed).toBe(false);
+      expect(source?.editorialPreference).toBe("none");
+      expect(source?.lifecycleStatus).not.toBe("active_default");
+    }
+  });
+
+  it("does not duplicate existing or failed batch-one candidates", () => {
+    const feedUrls = recommendedSources.flatMap((source) => (source.feedUrl ? [source.feedUrl] : []));
+    const duplicateFeedUrls = feedUrls.filter((feedUrl, index) => feedUrls.indexOf(feedUrl) !== index);
+
+    expect(duplicateFeedUrls).toEqual([]);
+    expect(recommendedSources.filter((source) => source.id === "ars-technica")).toHaveLength(1);
+    expect(recommendedSources.some((source) => source.feedUrl === "https://www.theverge.com/rss/index.xml")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "npr-economy")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "brookings-research")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "csis-analysis")).toBe(false);
+    expect(recommendedSources.some((source) => source.feedUrl === "https://feeds.content.dowjones.io/public/rss/mktw_wsjonline")).toBe(false);
   });
 });
