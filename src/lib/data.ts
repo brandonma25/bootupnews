@@ -17,6 +17,7 @@ import {
 } from "@/lib/homepage-taxonomy";
 import { logServerEvent } from "@/lib/observability";
 import { runClusterFirstPipeline } from "@/lib/pipeline";
+import { resolveNoArgumentRuntimeSourceResolutionSnapshot } from "@/lib/pipeline/ingestion";
 import { selectRelatedCoverage } from "@/lib/related-coverage";
 import {
   compareBriefingItemsByRanking,
@@ -224,6 +225,17 @@ export async function getViewerAccount(
   return viewer;
 }
 
+function buildNoArgumentRuntimeSourceResolutionAuditContext() {
+  try {
+    return resolveNoArgumentRuntimeSourceResolutionSnapshot();
+  } catch (error) {
+    return {
+      unavailable: true,
+      errorMessage: error instanceof Error ? error.message : "No-argument runtime source resolution audit failed",
+    };
+  }
+}
+
 export async function getDashboardData(
   route = "/dashboard",
   authState?: RequestAuthState,
@@ -235,6 +247,7 @@ export async function getDashboardData(
     route: resolvedAuthState.route,
     sessionExists: Boolean(user),
     sessionCookiePresent,
+    no_argument_runtime_source_resolution_audit: buildNoArgumentRuntimeSourceResolutionAuditContext(),
   });
 
   if (!supabase || !user) {

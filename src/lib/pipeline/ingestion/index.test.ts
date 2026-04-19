@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { getMvpDefaultPublicSources } from "@/lib/demo-data";
-import { ingestRawItems } from "@/lib/pipeline/ingestion";
+import {
+  ingestRawItems,
+  resolveNoArgumentRuntimeSourceResolutionSnapshot,
+} from "@/lib/pipeline/ingestion";
 
 vi.mock("@/lib/rss", () => ({
   fetchFeedArticles: vi.fn(async (feedUrl: string, sourceName: string) => [
@@ -103,6 +106,45 @@ describe("ingestRawItems", () => {
 
     expect(result.sources.map((source) => source.sourceId)).not.toContain("mit-technology-review");
     expect(result.sources.map((source) => source.source)).not.toContain("MIT Technology Review");
+  });
+
+  it("exposes an ID-only no-argument source-resolution audit snapshot without fetching feeds", () => {
+    const snapshot = resolveNoArgumentRuntimeSourceResolutionSnapshot();
+
+    expect(snapshot).toEqual({
+      resolution_mode: "no_argument_runtime",
+      mvp_default_public_source_ids: [
+        "source-verge",
+        "source-ars",
+        "source-tldr-tech",
+        "source-techcrunch",
+        "source-ft",
+      ],
+      donor_fallback_default_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+      ],
+      probationary_runtime_source_ids: ["mit-technology-review"],
+      resolved_runtime_source_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+        "mit-technology-review",
+      ],
+      resolved_default_donor_source_ids: [
+        "openclaw-the-verge",
+        "openclaw-ars-technica",
+        "horizon-reuters-world",
+        "horizon-reuters-business",
+      ],
+      resolved_probationary_source_ids: ["mit-technology-review"],
+      resolved_other_source_ids: [],
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("feedUrl");
+    expect(JSON.stringify(snapshot)).not.toContain("https://");
   });
 
   it("logs a safe source-resolution snapshot without feed URLs or registry dumps", async () => {

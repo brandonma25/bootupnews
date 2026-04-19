@@ -96,6 +96,13 @@ function resolveIngestionSources(sources?: Source[]): SourceDefinition[] {
     .map(buildCustomSourceDefinition);
 }
 
+export function resolveNoArgumentRuntimeSourceResolutionSnapshot(): RuntimeSourceResolutionSnapshot {
+  return buildRuntimeSourceResolutionSnapshot({
+    resolutionMode: "no_argument_runtime",
+    resolvedSources: resolveIngestionSources(),
+  });
+}
+
 async function fetchSourceWithAdapter(source: SourceDefinition) {
   const adapter = getIngestionAdapter(source.donor as DonorFeed["donor"]);
 

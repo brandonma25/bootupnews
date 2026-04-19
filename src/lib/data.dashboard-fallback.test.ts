@@ -373,6 +373,31 @@ describe("getDashboardData fallback behavior", () => {
     expect(data.sources.length).toBeGreaterThan(0);
     expect(runClusterFirstPipeline).toHaveBeenCalledTimes(1);
     expect(logServerEvent).toHaveBeenCalledWith(
+      "info",
+      "Dashboard data request received",
+      expect.objectContaining({
+        no_argument_runtime_source_resolution_audit: expect.objectContaining({
+          resolution_mode: "no_argument_runtime",
+          donor_fallback_default_ids: [
+            "openclaw-the-verge",
+            "openclaw-ars-technica",
+            "horizon-reuters-world",
+            "horizon-reuters-business",
+          ],
+          probationary_runtime_source_ids: ["mit-technology-review"],
+          resolved_runtime_source_ids: [
+            "openclaw-the-verge",
+            "openclaw-ars-technica",
+            "horizon-reuters-world",
+            "horizon-reuters-business",
+            "mit-technology-review",
+          ],
+          resolved_probationary_source_ids: ["mit-technology-review"],
+          resolved_other_source_ids: [],
+        }),
+      }),
+    );
+    expect(logServerEvent).toHaveBeenCalledWith(
       "warn",
       "Signed-in dashboard fell back to pipeline briefing",
       expect.objectContaining({
