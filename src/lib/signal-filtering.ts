@@ -1,3 +1,5 @@
+import { classifySourcePreference } from "@/lib/source-policy";
+
 export type SourceTier = "tier1" | "tier2" | "tier3" | "unknown";
 export type HeadlineQuality = "strong" | "medium" | "weak";
 export type FilterDecision = "pass" | "suppress" | "reject";
@@ -50,100 +52,6 @@ const SIGNAL_FILTER_CONFIG = {
   minPassCount: 4,
   fallbackLookbackHours: 48,
 };
-
-const SOURCE_TIER_RULES: Array<{
-  tier: SourceTier;
-  hosts: string[];
-  names: string[];
-}> = [
-  {
-    tier: "tier1",
-    hosts: [
-      "reuters.com",
-      "apnews.com",
-      "bbc.com",
-      "bbc.co.uk",
-      "ft.com",
-      "bloomberg.com",
-      "wsj.com",
-      "nytimes.com",
-      "washingtonpost.com",
-      "economist.com",
-      "imf.org",
-      "worldbank.org",
-      "oecd.org",
-      "sec.gov",
-      "federalreserve.gov",
-      "europa.eu",
-      "ec.europa.eu",
-      "whitehouse.gov",
-      "treasury.gov",
-    ],
-    names: [
-      "reuters",
-      "associated press",
-      "ap news",
-      "bbc",
-      "financial times",
-      "bloomberg",
-      "wall street journal",
-      "new york times",
-      "washington post",
-      "economist",
-      "international monetary fund",
-      "world bank",
-      "federal reserve",
-      "u.s. securities and exchange commission",
-    ],
-  },
-  {
-    tier: "tier2",
-    hosts: [
-      "techcrunch.com",
-      "arstechnica.com",
-      "cnbc.com",
-      "theinformation.com",
-      "semafor.com",
-      "axios.com",
-      "theverge.com",
-      "tldr.tech",
-      "marketwatch.com",
-      "nikkei.com",
-    ],
-    names: [
-      "techcrunch",
-      "ars technica",
-      "cnbc",
-      "the information",
-      "semafor",
-      "axios",
-      "the verge",
-      "tldr",
-      "marketwatch",
-      "nikkei",
-    ],
-  },
-  {
-    tier: "tier3",
-    hosts: [
-      "gdeltproject.org",
-      "thenewsapi.com",
-      "newsapi.org",
-      "substack.com",
-      "medium.com",
-      "blogspot.com",
-    ],
-    names: [
-      "gdelt",
-      "thenewsapi",
-      "newsapi",
-      "substack",
-      "medium",
-      "newsletter",
-      "blog",
-    ],
-  },
-];
 
 const STRONG_HEADLINE_PATTERNS: Array<{ pattern: RegExp; score: number; reason: string }> = [
   { pattern: /\b(approves?|bans?|orders?|mandates?|sanctions?|tariffs?|restrictions?|export controls?|regulat(?:es|ion)|policy|rules?)\b/i, score: 3, reason: "strong_policy_action" },
@@ -380,25 +288,7 @@ export function classifySourceTier(candidate: Pick<
   SignalFilterCandidate,
   "sourceName" | "url" | "sourceFeedUrl" | "sourceHomepageUrl"
 >): SourceTier {
-  const sourceName = normalizeSourceValue(candidate.sourceName);
-  const hosts = [
-    candidate.url,
-    candidate.sourceFeedUrl ?? undefined,
-    candidate.sourceHomepageUrl ?? undefined,
-  ]
-    .map(getHostname)
-    .filter((value): value is string => Boolean(value));
-
-  for (const rule of SOURCE_TIER_RULES) {
-    if (
-      rule.names.some((name) => sourceName.includes(name)) ||
-      rule.hosts.some((host) => hosts.some((candidateHost) => candidateHost === host || candidateHost.endsWith(`.${host}`)))
-    ) {
-      return rule.tier;
-    }
-  }
-
-  return "unknown";
+  return classifySourcePreference(candidate);
 }
 
 export function classifyHeadlineQuality(
@@ -539,22 +429,6 @@ function scoreHeadline(
 
 function normalizeText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9\s$-]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function normalizeSourceValue(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function getHostname(value: string | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return new URL(value).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
 }
 
 function uniqueReasons(reasons: Array<string | null>) {

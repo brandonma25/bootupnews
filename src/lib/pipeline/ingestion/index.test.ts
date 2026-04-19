@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { getMvpDefaultPublicSources } from "@/lib/demo-data";
 import { ingestRawItems } from "@/lib/pipeline/ingestion";
 
 vi.mock("@/lib/rss", () => ({
@@ -21,7 +22,12 @@ describe("ingestRawItems", () => {
     const firstItem = result.items[0];
 
     expect(result.usedSeedFallback).toBe(false);
-    expect(result.sources.length).toBeGreaterThan(0);
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "openclaw-the-verge",
+      "openclaw-ars-technica",
+      "horizon-reuters-world",
+      "horizon-reuters-business",
+    ]);
     expect(result.source_contributions.length).toBeGreaterThan(0);
     expect(firstItem?.source_metadata).toBeDefined();
     expect(firstItem?.source_metadata?.sourceId).toBeTruthy();
@@ -29,5 +35,24 @@ describe("ingestRawItems", () => {
     expect(firstItem?.source_metadata?.sourceClass).toBeTruthy();
     expect(firstItem?.source_metadata?.trustTier).toBeTruthy();
     expect(firstItem?.source_metadata?.provenance).toBeTruthy();
+  });
+
+  it("ingests only the explicit public MVP defaults when public sources are supplied", async () => {
+    const result = await ingestRawItems({ sources: getMvpDefaultPublicSources() });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-source-verge",
+      "custom-source-ars",
+      "custom-source-tldr-tech",
+      "custom-source-techcrunch",
+      "custom-source-ft",
+    ]);
+    expect(result.sources.map((source) => source.source)).toEqual([
+      "The Verge",
+      "Ars Technica",
+      "TLDR",
+      "TechCrunch",
+      "Financial Times",
+    ]);
   });
 });

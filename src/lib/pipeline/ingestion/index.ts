@@ -62,9 +62,17 @@ function buildCustomSourceDefinition(source: Source): SourceDefinition {
 
 function resolveIngestionSources(sources?: Source[]): SourceDefinition[] {
   if (!sources?.length) {
-    return getActiveSourceRegistry()
-      .filter((source) => getDefaultDonorFeeds().some((feed) => feed.id === source.sourceId))
-      .slice(0, 5);
+    const sourceRegistryById = new Map(getActiveSourceRegistry().map((source) => [source.sourceId, source]));
+
+    return getDefaultDonorFeeds().map((feed) => {
+      const source = sourceRegistryById.get(feed.id);
+
+      if (!source) {
+        throw new Error(`Default donor feed ${feed.id} is not present in the active source registry`);
+      }
+
+      return source;
+    });
   }
 
   return sources
