@@ -184,6 +184,78 @@ git push origin --delete feature/<name>
 - If a hotspot PR becomes stale, it should usually be superseded by port-forwarding the still-needed logic into a fresh branch from `main` instead of force-merging the stale branch.
 - See `docs/engineering/protocols/governance-gate-map.md` for governance tiering, hotspot ownership, and file responsibility boundaries.
 
+## 10b. Sequential Prompt Execution Protocol
+
+This section governs the approved pattern for PM-directed multi-prompt
+execution plans. It does not override the one-branch-per-feature rule — it
+clarifies how that rule applies when multiple prompts are pre-authored and
+executed sequentially.
+
+### When This Pattern Applies
+A Sequential Prompt Execution Plan is approved when all of the following
+are true:
+- The PM has pre-authored a set of prompts in a defined execution order
+- Each prompt is explicitly scoped to exactly one branch
+- Each prompt targets a single isolated feature, fix, or documentation update
+- The prompts are executed one at a time, not in parallel
+- Each branch is merged and main is pulled before the next prompt begins
+
+### Rules That Apply Within This Pattern
+- Every prompt in the plan must include: branch decision, branch name,
+  branch reason, scope boundaries, protected files, PRD requirement,
+  implementation steps, testing instructions, expected behavior,
+  documentation update requirement, sanitization rule, and cleanup step
+- The one-branch-per-feature rule still applies within each prompt —
+  a single prompt may not mix unrelated features onto one branch
+- Dependency order must be stated explicitly in the plan and respected
+  during execution — a prompt that depends on a prior merge must not
+  begin until that merge is confirmed
+- No prompt in the plan may be skipped unless the PM explicitly approves
+  the skip and the dependency chain is re-evaluated
+- If a prompt fails validation or build, that prompt must be resolved
+  before the next prompt begins — do not advance the plan on a broken state
+
+### What This Pattern Explicitly Does Not Allow
+- Parallel branch execution across multiple prompts simultaneously
+- Stacking a new prompt on top of an unmerged prior branch
+- Combining two sequential prompts into a single branch to save time
+- Starting prompt N+1 before prompt N is merged into main
+
+### Codex Behavior Under This Pattern
+- At the start of each prompt, Codex must confirm it is starting from
+  updated main by running: git checkout main && git pull
+- Codex must state which prompt number it is executing and confirm the
+  prior prompt's branch has been merged before proceeding
+- If Codex cannot confirm the prior merge, it must stop and ask the PM
+  to confirm before continuing
+- Codex must not infer or assume merge status — it must verify
+
+### PM Responsibility Under This Pattern
+- The PM is responsible for providing the full sequential prompt plan
+  before execution begins
+- The PM must confirm each merge before instructing Codex to proceed to
+  the next prompt
+- The PM must not instruct Codex to skip validation steps to accelerate
+  the plan
+
+## 10c. Local Repo and Worktree Discipline
+
+- The canonical local project root is `/Users/bm/Documents/daily-intelligence-aggregator-main`.
+- Do not use `/Users/bm/Documents/Daily news intel aggregator` for Git or Codex work; it is a symlink alias and increases directory-confusion risk.
+- Before every Git or Codex task, run:
+
+```bash
+cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
+pwd
+git branch --show-current
+git status --short
+git worktree list
+```
+
+- Use additional worktrees only when intentionally isolating parallel branch work.
+- Before removing any worktree, run `git status --short` inside that exact worktree.
+- Never auto-clean a worktree that contains modified or untracked files; preserve ambiguous work before cleanup.
+
 ## 11. Merge Checklist
 - Branch is correct and isolated.
 - Local validation passed.
