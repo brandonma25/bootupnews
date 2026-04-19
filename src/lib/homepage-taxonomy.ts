@@ -111,6 +111,13 @@ export const HOMEPAGE_CATEGORY_CONFIG: CategoryConfig[] = [
       "geopolitics",
       "diplomacy",
       "sanctions",
+      "iran",
+      "tehran",
+      "hormuz",
+      "strait",
+      "military",
+      "missile",
+      "war",
     ],
   },
 ];

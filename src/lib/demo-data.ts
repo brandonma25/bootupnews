@@ -18,6 +18,12 @@ export const demoTopics: Topic[] = [
     description: "Markets, companies, macro moves, and business news that matter today.",
     color: "#73563c",
   },
+  {
+    id: "topic-politics",
+    name: "Politics",
+    description: "Government, regulation, geopolitics, and policy shifts affecting the operating environment.",
+    color: "#35506b",
+  },
 ];
 
 export const demoSources: Source[] = [
@@ -82,6 +88,15 @@ export const demoSources: Source[] = [
     homepageUrl: "https://www.zerohedge.com",
     topicId: "topic-finance",
     topicName: "Finance",
+    status: "active",
+  },
+  {
+    id: "source-ap-top-news",
+    name: "AP Top News",
+    feedUrl: "https://apnews.com/hub/apf-topnews?output=rss",
+    homepageUrl: "https://apnews.com",
+    topicId: "topic-politics",
+    topicName: "Geopolitics",
     status: "active",
   },
   ...(env.newsApiKey

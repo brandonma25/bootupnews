@@ -1,3 +1,9 @@
+import type {
+  ExplanationPacket,
+  TrustLayerDebug,
+} from "@/lib/integration/subsystem-contracts";
+import type { SignalRole } from "@/lib/output-sanity";
+
 export type Topic = {
   id: string;
   userId?: string;
@@ -108,6 +114,9 @@ export type BriefingItem = {
   importanceLabel?: "Critical" | "High" | "Watch";
   rankingSignals?: string[];
   eventIntelligence?: EventIntelligence;
+  explanationPacket?: ExplanationPacket;
+  trustDebug?: TrustLayerDebug;
+  signalRole?: SignalRole;
   displayState?: EventDisplayState;
   continuityKey?: string;
   continuityFingerprint?: string;

@@ -2,16 +2,21 @@ import { createHash } from "crypto";
 import { formatISO } from "date-fns";
 
 import { demoDashboardData, demoHistory, demoSources, demoTopics } from "@/lib/demo-data";
+import { assembleExplanationPacket } from "@/lib/explanation-support";
 import { isAiConfigured } from "@/lib/env";
 import { buildEventIntelligence } from "@/lib/event-intelligence";
-import { countSourcesByHomepageCategory } from "@/lib/homepage-taxonomy";
+import {
+  classifyHomepageCategory,
+  countSourcesByHomepageCategory,
+} from "@/lib/homepage-taxonomy";
 import { logServerEvent } from "@/lib/observability";
+import { runClusterFirstPipeline } from "@/lib/pipeline";
 import { selectRelatedCoverage } from "@/lib/related-coverage";
 import {
   compareBriefingItemsByRanking,
   rankNewsClusters,
 } from "@/lib/ranking";
-import { clusterArticles, fetchFeedArticles, type FeedArticle } from "@/lib/rss";
+import { fetchFeedArticles, type FeedArticle } from "@/lib/rss";
 import {
   applySignalFiltering,
   type EventType,
@@ -119,6 +124,14 @@ type IngestionRunSummary = {
   degradedSourceNames: string[];
 };
 
+type DashboardDataPath = "public_pipeline" | "personalized_query" | "personalized_fallback_to_public";
+
+const PIPELINE_TOPIC_ALIASES: Record<"tech" | "finance" | "politics", string[]> = {
+  tech: ["tech", "technology", "ai", "software", "cybersecurity"],
+  finance: ["finance", "markets", "macro", "business", "economy"],
+  politics: ["politics", "policy", "government", "geopolitics", "world"],
+};
+
 type BriefingSummaryFields = Pick<
   BriefingItem,
   "title" | "whatHappened" | "keyPoints" | "whyItMatters" | "estimatedMinutes"
@@ -212,6 +225,12 @@ export async function getDashboardData(
   const resolvedAuthState = authState ?? (await getRequestAuthState(route));
   const { supabase, user, sessionCookiePresent } = resolvedAuthState;
 
+  logServerEvent("info", "Dashboard data request received", {
+    route: resolvedAuthState.route,
+    sessionExists: Boolean(user),
+    sessionCookiePresent,
+  });
+
   if (!supabase || !user) {
     if (sessionCookiePresent) {
       logServerEvent("warn", "Dashboard SSR fell back to public mode", {
@@ -219,7 +238,12 @@ export async function getDashboardData(
         sessionCookiePresent,
       });
     }
-    return getPublicDashboardData();
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "public_pipeline",
+      mode: "public",
+      sessionExists: false,
+    });
   }
 
   const dashboardQueryResults = await withServerFallback(
@@ -247,7 +271,14 @@ export async function getDashboardData(
       userId: user.id,
       reason: "query bundle failed",
     });
-    return getPublicDashboardData();
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public",
+      mode: "live",
+      sessionExists: true,
+      userId: user.id,
+      fallbackReason: "query bundle failed",
+    });
   }
 
   const [topicsResult, sourcesResult] = dashboardQueryResults;
@@ -259,7 +290,14 @@ export async function getDashboardData(
       topicsError: topicsResult.error?.message,
       sourcesError: sourcesResult.error?.message,
     });
-    return getPublicDashboardData();
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public",
+      mode: "live",
+      sessionExists: true,
+      userId: user.id,
+      fallbackReason: "user-scoped query error",
+    });
   }
 
   const topics: Topic[] =
@@ -287,6 +325,16 @@ export async function getDashboardData(
       createdAt: source.created_at,
     })) ?? [];
 
+  logServerEvent("info", "Dashboard personalized query resolved", {
+    route: resolvedAuthState.route,
+    path: "personalized_query" satisfies DashboardDataPath,
+    sessionExists: true,
+    userId: user.id,
+    topicCount: topics.length,
+    sourceCount: sources.length,
+    activeSourceCount: sources.filter((source) => source.status === "active").length,
+  });
+
   const ingestionSummary = await persistRawArticles(
     supabase,
     user.id,
@@ -298,6 +346,43 @@ export async function getDashboardData(
   await syncEventClusters(supabase, user.id, topics, sources);
 
   const briefing = await buildMatchedBriefing(supabase, user.id, topics, sources);
+  const shouldFallbackToPipeline =
+    topics.length === 0 ||
+    sources.filter((source) => source.status === "active").length === 0 ||
+    briefing.items.length === 0;
+
+  if (shouldFallbackToPipeline) {
+    const fallbackReason =
+      topics.length === 0
+        ? "no personalized topics"
+        : sources.filter((source) => source.status === "active").length === 0
+          ? "no active personalized sources"
+          : "personalized briefing returned no items";
+
+    logServerEvent("warn", "Signed-in dashboard fell back to pipeline briefing", {
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public" satisfies DashboardDataPath,
+      sessionExists: true,
+      userId: user.id,
+      topicCount: topics.length,
+      sourceCount: sources.length,
+      activeSourceCount: sources.filter((source) => source.status === "active").length,
+      personalizedItemsCount: briefing.items.length,
+      fallbackReason,
+    });
+
+    return getPipelineBackedDashboardData({
+      route: resolvedAuthState.route,
+      path: "personalized_fallback_to_public",
+      mode: "live",
+      sessionExists: true,
+      userId: user.id,
+      topics,
+      sources,
+      fallbackReason,
+    });
+  }
+
   const homepageDiagnostics = await buildHomepageDiagnostics(
     supabase,
     user.id,
@@ -331,23 +416,70 @@ export async function getDashboardPageState(route: string): Promise<{
   };
 }
 
-async function getPublicDashboardData(): Promise<DashboardData> {
-  const briefing = await generateDailyBriefing(demoTopics, demoSources);
+async function getPipelineBackedDashboardData(input: {
+  route: string;
+  path: DashboardDataPath;
+  mode: DashboardData["mode"];
+  sessionExists: boolean;
+  userId?: string;
+  topics?: Topic[];
+  sources?: Source[];
+  fallbackReason?: string;
+}): Promise<DashboardData> {
+  const fallbackTopics = input.topics?.length ? input.topics : demoTopics;
+  const fallbackSources = input.sources?.length ? input.sources : demoSources;
+  const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources);
+  const explanationModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
+    const mode = item.explanationPacket?.explanation_mode ?? "missing";
+    counts[mode] = (counts[mode] ?? 0) + 1;
+    return counts;
+  }, {});
+  const enrichmentStatuses = briefing.items.reduce<Record<string, number>>((counts, item) => {
+    const status = item.trustDebug?.enrichment.status ?? "missing";
+    counts[status] = (counts[status] ?? 0) + 1;
+    return counts;
+  }, {});
+  const connectionModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
+    const mode = item.explanationPacket?.connection_layer?.connection_mode ?? "missing";
+    counts[mode] = (counts[mode] ?? 0) + 1;
+    return counts;
+  }, {});
+  const connectionStatuses = briefing.items.reduce<Record<string, number>>((counts, item) => {
+    const status = item.trustDebug?.connection.status ?? "missing";
+    counts[status] = (counts[status] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  logServerEvent("info", "Dashboard pipeline path resolved", {
+    route: input.route,
+    path: input.path,
+    sessionExists: input.sessionExists,
+    userId: input.userId,
+    fallbackReason: input.fallbackReason,
+    topicCount: fallbackTopics.length,
+    sourceCount: fallbackSources.length,
+    generatedItemsCount: briefing.items.length,
+    pipelineClusterCount: pipelineRun.num_clusters,
+    explanationModes,
+    enrichmentStatuses,
+    connectionModes,
+    connectionStatuses,
+  });
 
   return {
-    mode: "public",
+    mode: input.mode,
     briefing,
-    topics: demoTopics,
-    sources: demoSources,
+    topics: fallbackTopics,
+    sources: fallbackSources,
     homepageDiagnostics: {
-      totalArticlesFetched: null,
-      totalCandidateEvents: briefing.items.length,
-      lastSuccessfulFetchTime: briefing.briefingDate,
-      lastRankingRunTime: briefing.briefingDate,
-      failedSourceCount: 0,
-      fallbackSourceCount: 0,
-      degradedSourceNames: [],
-      sourceCountsByCategory: countSourcesByHomepageCategory(demoSources),
+      totalArticlesFetched: pipelineRun.num_raw_items,
+      totalCandidateEvents: pipelineRun.num_clusters,
+      lastSuccessfulFetchTime: pipelineRun.timestamp,
+      lastRankingRunTime: pipelineRun.timestamp,
+      failedSourceCount: pipelineRun.feed_failures.length,
+      fallbackSourceCount: pipelineRun.used_seed_fallback ? 1 : 0,
+      degradedSourceNames: pipelineRun.feed_failures.map((failure) => failure.source),
+      sourceCountsByCategory: countSourcesByHomepageCategory(fallbackSources),
     },
   };
 }
@@ -444,97 +576,258 @@ export async function getHistoryPageState(route = "/history") {
 export async function generateDailyBriefing(
   topics: Topic[] = demoTopics,
   sources: Source[] = demoSources,
-): Promise<DailyBriefing> {
-  const items = await Promise.all(
-    topics.map(async (topic, index) => {
-      const topicSources = sources.filter((source) => source.topicId === topic.id && source.status === "active");
-      const sourceResults = await Promise.all(
-        topicSources.map((source) => fetchSourceArticlesWithFallback(source)),
-      );
-      const articleCandidates = sourceResults.flatMap((result) =>
-        result.articles.map((article) => ({
-          id: `${result.source.id}:${article.url}`,
-          article,
-          candidate: {
-            id: `${result.source.id}:${article.url}`,
-            title: article.title,
-            summaryText: article.summaryText,
-            url: article.url,
-            publishedAt: article.publishedAt,
-            sourceName: article.sourceName,
-            sourceFeedUrl: result.source.feedUrl,
-            sourceHomepageUrl: result.source.homepageUrl,
-            topicName: result.source.topicName ?? topic.name,
-          },
-        })),
-      );
-      const passingArticleIds = new Set(
-        applySignalFiltering(articleCandidates.map((entry) => entry.candidate))
-          .filter((evaluation) => evaluation.filterDecision === "pass")
-          .map((evaluation) => evaluation.id),
-      );
-      const articles = articleCandidates
-        .filter((entry) => passingArticleIds.has(entry.id))
-        .map((entry) => entry.article);
+): Promise<{ briefing: DailyBriefing; pipelineRun: Awaited<ReturnType<typeof runClusterFirstPipeline>>["run"] }> {
+  const { run, ranked_clusters } = await runClusterFirstPipeline({ sources });
+  const topicFallback = topics[0] ?? demoTopics[0];
 
-      if (!articles.length) {
-        return null;
-      }
-
-      const rankedClusters = rankNewsClusters(topic.name, clusterArticles(articles)).slice(0, 3);
-
-      if (!rankedClusters.length) {
-        return null;
-      }
-
-      const whyHistory: string[] = [];
-      const summaries: BriefingItem[] = [];
-
-      for (const [clusterIndex, cluster] of rankedClusters.entries()) {
-        const item = await buildBriefingItemFromFeedCluster({
-          id: `generated-${topic.id}-${clusterIndex + 1}`,
-          topicId: topic.id,
-          topicName: topic.name,
-          cluster,
-          priority: index < 2 ? ("top" as const) : ("normal" as const),
-          previousWhyOutputs: whyHistory,
-        });
-
-        whyHistory.push(item.whyItMatters);
-        summaries.push(item);
-      }
-
-      return summaries;
-    }),
-  );
-
-  const validItems = items
-    .flat()
-    .filter((item): item is NonNullable<typeof item> => item !== null)
-    .filter((item) => item.eventIntelligence?.isHighSignal ?? true)
-    // Keep public/demo briefing order aligned with the ranked event model used elsewhere.
-    .sort(compareBriefingItemsByRanking)
-    .map((item, index) => ({
-      ...item,
-      priority: index < 5 ? ("top" as const) : ("normal" as const),
+  const candidateItems: BriefingItem[] = ranked_clusters.map(({ cluster, ranked }) => {
+    const feedArticles = cluster.articles.map((article) => ({
+      title: article.title,
+      url: article.url,
+      summaryText: article.content,
+      contentText: article.content,
+      sourceName: article.source,
+      publishedAt: article.published_at,
     }));
+    const provisionalTopic = resolvePipelineTopic(topics, cluster, topicFallback);
+    const intelligence = buildEventIntelligence(feedArticles, {
+      topicName: provisionalTopic.name,
+      matchedKeywords: cluster.topic_keywords,
+      createdAt: cluster.representative_article.published_at,
+    });
+    const topic = resolvePipelineTopic(topics, cluster, topicFallback, intelligence);
+    const sourceCount = new Set(cluster.articles.map((article) => article.source)).size;
+    const rankingSignals = [intelligence.rankingReason];
+    const trustLayer = buildTrustLayerPresentation(intelligence, {
+      title: intelligence.title,
+      topicName: topic.name,
+      sourceCount,
+      rankingSignals,
+    });
+    const { packet, trustDebug } = assembleExplanationPacket({
+      title: intelligence.title,
+      topicName: topic.name,
+      intelligence,
+      sourceNames: cluster.articles.map((article) => article.source),
+      sourceCount,
+      whyItMatters: trustLayer.body,
+      rankingExplanation: ranked.ranking_debug.explanation,
+      rankingSignals,
+      rankingDebug: ranked.ranking_debug,
+      cluster,
+    });
+    const relatedArticles = cluster.articles.slice(0, 4).map((article, articleIndex) => ({
+      title: article.title,
+      url: article.url,
+      sourceName: article.source,
+      note: articleIndex === 0 ? "Lead coverage" : "Corroborating coverage",
+    }));
+    const corroborationWindow = getClusterCorroborationWindow(cluster.articles.map((article) => article.published_at));
 
-  if (!validItems.length) {
-    return topics === demoTopics && sources === demoSources
-      ? demoDashboardData.briefing
-      : createEmptyBriefing();
-  }
+    return {
+      id: `generated-${cluster.cluster_id}`,
+      topicId: topic.id,
+      topicName: topic.name,
+      title: intelligence.title,
+      whatHappened: packet.what_happened,
+      keyPoints: [
+        `${cluster.cluster_size} article${cluster.cluster_size === 1 ? "" : "s"} from ${sourceCount} ${sourceCount === 1 ? "source" : "sources"} are covering the same development.`,
+        `Coverage lined up ${corroborationWindow} around the representative report.`,
+        packet.what_to_watch,
+      ],
+      whyItMatters: packet.why_it_matters,
+      sources: relatedArticles.map((article) => ({
+        title: article.sourceName,
+        url: article.url,
+      })),
+      relatedArticles,
+      sourceCount,
+      estimatedMinutes: Math.min(6, Math.max(3, cluster.cluster_size + 1)),
+      read: false,
+      priority: "normal" as const,
+      matchedKeywords: cluster.topic_keywords,
+      matchScore: ranked.score,
+      publishedAt: cluster.representative_article.published_at,
+      importanceScore: ranked.score,
+      importanceLabel: ranked.score >= 80 ? "Critical" : ranked.score >= 65 ? "High" : "Watch",
+      rankingSignals: [
+        packet.why_this_ranks_here,
+        buildPublicRankingSignal(cluster.cluster_size, sourceCount, intelligence),
+        `Recent coverage and source agreement kept this event near the top of the briefing.`,
+        `Confidence ${packet.confidence}.`,
+      ],
+      eventIntelligence: intelligence,
+      explanationPacket: packet,
+      trustDebug,
+      signalRole: packet.signal_role,
+    };
+  });
+  const items = selectPublicBriefingItems(candidateItems).map((item, index) => ({
+    ...item,
+    priority: index < 5 ? ("top" as const) : ("normal" as const),
+  }));
 
-  const totalMinutes = validItems.reduce((sum, item) => sum + item.estimatedMinutes, 0);
+  const briefing =
+    items.length > 0
+      ? {
+          id: `generated-${Date.now()}`,
+          briefingDate: formatISO(new Date()),
+          title: "Daily Executive Briefing",
+          intro: "A deterministic scan of the strongest multi-source news clusters moving right now.",
+          readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
+          items,
+        }
+      : topics === demoTopics && sources === demoSources
+        ? demoDashboardData.briefing
+        : createEmptyBriefing();
 
   return {
-    id: `generated-${Date.now()}`,
-    briefingDate: formatISO(new Date()),
-    title: "Daily Executive Briefing",
-    intro: "A concise scan of the events most likely to affect decisions today.",
-    readingWindow: `${totalMinutes} minutes`,
-    items: validItems,
+    briefing,
+    pipelineRun: run,
   };
+}
+
+function resolvePipelineTopic(
+  topics: Topic[],
+  cluster: Awaited<ReturnType<typeof runClusterFirstPipeline>>["ranked_clusters"][number]["cluster"],
+  fallbackTopic: Topic,
+  intelligence?: ReturnType<typeof buildEventIntelligence>,
+) {
+  const topicByName = new Map(topics.map((topic) => [topic.name.toLowerCase(), topic]));
+  const classification = classifyHomepageCategory({
+    topicName: intelligence?.topics?.[0] ?? cluster.representative_article.source,
+    title: intelligence?.title ?? cluster.representative_article.title,
+    summary: intelligence?.summary ?? cluster.representative_article.content,
+    matchedKeywords: cluster.topic_keywords,
+    rankingSignals: intelligence ? [intelligence.rankingReason] : [],
+    sourceNames: cluster.articles.map((article) => article.source),
+  });
+  const candidates = [
+    ...(intelligence?.topics ?? []),
+    ...cluster.topic_keywords,
+    ...(classification.primaryCategory ? PIPELINE_TOPIC_ALIASES[classification.primaryCategory] : []),
+  ].map((value) => value.toLowerCase());
+
+  for (const candidate of candidates) {
+    const directMatch = topicByName.get(candidate);
+    if (directMatch) {
+      return directMatch;
+    }
+
+    if (PIPELINE_TOPIC_ALIASES.tech.includes(candidate)) {
+      const techTopic = topicByName.get("tech");
+      if (techTopic) return techTopic;
+    }
+
+    if (PIPELINE_TOPIC_ALIASES.finance.includes(candidate)) {
+      const financeTopic = topicByName.get("finance");
+      if (financeTopic) return financeTopic;
+    }
+
+    if (PIPELINE_TOPIC_ALIASES.politics.includes(candidate)) {
+      const politicsTopic = topicByName.get("politics");
+      if (politicsTopic) return politicsTopic;
+    }
+  }
+
+  return fallbackTopic;
+}
+
+function selectPublicBriefingItems(items: BriefingItem[], limit = 5) {
+  const sorted = items
+    .slice()
+    .sort((left, right) => {
+      const highSignalDelta =
+        Number(Boolean(right.eventIntelligence?.isHighSignal)) -
+        Number(Boolean(left.eventIntelligence?.isHighSignal));
+      if (highSignalDelta !== 0) {
+        return highSignalDelta;
+      }
+
+      return compareBriefingItemsByRanking(left, right);
+    });
+  const selected: BriefingItem[] = [];
+  const topicCounts = new Map<string, number>();
+  const skippedForSecondPass: BriefingItem[] = [];
+
+  for (const item of sorted) {
+    const topicKey = item.topicName.toLowerCase();
+    const topicCount = topicCounts.get(topicKey) ?? 0;
+    const isNonSignal = item.eventIntelligence?.eventType === "non_signal";
+
+    if (isNonSignal && selected.length < limit) {
+      skippedForSecondPass.push(item);
+      continue;
+    }
+
+    if (topicCount >= 2) {
+      skippedForSecondPass.push(item);
+      continue;
+    }
+
+    selected.push(item);
+    topicCounts.set(topicKey, topicCount + 1);
+
+    if (selected.length === limit) {
+      return selected;
+    }
+  }
+
+  for (const item of skippedForSecondPass) {
+    if (selected.some((selectedItem) => selectedItem.id === item.id)) {
+      continue;
+    }
+
+    selected.push(item);
+    if (selected.length === limit) {
+      break;
+    }
+  }
+
+  return selected;
+}
+
+function buildPublicRankingSignal(
+  clusterSize: number,
+  sourceCount: number,
+  intelligence: ReturnType<typeof buildEventIntelligence>,
+) {
+  if (sourceCount >= 3) {
+    return `Ranked high because multiple credible sources converged on the same development while it was still fresh.`;
+  }
+
+  if (clusterSize >= 2) {
+    return `Ranked highly because the development already has corroborating coverage and could still move the story further.`;
+  }
+
+  if (intelligence.isHighSignal) {
+    return `Ranked for likely impact even though coverage is still early.`;
+  }
+
+  return `Ranked as a watch item because it is recent and potentially meaningful, but still lightly confirmed.`;
+}
+
+function getClusterCorroborationWindow(publishedAtValues: string[]) {
+  const timestamps = publishedAtValues
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => right - left);
+
+  if (timestamps.length < 2) {
+    return "around the same reporting window";
+  }
+
+  const spreadHours = Math.max(0, (timestamps[0] - timestamps[timestamps.length - 1]) / (1000 * 60 * 60));
+
+  if (spreadHours < 1) {
+    return "within the same hour";
+  }
+
+  if (spreadHours < 24) {
+    return `within roughly ${Math.round(spreadHours)} hours`;
+  }
+
+  return `within roughly ${Math.round(spreadHours / 24)} days`;
 }
 
 export async function syncTopicMatches(
@@ -791,6 +1084,14 @@ export async function buildMatchedBriefing(
   sources: Source[],
 ): Promise<DailyBriefing> {
   if (!topics.length) {
+    logServerEvent("info", "Matched briefing skipped because no personalized topics exist", {
+      route: "/dashboard",
+      path: "personalized_query" satisfies DashboardDataPath,
+      sessionExists: true,
+      userId,
+      topicCount: 0,
+      sourceCount: sources.length,
+    });
     return createEmptyBriefing();
   }
 
@@ -822,6 +1123,17 @@ export async function buildMatchedBriefing(
   const articles = (articleResult.data ?? []) as StoredArticle[];
   const events = (eventResult.data ?? []) as StoredEvent[];
   const matches = (matchResult.data ?? []) as StoredArticleTopic[];
+  logServerEvent("info", "Matched briefing personalized rows loaded", {
+    route: "/dashboard",
+    path: "personalized_query" satisfies DashboardDataPath,
+    sessionExists: true,
+    userId,
+    personalizedArticleCount: articles.length,
+    personalizedEventCount: events.length,
+    personalizedMatchCount: matches.length,
+    topicCount: topics.length,
+    sourceCount: sources.length,
+  });
   const eventById = new Map(events.map((event) => [event.id, event]));
   const sourceById = new Map(sources.map((source) => [source.id, source]));
   const topicById = new Map(topics.map((topic) => [topic.id, topic]));
@@ -910,11 +1222,25 @@ export async function buildMatchedBriefing(
         sourceCount,
         rankingSignals: rankedCluster?.rankingSignals,
       });
+      const { packet, trustDebug } = assembleExplanationPacket({
+        title: intelligence.title,
+        topicName: topic.name,
+        intelligence,
+        sourceNames: eventArticles.map((article) => article.sourceName),
+        sourceCount,
+        whyItMatters: trustLayer.body,
+        rankingSignals: rankedCluster?.rankingSignals,
+      });
+      const keyPoints = buildKeyPoints(intelligence, freshest.sourceName, freshest.published_at, matchedKeywords);
       const fallbackSummary = {
         title: intelligence.title,
-        whatHappened: intelligence.summary,
-        keyPoints: buildKeyPoints(intelligence, freshest.sourceName, freshest.published_at, matchedKeywords),
-        whyItMatters: trustLayer.body,
+        whatHappened: packet.what_happened,
+        keyPoints: [
+          keyPoints[0],
+          keyPoints[1],
+          packet.what_to_watch,
+        ],
+        whyItMatters: packet.why_it_matters,
         estimatedMinutes: Math.min(6, Math.max(3, Math.ceil(eventArticles.length * 1.5))),
       } satisfies BriefingSummaryFields;
 
@@ -952,11 +1278,14 @@ export async function buildMatchedBriefing(
         importanceScore: intelligence.rankingScore,
         importanceLabel: getImportanceLabel(intelligence.rankingScore),
         rankingSignals: [
-          intelligence.rankingReason,
+          packet.why_this_ranks_here,
           `Confidence ${intelligence.confidenceScore}/100.`,
           ...buildSignalBreakdown(intelligence),
         ],
         eventIntelligence: intelligence,
+        explanationPacket: packet,
+        trustDebug,
+        signalRole: packet.signal_role,
       } satisfies BriefingItem;
     }),
   ))
@@ -969,6 +1298,17 @@ export async function buildMatchedBriefing(
     }));
 
   if (!items.length) {
+    logServerEvent("warn", "Matched briefing produced zero visible items", {
+      route: "/dashboard",
+      path: "personalized_query" satisfies DashboardDataPath,
+      sessionExists: true,
+      userId,
+      personalizedArticleCount: articles.length,
+      personalizedEventCount: events.length,
+      personalizedMatchCount: matches.length,
+      topicCount: topics.length,
+      sourceCount: sources.length,
+    });
     return createEmptyBriefing();
   }
 
@@ -1483,73 +1823,6 @@ function toFeedArticle(article: EventSeedArticle): FeedArticle {
     contentText: article.summary_text?.trim() || article.title,
     sourceName: article.sourceName,
     publishedAt: article.published_at ?? new Date().toISOString(),
-  };
-}
-
-async function buildBriefingItemFromFeedCluster(input: {
-  id: string;
-  topicId: string;
-  topicName: string;
-  cluster: {
-    representative: FeedArticle;
-    sources: FeedArticle[];
-    importanceScore: number;
-    importanceLabel: "Critical" | "High" | "Watch";
-    rankingSignals: string[];
-    eventIntelligence: BriefingItem["eventIntelligence"];
-  };
-  priority: "top" | "normal";
-  previousWhyOutputs?: string[];
-}): Promise<BriefingItem> {
-  const sourceCount = new Set(input.cluster.sources.map((article) => article.sourceName)).size;
-  const intelligence =
-    input.cluster.eventIntelligence ??
-    buildEventIntelligence(input.cluster.sources, {
-      topicName: input.topicName,
-      createdAt: input.cluster.representative.publishedAt,
-    });
-  const whyItMatters = await generateWhyThisMatters(intelligence, {
-    previousOutputs: input.previousWhyOutputs,
-  });
-
-  return {
-    id: input.id,
-    topicId: input.topicId,
-    topicName: input.topicName,
-    title: intelligence.title,
-    whatHappened: intelligence.summary,
-    keyPoints: buildKeyPoints(intelligence, input.cluster.representative.sourceName, input.cluster.representative.publishedAt, []),
-    whyItMatters,
-    sources: input.cluster.sources.slice(0, 3).map((article) => ({
-      title: article.sourceName,
-      url: article.url,
-    })),
-    sourceCount,
-    relatedArticles: input.cluster.sources.slice(0, 5).map((article) => ({
-      title: article.title,
-      url: article.url,
-      sourceName: article.sourceName,
-    })),
-    timeline: buildTimelineGroups(
-      input.cluster.sources.map((article) => ({
-        title: article.title,
-        url: article.url,
-        sourceName: article.sourceName,
-        summaryText: article.summaryText,
-        publishedAt: article.publishedAt,
-      })),
-    ),
-    estimatedMinutes: Math.min(6, Math.max(3, Math.ceil(input.cluster.sources.length * 1.5))),
-    read: false,
-    priority: input.priority,
-    importanceScore: intelligence.rankingScore,
-    importanceLabel: getImportanceLabel(intelligence.rankingScore),
-    rankingSignals: [
-      intelligence.rankingReason,
-      `Confidence ${intelligence.confidenceScore}/100.`,
-      ...buildSignalBreakdown(intelligence),
-    ],
-    eventIntelligence: intelligence,
   };
 }
 

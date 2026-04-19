@@ -60,7 +60,7 @@ function createData(items: BriefingItem[]): DashboardData {
 }
 
 describe("buildHomepageViewModel", () => {
-  it("keeps a ranked finance event visible in the finance category rail", () => {
+  it("keeps a featured finance event out of downstream rails", () => {
     const financeItem = createItem({
       id: "finance-1",
       topicId: "finance",
@@ -77,9 +77,10 @@ describe("buildHomepageViewModel", () => {
     const model = buildHomepageViewModel(createData([financeItem]));
     const financeSection = model.categorySections.find((section) => section.key === "finance");
 
-    expect(model.topRanked.map((event) => event.id)).toContain("finance-1");
-    expect(financeSection?.events.map((event) => event.id)).toContain("finance-1");
-    expect(financeSection?.state).toBe("sparse");
+    expect(model.featured?.id).toBe("finance-1");
+    expect(model.topRanked.map((event) => event.id)).not.toContain("finance-1");
+    expect(financeSection?.events).toHaveLength(0);
+    expect(model.debug.semanticDuplicateSuppressedCount).toBeGreaterThan(0);
   });
 
   it("maps geopolitics coverage into the politics category", () => {
@@ -96,7 +97,8 @@ describe("buildHomepageViewModel", () => {
     const model = buildHomepageViewModel(createData([politicsItem]));
     const politicsSection = model.categorySections.find((section) => section.key === "politics");
 
-    expect(politicsSection?.events.map((event) => event.id)).toContain("politics-1");
+    expect(model.featured?.id).toBe("politics-1");
+    expect(politicsSection?.events).toHaveLength(0);
   });
 
   it("renders an empty category only when no eligible events exist", () => {
@@ -132,11 +134,11 @@ describe("buildHomepageViewModel", () => {
     const model = buildHomepageViewModel(createData([financeItem]));
     const financeSection = model.categorySections.find((section) => section.key === "finance");
 
-    expect(financeSection?.state).toBe("sparse");
-    expect(financeSection?.placeholderCount).toBe(1);
+    expect(model.featured?.id).toBe("finance-thin");
+    expect(financeSection?.state).toBe("empty");
   });
 
-  it("borrows early signals when a category has no confirmed fallback coverage", () => {
+  it("keeps early signals in their primary category instead of duplicating them into unrelated empty rails", () => {
     const earlySignal = createItem({
       id: "early-tech",
       topicId: "tech",
@@ -150,10 +152,146 @@ describe("buildHomepageViewModel", () => {
     });
 
     const model = buildHomepageViewModel(createData([earlySignal]));
+    const techSection = model.categorySections.find((section) => section.key === "tech");
     const financeSection = model.categorySections.find((section) => section.key === "finance");
 
-    expect(financeSection?.fallbackEvents.map((event) => event.id)).toContain("early-tech");
-    expect(financeSection?.emptyReason).toContain("best available ranked coverage");
+    expect(model.featured?.id).toBe("early-tech");
+    expect(techSection?.events).toHaveLength(0);
+    expect(financeSection?.fallbackEvents).toHaveLength(0);
+  });
+
+  it("keeps the top visible set anchored around core signals before context signals when enough candidates exist", () => {
+    const coreOne = createItem({
+      id: "core-1",
+      title: "Federal Reserve signals broader policy reset",
+      importanceScore: 92,
+      importanceLabel: "Critical",
+      sourceCount: 4,
+      explanationPacket: {
+        what_happened: "Policy reset.",
+        why_it_matters: "It matters for rates and risk assets.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to broader consequences.",
+        what_to_watch: "Watch the next policy meeting.",
+        signal_role: "core",
+        confidence: "high",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 4,
+          source_names: ["Reuters", "AP"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const coreTwo = createItem({
+      id: "core-2",
+      topicId: "politics",
+      topicName: "Geopolitics",
+      title: "Export controls threaten chip supply chain",
+      importanceScore: 88,
+      importanceLabel: "Critical",
+      sourceCount: 3,
+      explanationPacket: {
+        what_happened: "Export controls broadened.",
+        why_it_matters: "It matters for supply chains.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to cross-domain impact.",
+        what_to_watch: "Watch retaliatory steps.",
+        signal_role: "core",
+        confidence: "high",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 3,
+          source_names: ["Reuters", "FT"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const coreThree = createItem({
+      id: "core-3",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Cloud capacity crunch changes AI deployment plans",
+      importanceScore: 84,
+      importanceLabel: "Critical",
+      sourceCount: 3,
+      explanationPacket: {
+        what_happened: "Capacity crunch.",
+        why_it_matters: "It matters for AI deployment.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to platform-level consequences.",
+        what_to_watch: "Watch capital spending and delivery timelines.",
+        signal_role: "core",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 3,
+          source_names: ["Reuters", "The Verge"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const contextOne = createItem({
+      id: "context-1",
+      title: "Regional bank funding costs edge higher",
+      importanceScore: 72,
+      importanceLabel: "High",
+      sourceCount: 2,
+      explanationPacket: {
+        what_happened: "Funding costs rose.",
+        why_it_matters: "It adds context to broader rate pressure.",
+        why_this_ranks_here: "Classified as a context signal and ranked because it helps explain the lead event.",
+        what_to_watch: "Watch bank guidance.",
+        signal_role: "context",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 2,
+          source_names: ["Reuters", "WSJ"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const contextTwo = createItem({
+      id: "context-2",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Supplier commentary hints at slower component deliveries",
+      importanceScore: 69,
+      importanceLabel: "High",
+      sourceCount: 2,
+      explanationPacket: {
+        what_happened: "Supplier commentary shifted.",
+        why_it_matters: "It adds context to the platform capacity story.",
+        why_this_ranks_here: "Classified as a context signal and ranked because it sharpens the main implications.",
+        what_to_watch: "Watch follow-on guidance.",
+        signal_role: "context",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 2,
+          source_names: ["Reuters", "Bloomberg"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+
+    const model = buildHomepageViewModel(createData([contextOne, coreThree, contextTwo, coreTwo, coreOne]));
+    const topSetRoles = [
+      model.featured?.signalRole,
+      ...model.topRanked.map((event) => event.signalRole),
+    ].filter((role): role is "core" | "context" | "watch" => Boolean(role));
+
+    expect(topSetRoles.filter((role) => role === "core").length).toBeGreaterThanOrEqual(3);
+    expect(topSetRoles.filter((role) => role === "context").length).toBeGreaterThanOrEqual(1);
+    expect(model.debug.coreSignalCount).toBeGreaterThanOrEqual(3);
   });
 
   it("does not repeat the same fallback card across multiple empty rails or reuse top-ranked cards", () => {
@@ -189,7 +327,161 @@ describe("buildHomepageViewModel", () => {
 
     expect(new Set(fallbackIds).size).toBe(fallbackIds.length);
     expect(fallbackIds).not.toContain("finance-fallback");
-    expect(fallbackIds).toContain("politics-early");
+    expect(politicsSection?.events.map((event) => event.id)).toContain("politics-early");
+  });
+
+  it("keeps surfaced event ids unique across featured, top-ranked, category, and watchlist rails", () => {
+    const financeLead = createItem({
+      id: "finance-lead",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Markets absorb a rates surprise",
+      matchedKeywords: ["rates", "markets", "fed"],
+      sourceCount: 4,
+    });
+    const techFollow = createItem({
+      id: "tech-follow",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Chip makers expand AI capacity",
+      matchedKeywords: ["chips", "ai", "data center"],
+      sourceCount: 3,
+    });
+    const politicsFollow = createItem({
+      id: "politics-follow",
+      topicId: "politics",
+      topicName: "Geopolitics",
+      title: "White House weighs new sanctions package",
+      matchedKeywords: ["white house", "sanctions", "policy"],
+      sourceCount: 3,
+    });
+
+    const model = buildHomepageViewModel(createData([financeLead, techFollow, politicsFollow]));
+    const surfacedIds = [
+      model.featured?.id,
+      ...model.topRanked.map((event) => event.id),
+      ...model.categorySections.flatMap((section) => section.events.map((event) => event.id)),
+      ...model.categorySections.flatMap((section) => section.fallbackEvents.map((event) => event.id)),
+      ...model.trending.map((event) => event.id),
+    ].filter((eventId): eventId is string => Boolean(eventId));
+
+    expect(new Set(surfacedIds).size).toBe(surfacedIds.length);
+    expect(model.debug.surfacedDuplicateCount).toBe(0);
+  });
+
+  it("suppresses semantically near-duplicate stories across rails", () => {
+    const firstStory = createItem({
+      id: "apple-1",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Apple delays Vision Pro launch timeline",
+      whatHappened: "Multiple outlets say Apple is pushing back the Vision Pro schedule.",
+      matchedKeywords: ["apple", "vision pro", "launch"],
+      sourceCount: 4,
+    });
+    const secondStory = createItem({
+      id: "apple-2",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "Apple pushes back Vision Pro rollout plans",
+      whatHappened: "A second cluster candidate describes the same Apple headset delay.",
+      matchedKeywords: ["apple", "vision pro", "rollout"],
+      sourceCount: 3,
+    });
+    const thirdStory = createItem({
+      id: "rates-1",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Treasury yields climb after inflation surprise",
+      matchedKeywords: ["treasury", "inflation", "yields"],
+      sourceCount: 4,
+    });
+
+    const model = buildHomepageViewModel(createData([firstStory, secondStory, thirdStory]));
+    const surfacedIds = [
+      model.featured?.id,
+      ...model.topRanked.map((event) => event.id),
+      ...model.categorySections.flatMap((section) => section.events.map((event) => event.id)),
+      ...model.trending.map((event) => event.id),
+    ].filter((eventId): eventId is string => Boolean(eventId));
+
+    expect(surfacedIds).toContain("apple-1");
+    expect(surfacedIds).not.toContain("apple-2");
+    expect(model.debug.semanticDuplicateSuppressedCount).toBeGreaterThan(0);
+  });
+
+  it("keeps ranking explanations free of junk debug phrases", () => {
+    const item = createItem({
+      id: "politics-clean-copy",
+      topicId: "politics",
+      topicName: "Politics",
+      title: "White House weighs new sanctions package",
+      whatHappened: "Multiple outlets report a sanctions package is under active review.",
+      matchedKeywords: ["white house", "sanctions", "policy"],
+      sourceCount: 4,
+    });
+
+    const model = buildHomepageViewModel(createData([item]));
+    const event = model.featured;
+
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("triggered by");
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("weighted similarity");
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("cluster evidence");
+    expect(event?.whyThisIsHere.toLowerCase()).not.toContain("signal like");
+  });
+
+  it("labels core and context signals explicitly in the visible explanation text", () => {
+    const coreItem = createItem({
+      id: "core-label",
+      title: "Federal Reserve policy shift drives top signal",
+      importanceScore: 90,
+      importanceLabel: "Critical",
+      sourceCount: 4,
+      explanationPacket: {
+        what_happened: "A major policy signal emerged.",
+        why_it_matters: "It matters because rates and risk assets may reset.",
+        why_this_ranks_here: "Classified as a top signal and ranked highly due to strong structural importance.",
+        what_to_watch: "Watch official confirmation.",
+        signal_role: "core",
+        confidence: "high",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 4,
+          source_names: ["Reuters", "AP"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+    const contextItem = createItem({
+      id: "context-label",
+      title: "Regional data sharpens the main policy read",
+      importanceScore: 71,
+      importanceLabel: "High",
+      sourceCount: 2,
+      explanationPacket: {
+        what_happened: "A regional data point followed.",
+        why_it_matters: "It matters because it sharpens the main story.",
+        why_this_ranks_here: "Classified as a context signal and ranked because it helps explain the lead event.",
+        what_to_watch: "Watch whether this spreads.",
+        signal_role: "context",
+        confidence: "medium",
+        unknowns: [],
+        citation_support_summary: {
+          source_count: 2,
+          source_names: ["Reuters", "FT"],
+          corroboration: "multi_source",
+          strongest_trust_tier: "tier_1",
+        },
+        explanation_mode: "deterministic",
+      },
+    });
+
+    const model = buildHomepageViewModel(createData([contextItem, coreItem]));
+
+    expect(model.featured?.whyThisIsHere).toContain("Top signal");
+    expect(model.topRanked[0]?.whyThisIsHere).toContain("Context signal");
   });
 
   it("keeps single-source items out of the top-ranked event rail", () => {
@@ -294,8 +586,8 @@ describe("buildHomepageViewModel", () => {
 
     const model = buildHomepageViewModel(createData([weakTop, strongerNormal]));
 
-    expect(model.topRanked.map((event) => event.id).slice(0, 2)).toEqual([
-      "strong-normal",
+    expect(model.featured?.id).toBe("strong-normal");
+    expect(model.topRanked.map((event) => event.id).slice(0, 1)).toEqual([
       "weak-top",
     ]);
   });
@@ -380,8 +672,8 @@ describe("buildHomepageViewModel", () => {
 
     const model = buildHomepageViewModel(createData([financeItem, techItem, weakEarly]), profile);
 
-    expect(model.topRanked.map((event) => event.id).slice(0, 2)).toEqual([
-      "tech-personalization",
+    expect(model.featured?.id).toBe("tech-personalization");
+    expect(model.topRanked.map((event) => event.id).slice(0, 1)).toEqual([
       "finance-personalization",
     ]);
     expect(model.topRanked.map((event) => event.id)).not.toContain("weak-early-personalization");

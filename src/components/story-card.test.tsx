@@ -22,6 +22,7 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
     timeline: overrides.timeline,
     rankingSignals: overrides.rankingSignals ?? [],
     eventIntelligence: overrides.eventIntelligence,
+    explanationPacket: overrides.explanationPacket,
   };
 }
 
@@ -130,6 +131,45 @@ describe("StoryCard timeline", () => {
     ).toBeGreaterThan(0);
     expect(screen.getByText("Covered by 5 articles")).toBeInTheDocument();
     expect(screen.getByText("Seen across 3 sources")).toBeInTheDocument();
+  });
+
+  it("renders bounded connection-layer fields when explanation data is available", () => {
+    render(
+      <StoryCard
+        item={createItem({
+          explanationPacket: {
+            what_happened: "Markets are repricing after the latest Fed signal.",
+            why_it_matters: "It matters because borrowing costs may stay higher.",
+            why_this_ranks_here: "Classified as a top signal and ranked highly due to structural importance.",
+            what_to_watch: "Watch the next Fed meeting.",
+            connection_layer: {
+              what_led_to_this: "This appears to follow earlier inflation and rate pressure that was already building.",
+              what_it_connects_to: "It connects to borrowing costs, market pricing, and corporate demand assumptions.",
+              connection_confidence: "high",
+              connection_mode: "deterministic",
+              connection_evidence_summary: "Built from macro terms and source confirmation.",
+              connection_unknowns: [],
+            },
+            signal_role: "core",
+            confidence: "high",
+            unknowns: [],
+            citation_support_summary: {
+              source_count: 2,
+              source_names: ["Reuters"],
+              corroboration: "multi_source",
+              strongest_trust_tier: "tier_1",
+            },
+            explanation_mode: "deterministic",
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Connections")).toBeInTheDocument();
+    expect(screen.getByText("What led to this")).toBeInTheDocument();
+    expect(screen.getByText(/inflation and rate pressure/i)).toBeInTheDocument();
+    expect(screen.getByText("What it connects to")).toBeInTheDocument();
+    expect(screen.getByText(/borrowing costs, market pricing/i)).toBeInTheDocument();
   });
 
   it("prefers the mapped why-it-matters copy when event intelligence is present", () => {

@@ -421,7 +421,6 @@ function FeaturedEventCard({
             event={event}
             variant="featured"
             label="Most important now"
-            showTimeline
             showRelatedArticles
           />
           <div className="mt-8 flex items-center justify-between gap-4 border-t border-[var(--line)] pt-5">
@@ -481,7 +480,6 @@ function TopRankedEventsSection({ events }: { events: HomepageEvent[] }) {
                   rank={index + 1}
                   variant={index === 0 ? "ranked-featured" : "ranked"}
                   label="Confirmed event"
-                  showTimeline={index === 0}
                   showRelatedArticles
                 />
               </Panel>
@@ -593,14 +591,12 @@ function EventCard({
   event,
   rank,
   label,
-  showTimeline = false,
   showRelatedArticles = false,
   variant,
 }: {
   event: HomepageEvent;
   rank?: number;
   label: string;
-  showTimeline?: boolean;
   showRelatedArticles?: boolean;
   variant: "featured" | "ranked-featured" | "ranked" | "compact" | "list";
 }) {
@@ -638,7 +634,7 @@ function EventCard({
             Ranking reason
           </p>
           <p className="mt-1 text-xs font-medium leading-5 text-[var(--foreground)]">
-            {intelligence.rankingReason}
+            {event.whyThisIsHere}
           </p>
           {event.personalization.active && event.personalization.shortReason ? (
             <p className="mt-2 text-xs leading-5 text-[#294f86]">Higher for you: {event.personalization.shortReason}</p>
@@ -679,8 +675,6 @@ function EventCard({
       {event.intelligence.keyEntities.length ? (
         <EntityBlock entities={event.intelligence.keyEntities} />
       ) : null}
-
-      {showTimeline && event.timeline.length ? <TimelineBlock timeline={event.timeline} /> : null}
 
       {showRelatedArticles ? (
         <RelatedArticlesList
@@ -775,33 +769,6 @@ function WhyItMattersBlock({
         Why this ranks here
       </p>
       <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{whyThisIsHere}</p>
-    </div>
-  );
-}
-
-function TimelineBlock({
-  timeline,
-}: {
-  timeline: Array<{ label: string; detail: string }>;
-}) {
-  return (
-    <div className="rounded-[22px] border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.58)] px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-        Timeline signal
-      </p>
-      <div className="mt-4 space-y-3">
-        {timeline.map((milestone) => (
-          <div
-            key={`${milestone.label}-${milestone.detail}`}
-            className="grid grid-cols-[92px_minmax(0,1fr)] gap-3"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#294f86]">
-              {milestone.label}
-            </p>
-            <p className="text-sm leading-6 text-[var(--foreground)]">{milestone.detail}</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1025,6 +992,9 @@ function HomepageDebugPanel({ debug }: { debug: HomepageDebugModel }) {
         <DebugStat label="Candidate events" value={formatDebugValue(debug.totalCandidateEvents)} />
         <DebugStat label="Ranked events" value={String(debug.rankedEventsCount)} />
         <DebugStat label="Uncategorized events" value={String(debug.uncategorizedEventsCount)} />
+        <DebugStat label="Surface duplicates" value={String(debug.surfacedDuplicateCount)} />
+        <DebugStat label="Semantic suppressions" value={String(debug.semanticDuplicateSuppressedCount)} />
+        <DebugStat label="Hidden timelines" value={String(debug.hiddenLowQualityTimelineSignalsCount)} />
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <DebugList

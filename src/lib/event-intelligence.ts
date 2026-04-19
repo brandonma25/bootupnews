@@ -94,7 +94,7 @@ const TOPIC_RULES: Array<{ topic: string; keywords: string[] }> = [
   { topic: "finance", keywords: ["markets", "market", "stocks", "bonds", "treasury", "fed", "inflation", "rates", "earnings", "bank", "banking", "ipo", "acquisition", "merger", "revenue", "economy", "economic", "trade", "tariff"] },
   { topic: "business", keywords: ["company", "companies", "revenue", "profit", "guidance", "capital", "acquisition", "merger", "layoff", "business"] },
   { topic: "politics", keywords: ["government", "white house", "election", "senate", "congress", "policy", "regulation", "regulatory", "executive order", "campaign"] },
-  { topic: "geopolitics", keywords: ["sanctions", "diplomacy", "minister", "cabinet", "parliament", "geopolitical", "war", "border", "alliance", "ministry"] },
+  { topic: "geopolitics", keywords: ["sanctions", "diplomacy", "minister", "cabinet", "parliament", "geopolitical", "war", "border", "alliance", "ministry", "iran", "tehran", "hormuz", "strait", "military", "missile"] },
 ];
 
 export function buildEventIntelligence(

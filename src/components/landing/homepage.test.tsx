@@ -143,6 +143,47 @@ describe("LandingHomepage", () => {
     expect(screen.getAllByText(/4 sources/i).length).toBeGreaterThan(0);
   });
 
+  it("does not render low-quality trigger or timeline milestone copy on homepage cards", () => {
+    const data = createData([
+      createItem({
+        id: "tech-1",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "OpenAI delays a flagship model release",
+        whatHappened: "Several outlets report a release delay tied to additional review work.",
+        matchedKeywords: ["openai", "model", "release"],
+        sourceCount: 4,
+      }),
+    ]);
+
+    render(<LandingHomepage data={data} viewer={null} />);
+
+    expect(screen.queryByText(/^Trigger$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Earlier$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Shift$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Timeline signal/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps 'Why this ranks here' free of junk internal phrasing", () => {
+    const data = createData([
+      createItem({
+        id: "finance-1",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Fed signals rates will stay elevated",
+        whatHappened: "Markets and banks are repricing after a new Federal Reserve signal.",
+        matchedKeywords: ["fed", "rates", "market"],
+        sourceCount: 4,
+      }),
+    ]);
+
+    render(<LandingHomepage data={data} viewer={null} />);
+
+    expect(screen.queryByText(/triggered by/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/weighted similarity/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cluster evidence/i)).not.toBeInTheDocument();
+  });
+
   it("renders debug visibility for QA when enabled", () => {
     const data = createData([
       createItem({
