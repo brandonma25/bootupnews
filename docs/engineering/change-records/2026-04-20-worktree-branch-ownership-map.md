@@ -21,7 +21,7 @@ These are the only currently approved owner worktrees for PRD-44 through PRD-49 
 | --- | --- | --- | --- | --- | --- |
 | PRD-44 | `/Users/bm/Documents/daily-intelligence-aggregator-auth-forms` | `feature/prd-44-auth-entry-forms` | `origin/feature/prd-44-auth-entry-forms` | `4cc21d1` | Canonical original feature lane |
 | PRD-45 | `/Users/bm/Documents/daily-intelligence-aggregator-password-reset` | `feature/prd-45-password-reset-flow` | `origin/feature/prd-45-password-reset-flow` | `bdc438b` | Canonical confirmed; no duplicate PRD-45 lane found |
-| PRD-46 | `/Users/bm/Documents/daily-intelligence-aggregator-home-categories` | `feature/prd-46-home-category-tabs` | `origin/feature/prd-46-home-category-tabs` | `b40e9cf` | Canonical feature lane |
+| PRD-46 | `/Users/bm/Documents/daily-intelligence-aggregator-home-categories` | `feature/prd-46-home-category-tabs` | `origin/feature/prd-46-home-category-tabs` | `b40e9cf` | Canonical confirmed; no duplicate PRD-46 lane found |
 | PRD-47 | `/Users/bm/Documents/daily-intelligence-aggregator-home-states` | `feature/prd-47-home-states` | `origin/feature/prd-47-home-states` | `0fba112` | Canonical feature lane |
 | PRD-48 | `/Users/bm/Documents/daily-intelligence-aggregator-history-components` | `feature/prd-48-history-components` | `origin/feature/prd-48-history-components` | `d800e07` | Canonical feature lane |
 | PRD-49 | `/Users/bm/Documents/daily-intelligence-aggregator-account-components` | `feature/prd-49-account-components` | `origin/feature/prd-49-account-components` | `84d1c3c` | Canonical feature lane |
@@ -49,6 +49,7 @@ Retirement proof:
 | --- | --- | --- | --- |
 | PRD-44 | Original branch is canonical | Original branch has the preserved feature commit `4cc21d1`; rebuild lane matched `origin/main` and had no unique payload | Retired the empty rebuild worktree and local rebuild branch after explicit approval |
 | PRD-45 | Existing password-reset branch is canonical | Only one local and remote PRD-45/password-reset branch exists; owner worktree is clean; `origin/main...HEAD` contains the password-reset feature diff only | No retirement needed; continue PRD-45 only in the password-reset owner worktree |
+| PRD-46 | Existing home-category-tabs branch is canonical | Only one local and remote PRD-46/home-category branch exists; owner worktree is clean; `origin/main...HEAD` contains the home category tabs feature diff only | No retirement needed; continue PRD-46 only in the home-categories owner worktree |
 
 ## Evidence and Recovery Lanes
 
@@ -96,4 +97,4 @@ Retirement proof:
 
 PRD-44 through PRD-49 now have one stated owner worktree and one stated canonical branch per PRD. The empty PRD-44 rebuild placeholder has been retired. Remaining ambiguity is concentrated in protected recovery artifacts and stale evidence branches.
 
-Next phase: continue canonical execution lane decisions one PRD at a time, starting with PRD-46, without deleting or bypassing preserved feature work.
+Next phase: continue canonical execution lane decisions one PRD at a time, starting with PRD-47, without deleting or bypassing preserved feature work.
