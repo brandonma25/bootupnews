@@ -140,8 +140,8 @@ This audit was run after PRD-44 through PRD-49 post-merge retirement. No additio
 | Worktree | Branch | State | Retirement readiness | Rule |
 | --- | --- | --- | --- | --- |
 | `/Users/bm/Documents/daily-intelligence-aggregator-main` | `codex/update-worktree-attachment-rules` | Active remediation docs lane; branch has ownership-map and branch-contamination records not yet merged to `main`; untracked `recovery-audit-20260420-163146/` remains protected evidence | Not a retirement candidate | Keep as the current remediation documentation lane until its records are merged or explicitly superseded; preserve the recovery audit bundle |
-| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` | `fix/prd-50-artifact10-production-parity-followup` | Dirty tracked local work in `src/components/landing/homepage.test.tsx` and `src/components/ui/button.tsx`; local branch has zero committed branch-only commits against `origin/main`, but the dirty diff is not preserved in `main` | Blocked | Treat as protected dirty follow-up work; do not clean, remove, or branch-delete until the dirty diff is either preserved, committed, or explicitly discarded |
-| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | PR #75 merged; branch is contained in `origin/main`; worktree has untracked `scripts/__pycache__/`; remote branch still exists and is shared as the upstream for the follow-up lane | Blocked until Artifact 10 follow-up is resolved | Do not retire independently while the follow-up worktree still tracks the same remote branch name and has protected dirty work |
+| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` | `fix/prd-50-artifact10-production-parity-followup` | Dirty tracked local work in `src/components/landing/homepage.test.tsx` and `src/components/ui/button.tsx`; local branch has zero committed branch-only commits against `origin/main`; the dirty test diff is already present in `origin/main`; the dirty button diff is stale relative to current `origin/main` because it would remove existing `asChild` support while retaining primary white text styling that already exists on `main` | Blocked pending explicit discard-or-archive approval | Treat as stale dirty follow-up state, not current feature payload; do not clean, remove, or branch-delete until the dirty diff is explicitly archived or discarded |
+| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | PR #75 merged; branch is contained in `origin/main`; worktree has untracked `scripts/__pycache__/`; remote branch still exists and is shared as the upstream for the follow-up lane | Blocked until Artifact 10 follow-up is resolved | Do not retire independently while the follow-up worktree still has dirty state and tracks the same remote branch name |
 | `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | PR #72 merged; worktree clean; branch contained in `origin/main`; remote branch still exists | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
 | `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` | `codex/docs-worktree-attachment-rules` | Draft PR #77 is still open; worktree clean; branch has one branch-only governance-protocol change against `origin/main`; checks were green on the PR | Not a retirement candidate | Resolve PR #77 intentionally, either by merging after review or closing/superseding after comparing with current remediation docs |
 | `/Users/bm/Documents/daily-intelligence-aggregator-global-style-spec` | `feature/prd-50-global-style-spec` | PR #73 merged; worktree clean; local and remote branch are contained in `origin/main` | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
@@ -154,6 +154,22 @@ Immediate priority after this audit:
 2. Resolve the still-open draft PR #77 governance-doc lane.
 3. Ask for explicit approval before retiring the clean merged candidates: auth callback fix, PRD-50 global style spec, sequential prompt docs, and PRD-51 worktree branch protocol.
 4. Preserve or decide the untracked UI audit report before retiring the UI audit worktree.
+
+### Artifact 10 Dirty Diff Decision Audit
+
+This audit was run before any Artifact 10 cleanup. No Artifact 10 files, worktrees, branches, generated files, stash entries, or recovery artifacts were changed.
+
+Findings:
+- `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` is on `fix/prd-50-artifact10-production-parity-followup` with dirty tracked changes in `src/components/landing/homepage.test.tsx` and `src/components/ui/button.tsx`.
+- The follow-up branch has zero committed branch-only commits against `origin/main`; only dirty worktree state remains.
+- The dirty `src/components/landing/homepage.test.tsx` assertions are already present in `origin/main`.
+- The dirty `src/components/ui/button.tsx` change is stale relative to `origin/main`: it preserves primary white text styling that already exists on `main`, but it would remove the current `asChild` support and simplified prop handling from `main`.
+- `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` is on `fix/prd-50-artifact-10-parity-repair`, is behind its remote, and only has untracked generated `scripts/__pycache__/` state in the worktree.
+
+Decision:
+- The Artifact 10 follow-up dirty diff is not currently classified as feature payload requiring preservation by commit.
+- Artifact 10 cleanup remains blocked until there is explicit approval to archive or discard the stale dirty diff and to remove the generated `scripts/__pycache__/` state.
+- If maximum caution is desired, create a patch artifact from the dirty follow-up diff before cleanup. Otherwise, discard the stale follow-up diff and retire both Artifact 10 worktrees and branch refs in a separate explicit cleanup pass.
 
 ## Continuation Rules
 
