@@ -66,7 +66,7 @@ Retirement proof:
 
 ## Phase 3 Pre-Retirement Audit
 
-The purpose of this audit is to identify which names are safe retirement candidates only after explicit human approval. No feature payload, stash, or recovery artifact is retired by this section.
+The purpose of this audit was to identify which names were safe retirement candidates only after explicit human approval. Later entries record candidates retired after preservation and containment proof. No feature payload, stash, or recovery artifact was retired by this section.
 
 | Branch or worktree | Evidence | Retirement status | Rule |
 | --- | --- | --- | --- |
@@ -74,7 +74,7 @@ The purpose of this audit is to identify which names are safe retirement candida
 | `/Users/bm/Documents/daily-intelligence-aggregator-worktree-attachment-enforcement` on `docs/worktree-attachment-enforcement` | Worktree was clean; branch head `c124f56` matched `origin/main`; no remote branch ref; `origin/main...docs/worktree-attachment-enforcement` had no diff | Retired after explicit approval on 2026-04-21 | Removed zero-diff worktree and deleted local branch; do not recreate for PRD-44 through PRD-49 work |
 | `codexfeature/prd-43-49-mvp-ui-artifact-alignment` | Local branch only; head `c124f56` matched `origin/main`; no remote branch ref; `origin/main...codexfeature/prd-43-49-mvp-ui-artifact-alignment` had no diff | Retired after explicit approval on 2026-04-21 | Misleading zero-diff PRD-43-49-like branch name removed; do not recreate |
 | `fix/settings-shell-cleanup` | Local and remote branch at `d8d9807`; no current `origin/main...fix/settings-shell-cleanup` diff; branch is behind `origin/main` | Candidate for retirement after approval and PR/merge confirmation | Semantically adjacent to Account/settings work; remove local and remote refs only after explicit approval |
-| `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` on `feature/ui-audit-playwright-expansion` | Branch head `c124f56` matches `origin/main`, but the worktree has untracked `docs/engineering/testing/ui-audit-report.md` | Not a retirement candidate yet | Preserve until the untracked report is reviewed, preserved, or explicitly discarded |
+| `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` on `feature/ui-audit-playwright-expansion` | Branch head `c124f56` matched `origin/main`; untracked `docs/engineering/testing/ui-audit-report.md` was preserved at `docs/engineering/testing/ui-audit-report.md`; no same-name remote branch existed | Retired after preservation proof and explicit approval on 2026-04-21 | Removed worktree and local branch after preserving the report; do not recreate this audit lane |
 | `feature/prd-43-49-mvp-ui-artifact-alignment` | Protected WIP branch at `3f3c83b`; `origin/main...feature/prd-43-49-mvp-ui-artifact-alignment` still has package and route-deletion diffs | Not a retirement candidate yet | Preserve as branch-contamination evidence until a separate evidence-retention decision is made |
 | `feature/prd-43-collapsible-sidebar` and `docs/artifact3-backend-contract-audit` | Local branches at `f1967b5`; no current diff from `origin/main`, but already classified as stale evidence lanes | Not a retirement candidate yet | Preserve until the recovery audit bundle and stash retention strategy are resolved |
 
@@ -131,7 +131,7 @@ Phase 3 retirement proof for PRD-44 through PRD-49 post-merge lanes:
 | `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | Retired scoped fix lane | PR #75 was already merged; worktree, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | Retired scoped auth fix lane | PR #72 was already merged; worktree, leftover generated folder, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-global-style-spec` | `feature/prd-50-global-style-spec` | Retired scoped feature lane | PR #73 was already merged; worktree, local branch, and remote branch retired |
-| `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` | `feature/ui-audit-playwright-expansion` | Audit / testing lane at current `main` | Do not use for PRD-44 through PRD-49 feature work |
+| `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` | `feature/ui-audit-playwright-expansion` | Retired UI audit evidence lane | UI audit report preserved; worktree and local branch retired; no same-name remote branch existed |
 
 ## Phase 3 Remaining Attached Worktree Audit
 
@@ -146,11 +146,29 @@ This audit was run after PRD-44 through PRD-49 post-merge retirement. It first i
 | `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` | `codex/docs-worktree-attachment-rules` | Draft PR #77 was closed as superseded; the one branch-only governance-protocol diff was archived at `docs/engineering/change-records/2026-04-21-pr-77-worktree-attachment-rule.patch`; the branch was behind `main` and included mandatory new-worktree language that conflicted with the current owning-worktree rule for existing branch continuation | Retired after proof on 2026-04-21 | Worktree, local branch, and remote branch retired; do not recreate or merge this stale governance lane as written |
 | `/Users/bm/Documents/daily-intelligence-aggregator-global-style-spec` | `feature/prd-50-global-style-spec` | PR #73 merged; worktree was clean; local and remote branch refs had zero branch-only commits against `origin/main` | Retired after proof and explicit approval on 2026-04-21 | Worktree, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-main-docs-sequential` | `docs/sequential-prompt-execution-protocol` | PR #63 merged; worktree was clean; local and remote branch refs had zero branch-only commits against `origin/main` | Retired after proof and explicit approval on 2026-04-21 | Worktree, local branch, and remote branch retired |
-| `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` | `feature/ui-audit-playwright-expansion` | Worktree has untracked `docs/engineering/testing/ui-audit-report.md`; branch itself is contained in `origin/main`; no same-name remote branch currently exists | Blocked | Preserve until the untracked UI audit report is reviewed, moved, committed, or explicitly discarded |
+| `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` | `feature/ui-audit-playwright-expansion` | Untracked `docs/engineering/testing/ui-audit-report.md` was preserved in the remediation docs lane; branch itself was contained in `origin/main`; no same-name remote branch existed | Retired after preservation proof and explicit approval on 2026-04-21 | Worktree and local branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-worktree-branch-protocol` | `docs/prd-51-worktree-branch-protocol` | PR #74 merged; worktree was clean; local and remote branch refs had zero branch-only commits against `origin/main` | Retired after proof and explicit approval on 2026-04-21 | Worktree, local branch, and remote branch retired |
 
 Immediate priority after this audit:
-1. Preserve or decide the untracked UI audit report before retiring the UI audit worktree.
+1. Merge or otherwise close the current remediation docs lane when ready; all sibling cleanup candidates from this audit have been resolved or preserved.
+
+### UI Audit Evidence Lane Retirement Audit
+
+The UI audit lane contained no branch-only commits, but it did contain one untracked validation report. The report was preserved before cleanup.
+
+Findings:
+- `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` was on `feature/ui-audit-playwright-expansion`.
+- The worktree had untracked `docs/engineering/testing/ui-audit-report.md`.
+- The report was preserved verbatim at `docs/engineering/testing/ui-audit-report.md` on the remediation docs branch.
+- `origin/main...feature/ui-audit-playwright-expansion` had zero branch-only commits before retirement.
+- `feature/ui-audit-playwright-expansion` was an ancestor of `origin/main`.
+- No same-name remote branch `origin/feature/ui-audit-playwright-expansion` existed.
+
+Retirement proof:
+- The worktree path `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` was absent after cleanup.
+- Local branch `feature/ui-audit-playwright-expansion` was absent after cleanup.
+- Remote branch `origin/feature/ui-audit-playwright-expansion` was absent after cleanup.
+- No feature branch, recovery artifact, stash entry, or unrelated worktree was touched.
 
 ### PRD-51 Worktree Branch Protocol Lane Retirement Audit
 
@@ -299,6 +317,6 @@ Example: the PRD-47 failure in GitHub Actions job `72159412287` should be fixed 
 
 ## Phase 1 Result
 
-PRD-44 through PRD-49 had one stated owner worktree and one stated canonical branch per PRD, and all six canonical feature branches merged to `main` through PRs #79, #80, #81, #78, #82, and #83. After post-merge proof and explicit approval, the six former feature worktrees, six local branches, and six remote branches were retired. The empty PRD-44 rebuild placeholder has been retired. The zero-diff `docs/worktree-attachment-enforcement` and `codexfeature/prd-43-49-mvp-ui-artifact-alignment` placeholder lanes have also been retired after explicit approval. Remaining ambiguity is concentrated in protected recovery artifacts, stale evidence branches, and approval-gated zero-diff placeholder lanes.
+PRD-44 through PRD-49 had one stated owner worktree and one stated canonical branch per PRD, and all six canonical feature branches merged to `main` through PRs #79, #80, #81, #78, #82, and #83. After post-merge proof and explicit approval, the six former feature worktrees, six local branches, and six remote branches were retired. The empty PRD-44 rebuild placeholder has been retired. The zero-diff `docs/worktree-attachment-enforcement` and `codexfeature/prd-43-49-mvp-ui-artifact-alignment` placeholder lanes have also been retired after explicit approval. The later non-PRD-44-through-PRD-49 attached worktree cleanup retired Artifact 10, auth-callback, PRD-50 global style, sequential docs, PRD-51 protocol, and UI audit lanes after preservation and containment proof. Remaining ambiguity is concentrated in protected recovery artifacts and stale evidence branches, not attached sibling worktrees.
 
-Next phase: do not retire additional remote, local, worktree, or evidence-bearing lanes without a separate proof-and-approval pass. The remaining practical path is a focused audit of still-attached non-PRD-44-through-PRD-49 worktrees and stale evidence lanes, especially protected recovery artifacts and unrelated scoped branches.
+Next phase: do not retire additional remote, local, worktree, or evidence-bearing lanes without a separate proof-and-approval pass. The remaining practical path is a focused audit of stale evidence branches and protected recovery artifacts, especially `recovery-audit-20260420-163146/`, `stash@{0}`, `feature/prd-43-collapsible-sidebar`, `docs/artifact3-backend-contract-audit`, `feature/prd-43-49-mvp-ui-artifact-alignment`, and `fix/settings-shell-cleanup`.
