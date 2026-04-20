@@ -117,12 +117,12 @@ export default function PersonalizedDashboard({
         />
 
         {params.generated === "1" ? (
-          <div className="rounded-[22px] border border-[rgba(31,79,70,0.18)] bg-[rgba(31,79,70,0.06)] px-5 py-4 text-sm font-medium text-[var(--accent)]">
+          <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-5 py-4 text-sm font-medium text-[var(--accent)]">
             Fresh briefing generated successfully.
           </div>
         ) : null}
         {params.allread === "1" ? (
-          <div className="rounded-[22px] border border-[var(--line)] bg-white/70 px-5 py-4 text-sm font-medium text-[var(--foreground)]">
+          <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-5 py-4 text-sm font-medium text-[var(--text-primary)]">
             All events marked as read.
           </div>
         ) : null}
@@ -131,13 +131,13 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   Personalization
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
+                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
                   {personalizationActive ? "Your ranking is tuned to your briefing priorities" : "Add priorities to tune this briefing"}
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--muted)]">
+                <p className="mt-2 max-w-2xl text-base text-[var(--text-secondary)]">
                   {personalizationActive
                     ? `${personalizationSummary}. Matching confirmed events can surface earlier for you, but confirmed multi-source quality still decides what belongs in Top Events.`
                     : "Track a few topics or entities and the dashboard will shift strong matching events upward without flooding the briefing with weak coverage."}
@@ -145,7 +145,7 @@ export default function PersonalizedDashboard({
               </div>
               <Link
                 href="/settings#account-settings"
-                className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
+                className="inline-flex items-center justify-center rounded-button border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--card)]"
               >
                 Manage personalization
               </Link>
@@ -153,12 +153,12 @@ export default function PersonalizedDashboard({
             {personalizationActive ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {trackedTopics.map((topic) => (
-                  <Badge key={topic} className="text-[#294f86]">
+                  <Badge key={topic} className="text-[var(--text-primary)]">
                     Tracking {topic}
                   </Badge>
                 ))}
                 {followedEntities.map((entity) => (
-                  <Badge key={entity} className="text-[#294f86]">
+                  <Badge key={entity} className="text-[var(--text-primary)]">
                     Following {entity}
                   </Badge>
                 ))}
@@ -169,13 +169,13 @@ export default function PersonalizedDashboard({
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
           <Panel className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               {isSignedIn ? "Unlocked view" : "Public briefing"}
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
+            <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
               {isSignedIn ? "The capped signal briefing starts here" : "What signing in unlocks"}
             </h2>
-            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+            <p className="mt-2 text-base text-[var(--text-secondary)]">
               {isSignedIn
                 ? "The main dashboard now stays intentionally brief: a maximum of five ranked signals, with the top three framed as Core Signals and the next two framed as Context Signals."
                 : "Preview the ranked public briefing here, then sign in to unlock personalized topics, saved history, custom alerts, and the complete dashboard workflow."}
@@ -192,14 +192,14 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   Reading window
                 </p>
                 <div className="mt-2 flex flex-wrap items-end gap-3">
-                  <h2 className="text-4xl font-semibold tracking-tight text-[var(--foreground)]">
+                  <h2 className="text-xl font-semibold tracking-normal text-[var(--text-primary)] md:text-2xl">
                     {formatReadingWindow(readingMetrics.totalMinutes)}
                   </h2>
-                  <p className="pb-1 text-sm font-medium text-[var(--muted)]">today</p>
+                  <p className="pb-1 text-sm font-medium text-[var(--text-secondary)]">today</p>
                 </div>
                 <div className="mt-2 flex max-w-full flex-wrap gap-2">
                   <Badge>{formatReadingDelta(readingMetrics.deltaVsYesterday)}</Badge>
@@ -208,20 +208,20 @@ export default function PersonalizedDashboard({
               </div>
               <div className="min-w-0 xl:w-[360px]">
                 <div className="flex items-center justify-between gap-3 text-sm">
-                  <p className="font-medium text-[var(--foreground)]">
+                  <p className="font-medium text-[var(--text-primary)]">
                     {readingMetrics.progressLabel}
                   </p>
-                  <p className="text-[var(--muted)]">
+                  <p className="text-[var(--text-secondary)]">
                     {Math.round(readingMetrics.progressRatio * 100)}%
                   </p>
                 </div>
-                <div className="mt-3 h-3 overflow-hidden rounded-full bg-[rgba(31,79,70,0.08)]">
+                <div className="mt-3 h-3 overflow-hidden rounded-button bg-[var(--sidebar)]">
                   <div
-                    className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+                    className="h-full rounded-button bg-[var(--text-primary)] transition-[width] duration-300"
                     style={{ width: `${Math.round(readingMetrics.progressRatio * 100)}%` }}
                   />
                 </div>
-                <p className="mt-2 text-sm text-[var(--muted)]">
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
                   {readingMetrics.remainingMinutes === 0
                     ? "All reading minutes for today are complete."
                     : `${readingMetrics.remainingMinutes} min remaining in today’s scan.`}
@@ -235,13 +235,13 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   Since your last pass
                 </p>
-                <h2 className="mt-1.5 text-xl font-semibold text-[var(--foreground)]">
+                <h2 className="mt-1.5 text-xl font-semibold text-[var(--text-primary)]">
                   What changed since yesterday
                 </h2>
-                <p className="mt-1 text-sm text-[var(--muted)]">
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   New signals surface first, updates stay visible, and single-source items are kept separate from the confirmed event layer.
                 </p>
               </div>
@@ -259,13 +259,13 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   Main briefing
                 </p>
-                <h2 className="mt-1.5 text-xl font-semibold text-[var(--foreground)]">
+                <h2 className="mt-1.5 text-xl font-semibold text-[var(--text-primary)]">
                   Today&apos;s signal briefing
                 </h2>
-                <p className="mt-1 text-sm text-[var(--muted)]">
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   The dashboard renders at most five ranked signals. Core Signals come first, followed by up to two Context Signals.
                 </p>
               </div>
@@ -277,7 +277,7 @@ export default function PersonalizedDashboard({
                     <input type="hidden" name="eventStates" value={serializedEventStates} />
                     <button
                       type="submit"
-                      className="flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-white/60 px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-white"
+                      className="flex items-center gap-1.5 rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--card)]"
                     >
                       <CheckCheck className="h-3.5 w-3.5" />
                       Mark all read
@@ -311,7 +311,7 @@ export default function PersonalizedDashboard({
                   ) : null}
                 </>
               ) : (
-                <Panel className="border-dashed border-[var(--line)] bg-white/40 p-5 text-sm leading-7 text-[var(--muted)]">
+                <Panel className="border-dashed border-[var(--border)] bg-[var(--card)] p-5 text-base text-[var(--text-secondary)]">
                   No signals qualified for this briefing yet. Refresh the briefing or adjust your tracked topics and sources to repopulate the dashboard.
                 </Panel>
               )}
@@ -320,10 +320,10 @@ export default function PersonalizedDashboard({
 
           <div className="xl:sticky xl:top-4 xl:self-start">
             <Panel className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                 Display rules
               </p>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
                 The pipeline keeps the full ranked list. This view deliberately shows only the highest-signal slice.
               </p>
               <div className="mt-4 space-y-3">
@@ -337,24 +337,24 @@ export default function PersonalizedDashboard({
 
         {canTrackProgress ? (
           <Panel className="p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               Session status
             </p>
             {isCaughtUp ? (
               <>
-                <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
                   You&apos;re caught up
                 </h2>
-                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                <p className="mt-2 text-base text-[var(--text-secondary)]">
                   {sessionSummary?.reviewedCount ?? 0} events reviewed today, with {sessionSummary?.newCount ?? 0} new, {sessionSummary?.changedCount ?? 0} changed, and {sessionSummary?.escalatedCount ?? 0} escalated since your last pass.
                 </p>
               </>
             ) : (
               <>
-                <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
                   Keep scanning
                 </h2>
-                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                <p className="mt-2 text-base text-[var(--text-secondary)]">
                   Mark events as read as you finish them. When everything in today&apos;s briefing is reviewed, this becomes your closure point.
                 </p>
               </>
@@ -387,30 +387,30 @@ function DashboardEventCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[22px] border bg-white/65 p-5",
+        "overflow-hidden rounded-card border bg-[var(--card)] p-5",
         tier === "core"
-          ? "border-[rgba(31,79,70,0.22)] bg-[rgba(31,79,70,0.04)]"
-          : "border-[rgba(41,79,134,0.18)] bg-[rgba(41,79,134,0.04)]",
+          ? "border-[var(--border)] bg-[var(--sidebar)]"
+          : "border-[var(--border)] bg-[var(--bg)]",
       )}
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             <Badge>{item.topicName}</Badge>
-            <Badge className={tier === "core" ? "text-[var(--accent)]" : "text-[#294f86]"}>
+            <Badge className="text-[var(--text-primary)]">
               {tierLabel}
             </Badge>
             {displayStateLabel ? (
               <Badge className={getDisplayStateTone(item.displayState)}>{displayStateLabel}</Badge>
             ) : null}
             <Badge>{intelligence.timelineIndicator}</Badge>
-            <Badge className={intelligence.confidenceTone === "developing" ? "text-[#8a5a11]" : "text-[#294f86]"}>
+            <Badge className={intelligence.confidenceTone === "developing" ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}>
               {intelligence.confidenceLabel}
             </Badge>
             {personalizationEnabled && personalization?.active ? (
-              <Badge className="text-[#294f86]">Higher for you</Badge>
+              <Badge className="text-[var(--text-primary)]">Higher for you</Badge>
             ) : null}
-            {item.read ? <Badge className="text-[var(--muted)]">Read</Badge> : null}
+            {item.read ? <Badge className="text-[var(--text-secondary)]">Read</Badge> : null}
           </div>
           <div>
             {primarySourceUrl ? (
@@ -418,15 +418,15 @@ function DashboardEventCard({
                 href={primarySourceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-w-0 items-start gap-2 text-xl font-semibold tracking-tight text-[var(--foreground)] underline-offset-4 hover:underline"
+                className="briefing-title inline-flex min-w-0 items-start gap-2 text-[var(--text-primary)] underline-offset-4 hover:underline"
               >
                 <span className="break-words">{item.title}</span>
-                <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-[var(--muted)]" />
+                <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
               </a>
             ) : (
-              <h3 className="break-words text-xl font-semibold tracking-tight text-[var(--foreground)]">{item.title}</h3>
+              <h3 className="briefing-title break-words text-[var(--text-primary)]">{item.title}</h3>
             )}
-            <p className="mt-2 text-sm leading-7 text-[var(--muted)] line-clamp-3">{item.whatHappened}</p>
+            <p className="mt-2 text-base text-[var(--text-secondary)] line-clamp-3">{item.whatHappened}</p>
           </div>
         </div>
 
@@ -443,14 +443,14 @@ function DashboardEventCard({
             <input type="hidden" name="current" value={String(item.read)} />
             <button
               className={cn(
-                "flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-2 rounded-button border px-3 py-2 text-sm transition-colors",
                 item.read
-                  ? "border-[rgba(31,79,70,0.18)] bg-[rgba(31,79,70,0.06)] text-[var(--accent)]"
-                  : "border-[var(--line)] bg-white/60 text-[var(--muted)] hover:bg-white",
+                  ? "border-[var(--border)] bg-[var(--sidebar)] text-[var(--text-primary)]"
+                  : "border-[var(--border)] bg-[var(--card)] text-[var(--text-secondary)] hover:bg-[var(--card)]",
               )}
             >
               {item.read ? (
-                <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
+                <CheckCircle2 className="h-4 w-4 text-[var(--text-primary)]" />
               ) : (
                 <Circle className="h-4 w-4" />
               )}
@@ -460,16 +460,16 @@ function DashboardEventCard({
         ) : null}
       </div>
 
-      <div className="mt-4 rounded-[18px] border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+      <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
           Ranking reason
         </p>
-        <p className="mt-2 text-sm font-medium text-[var(--foreground)]">{intelligence.rankingReason}</p>
+        <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{intelligence.rankingReason}</p>
         {item.rankingSignals?.[0] ? (
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.rankingSignals[0]}</p>
+          <p className="mt-2 text-base text-[var(--text-secondary)]">{item.rankingSignals[0]}</p>
         ) : null}
         {personalizationEnabled && personalization?.active && personalization.shortReason ? (
-          <p className="mt-2 text-sm leading-6 text-[#294f86]">Higher for you: {personalization.shortReason}</p>
+          <p className="mt-2 text-base text-[var(--text-primary)]">Higher for you: {personalization.shortReason}</p>
         ) : null}
       </div>
 
@@ -480,19 +480,19 @@ function DashboardEventCard({
         <SignalStat label="Recency" value={intelligence.recencyLabel} />
       </div>
 
-      <div className="mt-4 rounded-[18px] border border-[rgba(19,26,34,0.08)] bg-[rgba(41,79,134,0.05)] px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#294f86]">Why it matters</p>
-        <p className="mt-2 text-sm leading-7 text-[var(--foreground)]">{item.whyItMatters}</p>
+      <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-primary)]">Why it matters</p>
+        <p className="mt-2 text-base text-[var(--text-primary)]">{item.whyItMatters}</p>
       </div>
 
       {intelligence.keyEntities.length ? (
         <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Key entities</p>
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">Key entities</p>
           <div className="mt-2 flex max-w-full flex-wrap gap-2">
             {intelligence.keyEntities.map((entity) => (
               <span
                 key={entity}
-                className="inline-flex max-w-full items-center rounded-full border border-[rgba(19,26,34,0.08)] bg-white/80 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] break-words"
+                className="inline-flex max-w-full items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] break-words"
               >
                 {entity}
               </span>
@@ -501,12 +501,12 @@ function DashboardEventCard({
         </div>
       ) : null}
 
-      <div className="mt-4 rounded-[18px] border border-[rgba(19,26,34,0.08)] bg-white/60 px-4 py-4">
+      <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Supporting coverage
           </p>
-          <p className="text-xs font-medium text-[var(--muted)]">{intelligence.sourceLabel}</p>
+          <p className="text-xs font-medium text-[var(--text-secondary)]">{intelligence.sourceLabel}</p>
         </div>
         <div className="mt-3 space-y-2.5">
           {(item.relatedArticles?.length ? item.relatedArticles : item.sources.map((source) => ({
@@ -521,24 +521,24 @@ function DashboardEventCard({
                 href={article.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex flex-col gap-2 rounded-[16px] border border-[rgba(19,26,34,0.06)] bg-white/70 px-3 py-3 transition-colors hover:bg-white sm:flex-row sm:items-start sm:justify-between"
+                className="flex flex-col gap-2 rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 transition-colors hover:bg-[var(--card)] sm:flex-row sm:items-start sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold leading-6 text-[var(--foreground)]">{article.title}</p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{article.sourceName}</p>
+                  <p className="break-words text-sm font-semibold leading-6 text-[var(--text-primary)]">{article.title}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{article.sourceName}</p>
                 </div>
-                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
+                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
               </a>
             ))}
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-[var(--muted)]">
-        <span className="inline-flex items-center rounded-full border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.72)] px-3 py-1.5">
+      <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-[var(--text-secondary)]">
+        <span className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-1.5">
           {minutesToLabel(item.estimatedMinutes)} read
         </span>
         {item.matchedKeywords?.[0] ? (
-          <span className="inline-flex items-center rounded-full border border-[rgba(19,26,34,0.08)] bg-[rgba(255,255,255,0.72)] px-3 py-1.5">
+          <span className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-1.5">
             Signal: {item.matchedKeywords[0]}
           </span>
         ) : null}
@@ -566,8 +566,8 @@ function SignalTierSection({
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--foreground)]">{title}</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">{description}</p>
         </div>
         <Badge>{items.length} {items.length === 1 ? "signal" : "signals"}</Badge>
       </div>
@@ -588,18 +588,18 @@ function SignalTierSection({
 
 function SignalStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[16px] border border-[rgba(19,26,34,0.08)] bg-white/70 px-3 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-sm font-medium text-[var(--foreground)]">{value}</p>
+    <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-normal text-[var(--text-secondary)]">{label}</p>
+      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }
 
 function StateMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[18px] border border-[var(--line)] bg-white/60 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">{value}</p>
+    <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }

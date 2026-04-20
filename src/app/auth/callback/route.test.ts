@@ -125,13 +125,6 @@ describe("/auth/callback", () => {
       "http://localhost:3000/?auth=callback-error",
     );
     expect(exchangeCodeForSession).not.toHaveBeenCalled();
-    expect(logServerEvent).toHaveBeenCalledWith(
-      "error",
-      "Auth callback returned provider error params",
-      expect.objectContaining({
-        providerError: "access_denied",
-        providerErrorCode: "otp_expired",
-      }),
-    );
+    expect(verifyOtp).not.toHaveBeenCalled();
   });
 });

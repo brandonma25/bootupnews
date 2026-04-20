@@ -16,33 +16,33 @@ export default function Error({ error, reset }: Props) {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center px-4 py-10">
-      <div className="glass-panel w-full rounded-[28px] p-8">
+      <div className="glass-panel w-full rounded-card p-8">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgba(148,72,53,0.10)] text-[#944835]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-[var(--card)] text-[var(--error)]">
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               Temporary issue
             </p>
-            <h1 className="display-font text-3xl text-[var(--foreground)]">
+            <h1 className="text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
               This page hit a server problem, but the app is still recoverable.
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-[var(--muted)]">
+            <p className="max-w-2xl text-base text-[var(--text-secondary)]">
               Try the page again, or head back to the dashboard shell while we fall back to safer defaults.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={reset}
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white"
+                className="inline-flex items-center gap-2 rounded-button bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
               >
                 <RotateCcw className="h-4 w-4" />
                 Retry page
               </button>
               <Link
                 href="/dashboard"
-                className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm font-semibold text-[var(--foreground)]"
+                className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]"
               >
                 Open Today
               </Link>
@@ -53,13 +53,13 @@ export default function Error({ error, reset }: Props) {
                   window.localStorage.removeItem("daily-intel-preferences");
                   window.location.href = "/";
                 }}
-                className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm font-semibold text-[var(--foreground)]"
+                className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]"
               >
                 Reset local state
               </button>
             </div>
             {error.digest ? (
-              <p className="text-xs leading-6 text-[var(--muted)]">Error digest: {error.digest}</p>
+              <p className="text-xs leading-6 text-[var(--text-secondary)]">Error digest: {error.digest}</p>
             ) : null}
           </div>
         </div>

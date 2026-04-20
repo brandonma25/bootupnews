@@ -133,26 +133,26 @@ export function SettingsPreferences({
     <Panel className="p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Personal settings
           </p>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
+          <h3 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
             Tune your personal briefing
           </h3>
-          <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+          <p className="mt-2 text-base text-[var(--text-secondary)]">
             {signedIn
               ? "Set the topics and entities that should pull strong events a little higher, while the confirmed-event quality floor stays intact."
               : "These preferences save on this browser for now. Sign in to use them across the full briefing flow."}
           </p>
         </div>
-        <div className="rounded-[20px] border border-[var(--line)] bg-[var(--panel)]/60 px-4 py-3 text-sm text-[var(--foreground)]">
+        <div className="rounded-card border border-[var(--border)] bg-[var(--panel)]/60 px-4 py-3 text-sm text-[var(--text-primary)]">
           {statusMessage}
         </div>
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[24px] border border-[var(--line)] bg-white/70 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Personalization status
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -161,7 +161,7 @@ export function SettingsPreferences({
             <StatusBadge label={`${followedEntityCount} ${followedEntityCount === 1 ? "entity" : "entities"}`} active={followedEntityCount > 0} />
             <StatusBadge label={hasUnsavedChanges ? "Unsaved changes" : "Saved state"} active={!hasUnsavedChanges} />
           </div>
-          <div className="mt-4 rounded-[20px] border border-[var(--line)] bg-[var(--panel)]/45 p-4 text-sm leading-6 text-[var(--muted)]">
+          <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-base text-[var(--text-secondary)]">
             <p>
               {personalizationSummary
                 ? `${personalizationSummary}. Strong matching events can move up, but weak or single-source items still stay constrained.`
@@ -171,12 +171,12 @@ export function SettingsPreferences({
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-[var(--line)] bg-white/70 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Briefing effect
           </p>
-          <h4 className="mt-2 text-lg font-semibold text-[var(--foreground)]">How the ranking changes</h4>
-          <div className="mt-4 space-y-2 rounded-[20px] border border-[var(--line)] bg-[var(--panel)]/45 p-4 text-sm leading-6 text-[var(--muted)]">
+          <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">How the ranking changes</h4>
+          <div className="mt-4 space-y-2 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-base text-[var(--text-secondary)]">
             <p>Confirmed multi-source events still dominate Top Events.</p>
             <p>Matching priorities can move strong events higher for you.</p>
             <p>Early Signals stay separate even when they match your interests.</p>
@@ -192,11 +192,11 @@ export function SettingsPreferences({
           note="These profile controls are intentionally hidden for now so the page only shows settings that already do something."
         />
 
-        <div className="rounded-[22px] border border-[var(--line)] bg-white/70 p-4">
+        <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-[var(--foreground)]">Personalized ranking</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+              <p className="text-sm font-medium text-[var(--text-primary)]">Personalized ranking</p>
+              <p className="mt-1 text-base text-[var(--text-secondary)]">
                 Keep event quality first, then let your priorities shape the order.
               </p>
             </div>
@@ -204,12 +204,12 @@ export function SettingsPreferences({
               type="button"
               aria-pressed={preferences.personalizationEnabled}
               onClick={() => updatePreference("personalizationEnabled", !preferences.personalizationEnabled)}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                preferences.personalizationEnabled ? "bg-[var(--foreground)]" : "bg-[var(--line)]"
+              className={`relative inline-flex h-7 w-12 items-center rounded-button transition-colors disabled:opacity-40 ${
+                preferences.personalizationEnabled ? "bg-[var(--accent)]" : "bg-[var(--border)]"
               }`}
             >
               <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                className={`inline-block h-5 w-5 transform rounded-button bg-[var(--card)] transition-colors ${
                   preferences.personalizationEnabled ? "translate-x-6" : "translate-x-1"
                 }`}
               />
@@ -233,12 +233,12 @@ export function SettingsPreferences({
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[24px] border border-[var(--line)] bg-white/70 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Topic preferences
           </p>
-          <h4 className="mt-2 text-lg font-semibold text-[var(--foreground)]">Choose what should pull harder</h4>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Choose what should pull harder</h4>
+          <p className="mt-2 text-base text-[var(--text-secondary)]">
             Keep this list tight. A few focused priorities produce the clearest personalization.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -252,10 +252,10 @@ export function SettingsPreferences({
                   key={topic.id}
                   type="button"
                   onClick={() => toggleTopic(topic)}
-                  className={`rounded-full border px-3 py-2 text-sm transition-colors ${
+                  className={`rounded-button border px-3 py-2 text-sm transition-colors ${
                     selected
-                      ? "border-[rgba(41,79,134,0.25)] bg-[rgba(41,79,134,0.10)] text-[#294f86]"
-                      : "border-[var(--line)] bg-white text-[var(--foreground)] hover:bg-[var(--panel)]"
+                      ? "border-[var(--border)] bg-[var(--bg)] text-[var(--text-primary)]"
+                      : "border-[var(--border)] bg-[var(--card)] text-[var(--text-primary)] hover:bg-[var(--panel)]"
                   }`}
                 >
                   {selected ? "Tracking" : "Track"} {topic.label}
@@ -265,27 +265,27 @@ export function SettingsPreferences({
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-[var(--line)] bg-white/70 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Save behavior
           </p>
-          <h4 className="mt-2 text-lg font-semibold text-[var(--foreground)]">Local for now, explicit by design</h4>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Local for now, explicit by design</h4>
+          <p className="mt-2 text-base text-[var(--text-secondary)]">
             Preferences currently save to this browser. That keeps the foundation safe and predictable while account-backed persistence stays a follow-up.
           </p>
-          <div className="mt-4 rounded-[20px] border border-[var(--line)] bg-[var(--panel)]/45 p-4 text-sm leading-6 text-[var(--muted)]">
+          <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-base text-[var(--text-secondary)]">
             <p>{hasUnsavedChanges ? "You have unsaved changes on this device." : "Your saved browser state matches the current selections."}</p>
             <p className="mt-2">{savedAt ? formatSavedAtLabel(savedAt) : "Nothing has been saved on this browser yet."}</p>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-[24px] border border-[var(--line)] bg-white/70 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+      <div className="mt-6 rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
+        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
           Followed entities
         </p>
-        <h4 className="mt-2 text-lg font-semibold text-[var(--foreground)]">Add entities you want surfaced faster</h4>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+        <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Add entities you want surfaced faster</h4>
+        <p className="mt-2 text-base text-[var(--text-secondary)]">
           Use this for companies, institutions, leaders, or products you actively watch.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -298,7 +298,7 @@ export function SettingsPreferences({
                 addEntity(entityInput);
               }
             }}
-            className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm outline-none"
+            className="w-full rounded-input border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm outline-none hover:border-[var(--text-secondary)] focus:border-[var(--text-primary)] disabled:opacity-40"
             placeholder="Add an entity like Nvidia or Federal Reserve"
           />
           <Button type="button" onClick={() => addEntity(entityInput)} className="whitespace-nowrap">
@@ -313,7 +313,7 @@ export function SettingsPreferences({
                 key={entity}
                 type="button"
                 onClick={() => removeEntity(entity)}
-                className="rounded-full border border-[rgba(41,79,134,0.18)] bg-[rgba(41,79,134,0.08)] px-3 py-2 text-sm text-[#294f86]"
+                className="rounded-button border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 {entity} ×
               </button>
@@ -323,7 +323,7 @@ export function SettingsPreferences({
 
         {suggestedEntities.length ? (
           <div className="mt-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               Suggested from current briefing
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -332,7 +332,7 @@ export function SettingsPreferences({
                   key={entity}
                   type="button"
                   onClick={() => addEntity(entity)}
-                  className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--panel)]"
+                  className="rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--panel)]"
                 >
                   Follow {entity}
                 </button>
@@ -350,7 +350,7 @@ export function SettingsPreferences({
           Reset
         </Button>
         {hasUnsavedChanges ? (
-          <p className="text-sm text-[var(--muted)]">Save to apply these changes on this browser.</p>
+          <p className="text-sm text-[var(--text-secondary)]">Save to apply these changes on this browser.</p>
         ) : null}
       </div>
     </Panel>
@@ -360,10 +360,10 @@ export function SettingsPreferences({
 function StatusBadge({ label, active }: { label: string; active: boolean }) {
   return (
     <span
-      className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+      className={`rounded-button border px-3 py-1.5 text-xs font-medium ${
         active
-          ? "border-[rgba(41,79,134,0.18)] bg-[rgba(41,79,134,0.08)] text-[#294f86]"
-          : "border-[var(--line)] bg-white text-[var(--muted)]"
+          ? "border-[var(--border)] bg-[var(--bg)] text-[var(--text-primary)]"
+          : "border-[var(--border)] bg-[var(--card)] text-[var(--text-secondary)]"
       }`}
     >
       {label}
