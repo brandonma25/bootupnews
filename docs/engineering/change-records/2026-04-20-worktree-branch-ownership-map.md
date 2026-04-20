@@ -118,17 +118,17 @@ Phase 3 retirement proof for PRD-44 through PRD-49 post-merge lanes:
 | Worktree | Branch | Classification | Rule |
 | --- | --- | --- | --- |
 | `/Users/bm/Documents/daily-intelligence-aggregator-main` | `codex/update-worktree-attachment-rules` | Current remediation documentation lane | Use only for remediation docs and ownership records |
-| `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` | `codex/docs-worktree-attachment-rules` | Worktree attachment rules lane | Do not use for feature work |
+| `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` | `codex/docs-worktree-attachment-rules` | Retired superseded governance lane | PR #77 was closed as superseded; diff archived; worktree, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-worktree-attachment-enforcement` | `docs/worktree-attachment-enforcement` | Retired zero-diff governance placeholder | Removed after explicit approval; do not recreate for PRD-44 through PRD-49 feature work |
 | `/Users/bm/Documents/daily-intelligence-aggregator-worktree-branch-protocol` | `docs/prd-51-worktree-branch-protocol` | Branch protocol docs lane | Do not use for PRD-44 through PRD-49 feature work |
 | `/Users/bm/Documents/daily-intelligence-aggregator-main-docs-sequential` | `docs/sequential-prompt-execution-protocol` | Sequential prompt protocol docs lane | Do not use for PRD-44 through PRD-49 feature work |
 
-## Other Active Worktrees
+## Other Worktree Lanes
 
 | Worktree | Branch | Classification | Rule |
 | --- | --- | --- | --- |
-| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` | `fix/prd-50-artifact10-production-parity-followup` | Scoped fix lane | Keep separate from PRD-44 through PRD-49 |
-| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | Scoped fix lane | Keep separate from PRD-44 through PRD-49 |
+| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` | `fix/prd-50-artifact10-production-parity-followup` | Retired scoped fix lane | Dirty diff archived; worktree and local branch retired |
+| `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | Retired scoped fix lane | PR #75 was already merged; worktree, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | Scoped auth fix lane | Keep separate from PRD-44 auth entry forms unless explicitly coordinating |
 | `/Users/bm/Documents/daily-intelligence-aggregator-global-style-spec` | `feature/prd-50-global-style-spec` | Scoped feature lane | Keep separate from PRD-44 through PRD-49 |
 | `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` | `feature/ui-audit-playwright-expansion` | Audit / testing lane at current `main` | Do not use for PRD-44 through PRD-49 feature work |
@@ -143,16 +143,32 @@ This audit was run after PRD-44 through PRD-49 post-merge retirement. It first i
 | `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` | `fix/prd-50-artifact10-production-parity-followup` | Dirty tracked local work was archived at `docs/engineering/change-records/2026-04-21-artifact10-followup-dirty-state.patch`; local branch had zero committed branch-only commits against `origin/main`; dirty test diff was already present in `origin/main`; dirty button diff was stale relative to current `origin/main` because it would remove existing `asChild` support while retaining primary white text styling that already exists on `main` | Retired after proof and explicit approval on 2026-04-21 | Worktree and local branch retired; no same-name remote branch existed |
 | `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | PR #75 merged; local and remote branch refs were contained in `origin/main`; generated `scripts/__pycache__/` state was removed after the dirty follow-up patch was archived | Retired after proof and explicit approval on 2026-04-21 | Worktree, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | PR #72 merged; worktree clean; branch contained in `origin/main`; remote branch still exists | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
-| `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` | `codex/docs-worktree-attachment-rules` | Draft PR #77 is still open; worktree clean; branch has one branch-only governance-protocol change against `origin/main`; checks were green on the PR | Not a retirement candidate | Resolve PR #77 intentionally, either by merging after review or closing/superseding after comparing with current remediation docs |
+| `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` | `codex/docs-worktree-attachment-rules` | Draft PR #77 was closed as superseded; the one branch-only governance-protocol diff was archived at `docs/engineering/change-records/2026-04-21-pr-77-worktree-attachment-rule.patch`; the branch was behind `main` and included mandatory new-worktree language that conflicted with the current owning-worktree rule for existing branch continuation | Retired after proof on 2026-04-21 | Worktree, local branch, and remote branch retired; do not recreate or merge this stale governance lane as written |
 | `/Users/bm/Documents/daily-intelligence-aggregator-global-style-spec` | `feature/prd-50-global-style-spec` | PR #73 merged; worktree clean; local and remote branch are contained in `origin/main` | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
 | `/Users/bm/Documents/daily-intelligence-aggregator-main-docs-sequential` | `docs/sequential-prompt-execution-protocol` | PR #63 merged; worktree clean; local branch is behind its remote but both are contained in `origin/main` | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
 | `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` | `feature/ui-audit-playwright-expansion` | Worktree has untracked `docs/engineering/testing/ui-audit-report.md`; branch itself is contained in `origin/main`; no same-name remote branch currently exists | Blocked | Preserve until the untracked UI audit report is reviewed, moved, committed, or explicitly discarded |
 | `/Users/bm/Documents/daily-intelligence-aggregator-worktree-branch-protocol` | `docs/prd-51-worktree-branch-protocol` | PR #74 merged; worktree clean; local branch is behind its remote but both are contained in `origin/main` | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
 
 Immediate priority after this audit:
-1. Resolve the still-open draft PR #77 governance-doc lane.
-2. Ask for explicit approval before retiring the clean merged candidates: auth callback fix, PRD-50 global style spec, sequential prompt docs, and PRD-51 worktree branch protocol.
-3. Preserve or decide the untracked UI audit report before retiring the UI audit worktree.
+1. Ask for explicit approval before retiring the clean merged candidates: auth callback fix, PRD-50 global style spec, sequential prompt docs, and PRD-51 worktree branch protocol.
+2. Preserve or decide the untracked UI audit report before retiring the UI audit worktree.
+
+### PR #77 Worktree Attachment Rule Lane Retirement Audit
+
+PR #77 was a draft governance-doc PR on `codex/docs-worktree-attachment-rules`. It changed only `docs/engineering/protocols/engineering-protocol.md`, had previously green checks, and became stale behind `main`.
+
+Findings:
+- The PR's useful historical diff is archived at `docs/engineering/change-records/2026-04-21-pr-77-worktree-attachment-rule.patch`.
+- The PR's strict attachment-proof idea is already represented in current repo rules through `AGENTS.md` and the current `engineering-protocol.md` local repo/worktree discipline section.
+- The PR text also required creating a dedicated clean worktree before any coding. That language conflicts with the newer rule that work on an existing branch must happen inside that branch's owning worktree, and would increase the risk of new worktree proliferation during continuation prompts.
+- The worktree at `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` was clean before removal.
+
+Retirement proof:
+- PR #77 was closed as superseded: `https://github.com/brandonma25/daily-intelligence-aggregator/pull/77`.
+- The worktree path `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` was absent after cleanup.
+- Local branch `codex/docs-worktree-attachment-rules` was absent after cleanup.
+- Remote branch `origin/codex/docs-worktree-attachment-rules` was absent after cleanup.
+- No feature branch, recovery artifact, stash entry, UI audit report, or unrelated worktree was touched.
 
 ### Artifact 10 Dirty Diff Decision Audit
 

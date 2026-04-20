@@ -1,0 +1,47 @@
+diff --git a/docs/engineering/protocols/engineering-protocol.md b/docs/engineering/protocols/engineering-protocol.md
+index f5df31f..b698c91 100644
+--- a/docs/engineering/protocols/engineering-protocol.md
++++ b/docs/engineering/protocols/engineering-protocol.md
+@@ -259,6 +259,42 @@ git worktree list
+ - Before removing any worktree, run `git status --short` inside that exact worktree.
+ - Never auto-clean a worktree that contains modified or untracked files; preserve ambiguous work before cleanup.
+ 
++### Worktree Attachment Rule
++- Codex must not merely create or reference a branch. It must prove it is operating in the correct worktree and correct folder before making changes.
++- Before any coding:
++  1. create a dedicated clean worktree from the intended base branch or commit
++  2. `cd` into that exact worktree path
++  3. run:
++     - `pwd`
++     - `git rev-parse --show-toplevel`
++     - `git branch --show-current`
++     - `git status --short --branch`
++     - `git worktree list`
++  4. report the exact:
++     - folder path
++     - repo root
++     - active branch
++     - whether working tree is clean
++  5. if the path, branch, or clean state do not exactly match the intended target, stop and fix attachment before editing anything
++- Branch creation alone is not sufficient.
++- Codex must prove correct worktree attachment.
++- Do not edit code from any inherited or contaminated worktree.
++- Do not continue if still inside `fix/branch-contamination-reconstruction` or any other audit/recovery worktree when a rebuild task asked for a fresh worktree.
++
++### Clean Rebuild Execution Rule
++- Rebuild tasks must be performed in a newly created dedicated worktree, not in the current recovery or audit worktree.
++- Required sequence:
++  1. identify base branch or commit explicitly
++  2. create a new sibling worktree for the target branch
++  3. `cd` into that new worktree
++  4. prove attachment with:
++     - `pwd`
++     - `git rev-parse --show-toplevel`
++     - `git branch --show-current`
++     - `git status --short --branch`
++  5. only after that may files be inspected or edited
++- If Codex remains in the old worktree, the rebuild task is considered failed even if the branch name is correct.
++
+ Reusable prompt block:
+ 
+ ```text
