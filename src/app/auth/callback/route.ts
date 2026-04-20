@@ -13,6 +13,16 @@ import { errorContext, logServerEvent } from "@/lib/observability";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
+  if (
+    requestUrl.searchParams.get("error") ||
+    requestUrl.searchParams.get("error_code") ||
+    requestUrl.searchParams.get("error_description")
+  ) {
+    return NextResponse.redirect(
+      new URL("/?auth=callback-error", requestUrl.origin),
+    );
+  }
+
   const requestCookies = request.cookies.getAll();
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
@@ -23,6 +33,9 @@ export async function GET(request: NextRequest) {
   const next = safeRedirectPath(requestUrl.searchParams.get("next"));
   const sessionCookiePresent = hasSupabaseSessionCookie(requestCookies);
   const codeVerifierCookiePresent = hasSupabaseCodeVerifierCookie(requestCookies);
+  const supabaseUrlHost = env.supabaseUrl
+    ? new URL(env.supabaseUrl).host
+    : null;
 
   logServerEvent("info", "Auth callback received", {
     route: "/auth/callback",
@@ -38,7 +51,7 @@ export async function GET(request: NextRequest) {
     sessionCookiePresent,
     codeVerifierCookiePresent,
     appUrl: env.appUrl,
-    supabaseUrlHost: new URL(env.supabaseUrl).host,
+    supabaseUrlHost,
   });
 
   if (!isSupabaseConfigured) {
