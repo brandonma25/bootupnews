@@ -112,11 +112,24 @@ describe("LandingHomepage", () => {
   });
 
   it("shows public briefing value messaging to guests", () => {
-    render(<LandingHomepage data={createData([])} viewer={null} />);
+    const { container } = render(<LandingHomepage data={createData([])} viewer={null} />);
 
     expect(screen.getAllByText("Public briefing").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Sign in to personalize").length).toBeGreaterThan(0);
     expect(screen.queryByText("Session state")).not.toBeInTheDocument();
+    expect(screen.queryByText("SESSION STATE")).not.toBeInTheDocument();
+    expect(screen.queryByText("Signed out in public briefing mode")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Personalize briefing" })).toHaveAttribute(
+      "href",
+      "/#email-access",
+    );
+    expect(
+      [...container.querySelectorAll("a,button")].filter(
+        (element) =>
+          element.textContent?.trim() === "" &&
+          element.getAttribute("class")?.includes("bg-[var(--accent)]"),
+      ),
+    ).toHaveLength(0);
     expect(screen.getByText("Personalized topics")).toBeInTheDocument();
     expect(screen.getByText("Saved history")).toBeInTheDocument();
     expect(screen.getByText("Custom alerts")).toBeInTheDocument();
