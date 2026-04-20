@@ -40,6 +40,7 @@ export type HomepageEvent = {
   id: string;
   topicName: string;
   title: string;
+  whatHappened: string;
   summary: string;
   trustLayer: TrustLayerPresentation;
   whyItMatters: string;
@@ -297,15 +298,17 @@ export function buildHomepageEvents(
     .sort((left, right) => compareBriefingItemsByPersonalization(left, right, profile))
     .map((item, index, sortedItems) => {
       const intelligence = buildEventIntelligenceSignals(item);
-      const classification = classifyHomepageCategory({
-        topicName: item.topicName,
-        title: item.title,
-        summary: item.whatHappened,
-        whyItMatters: item.whyItMatters,
-        matchedKeywords: item.matchedKeywords,
-        rankingSignals: item.rankingSignals,
-        sourceNames: item.sources.map((source) => source.title),
-      });
+      const classification =
+        item.homepageClassification ??
+        classifyHomepageCategory({
+          topicName: item.topicName,
+          title: item.title,
+          summary: item.whatHappened,
+          whyItMatters: item.whyItMatters,
+          matchedKeywords: item.matchedKeywords,
+          rankingSignals: item.rankingSignals,
+          sourceNames: item.sources.map((source) => source.title),
+        });
       const siblingItems = sortedItems.filter(
         (candidate) => candidate.id !== item.id && candidate.topicId === item.topicId,
       );
@@ -319,6 +322,7 @@ export function buildHomepageEvents(
         id: item.id,
         topicName: item.topicName,
         title: item.title,
+        whatHappened: item.whatHappened,
         summary: summarize(item.eventIntelligence?.summary ?? item.whatHappened, item.priority === "top" ? 2 : 1),
         trustLayer: buildTrustLayerPresentation(item.eventIntelligence, {
           title: item.title,
