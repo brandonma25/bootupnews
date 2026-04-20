@@ -32,9 +32,16 @@ Operational rule: if a prompt names one of these PRDs and asks to continue the s
 
 | Lane | Worktree | Branch | Upstream | Head | Classification | Rule |
 | --- | --- | --- | --- | --- | --- | --- |
-| PRD-44 rebuild placeholder | `/Users/bm/Documents/daily-intelligence-aggregator-prd-44-auth-entry-forms-rebuild` | `feature/prd-44-auth-entry-forms-rebuild` | `origin/main` | `c124f56` | Duplicate rebuild lane with no PRD-44 feature payload | Block PRD-44 implementation here; preserve until explicit retirement approval |
+| PRD-44 rebuild placeholder | `/Users/bm/Documents/daily-intelligence-aggregator-prd-44-auth-entry-forms-rebuild` | `feature/prd-44-auth-entry-forms-rebuild` | `origin/main` | `c124f56` | Retired duplicate rebuild lane with no PRD-44 feature payload | Retired after proof and explicit approval; do not recreate for PRD-44 continuation |
 
-The PRD-44 rebuild lane is not canonical because the original PRD-44 branch contains the preserved feature commit and the rebuild branch currently matches `origin/main`. Its name remains a likely branch-switch trigger until it is explicitly retired or renamed after approval.
+The PRD-44 rebuild lane was not canonical because the original PRD-44 branch contains the preserved feature commit and the rebuild branch matched `origin/main`. After explicit human approval, the clean duplicate rebuild worktree was removed and the local rebuild branch was deleted. No remote rebuild branch existed.
+
+Retirement proof:
+- Rebuild worktree status was clean.
+- Rebuild `HEAD` matched `origin/main` at `c124f56`.
+- `origin/main...feature/prd-44-auth-entry-forms-rebuild` had no unique commits and no diff.
+- `origin/feature/prd-44-auth-entry-forms-rebuild` did not exist.
+- Canonical PRD-44 branch `feature/prd-44-auth-entry-forms` remained preserved at `4cc21d1` and tracks `origin/feature/prd-44-auth-entry-forms`.
 
 ## Evidence and Recovery Lanes
 
@@ -80,6 +87,6 @@ The PRD-44 rebuild lane is not canonical because the original PRD-44 branch cont
 
 ## Phase 1 Result
 
-PRD-44 through PRD-49 now have one stated owner worktree and one stated canonical branch per PRD. Remaining ambiguity is concentrated in duplicate or evidence lanes, especially the PRD-44 rebuild placeholder and protected recovery artifacts.
+PRD-44 through PRD-49 now have one stated owner worktree and one stated canonical branch per PRD. The empty PRD-44 rebuild placeholder has been retired. Remaining ambiguity is concentrated in protected recovery artifacts and stale evidence branches.
 
-Next phase: decide canonical execution lane outcomes one PRD at a time, starting with PRD-44, without deleting or bypassing preserved feature work.
+Next phase: continue canonical execution lane decisions one PRD at a time, starting with PRD-45, without deleting or bypassing preserved feature work.
