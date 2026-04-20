@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowRight, ExternalLink, RefreshCcw } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 
 import AuthModal from "@/components/auth/auth-modal";
+import { BriefingCardCategory } from "@/components/home/BriefingCardCategory";
+import { CategoryTabStrip } from "@/components/home/CategoryTabStrip";
 import { GuestValuePreview } from "@/components/guest-value-preview";
 import { isHomepageDebugConfigured } from "@/lib/env";
 import {
@@ -149,13 +151,7 @@ export default function LandingHomepage({
             </Panel>
           ) : null}
 
-          <TopRankedEventsSection events={topRanked} />
-
-          <section className="space-y-8 lg:space-y-10">
-            {categorySections.map((section) => (
-              <CategorySection key={section.key} section={section} />
-            ))}
-          </section>
+          <HomeCategoryTabsSection topRanked={topRanked} categorySections={categorySections} />
 
           <TrendingSection events={trending} />
 
@@ -413,77 +409,52 @@ function FeaturedEventCard({
   );
 }
 
-function TopRankedEventsSection({ events }: { events: HomepageEvent[] }) {
-  const noDataMessage = buildOverallNoDataMessage(events.length);
+function HomeCategoryTabsSection({
+  topRanked,
+  categorySections,
+}: {
+  topRanked: HomepageEvent[];
+  categorySections: HomepageCategorySection[];
+}) {
+  const noDataMessage = buildOverallNoDataMessage(topRanked.length);
 
   return (
     <section id="top-events" className="space-y-5 lg:space-y-6">
       <SectionHeader
         eyebrow="Top Events"
         title="Confirmed developments, ranked with transparent logic"
-        description="The homepage leads with confirmed multi-source developments. Each card shows impact, recency, source breadth, confidence, and why it made the briefing."
+        description="Use the tabs to move between the ranked lead set and category-specific developments already derived by the homepage model."
       />
-      {events.length ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-          {events.map((event, index) => (
-            <div key={event.id} className={cn(index === 0 ? "xl:col-span-7" : "xl:col-span-5")}>
-              <Panel
-                className={cn(
-                  "h-full border-[var(--border)] bg-[var(--card)] p-5 transition-colors duration-150 ",
-                  index === 0 && "rounded-card p-6 lg:p-7",
-                )}
-              >
-                <EventCard
-                  event={event}
-                  rank={index + 1}
-                  variant={index === 0 ? "ranked-featured" : "ranked"}
-                  label="Confirmed event"
-                  showRelatedArticles
-                />
-              </Panel>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <StatusPanel title={noDataMessage.title} body={noDataMessage.body} />
-      )}
-    </section>
-  );
-}
-
-function CategorySection({ section }: { section: HomepageCategorySection }) {
-  return (
-    <section id={section.label.toLowerCase()} className="space-y-4">
-      <SectionHeader
-        eyebrow="Category"
-        title={section.label}
-        description={section.description}
-        compact
+      <CategoryTabStrip
+        topEvents={topRanked}
+        categorySections={categorySections}
+        topEventsEmptyState={<StatusPanel title={noDataMessage.title} body={noDataMessage.body} />}
+        renderTopEvent={(event, index) => (
+          <Panel
+            className={cn(
+              "h-full border-[var(--border)] bg-[var(--card)] p-5 transition-colors duration-150",
+              index === 0 && "rounded-card p-6 lg:p-7",
+            )}
+          >
+            <EventCard
+              event={event}
+              rank={index + 1}
+              variant={index === 0 ? "ranked-featured" : "ranked"}
+              label="Confirmed event"
+              showRelatedArticles
+            />
+          </Panel>
+        )}
+        renderCategoryEvent={(event) => (
+          <BriefingCardCategory
+            item={{
+              title: event.title,
+              whatHappened: event.whatHappened,
+              matchedKeywords: event.matchedKeywords,
+            }}
+          />
+        )}
       />
-      {section.events.length ? (
-        <>
-          {section.state === "sparse" ? (
-            <p className="text-sm text-[var(--text-secondary)]">
-              This category is intentionally capped so the briefing stays calm. Confirmed events appear first, while single-source developments stay visibly labeled as early signals.
-            </p>
-          ) : null}
-          <div className="grid gap-4 md:grid-cols-2">
-            {section.events.map((event) => (
-              <Panel
-                key={event.id}
-                className="border-[var(--border)] bg-[var(--card)] p-5 transition-colors duration-150 "
-              >
-                <EventCard event={event} variant="compact" label="Event" showRelatedArticles />
-              </Panel>
-            ))}
-            {Array.from({ length: section.placeholderCount }).map((_, index) => (
-              <CoverageBuildingCard key={`${section.key}-placeholder-${index}`} label={section.label} />
-            ))}
-          </div>
-        </>
-      ) : (
-        <EmptyCategoryState section={section} />
-      )}
     </section>
   );
 }
@@ -857,76 +828,6 @@ function MetaPill({ children }: { children: React.ReactNode }) {
     <span className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-1.5">
       {children}
     </span>
-  );
-}
-
-function CoverageBuildingCard({ label }: { label: string }) {
-  return (
-    <Panel className="border-dashed border-[var(--border)] bg-[var(--card)] p-5">
-      <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
-        Coverage Still Building
-      </p>
-      <h3 className="mt-3 text-lg font-semibold text-[var(--text-primary)]">
-        More {label} coverage is on the way
-      </h3>
-      <p className="mt-2 text-base text-[var(--text-secondary)]">
-        This rail keeps its shape while we wait for more confirmed category-matched events.
-      </p>
-    </Panel>
-  );
-}
-
-function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
-  return (
-    <div className="space-y-4">
-      <Panel className="rounded-card border-[var(--border)] bg-[var(--card)] p-6">
-        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
-          Category status
-        </p>
-        <h3 className="mt-3 text-lg font-semibold text-[var(--text-primary)]">
-          No updates yet — check back shortly
-        </h3>
-        <p className="mt-3 max-w-2xl text-base text-[var(--text-secondary)]">
-          We&apos;re keeping this section intentional while live coverage catches up, so it never collapses into an empty gap.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button variant="secondary" className="px-4" onClick={() => window.location.reload()}>
-            <RefreshCcw className="mr-2 h-4 w-4" />
-            Refresh briefing
-          </Button>
-          <a
-            href="#top-events"
-            className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]"
-          >
-            Top events
-          </a>
-        </div>
-        <p className="mt-4 text-base text-[var(--text-secondary)]">{section.emptyReason}</p>
-      </Panel>
-
-      {section.fallbackEvents.length ? (
-        <Panel className="rounded-card border-[var(--border)] bg-[var(--card)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
-            Other confirmed events while this category fills in
-          </p>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {section.fallbackEvents.map((event) => (
-              <Panel
-                key={`${section.key}-${event.id}`}
-                className="border-[var(--border)] bg-[var(--card)] p-4"
-              >
-                <EventCard
-                  event={event}
-                  variant="compact"
-                  label={event.intelligence.isEarlySignal ? "Fallback signal" : "Fallback story"}
-                  showRelatedArticles
-                />
-              </Panel>
-            ))}
-          </div>
-        </Panel>
-      ) : null}
-    </div>
   );
 }
 

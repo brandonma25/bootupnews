@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildHomepageViewModel } from "@/lib/homepage-model";
+import { buildHomepageEvents, buildHomepageViewModel } from "@/lib/homepage-model";
 import { createDefaultPersonalizationProfile } from "@/lib/personalization";
 import type { DashboardData, BriefingItem } from "@/lib/types";
 
@@ -29,6 +29,7 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
     importanceLabel: overrides.importanceLabel ?? "High",
     rankingSignals: overrides.rankingSignals ?? ["Fresh reporting in the current cycle."],
     eventIntelligence: overrides.eventIntelligence,
+    homepageClassification: overrides.homepageClassification,
   };
 }
 
@@ -60,6 +61,28 @@ function createData(items: BriefingItem[]): DashboardData {
 }
 
 describe("buildHomepageViewModel", () => {
+  it("uses the proposed homepageClassification contract before computed fallback taxonomy", () => {
+    const [event] = buildHomepageEvents([
+      createItem({
+        id: "contract-classified",
+        topicName: "General",
+        title: "Broad update without category words",
+        whatHappened: "A broad update happened.",
+        matchedKeywords: [],
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.91,
+          scores: { tech: 0, finance: 11, politics: 0 },
+          matchedSignals: { tech: [], finance: ["backend contract"], politics: [] },
+        },
+      }),
+    ]);
+
+    expect(event?.classification.primaryCategory).toBe("finance");
+    expect(event?.classification.confidence).toBe(0.91);
+  });
+
   it("keeps a featured finance event out of downstream rails", () => {
     const financeItem = createItem({
       id: "finance-1",
