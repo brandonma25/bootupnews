@@ -242,19 +242,40 @@ are true:
 
 - The canonical local project root is `/Users/bm/Documents/daily-intelligence-aggregator-main`.
 - Do not use `/Users/bm/Documents/Daily news intel aggregator` for Git or Codex work; it is a symlink alias and increases directory-confusion risk.
+- Before installs, edits, tests, refactors, or any prompt step that assumes branch context, Codex must confirm the active workspace identity.
 - Before every Git or Codex task, run:
 
 ```bash
-cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
 pwd
 git branch --show-current
-git status --short
+git status
 git worktree list
 ```
 
+- Codex must report the current folder, current branch, full worktree list, whether the requested branch is already owned by another worktree, and whether the current session is attached to the correct owning worktree for the task.
+- If the requested branch is already used by another worktree, Codex must not run `git checkout` for that branch, must not use `--ignore-other-worktrees`, must not create a duplicate worktree for the same branch, and must stop and instruct the user to open or use the owning worktree directly.
+- All work on an existing feature, fix, docs, or chore branch must happen inside that branch's owning worktree folder.
 - Use additional worktrees only when intentionally isolating parallel branch work.
 - Before removing any worktree, run `git status --short` inside that exact worktree.
 - Never auto-clean a worktree that contains modified or untracked files; preserve ambiguous work before cleanup.
+
+Reusable prompt block:
+
+```text
+WORKSPACE IDENTITY CHECK — REQUIRED FIRST STEP
+Run:
+pwd
+git branch --show-current
+git status
+git worktree list
+
+Report:
+- current folder
+- current branch
+- whether this is the correct owning worktree for the requested task
+
+Do not proceed until this is confirmed.
+```
 
 ## 11. Merge Checklist
 - Branch is correct and isolated.

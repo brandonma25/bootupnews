@@ -11,6 +11,52 @@ Before ANY substantial implementation work, you MUST read:
 
 ## Branch Discipline Rules (Mandatory)
 
+## Git Worktree / Branch Attachment Protocol (Mandatory)
+
+Before installs, edits, tests, refactors, or any prompt step that assumes branch context, Codex must confirm the active workspace identity.
+
+Run first:
+
+```bash
+pwd
+git branch --show-current
+git status
+git worktree list
+```
+
+Codex must report:
+- current folder
+- current branch
+- full worktree list
+- whether the requested branch is already owned by another worktree
+- whether the current session is attached to the correct owning worktree for the task
+
+If the requested branch is already used by another worktree:
+- do not run `git checkout` for that branch
+- do not use `--ignore-other-worktrees`
+- do not create a duplicate worktree for the same branch
+- stop and instruct the user to open or use the owning worktree directly
+
+All work on an existing feature, fix, docs, or chore branch must happen inside that branch's owning worktree folder.
+
+Reusable prompt block:
+
+```text
+WORKSPACE IDENTITY CHECK — REQUIRED FIRST STEP
+Run:
+pwd
+git branch --show-current
+git status
+git worktree list
+
+Report:
+- current folder
+- current branch
+- whether this is the correct owning worktree for the requested task
+
+Do not proceed until this is confirmed.
+```
+
 Before starting any new development:
 
 1. Always start from `main`.
