@@ -1,12 +1,12 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { InputHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
 
-export function Input({ className, ...props }: ComponentPropsWithoutRef<"input">) {
+export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       className={cn(
-        "min-h-11 w-full rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted)] focus:border-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60",
+        "w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60",
         className,
       )}
       {...props}

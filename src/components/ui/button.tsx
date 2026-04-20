@@ -1,22 +1,27 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, PropsWithChildren } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  type AnchorHTMLAttributes,
+  type ButtonHTMLAttributes,
+  type PropsWithChildren,
+  type ReactElement,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
 type BaseButtonProps = PropsWithChildren<{
-    variant?: "primary" | "secondary" | "ghost";
-  }>;
+  className?: string;
+  variant?: "primary" | "secondary" | "ghost";
+}>;
 
 type ButtonProps =
-  | (BaseButtonProps & ButtonHTMLAttributes<HTMLButtonElement> & { as?: "button" })
-  | (BaseButtonProps & AnchorHTMLAttributes<HTMLAnchorElement> & { as: "a" });
+  | (BaseButtonProps & ButtonHTMLAttributes<HTMLButtonElement> & { as?: "button"; asChild?: false })
+  | (BaseButtonProps & AnchorHTMLAttributes<HTMLAnchorElement> & { as: "a"; asChild?: false })
+  | (BaseButtonProps & { asChild: true; as?: never });
 
-export function Button({
-  as = "button",
-  children,
-  className,
-  variant = "primary",
-  ...props
-}: ButtonProps) {
+export function Button(props: ButtonProps) {
+  const { children, className, variant = "primary" } = props;
   const classes = cn(
     "inline-flex items-center justify-center rounded-button px-4 py-2 text-sm font-medium leading-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
     variant === "primary" &&
@@ -27,19 +32,40 @@ export function Button({
     className,
   );
 
-  if (as === "a") {
+  if ("asChild" in props && props.asChild) {
+    const child = Children.only(children);
+
+    if (isValidElement<{ className?: string }>(child)) {
+      return cloneElement(child as ReactElement<{ className?: string }>, {
+        className: cn(classes, child.props.className),
+      });
+    }
+  }
+
+  if ("as" in props && props.as === "a") {
+    const anchorProps = { ...props } as Record<string, unknown>;
+    delete anchorProps.as;
+    delete anchorProps.asChild;
+    delete anchorProps.children;
+    delete anchorProps.className;
+    delete anchorProps.variant;
+
     return (
-      <a className={classes} {...(props as AnchorHTMLAttributes<HTMLAnchorElement>)}>
+      <a className={classes} {...(anchorProps as AnchorHTMLAttributes<HTMLAnchorElement>)}>
         {children}
       </a>
     );
   }
 
+  const buttonProps = { ...props } as Record<string, unknown>;
+  delete buttonProps.as;
+  delete buttonProps.asChild;
+  delete buttonProps.children;
+  delete buttonProps.className;
+  delete buttonProps.variant;
+
   return (
-    <button
-      className={classes}
-      {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
-    >
+    <button className={classes} {...(buttonProps as ButtonHTMLAttributes<HTMLButtonElement>)}>
       {children}
     </button>
   );

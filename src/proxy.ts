@@ -7,10 +7,12 @@ import { env, isSupabaseConfigured } from "@/lib/env";
 export async function proxy(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const isAuthCallbackRequest = requestUrl.pathname === "/auth/callback";
+  const isPasswordResetRequest = requestUrl.pathname === "/reset-password";
 
   if (
     isSupabaseConfigured &&
     !isAuthCallbackRequest &&
+    !isPasswordResetRequest &&
     hasAuthReturnParams(requestUrl.searchParams)
   ) {
     return NextResponse.redirect(buildAuthCallbackExchangeUrl(requestUrl));
