@@ -8,11 +8,11 @@ export default function HeroSection({ onGetStarted }: Props) {
   return (
     <section className="flex flex-col items-center justify-center text-center px-6 py-24">
       <div className="mx-auto max-w-3xl">
-        <h1 className="mb-4 text-4xl font-bold tracking-normal text-[var(--text-primary)] sm:text-5xl">
+        <h1 className="mb-4 text-xl font-semibold tracking-normal text-[var(--text-primary)] md:text-2xl">
           Understand the news in 10 minutes, not 60.
         </h1>
 
-        <p className="mx-auto mb-8 max-w-2xl text-base leading-7 text-[var(--muted-foreground)] sm:text-lg">
+        <p className="mx-auto mb-8 max-w-2xl text-base text-[var(--text-secondary)]">
           We scan global events, connect the dots, and explain what actually matters.
         </p>
 

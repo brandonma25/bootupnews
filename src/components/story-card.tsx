@@ -98,14 +98,14 @@ export function StoryCard({ item }: { item: BriefingItem }) {
           <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             What happened
           </p>
-          <p className="text-sm leading-7 text-[var(--text-primary)]">{item.whatHappened}</p>
+          <p className="text-base text-[var(--text-primary)]">{item.whatHappened}</p>
         </section>
 
         <section className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Key points
           </p>
-          <ul className="space-y-2 text-sm leading-7 text-[var(--text-primary)]">
+          <ul className="space-y-2 text-[13px] leading-[1.6] text-[var(--text-primary)] md:text-sm">
             {item.keyPoints.map((point) => (
               <li key={point} className="flex gap-3">
                 <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-button bg-[var(--text-secondary)]" />
@@ -119,7 +119,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
           <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Why this ranks
           </p>
-          <p className="text-sm leading-7 text-[var(--text-primary)]">
+          <p className="text-base text-[var(--text-primary)]">
             {item.eventIntelligence?.rankingReason ??
               item.rankingSignals?.[0] ??
               "This event rose because it cleared the current ranking thresholds."}
@@ -153,7 +153,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
                 <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   What led to this
                 </p>
-                <p className="mt-1 text-sm leading-7 text-[var(--text-primary)]">
+                <p className="mt-1 text-base text-[var(--text-primary)]">
                   {item.explanationPacket.connection_layer.what_led_to_this}
                 </p>
               </div>
@@ -161,7 +161,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
                 <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   What it connects to
                 </p>
-                <p className="mt-1 text-sm leading-7 text-[var(--text-primary)]">
+                <p className="mt-1 text-base text-[var(--text-primary)]">
                   {item.explanationPacket.connection_layer.what_it_connects_to}
                 </p>
               </div>
@@ -182,7 +182,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
             className={cn(
               trustLayer.tier === "low"
                 ? "text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]"
-                : "text-sm leading-7 text-[var(--text-primary)]",
+                : "text-base text-[var(--text-primary)]",
             )}
           >
             {trustLayer.body}

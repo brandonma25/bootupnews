@@ -11,10 +11,10 @@ export default function GlobalError() {
             <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               Global fallback
             </p>
-            <h1 className="mt-3 text-3xl text-[var(--text-primary)]">
+            <h1 className="mt-3 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
               We hit a larger app error, but the workspace itself is still reachable.
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+            <p className="mt-3 max-w-2xl text-base text-[var(--text-secondary)]">
               Use the links below to recover, or clear local state if the browser is holding a stale session.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">

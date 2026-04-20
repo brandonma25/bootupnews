@@ -25,10 +25,10 @@ export default function Error({ error, reset }: Props) {
             <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               Temporary issue
             </p>
-            <h1 className="text-3xl text-[var(--text-primary)]">
+            <h1 className="text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
               This page hit a server problem, but the app is still recoverable.
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+            <p className="max-w-2xl text-base text-[var(--text-secondary)]">
               Try the page again, or head back to the dashboard shell while we fall back to safer defaults.
             </p>
             <div className="flex flex-wrap gap-3">

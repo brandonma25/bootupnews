@@ -12,10 +12,10 @@ export default function NotFound() {
         <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
           404
         </p>
-        <h1 className="mt-3 text-2xl text-[var(--text-primary)]">
+        <h1 className="mt-3 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
           Page not found
         </h1>
-        <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="mt-3 text-base text-[var(--text-secondary)]">
           Head back to the dashboard to continue your daily briefing.
         </p>
         <Link

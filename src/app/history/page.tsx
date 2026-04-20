@@ -70,7 +70,7 @@ export default async function HistoryPage() {
             <h2 className="mt-4 text-base font-semibold text-[var(--text-primary)]">
               No briefings yet
             </h2>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="mx-auto mt-2 max-w-sm text-base text-[var(--text-secondary)]">
               Once you generate your first daily briefing from the{" "}
               <Link href="/dashboard" className="font-semibold underline underline-offset-2">
                 Today
@@ -90,7 +90,7 @@ export default async function HistoryPage() {
                     <h2 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
                       {briefing.title}
                     </h2>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+                    <p className="mt-2 max-w-3xl text-base text-[var(--text-secondary)]">
                       {briefing.intro}
                     </p>
                   </div>

@@ -114,9 +114,9 @@ describe("LandingHomepage", () => {
   it("shows public briefing value messaging to guests", () => {
     render(<LandingHomepage data={createData([])} viewer={null} />);
 
-    expect(screen.getAllByText("You're viewing the public briefing").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Sign in to personalize your intelligence").length).toBeGreaterThan(0);
-    expect(screen.getByText("Signed out in public briefing mode")).toBeInTheDocument();
+    expect(screen.getAllByText("Public briefing").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sign in to personalize").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Session state")).not.toBeInTheDocument();
     expect(screen.getByText("Personalized topics")).toBeInTheDocument();
     expect(screen.getByText("Saved history")).toBeInTheDocument();
     expect(screen.getByText("Custom alerts")).toBeInTheDocument();
@@ -218,9 +218,11 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    expect(screen.queryByText("You're viewing the public briefing")).not.toBeInTheDocument();
-    expect(screen.queryByText("Sign in to personalize your intelligence")).not.toBeInTheDocument();
-    expect(screen.getByText("Signed in as Alex Analyst")).toBeInTheDocument();
+    expect(screen.queryByText("Public briefing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign in to personalize")).not.toBeInTheDocument();
+    expect(screen.queryByText("Session state")).not.toBeInTheDocument();
+    expect(screen.getByText("Alex Analyst")).toBeInTheDocument();
+    expect(screen.getByText("Personal workspace")).toBeInTheDocument();
   });
 
   it("shows a personalization summary for signed-in viewers with saved preferences", () => {

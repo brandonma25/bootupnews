@@ -132,7 +132,7 @@ export default async function SourcesPage({
               <Rss className="h-4 w-4 text-[var(--text-secondary)]" />
               <h2 className="text-base font-semibold text-[var(--text-primary)]">Add an RSS source</h2>
             </div>
-            <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="mt-1 text-base text-[var(--text-secondary)]">
               {isSupabaseConfigured
                 ? "Paste any RSS feed URL. The source will be assigned to the topic you choose and included in your next briefing."
                 : "The form is available for setup, but saving still requires Supabase credentials to be loaded."}
@@ -202,7 +202,7 @@ export default async function SourcesPage({
               </div>
             </form>
           ) : (
-            <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4 text-sm leading-7 text-[var(--text-primary)]">
+            <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4 text-base text-[var(--text-primary)]">
               Source creation is available after sign-in so the source can be saved to your account.
             </div>
           )}
@@ -247,14 +247,14 @@ export default async function SourcesPage({
                     </Badge>
                   </div>
 
-                  <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+                  <p className="mt-3 text-base text-[var(--text-secondary)]">
                     {source.description}
                   </p>
 
                   {source.note ? (
                     <div className="mt-3 flex items-start gap-2 rounded-card border border-[var(--border)] bg-[var(--sidebar)] px-3 py-2">
                       <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
-                      <p className="text-xs leading-5 text-[var(--text-secondary)]">{source.note}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{source.note}</p>
                     </div>
                   ) : null}
 

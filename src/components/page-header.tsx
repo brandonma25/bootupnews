@@ -17,10 +17,10 @@ export function PageHeader({
         <div className="min-w-0 space-y-3">
           <Badge>{eyebrow}</Badge>
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold leading-tight tracking-normal text-[var(--text-primary)] md:text-3xl">
+            <h1 className="text-xl font-semibold tracking-normal text-[var(--text-primary)] md:text-2xl">
               {title}
             </h1>
-            <p className="max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+            <p className="max-w-2xl text-base text-[var(--text-secondary)]">{description}</p>
           </div>
         </div>
         {aside ? <div className="shrink-0">{aside}</div> : null}

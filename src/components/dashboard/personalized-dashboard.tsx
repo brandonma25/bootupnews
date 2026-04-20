@@ -137,7 +137,7 @@ export default function PersonalizedDashboard({
                 <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
                   {personalizationActive ? "Your ranking is tuned to your briefing priorities" : "Add priorities to tune this briefing"}
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+                <p className="mt-2 max-w-2xl text-base text-[var(--text-secondary)]">
                   {personalizationActive
                     ? `${personalizationSummary}. Matching confirmed events can surface earlier for you, but confirmed multi-source quality still decides what belongs in Top Events.`
                     : "Track a few topics or entities and the dashboard will shift strong matching events upward without flooding the briefing with weak coverage."}
@@ -175,7 +175,7 @@ export default function PersonalizedDashboard({
             <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
               {isSignedIn ? "The capped signal briefing starts here" : "What signing in unlocks"}
             </h2>
-            <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+            <p className="mt-2 text-base text-[var(--text-secondary)]">
               {isSignedIn
                 ? "The main dashboard now stays intentionally brief: a maximum of five ranked signals, with the top three framed as Core Signals and the next two framed as Context Signals."
                 : "Preview the ranked public briefing here, then sign in to unlock personalized topics, saved history, custom alerts, and the complete dashboard workflow."}
@@ -196,7 +196,7 @@ export default function PersonalizedDashboard({
                   Reading window
                 </p>
                 <div className="mt-2 flex flex-wrap items-end gap-3">
-                  <h2 className="text-4xl font-semibold tracking-normal text-[var(--text-primary)]">
+                  <h2 className="text-xl font-semibold tracking-normal text-[var(--text-primary)] md:text-2xl">
                     {formatReadingWindow(readingMetrics.totalMinutes)}
                   </h2>
                   <p className="pb-1 text-sm font-medium text-[var(--text-secondary)]">today</p>
@@ -311,7 +311,7 @@ export default function PersonalizedDashboard({
                   ) : null}
                 </>
               ) : (
-                <Panel className="border-dashed border-[var(--border)] bg-[var(--card)] p-5 text-sm leading-7 text-[var(--text-secondary)]">
+                <Panel className="border-dashed border-[var(--border)] bg-[var(--card)] p-5 text-base text-[var(--text-secondary)]">
                   No signals qualified for this briefing yet. Refresh the briefing or adjust your tracked topics and sources to repopulate the dashboard.
                 </Panel>
               )}
@@ -342,19 +342,19 @@ export default function PersonalizedDashboard({
             </p>
             {isCaughtUp ? (
               <>
-                <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
+                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
                   You&apos;re caught up
                 </h2>
-                <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+                <p className="mt-2 text-base text-[var(--text-secondary)]">
                   {sessionSummary?.reviewedCount ?? 0} events reviewed today, with {sessionSummary?.newCount ?? 0} new, {sessionSummary?.changedCount ?? 0} changed, and {sessionSummary?.escalatedCount ?? 0} escalated since your last pass.
                 </p>
               </>
             ) : (
               <>
-                <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
+                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
                   Keep scanning
                 </h2>
-                <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+                <p className="mt-2 text-base text-[var(--text-secondary)]">
                   Mark events as read as you finish them. When everything in today&apos;s briefing is reviewed, this becomes your closure point.
                 </p>
               </>
@@ -426,7 +426,7 @@ function DashboardEventCard({
             ) : (
               <h3 className="briefing-title break-words text-[var(--text-primary)]">{item.title}</h3>
             )}
-            <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)] line-clamp-3">{item.whatHappened}</p>
+            <p className="mt-2 text-base text-[var(--text-secondary)] line-clamp-3">{item.whatHappened}</p>
           </div>
         </div>
 
@@ -466,10 +466,10 @@ function DashboardEventCard({
         </p>
         <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{intelligence.rankingReason}</p>
         {item.rankingSignals?.[0] ? (
-          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{item.rankingSignals[0]}</p>
+          <p className="mt-2 text-base text-[var(--text-secondary)]">{item.rankingSignals[0]}</p>
         ) : null}
         {personalizationEnabled && personalization?.active && personalization.shortReason ? (
-          <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]">Higher for you: {personalization.shortReason}</p>
+          <p className="mt-2 text-base text-[var(--text-primary)]">Higher for you: {personalization.shortReason}</p>
         ) : null}
       </div>
 
@@ -482,7 +482,7 @@ function DashboardEventCard({
 
       <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-primary)]">Why it matters</p>
-        <p className="mt-2 text-sm leading-7 text-[var(--text-primary)]">{item.whyItMatters}</p>
+        <p className="mt-2 text-base text-[var(--text-primary)]">{item.whyItMatters}</p>
       </div>
 
       {intelligence.keyEntities.length ? (
@@ -525,7 +525,7 @@ function DashboardEventCard({
               >
                 <div className="min-w-0">
                   <p className="break-words text-sm font-semibold leading-6 text-[var(--text-primary)]">{article.title}</p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{article.sourceName}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{article.sourceName}</p>
                 </div>
                 <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
               </a>

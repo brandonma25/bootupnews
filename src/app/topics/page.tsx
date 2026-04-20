@@ -90,7 +90,7 @@ export default async function TopicsPage({
                           <h2 className="text-base font-semibold text-[var(--text-primary)]">
                             {topic.name}
                           </h2>
-                          <p className="mt-1.5 text-sm leading-6 text-[var(--text-secondary)]">
+                          <p className="mt-1.5 text-base text-[var(--text-secondary)]">
                             {topic.description}
                           </p>
                           {topic.keywords?.length ? (
@@ -140,7 +140,7 @@ export default async function TopicsPage({
         <Panel className="p-5">
           <div className="border-b border-[var(--border)] pb-4 mb-5">
             <h2 className="text-base font-semibold text-[var(--text-primary)]">Add a new topic</h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="mt-1 text-base text-[var(--text-secondary)]">
               {isSupabaseConfigured
                 ? "Use broad categories — AI, markets, geopolitics — to keep your briefing scannable."
                 : "Topic creation is available here, but saving still depends on Supabase being loaded in the current server process."}
@@ -233,7 +233,7 @@ export default async function TopicsPage({
               </div>
             </form>
           ) : (
-            <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4 text-sm leading-7 text-[var(--text-primary)]">
+            <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4 text-base text-[var(--text-primary)]">
               Topic creation is available after sign-in so the topic can be saved to your account.
             </div>
           )}
@@ -250,7 +250,7 @@ export default async function TopicsPage({
             ].map((point) => (
               <div
                 key={point}
-                className="rounded-card border border-[var(--border)] bg-[var(--card)] p-4 text-sm leading-6 text-[var(--text-primary)]"
+                className="rounded-card border border-[var(--border)] bg-[var(--card)] p-4 text-base text-[var(--text-primary)]"
               >
                 {point}
               </div>

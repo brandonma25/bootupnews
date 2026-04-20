@@ -139,7 +139,7 @@ export function SettingsPreferences({
           <h3 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
             Tune your personal briefing
           </h3>
-          <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+          <p className="mt-2 text-base text-[var(--text-secondary)]">
             {signedIn
               ? "Set the topics and entities that should pull strong events a little higher, while the confirmed-event quality floor stays intact."
               : "These preferences save on this browser for now. Sign in to use them across the full briefing flow."}
@@ -161,7 +161,7 @@ export function SettingsPreferences({
             <StatusBadge label={`${followedEntityCount} ${followedEntityCount === 1 ? "entity" : "entities"}`} active={followedEntityCount > 0} />
             <StatusBadge label={hasUnsavedChanges ? "Unsaved changes" : "Saved state"} active={!hasUnsavedChanges} />
           </div>
-          <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-sm leading-6 text-[var(--text-secondary)]">
+          <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-base text-[var(--text-secondary)]">
             <p>
               {personalizationSummary
                 ? `${personalizationSummary}. Strong matching events can move up, but weak or single-source items still stay constrained.`
@@ -176,7 +176,7 @@ export function SettingsPreferences({
             Briefing effect
           </p>
           <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">How the ranking changes</h4>
-          <div className="mt-4 space-y-2 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-sm leading-6 text-[var(--text-secondary)]">
+          <div className="mt-4 space-y-2 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-base text-[var(--text-secondary)]">
             <p>Confirmed multi-source events still dominate Top Events.</p>
             <p>Matching priorities can move strong events higher for you.</p>
             <p>Early Signals stay separate even when they match your interests.</p>
@@ -196,7 +196,7 @@ export function SettingsPreferences({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">Personalized ranking</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+              <p className="mt-1 text-base text-[var(--text-secondary)]">
                 Keep event quality first, then let your priorities shape the order.
               </p>
             </div>
@@ -238,7 +238,7 @@ export function SettingsPreferences({
             Topic preferences
           </p>
           <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Choose what should pull harder</h4>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="mt-2 text-base text-[var(--text-secondary)]">
             Keep this list tight. A few focused priorities produce the clearest personalization.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -270,10 +270,10 @@ export function SettingsPreferences({
             Save behavior
           </p>
           <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Local for now, explicit by design</h4>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="mt-2 text-base text-[var(--text-secondary)]">
             Preferences currently save to this browser. That keeps the foundation safe and predictable while account-backed persistence stays a follow-up.
           </p>
-          <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-sm leading-6 text-[var(--text-secondary)]">
+          <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-base text-[var(--text-secondary)]">
             <p>{hasUnsavedChanges ? "You have unsaved changes on this device." : "Your saved browser state matches the current selections."}</p>
             <p className="mt-2">{savedAt ? formatSavedAtLabel(savedAt) : "Nothing has been saved on this browser yet."}</p>
           </div>
@@ -285,7 +285,7 @@ export function SettingsPreferences({
           Followed entities
         </p>
         <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Add entities you want surfaced faster</h4>
-        <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="mt-2 text-base text-[var(--text-secondary)]">
           Use this for companies, institutions, leaders, or products you actively watch.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">

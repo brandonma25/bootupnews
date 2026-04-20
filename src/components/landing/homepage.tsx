@@ -103,11 +103,6 @@ export default function LandingHomepage({
           viewer={viewer}
           onSignIn={() => setAuthModalManuallyOpen(true)}
         />
-        <SessionStateBanner
-          signedIn={signedIn}
-          viewer={viewer}
-          onSignIn={() => setAuthModalManuallyOpen(true)}
-        />
 
         <div className="mt-8 space-y-10 lg:mt-10 lg:space-y-14">
           <HeroIntelligenceBlock
@@ -128,7 +123,7 @@ export default function LandingHomepage({
                   <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
                     This homepage is tuned to your tracked priorities
                   </h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+                  <p className="mt-2 max-w-2xl text-base text-[var(--text-secondary)]">
                     {personalizationSummary}. Matching confirmed events can surface a little earlier for you, while the core quality floor remains unchanged.
                   </p>
                 </div>
@@ -214,52 +209,6 @@ function getHomepageAuthMessage(authState?: string) {
   }
 }
 
-function SessionStateBanner({
-  signedIn,
-  viewer,
-  onSignIn,
-}: {
-  signedIn: boolean;
-  viewer: ViewerAccount | null;
-  onSignIn: () => void;
-}) {
-  return (
-    <section className="mt-5">
-      <Panel className={cn("p-4 sm:p-5", signedIn ? "border-[var(--border)]" : "border-[var(--border)]")}>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
-              Session state
-            </p>
-            <h2 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
-              {signedIn ? `Signed in as ${viewer?.displayName}` : "Signed out in public briefing mode"}
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
-              {signedIn
-                ? "Your account session is active, and refreshes should keep you in the personalized workspace."
-                : "You can browse the public homepage, but topics, sources, history, and personalization stay behind sign-in."}
-            </p>
-          </div>
-          {signedIn ? (
-            <div className="flex flex-wrap gap-2">
-              <Link href="/dashboard">
-                <Button className="px-5">Open dashboard</Button>
-              </Link>
-              <Link href="/settings#account-settings">
-                <Button variant="secondary" className="px-5">Account settings</Button>
-              </Link>
-            </div>
-          ) : (
-            <Button className="px-5" onClick={onSignIn}>
-              Sign in to unlock your workspace
-            </Button>
-          )}
-        </div>
-      </Panel>
-    </section>
-  );
-}
-
 function HomepageNav({
   signedIn,
   viewer,
@@ -274,7 +223,7 @@ function HomepageNav({
       <div className="mx-auto flex min-h-[56px] max-w-[1280px] flex-wrap items-center justify-between gap-3 lg:min-h-[64px] lg:flex-nowrap">
         <div className="flex min-w-0 items-center gap-4">
           <Link href="/" className="min-w-0">
-            <p className="text-[1.25rem] leading-none text-[var(--text-primary)] sm:text-[1.4rem]">
+            <p className="text-lg font-medium text-[var(--text-primary)] sm:text-xl">
               Daily Intelligence
             </p>
             <p className="mt-1 text-[11px] font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
@@ -301,13 +250,13 @@ function HomepageNav({
         <div className="flex items-center gap-3">
           {signedIn && viewer ? (
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{viewer.displayName}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Signed in</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{viewer.displayName}</p>
+              <p className="text-xs text-[var(--text-secondary)]">Personal workspace</p>
             </div>
           ) : (
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">You&apos;re viewing the public briefing</p>
-              <p className="text-xs text-[var(--text-secondary)]">Sign in to personalize your intelligence</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Public briefing</p>
+              <p className="text-xs text-[var(--text-secondary)]">Sign in to personalize</p>
             </div>
           )}
           {signedIn ? (
@@ -368,10 +317,10 @@ function HeroIntelligenceBlock({
             <Badge>{signedIn ? (mode === "live" ? "Personalized briefing" : "Briefing preview") : "Public briefing"}</Badge>
             <Badge>{formatBriefingDate(briefingDate)}</Badge>
           </div>
-          <h1 className="mt-6 max-w-3xl text-[2.35rem] font-semibold leading-[1.04] text-[var(--text-primary)] sm:text-[3rem] lg:text-[3.45rem]">
+          <h1 className="mt-6 max-w-3xl text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
             Preview a structured intelligence briefing before you unlock the full workspace.
           </h1>
-          <p className="mt-5 max-w-xl text-[15px] leading-7 text-[var(--text-secondary)] sm:text-[17px] sm:leading-8">
+          <p className="mt-5 max-w-xl text-base text-[var(--text-secondary)]">
             Daily Intelligence Aggregator turns scattered coverage into a structured intelligence briefing with confirmed events, visible ranking logic, and clearly separated early signals. This homepage stays public-facing while the dashboard unlocks the full workflow.
           </p>
           <p className="mt-5 text-sm font-medium text-[var(--text-primary)]/88">
@@ -646,7 +595,7 @@ function EventCard({
             {event.whyThisIsHere}
           </p>
           {event.personalization.active && event.personalization.shortReason ? (
-            <p className="mt-2 text-xs leading-5 text-[var(--text-primary)]">Higher for you: {event.personalization.shortReason}</p>
+            <p className="mt-2 text-xs text-[var(--text-primary)]">Higher for you: {event.personalization.shortReason}</p>
           ) : null}
         </div>
       </div>
@@ -666,7 +615,7 @@ function EventCard({
         <p
           className={cn(
             "mt-3 text-[var(--text-secondary)]",
-            emphatic ? "text-sm leading-7 lg:text-[15px]" : "text-sm leading-6",
+            emphatic ? "text-base lg:text-[15px]" : "text-base",
           )}
         >
           {event.summary}
@@ -712,7 +661,7 @@ function SignalStrip({ event }: { event: HomepageEvent }) {
         <MetaPill>{event.intelligence.recencyLabel}</MetaPill>
       </div>
       {event.rankingSignals.length ? (
-        <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{event.rankingSignals[0]}</p>
+        <p className="mt-3 text-base text-[var(--text-secondary)]">{event.rankingSignals[0]}</p>
       ) : null}
     </div>
   );
@@ -773,11 +722,11 @@ function WhyItMattersBlock({
       )}
     >
       <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-primary)]">Why it matters</p>
-      <p className="mt-2 text-sm leading-7 text-[var(--text-primary)]">{text}</p>
+      <p className="mt-2 text-base text-[var(--text-primary)]">{text}</p>
       <p className="mt-3 text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
         Why this ranks here
       </p>
-      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{whyThisIsHere}</p>
+      <p className="mt-2 text-base text-[var(--text-secondary)]">{whyThisIsHere}</p>
     </div>
   );
 }
@@ -814,12 +763,12 @@ function RelatedArticlesList({
               <p
                 className={cn(
                   "break-words font-semibold text-[var(--text-primary)]",
-                  compact ? "text-sm leading-5" : "text-sm leading-6",
+                  compact ? "text-sm" : "text-base",
                 )}
               >
                 {article.title}
               </p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
                 {article.sourceName}
                 {article.note ? ` • ${article.note}` : ""}
               </p>
@@ -846,10 +795,10 @@ function DelayedCtaSection({
           <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Daily briefing access
           </p>
-          <h2 className="mt-3 text-[2rem] leading-tight text-[var(--text-primary)] sm:text-[2.35rem]">
+          <h2 className="mt-3 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
             Get your daily intelligence briefing
           </h2>
-          <p className="mt-3 text-base leading-8 text-[var(--text-secondary)]">
+          <p className="mt-3 text-base text-[var(--text-secondary)]">
             Track the most important developments with context, prioritization, and less noise.
           </p>
         </div>
@@ -886,7 +835,7 @@ function SectionHeader({
       <h2
         className={cn(
           "mt-2 font-semibold tracking-normal text-[var(--text-primary)]",
-          compact ? "text-[1.45rem]" : "text-[1.8rem] lg:text-[2rem]",
+          compact ? "text-lg" : "text-xl md:text-2xl",
         )}
       >
         {title}
@@ -894,7 +843,7 @@ function SectionHeader({
       <p
         className={cn(
           "mt-2 text-[var(--text-secondary)]",
-          compact ? "text-sm leading-7" : "text-sm leading-7 lg:text-[15px]",
+          compact ? "text-base" : "text-base lg:text-[15px]",
         )}
       >
         {description}
@@ -920,7 +869,7 @@ function CoverageBuildingCard({ label }: { label: string }) {
       <h3 className="mt-3 text-lg font-semibold text-[var(--text-primary)]">
         More {label} coverage is on the way
       </h3>
-      <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+      <p className="mt-2 text-base text-[var(--text-secondary)]">
         This rail keeps its shape while we wait for more confirmed category-matched events.
       </p>
     </Panel>
@@ -934,10 +883,10 @@ function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
         <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
           Category status
         </p>
-        <h3 className="mt-3 text-[1.4rem] font-semibold text-[var(--text-primary)]">
+        <h3 className="mt-3 text-lg font-semibold text-[var(--text-primary)]">
           No updates yet — check back shortly
         </h3>
-        <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+        <p className="mt-3 max-w-2xl text-base text-[var(--text-secondary)]">
           We&apos;re keeping this section intentional while live coverage catches up, so it never collapses into an empty gap.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
@@ -952,7 +901,7 @@ function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
             Top events
           </a>
         </div>
-        <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">{section.emptyReason}</p>
+        <p className="mt-4 text-base text-[var(--text-secondary)]">{section.emptyReason}</p>
       </Panel>
 
       {section.fallbackEvents.length ? (
@@ -983,7 +932,7 @@ function EmptyCategoryState({ section }: { section: HomepageCategorySection }) {
 
 function StatusPanel({ title, body }: { title: string; body: string }) {
   return (
-    <Panel className="p-5 text-sm leading-7 text-[var(--text-secondary)]">
+    <Panel className="p-5 text-base text-[var(--text-secondary)]">
       <p className="font-semibold text-[var(--text-primary)]">{title}</p>
       <p className="mt-2">{body}</p>
     </Panel>
@@ -1074,7 +1023,7 @@ function DebugList({ title, rows }: { title: string; rows: string[] }) {
       <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
         {title}
       </p>
-      <div className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-primary)]">
+      <div className="mt-3 space-y-2 text-base text-[var(--text-primary)]">
         {rows.length ? rows.map((row) => <p key={row}>{row}</p>) : <p>No exclusions recorded.</p>}
       </div>
     </div>

@@ -48,7 +48,7 @@ export function GuestValuePreview({
           <h2 className={cn("mt-3 text-lg font-semibold text-[var(--text-primary)]", compact && "text-base")}>
             Sign in to personalize your intelligence
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="mt-2 max-w-2xl text-base text-[var(--text-secondary)]">
             Preview today&apos;s ranked briefing now, then unlock your own topics, saved briefings, and tailored monitoring when you sign in.
           </p>
           <Link
@@ -70,7 +70,7 @@ export function GuestValuePreview({
               <LockKeyhole className="h-4 w-4 text-[var(--text-secondary)]" />
               <span>{feature.title}</span>
             </div>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{feature.description}</p>
+            <p className="mt-2 text-base text-[var(--text-secondary)]">{feature.description}</p>
           </div>
         ))}
       </div>

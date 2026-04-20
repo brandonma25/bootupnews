@@ -18,7 +18,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const classes = cn(
-    "inline-flex items-center justify-center rounded-button px-4 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+    "inline-flex items-center justify-center rounded-button px-4 py-2 text-sm font-medium leading-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
     variant === "primary" &&
       "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] active:bg-[var(--accent-hover)]",
     variant === "secondary" &&

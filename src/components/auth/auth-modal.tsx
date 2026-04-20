@@ -127,21 +127,21 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           <div
             role="alert"
             aria-live="polite"
-            className="mb-4 rounded-card border border-[var(--error)] bg-[var(--card)] px-4 py-3 text-sm leading-6 text-[var(--error)]"
+            className="mb-4 rounded-card border border-[var(--error)] bg-[var(--card)] px-4 py-3 text-base text-[var(--error)]"
           >
             {visibleError}
           </div>
         ) : null}
 
         {configErrorMessage ? (
-          <div className="mb-4 rounded-card border border-[var(--error)] bg-[var(--card)] px-4 py-3 text-sm leading-6 text-[var(--error)]">
+          <div className="mb-4 rounded-card border border-[var(--error)] bg-[var(--card)] px-4 py-3 text-base text-[var(--error)]">
             {configErrorMessage}
           </div>
         ) : null}
 
         <div className="space-y-3">
           <GoogleAuthButton pending={googlePending} onClick={handleGoogleSignIn} disabled={!authConfigured} />
-          <p className="text-xs leading-5 text-[var(--text-secondary)]">
+          <p className="text-xs text-[var(--text-secondary)]">
             Google uses a full-page redirect flow through{" "}
             <span className="font-medium text-[var(--text-primary)]">/auth/callback</span>.
           </p>
@@ -193,11 +193,11 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           </div>
         </form>
 
-        <p className="mt-4 text-xs leading-5 text-[var(--text-secondary)]">
+        <p className="mt-4 text-xs text-[var(--text-secondary)]">
           Password sign-up uses the same onboarding bootstrap as Google. If your project requires email confirmation, you may be asked to verify your inbox before the session is ready.
         </p>
 
-        <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
+        <p className="mt-2 text-xs text-[var(--text-secondary)]">
           Trouble signing in? Check the Google OAuth redirect settings in Supabase and make sure the current environment URL is allowed as a callback.
         </p>
       </div>

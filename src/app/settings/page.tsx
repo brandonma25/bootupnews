@@ -184,7 +184,7 @@ export default async function SettingsPage() {
                       </Badge>
                     </div>
 
-                    <p className={`mt-3 text-xs leading-5 ${item.ready ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}`}>
+                    <p className={`mt-3 text-xs ${item.ready ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}`}>
                       {item.ready ? item.value : item.helpText}
                     </p>
 
@@ -216,7 +216,7 @@ export default async function SettingsPage() {
               <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
                 Personal preferences
               </h2>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+              <p className="mt-2 max-w-xl text-base text-[var(--text-secondary)]">
                 Settings that shape how each signed-in reader experiences the product.
               </p>
             </div>
@@ -278,11 +278,11 @@ export default async function SettingsPage() {
                   <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
                     {item.title}
                   </h3>
-                  <p className="mt-1.5 flex-1 text-xs leading-5 text-[var(--text-secondary)]">
+                  <p className="mt-1.5 flex-1 text-xs text-[var(--text-secondary)]">
                     {item.description}
                   </p>
                   {"supportingNote" in item ? (
-                    <p className="mt-3 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 px-3 py-2 text-xs leading-5 text-[var(--text-primary)]">
+                    <p className="mt-3 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 px-3 py-2 text-xs text-[var(--text-primary)]">
                       {item.supportingNote}
                     </p>
                   ) : null}
@@ -317,7 +317,7 @@ export default async function SettingsPage() {
             <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
               Ownership and controls
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="mt-2 max-w-xl text-base text-[var(--text-secondary)]">
               Account-level governance, privacy, and lifecycle controls.
             </p>
           </div>
@@ -357,7 +357,7 @@ export default async function SettingsPage() {
                   <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-button bg-[var(--warm)]">
                     <Icon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                   </span>
-                  <p className="text-sm leading-6 text-[var(--text-primary)]">{text}</p>
+                  <p className="text-base text-[var(--text-primary)]">{text}</p>
                 </div>
               ))}
             </div>

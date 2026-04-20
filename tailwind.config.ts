@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -21,24 +22,21 @@ const config: Config = {
         heading: ["var(--font-lora)", "Lora", "serif"],
       },
       fontSize: {
-        body: ["15px", { lineHeight: "1.6" }],
-        "body-mobile": ["14px", { lineHeight: "1.6" }],
-        "key-point": ["14px", { lineHeight: "1.6" }],
-        "key-point-mobile": ["13px", { lineHeight: "1.6" }],
-        label: ["14px", { lineHeight: "1.4" }],
-        meta: ["12px", { lineHeight: "1.4" }],
-        section: ["11px", { lineHeight: "1.4", fontWeight: "600" }],
-        button: ["14px", { lineHeight: "1.4", fontWeight: "500" }],
-        input: ["14px", { lineHeight: "1.5" }],
-        "briefing-card": ["22px", { lineHeight: "1.2", fontWeight: "600" }],
-        "briefing-card-mobile": ["18px", { lineHeight: "1.25", fontWeight: "600" }],
-        "briefing-detail": ["28px", { lineHeight: "1.18", fontWeight: "600" }],
-        "briefing-detail-mobile": ["22px", { lineHeight: "1.2", fontWeight: "600" }],
+        "2xs": ["11px", { lineHeight: "1.4" }],
+        xs: ["12px", { lineHeight: "1.4" }],
+        sm: ["14px", { lineHeight: "1.4" }],
+        base: ["15px", { lineHeight: "1.65" }],
+        lg: ["18px", { lineHeight: "1.35" }],
+        xl: ["22px", { lineHeight: "1.35" }],
+        "2xl": ["28px", { lineHeight: "1.3" }],
       },
       maxWidth: {
         content: "720px",
       },
       borderRadius: {
+        DEFAULT: "6px",
+        sm: "4px",
+        none: "0px",
         card: "6px",
         input: "6px",
         button: "6px",
@@ -47,6 +45,7 @@ const config: Config = {
       },
     },
   },
+  plugins: [],
 };
 
 export default config;
