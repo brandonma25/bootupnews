@@ -94,8 +94,23 @@ Retirement proof:
 9. Rebuild branches are allowed only after the canonical feature lane has been compared and a human explicitly approves rebuild over continuation.
 10. Retirement is allowed only after preservation evidence, remote branch state, and explicit human approval are all present.
 
+## Final Remediation Step: Hotspot Feature Merge Sequencing
+
+Do not merge the pushed PRD-44 through PRD-49 feature branches before the canonical-lane remediation is complete. These branches each represent protected feature work and may also touch the serialized governance hotspot `docs/product/feature-system.csv`, so merging them before the worktree/branch ownership cleanup is finished would preserve the same ambiguity this remediation is trying to remove.
+
+After canonical-lane decisions are complete for PRD-44 through PRD-49:
+
+1. Process feature branches one at a time from the owning worktree listed in this map.
+2. Do not batch-merge PRD-44 through PRD-49.
+3. Do not create replacement branches merely to satisfy a governance-gate failure when the canonical owner branch exists.
+4. For any PRD feature PR that changes `docs/product/feature-system.csv`, add or update a feature-specific governance-facing document, usually a concise `docs/engineering/change-records/...` note, in that same owner branch.
+5. Re-run the release governance gate and required validation for that branch before recommending merge.
+6. Merge and clean up one canonical feature lane before starting the next feature merge lane.
+
+Example: the PRD-47 failure in GitHub Actions job `72159412287` should be fixed on `feature/prd-47-home-states` in `/Users/bm/Documents/daily-intelligence-aggregator-home-states` by adding a PRD-47-specific governance change record for the `docs/product/feature-system.csv` hotspot update, not by merging all feature branches first and not by creating a new replacement branch.
+
 ## Phase 1 Result
 
 PRD-44 through PRD-49 now have one stated owner worktree and one stated canonical branch per PRD. The empty PRD-44 rebuild placeholder has been retired. Remaining ambiguity is concentrated in protected recovery artifacts and stale evidence branches.
 
-Next phase: continue canonical execution lane decisions one PRD at a time, starting with PRD-48, without deleting or bypassing preserved feature work.
+Next phase: continue canonical execution lane decisions one PRD at a time, starting with PRD-48, without deleting or bypassing preserved feature work. After the canonical-lane decisions are complete, follow the hotspot feature merge sequencing rule above before merging any PRD-44 through PRD-49 feature branch.
