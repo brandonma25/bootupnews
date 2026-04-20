@@ -2,6 +2,7 @@ import type {
   ExplanationPacket,
   TrustLayerDebug,
 } from "@/lib/integration/subsystem-contracts";
+import type { HomepageCategoryClassification } from "@/lib/homepage-taxonomy";
 import type { SignalRole } from "@/lib/output-sanity";
 
 export type Topic = {
@@ -116,6 +117,7 @@ export type BriefingItem = {
   eventIntelligence?: EventIntelligence;
   explanationPacket?: ExplanationPacket;
   trustDebug?: TrustLayerDebug;
+  homepageClassification?: HomepageCategoryClassification;
   signalRole?: SignalRole;
   displayState?: EventDisplayState;
   continuityKey?: string;
