@@ -129,7 +129,7 @@ Phase 3 retirement proof for PRD-44 through PRD-49 post-merge lanes:
 | --- | --- | --- | --- |
 | `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` | `fix/prd-50-artifact10-production-parity-followup` | Retired scoped fix lane | Dirty diff archived; worktree and local branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | Retired scoped fix lane | PR #75 was already merged; worktree, local branch, and remote branch retired |
-| `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | Scoped auth fix lane | Keep separate from PRD-44 auth entry forms unless explicitly coordinating |
+| `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | Retired scoped auth fix lane | PR #72 was already merged; worktree, leftover generated folder, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-global-style-spec` | `feature/prd-50-global-style-spec` | Scoped feature lane | Keep separate from PRD-44 through PRD-49 |
 | `/Users/bm/Documents/daily-intelligence-aggregator-ui-audit` | `feature/ui-audit-playwright-expansion` | Audit / testing lane at current `main` | Do not use for PRD-44 through PRD-49 feature work |
 
@@ -142,7 +142,7 @@ This audit was run after PRD-44 through PRD-49 post-merge retirement. It first i
 | `/Users/bm/Documents/daily-intelligence-aggregator-main` | `codex/update-worktree-attachment-rules` | Active remediation docs lane; branch has ownership-map and branch-contamination records not yet merged to `main`; untracked `recovery-audit-20260420-163146/` remains protected evidence | Not a retirement candidate | Keep as the current remediation documentation lane until its records are merged or explicitly superseded; preserve the recovery audit bundle |
 | `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-followup` | `fix/prd-50-artifact10-production-parity-followup` | Dirty tracked local work was archived at `docs/engineering/change-records/2026-04-21-artifact10-followup-dirty-state.patch`; local branch had zero committed branch-only commits against `origin/main`; dirty test diff was already present in `origin/main`; dirty button diff was stale relative to current `origin/main` because it would remove existing `asChild` support while retaining primary white text styling that already exists on `main` | Retired after proof and explicit approval on 2026-04-21 | Worktree and local branch retired; no same-name remote branch existed |
 | `/Users/bm/Documents/daily-intelligence-aggregator-artifact10-repair` | `fix/prd-50-artifact-10-parity-repair` | PR #75 merged; local and remote branch refs were contained in `origin/main`; generated `scripts/__pycache__/` state was removed after the dirty follow-up patch was archived | Retired after proof and explicit approval on 2026-04-21 | Worktree, local branch, and remote branch retired |
-| `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | PR #72 merged; worktree clean; branch contained in `origin/main`; remote branch still exists | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
+| `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` | `fix/auth-callback-provider-error-redirect` | PR #72 merged; worktree was clean; local and remote branch refs had zero branch-only commits against `origin/main`; Git unregistered the worktree, then left a non-repo folder containing generated install/build/test artifacts | Retired after proof and explicit approval on 2026-04-21 | Worktree registration, leftover folder, local branch, and remote branch retired |
 | `/Users/bm/Documents/daily-intelligence-aggregator-docs-worktree-attachment-rules` | `codex/docs-worktree-attachment-rules` | Draft PR #77 was closed as superseded; the one branch-only governance-protocol diff was archived at `docs/engineering/change-records/2026-04-21-pr-77-worktree-attachment-rule.patch`; the branch was behind `main` and included mandatory new-worktree language that conflicted with the current owning-worktree rule for existing branch continuation | Retired after proof on 2026-04-21 | Worktree, local branch, and remote branch retired; do not recreate or merge this stale governance lane as written |
 | `/Users/bm/Documents/daily-intelligence-aggregator-global-style-spec` | `feature/prd-50-global-style-spec` | PR #73 merged; worktree clean; local and remote branch are contained in `origin/main` | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
 | `/Users/bm/Documents/daily-intelligence-aggregator-main-docs-sequential` | `docs/sequential-prompt-execution-protocol` | PR #63 merged; worktree clean; local branch is behind its remote but both are contained in `origin/main` | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
@@ -150,8 +150,26 @@ This audit was run after PRD-44 through PRD-49 post-merge retirement. It first i
 | `/Users/bm/Documents/daily-intelligence-aggregator-worktree-branch-protocol` | `docs/prd-51-worktree-branch-protocol` | PR #74 merged; worktree clean; local branch is behind its remote but both are contained in `origin/main` | Candidate after approval | Safe-looking post-merge cleanup candidate, but delete only after explicit approval |
 
 Immediate priority after this audit:
-1. Ask for explicit approval before retiring the clean merged candidates: auth callback fix, PRD-50 global style spec, sequential prompt docs, and PRD-51 worktree branch protocol.
+1. Ask for explicit approval before retiring the remaining clean merged candidates: PRD-50 global style spec, sequential prompt docs, and PRD-51 worktree branch protocol.
 2. Preserve or decide the untracked UI audit report before retiring the UI audit worktree.
+
+### Auth Callback Fix Lane Retirement Audit
+
+The auth-callback fix lane was a clean post-merge cleanup candidate. It was retired only after merge and containment proof.
+
+Findings:
+- PR #72 was merged to `main`: `https://github.com/brandonma25/daily-intelligence-aggregator/pull/72`.
+- `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` was clean before removal.
+- `origin/main...fix/auth-callback-provider-error-redirect` had zero branch-only commits before retirement.
+- `origin/main...origin/fix/auth-callback-provider-error-redirect` had zero remote branch-only commits before retirement.
+- The branch was tracked against `origin/main` and was behind current `main`, not ahead of it.
+- `git worktree remove` unregistered the worktree but left a non-repo directory containing generated install/build/test artifacts such as `.next`, `node_modules`, `playwright-report`, and `test-results`; that leftover directory was removed after containment proof.
+
+Retirement proof:
+- The worktree path `/Users/bm/Documents/daily-intelligence-aggregator-auth-callback-fix` was absent after cleanup.
+- Local branch `fix/auth-callback-provider-error-redirect` was absent after cleanup.
+- Remote branch `origin/fix/auth-callback-provider-error-redirect` was absent after cleanup.
+- No feature branch, recovery artifact, stash entry, UI audit report, or unrelated worktree was touched.
 
 ### PR #77 Worktree Attachment Rule Lane Retirement Audit
 
