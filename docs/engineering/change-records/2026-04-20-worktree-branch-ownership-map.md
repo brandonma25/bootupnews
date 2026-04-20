@@ -422,3 +422,17 @@ Operational conclusion:
 - Recovery evidence no longer needs to appear as branch/worktree dirt in normal `git status`.
 - The remaining stashes are preservation refs, not active continuation lanes.
 - Future feature continuation should be based on the current owning branch/worktree for that feature, not on these historical stashes.
+
+## Phase 6 Stash Preservation Review
+
+The remaining stashes were reviewed in `docs/engineering/change-records/2026-04-21-stash-preservation-review.md`.
+
+Current classification:
+- `stash@{0}` remains protected PRD-43 responsive-shell source material; do not drop or apply wholesale.
+- `stash@{1}` is a low-risk retirement candidate because its single tracker-sync file matches the current canonical tracker-sync file.
+- `stash@{2}` remains protected historical importance-scoring source material; do not drop or apply wholesale.
+
+Operational conclusion:
+- No stash was applied, popped, dropped, moved, or rewritten.
+- `stash@{1}` should be the first stash considered for retirement, but only after explicit approval naming that stash.
+- `stash@{0}` and `stash@{2}` should remain protected until separate feature-port or archival decisions are made.
