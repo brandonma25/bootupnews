@@ -436,3 +436,21 @@ Operational conclusion:
 - No stash was applied, popped, dropped, moved, or rewritten.
 - `stash@{1}` should be the first stash considered for retirement, but only after explicit approval naming that stash.
 - `stash@{0}` and `stash@{2}` should remain protected until separate feature-port or archival decisions are made.
+
+## Phase 7 Duplicate Tracker-Sync Stash Retirement
+
+The low-risk duplicate tracker-sync stash was retired after explicit approval.
+
+Retirement proof:
+- Approved target before retirement: `stash@{1}` at `95bb9c71dfaf14b2c81544dd1f9d6cdc99ef0a89`.
+- Target contents: one untracked duplicate file, `docs/operations/tracker-sync/2026-04-19-explicit-default-source-ingestion 2.md`.
+- Preservation proof: the stash file content matched current `docs/operations/tracker-sync/2026-04-19-explicit-default-source-ingestion.md`.
+- Retired target: only `95bb9c71dfaf14b2c81544dd1f9d6cdc99ef0a89`.
+- Preserved stashes after retirement: `b34f620170fcc419b7dd7e280e0b8e91fae09882` and `6571ec2245d09a16eb4107f3c0c7cef8e6cab9da`.
+- Recovery bundle remained present after retirement.
+
+Operational conclusion:
+- The remaining stash count is two.
+- The current `stash@{0}` is the PRD-43 responsive-shell preservation stash.
+- The current `stash@{1}` is the historical importance-scoring preservation stash.
+- Both remaining stashes are feature-bearing and must remain protected until separate feature-port or archival decisions are made.

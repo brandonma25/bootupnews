@@ -79,6 +79,20 @@ The remaining stashes are preservation refs, not active continuation lanes. Futu
 4. Preserve evidence before any stash retirement.
 5. Drop a stash only after explicit approval naming that stash.
 
-## Next Recommendation
+## Retirement Update
 
-Review `stash@{1}` for retirement first. It is the only stash in this review that appears to contain no unique feature payload. Keep `stash@{0}` and `stash@{2}` protected until separate feature-port or archival decisions are made.
+The source-onboarding tracker-sync duplicate was retired after explicit approval.
+
+Retirement proof:
+- Approved target before retirement: `stash@{1}` at `95bb9c71dfaf14b2c81544dd1f9d6cdc99ef0a89`.
+- Approved target contents: one untracked file, `docs/operations/tracker-sync/2026-04-19-explicit-default-source-ingestion 2.md`.
+- Preservation proof: the stash file content matched current `docs/operations/tracker-sync/2026-04-19-explicit-default-source-ingestion.md`.
+- Retirement action: dropped only `stash@{1}` at `95bb9c71dfaf14b2c81544dd1f9d6cdc99ef0a89`.
+- Preserved after retirement: PRD-43 responsive-shell stash `b34f620170fcc419b7dd7e280e0b8e91fae09882`.
+- Preserved after retirement: historical importance-scoring stash `6571ec2245d09a16eb4107f3c0c7cef8e6cab9da`.
+- Recovery bundle remained present.
+
+Current recommendation:
+- Keep the two remaining feature-bearing stashes protected.
+- Do not apply either remaining stash wholesale.
+- Do not drop another stash without a separate explicit approval naming the exact stash and commit.
