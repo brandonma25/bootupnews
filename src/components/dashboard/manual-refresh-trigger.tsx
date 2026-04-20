@@ -20,15 +20,15 @@ export function ManualRefreshTrigger({
 }) {
   return (
     <div className="flex flex-col items-stretch gap-2 min-w-[168px]">
-      <div className="rounded-[22px] border border-[var(--line)] bg-white/70 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+      <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
           Reading window
         </p>
-        <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">
+        <p className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
           {readingWindow}
         </p>
         {readingMetrics ? (
-          <p className="mt-1 text-xs font-medium text-[var(--muted)]">
+          <p className="mt-1 text-xs font-medium text-[var(--text-secondary)]">
             {readingMetrics.progressLabel}
           </p>
         ) : null}

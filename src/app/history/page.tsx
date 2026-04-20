@@ -34,18 +34,18 @@ export default async function HistoryPage() {
 
         {/* Guest / demo context banners */}
         {isGuest ? (
-          <div className="flex flex-col gap-4 rounded-[22px] border border-[var(--line)] bg-white/70 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-card border border-[var(--border)] bg-[var(--card)] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-[var(--foreground)]">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
                 Sample history shown
               </p>
-              <p className="text-sm text-[var(--muted)]">
+              <p className="text-sm text-[var(--text-secondary)]">
                 Sign in to see your personal briefing history — every daily briefing you generate is saved here automatically.
               </p>
             </div>
             <Link
               href="/#email-access"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] bg-white/80 px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-white"
+              className="inline-flex shrink-0 items-center gap-2 rounded-button border border-[var(--border)] bg-[var(--card)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--card)]"
             >
               Sign in
             </Link>
@@ -53,7 +53,7 @@ export default async function HistoryPage() {
         ) : null}
 
         {isDemo ? (
-          <div className="rounded-[22px] border border-[var(--line)] bg-white/70 px-5 py-4 text-sm text-[var(--foreground)]">
+          <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-5 py-4 text-sm text-[var(--text-primary)]">
             Demo mode — sample briefing history shown.{" "}
             <Link href="/settings" className="font-semibold underline underline-offset-2">
               Connect Supabase
@@ -64,13 +64,13 @@ export default async function HistoryPage() {
 
         {history.length === 0 ? (
           <Panel className="p-10 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--warm)]">
-              <BookOpen className="h-5 w-5 text-[var(--muted)]" />
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-card bg-[var(--warm)]">
+              <BookOpen className="h-5 w-5 text-[var(--text-secondary)]" />
             </div>
-            <h2 className="mt-4 text-base font-semibold text-[var(--foreground)]">
+            <h2 className="mt-4 text-base font-semibold text-[var(--text-primary)]">
               No briefings yet
             </h2>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[var(--muted)]">
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[var(--text-secondary)]">
               Once you generate your first daily briefing from the{" "}
               <Link href="/dashboard" className="font-semibold underline underline-offset-2">
                 Today
@@ -84,13 +84,13 @@ export default async function HistoryPage() {
               <Panel key={briefing.id} className="p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                    <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                       {formatBriefingDate(briefing.briefingDate)}
                     </p>
-                    <h2 className="mt-2 text-lg font-semibold text-[var(--foreground)]">
+                    <h2 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
                       {briefing.title}
                     </h2>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
                       {briefing.intro}
                     </p>
                   </div>

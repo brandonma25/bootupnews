@@ -29,13 +29,11 @@ export function StoryCard({ item }: { item: BriefingItem }) {
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge>{item.topicName}</Badge>
-              {item.priority === "top" ? (
-                <Badge className="text-[var(--accent)]">Top event</Badge>
-              ) : null}
+              {item.priority === "top" ? <Badge className="text-[var(--text-primary)]">Top event</Badge> : null}
               <Badge>{sourceCount} {sourceCount === 1 ? "source" : "sources"}</Badge>
               {rankingDisplaySignals[0] ? <Badge>{rankingDisplaySignals[0]}</Badge> : null}
               {item.read ? (
-                <Badge className="text-[var(--muted)]">Read</Badge>
+                <Badge className="text-[var(--text-secondary)]">Read</Badge>
               ) : null}
             </div>
             <div>
@@ -45,29 +43,29 @@ export function StoryCard({ item }: { item: BriefingItem }) {
                   target="_blank"
                   rel="noreferrer"
                   className={cn(
-                    "inline-flex items-start gap-2 text-xl font-semibold tracking-tight underline-offset-4 hover:underline",
-                    item.read ? "text-[var(--muted)]" : "text-[var(--foreground)]",
+                    "briefing-title inline-flex items-start gap-2 underline-offset-4 hover:underline",
+                    item.read ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]",
                   )}
                 >
                   <span>{item.title}</span>
-                  <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-[var(--muted)]" />
+                  <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
                 </a>
               ) : (
                 <div>
                   <h3
                     className={cn(
-                      "text-xl font-semibold tracking-tight",
-                      item.read ? "text-[var(--muted)]" : "text-[var(--foreground)]",
+                      "briefing-title",
+                      item.read ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]",
                     )}
                   >
                     {item.title}
                   </h3>
-                  <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-[var(--muted)]">
+                  <p className="mt-1 text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                     Source unavailable
                   </p>
                 </div>
               )}
-              <p className="mt-1.5 text-sm font-medium text-[var(--muted)]">
+              <p className="mt-1.5 text-sm font-medium text-[var(--text-secondary)]">
                 {minutesToLabel(item.estimatedMinutes)}
               </p>
             </div>
@@ -79,14 +77,14 @@ export function StoryCard({ item }: { item: BriefingItem }) {
               <input type="hidden" name="current" value={String(item.read)} />
               <button
                 className={cn(
-                  "flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition-colors",
+                  "flex items-center gap-2 rounded-button border px-3 py-2 text-sm transition-colors",
                   item.read
-                    ? "border-[rgba(31,79,70,0.18)] bg-[rgba(31,79,70,0.06)] text-[var(--accent)]"
-                    : "border-[var(--line)] bg-white/60 text-[var(--muted)] hover:bg-white",
+                    ? "border-[var(--border)] bg-[var(--sidebar)] text-[var(--text-primary)]"
+                    : "border-[var(--border)] bg-[var(--card)] text-[var(--text-secondary)] hover:bg-[var(--card)]",
                 )}
               >
                 {item.read ? (
-                  <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
+                  <CheckCircle2 className="h-4 w-4 text-[var(--text-primary)]" />
                 ) : (
                   <Circle className="h-4 w-4" />
                 )}
@@ -97,20 +95,20 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </div>
 
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             What happened
           </p>
-          <p className="text-sm leading-7 text-[var(--foreground)]">{item.whatHappened}</p>
+          <p className="text-sm leading-7 text-[var(--text-primary)]">{item.whatHappened}</p>
         </section>
 
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Key points
           </p>
-          <ul className="space-y-2 text-sm leading-7 text-[var(--foreground)]">
+          <ul className="space-y-2 text-sm leading-7 text-[var(--text-primary)]">
             {item.keyPoints.map((point) => (
               <li key={point} className="flex gap-3">
-                <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+                <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-button bg-[var(--text-secondary)]" />
                 <span>{point}</span>
               </li>
             ))}
@@ -118,10 +116,10 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </section>
 
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Why this ranks
           </p>
-          <p className="text-sm leading-7 text-[var(--foreground)]">
+          <p className="text-sm leading-7 text-[var(--text-primary)]">
             {item.eventIntelligence?.rankingReason ??
               item.rankingSignals?.[0] ??
               "This event rose because it cleared the current ranking thresholds."}
@@ -131,7 +129,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
               {rankingDisplaySignals.slice(1).map((signal) => (
                 <span
                   key={signal}
-                  className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-2.5 py-1 text-xs font-medium text-[var(--muted)]"
+                  className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]"
                 >
                   {signal}
                 </span>
@@ -143,27 +141,27 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         {item.explanationPacket?.connection_layer ? (
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                 Connections
               </p>
-              <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-2.5 py-1 text-xs font-medium text-[var(--muted)]">
+              <span className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]">
                 {item.explanationPacket.connection_layer.connection_confidence} confidence
               </span>
             </div>
             <div className="space-y-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   What led to this
                 </p>
-                <p className="mt-1 text-sm leading-7 text-[var(--foreground)]">
+                <p className="mt-1 text-sm leading-7 text-[var(--text-primary)]">
                   {item.explanationPacket.connection_layer.what_led_to_this}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   What it connects to
                 </p>
-                <p className="mt-1 text-sm leading-7 text-[var(--foreground)]">
+                <p className="mt-1 text-sm leading-7 text-[var(--text-primary)]">
                   {item.explanationPacket.connection_layer.what_it_connects_to}
                 </p>
               </div>
@@ -174,8 +172,8 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         <section className="space-y-2" data-trust-tier={trustLayer.tier}>
           <p
             className={cn(
-              "text-xs font-semibold uppercase tracking-[0.18em]",
-              trustLayer.tier === "high" ? "text-[var(--accent)]" : "text-[var(--muted)]",
+              "text-xs font-semibold uppercase tracking-normal",
+              trustLayer.tier === "high" ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]",
             )}
           >
             {trustLayer.heading}
@@ -183,8 +181,8 @@ export function StoryCard({ item }: { item: BriefingItem }) {
           <p
             className={cn(
               trustLayer.tier === "low"
-                ? "text-xs font-medium uppercase tracking-[0.14em] text-[var(--muted)]"
-                : "text-sm leading-7 text-[var(--foreground)]",
+                ? "text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]"
+                : "text-sm leading-7 text-[var(--text-primary)]",
             )}
           >
             {trustLayer.body}
@@ -194,7 +192,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
               {trustLayer.supportingSignals.map((signal) => (
                 <span
                   key={signal}
-                  className="inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-2.5 py-1 text-xs font-medium text-[var(--muted)]"
+                  className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]"
                 >
                   {signal}
                 </span>
@@ -204,7 +202,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </section>
 
         <section className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Related coverage
           </p>
           <div className="flex flex-wrap gap-2">
@@ -219,18 +217,18 @@ export function StoryCard({ item }: { item: BriefingItem }) {
                   href={source.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/70 px-3 py-2 text-sm font-medium text-[var(--foreground)] underline-offset-2 transition-colors hover:bg-white hover:underline"
+                  className="inline-flex items-center gap-2 rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] underline-offset-2 transition-colors hover:bg-[var(--card)] hover:underline"
                 >
                   {source.sourceName}: {source.title}
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
                 </a>
               ) : (
                 <span
                   key={`${source.sourceName}-${source.title}-${source.url}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/50 px-3 py-2 text-sm font-medium text-[var(--muted)]"
+                  className="inline-flex items-center gap-2 rounded-button border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)]"
                 >
                   {source.sourceName}: {source.title}
-                  <span className="text-xs uppercase tracking-[0.14em]">Unavailable</span>
+                  <span className="text-xs uppercase tracking-normal">Unavailable</span>
                 </span>
               ),
             )}
@@ -238,7 +236,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </section>
 
         <section className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
             Timeline
           </p>
           <TimelineBlock timeline={item.timeline} />
@@ -251,30 +249,30 @@ export function StoryCard({ item }: { item: BriefingItem }) {
 function TimelineBlock({ timeline }: { timeline: BriefingItem["timeline"] }) {
   if (!timeline?.length) {
     return (
-      <div className="rounded-[20px] border border-dashed border-[var(--line)] bg-white/40 px-4 py-4 text-sm text-[var(--muted)]">
+      <div className="rounded-card border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-4 text-sm text-[var(--text-secondary)]">
         No timeline available yet
       </div>
     );
   }
 
   return (
-    <div className="rounded-[20px] border border-[var(--line)] bg-white/55 px-4 py-4">
+    <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4">
       <div className="space-y-4">
         {timeline.map((group) => (
           <div key={group.dateKey} className="grid gap-3 md:grid-cols-[84px_minmax(0,1fr)]">
             <div className="flex items-start gap-2">
-              <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--accent)]" />
-              <p className="text-sm font-semibold text-[var(--foreground)]">{group.dateLabel}</p>
+              <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-button bg-[var(--text-secondary)]" />
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{group.dateLabel}</p>
             </div>
             <div className="space-y-3">
               {group.entries.map((entry) => (
                 <div
                   key={`${group.dateKey}-${entry.source}-${entry.title}`}
-                  className="rounded-[16px] border border-[var(--line)] bg-white/70 px-3 py-3"
+                  className="rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3"
                 >
-                  <p className="text-sm font-semibold leading-6 text-[var(--foreground)]">{entry.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{entry.summary}</p>
-                  <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-[var(--muted)]">
+                  <p className="text-sm font-semibold leading-6 text-[var(--text-primary)]">{entry.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{entry.summary}</p>
+                  <p className="mt-1 text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                     {entry.source}
                   </p>
                 </div>
@@ -284,7 +282,7 @@ function TimelineBlock({ timeline }: { timeline: BriefingItem["timeline"] }) {
         ))}
       </div>
       {timeline.reduce((count, group) => count + group.entries.length, 0) === 1 ? (
-        <p className="mt-4 text-sm font-medium text-[var(--muted)]">
+        <p className="mt-4 text-sm font-medium text-[var(--text-secondary)]">
           Developing story — more updates coming
         </p>
       ) : null}

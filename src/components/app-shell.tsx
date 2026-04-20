@@ -104,7 +104,7 @@ export function AppShell({
         aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
         aria-controls={mobileDrawerId}
         aria-expanded={mobileOpen}
-        className="fixed left-4 top-4 z-[60] inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--foreground)] shadow-[0_12px_32px_rgba(19,26,34,0.12)] transition-colors lg:hidden"
+        className="fixed left-4 top-4 z-[60] inline-flex h-12 w-12 items-center justify-center rounded-button border border-[var(--border)] bg-[var(--card)] text-[var(--text-primary)] transition-colors hover:border-[var(--text-secondary)] lg:hidden"
         onClick={() => setMobileOpen((value) => !value)}
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -113,7 +113,7 @@ export function AppShell({
       {/* Mobile overlay */}
       <div
         className={cn(
-          "fixed inset-0 z-50 bg-[rgba(19,26,34,0.24)] backdrop-blur-[2px] transition-opacity duration-200 lg:hidden",
+          "fixed inset-0 z-50 bg-[rgba(26,26,24,0.24)] transition-opacity duration-200 lg:hidden",
           mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
         )}
         aria-hidden={!mobileOpen}
@@ -121,7 +121,7 @@ export function AppShell({
       >
         <div
           className={cn(
-            "flex h-full max-w-[320px] p-4 transition-transform duration-200 ease-out",
+            "flex h-full max-w-[320px] p-4 transition-colors duration-200 ease-out",
             mobileOpen ? "translate-x-0" : "-translate-x-full",
           )}
           onClick={(event) => event.stopPropagation()}
@@ -158,10 +158,10 @@ export function AppShell({
       <main className="min-w-0 flex-1">
         <div className="mb-3 flex min-h-[3rem] items-start justify-end gap-3 pl-14 lg:mb-4 lg:min-h-0 lg:pl-0">
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Badge className={account ? "text-[var(--accent)]" : ""}>
+            <Badge className={account ? "text-[var(--text-primary)]" : ""}>
               {account ? "Signed in" : "Public briefing"}
             </Badge>
-            <Badge className={mode === "live" ? "text-[var(--accent)]" : ""}>
+            <Badge className={mode === "live" ? "text-[var(--text-primary)]" : ""}>
               {mode === "live" ? "Personalized" : mode === "public" ? "Live preview" : "Demo preview"}
             </Badge>
           </div>
@@ -193,30 +193,27 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
         aria-label="Open account menu"
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-3 rounded-full border px-2 py-2 shadow-[0_12px_28px_rgba(19,26,34,0.10)] backdrop-blur transition-colors",
-          signedIn
-            ? "border-[rgba(31,79,70,0.14)] bg-[rgba(255,255,255,0.92)]"
-            : "border-[rgba(19,26,34,0.10)] bg-[rgba(231,233,236,0.92)]",
+          "flex items-center gap-3 rounded-button border border-[var(--border)] bg-[var(--card)] px-2 py-2 transition-colors hover:border-[var(--text-secondary)]",
         )}
         onClick={() => setOpen((v) => !v)}
       >
         <span
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold",
-            signedIn ? "bg-[var(--foreground)] text-white" : "bg-[rgba(19,26,34,0.12)] text-[var(--foreground)]",
+            "flex h-9 w-9 items-center justify-center rounded-button text-sm font-semibold",
+            signedIn ? "bg-[var(--text-primary)] text-white" : "bg-[var(--sidebar)] text-[var(--text-primary)]",
           )}
         >
           {signedIn ? account?.initials : <UserRound className="h-4 w-4" />}
         </span>
         <span className="hidden min-w-0 text-left md:block">
-          <span className="block truncate text-sm font-semibold text-[var(--foreground)]">
+          <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">
             {signedIn ? account?.displayName : "Account"}
           </span>
-          <span className="block truncate text-xs text-[var(--muted)]">
+          <span className="block truncate text-xs text-[var(--text-secondary)]">
             {signedIn ? account?.email : "Sign in to personalize your intelligence"}
           </span>
         </span>
-        <ChevronDown className={cn("mr-1 h-4 w-4 text-[var(--muted)] transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("mr-1 h-4 w-4 text-[var(--text-secondary)] transition-colors", open && "rotate-180")} />
       </button>
 
       {open ? (
@@ -224,17 +221,17 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
           <div className="flex items-start gap-3">
             <span
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                signedIn ? "bg-[var(--foreground)] text-white" : "bg-[rgba(19,26,34,0.12)] text-[var(--foreground)]",
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-button text-sm font-semibold",
+                signedIn ? "bg-[var(--text-primary)] text-white" : "bg-[var(--sidebar)] text-[var(--text-primary)]",
               )}
             >
               {signedIn ? account?.initials : <UserRound className="h-4 w-4" />}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+              <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                 {signedIn ? account?.displayName : "You&apos;re viewing the public briefing"}
               </p>
-              <p className="truncate text-xs text-[var(--muted)]">
+              <p className="truncate text-xs text-[var(--text-secondary)]">
                 {signedIn ? account?.email : "Sign in to personalize your intelligence."}
               </p>
             </div>
@@ -245,19 +242,19 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
               <>
                 <Link
                   href="/settings#account-settings"
-                  className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-white/70 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
+                  className="flex items-center justify-between rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--card)]"
                   onClick={() => setOpen(false)}
                 >
                   <span>Account settings</span>
-                  <PanelTopOpen className="h-4 w-4 text-[var(--muted)]" />
+                  <PanelTopOpen className="h-4 w-4 text-[var(--text-secondary)]" />
                 </Link>
                 <Link
                   href="/settings#account-management"
-                  className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-white/70 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
+                  className="flex items-center justify-between rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--card)]"
                   onClick={() => setOpen(false)}
                 >
                   <span>Account management</span>
-                  <PanelTopOpen className="h-4 w-4 text-[var(--muted)]" />
+                  <PanelTopOpen className="h-4 w-4 text-[var(--text-secondary)]" />
                 </Link>
                 <form action={signOutAction}>
                   <Button type="submit" variant="secondary" className="mt-1 w-full">
@@ -267,11 +264,11 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
               </>
             ) : (
               <>
-                <div className="rounded-[18px] border border-[var(--line)] bg-[rgba(245,241,233,0.62)] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                     Unlock with sign-in
                   </p>
-                  <div className="mt-3 space-y-2 text-sm text-[var(--foreground)]">
+                  <div className="mt-3 space-y-2 text-sm text-[var(--text-primary)]">
                     <p>Personalized topics</p>
                     <p>Saved history</p>
                     <p>Custom alerts</p>
@@ -279,13 +276,13 @@ function AccountMenu({ account }: { account?: ViewerAccount | null }) {
                 </div>
                 <Link
                   href="/#email-access"
-                  className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-white/70 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-white"
+                  className="flex items-center justify-between rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--card)]"
                   onClick={() => setOpen(false)}
                 >
                   <span>Sign in to personalize</span>
-                  <PanelTopOpen className="h-4 w-4 text-[var(--muted)]" />
+                  <PanelTopOpen className="h-4 w-4 text-[var(--text-secondary)]" />
                 </Link>
-                <p className="px-1 pt-1 text-xs leading-5 text-[var(--muted)]">
+                <p className="px-1 pt-1 text-xs leading-5 text-[var(--text-secondary)]">
                   Use the homepage sign-in flow to continue with Google or your existing email-based auth options.
                 </p>
               </>
@@ -341,16 +338,16 @@ function SidebarPanel({
           {collapsed && !mobile ? (
             <div className="flex w-full flex-col items-center gap-3">
               <Badge className="px-2.5 py-1 text-xs">DI</Badge>
-              <p className="text-center text-lg font-bold text-[var(--foreground)]">DIA</p>
+              <p className="text-center text-lg font-bold text-[var(--text-primary)]">DIA</p>
             </div>
           ) : (
             <div className="space-y-2">
               <Badge>Daily Intelligence</Badge>
               <div>
-                <h1 className="display-font text-2xl leading-none text-[var(--foreground)]">
+                <h1 className="text-2xl font-semibold leading-none text-[var(--text-primary)]">
                   Aggregator
                 </h1>
-                <p className="mt-1.5 text-xs leading-5 text-[var(--muted)]">
+                <p className="mt-1.5 text-xs leading-5 text-[var(--text-secondary)]">
                   High-signal daily briefings for fast executive scanning.
                 </p>
               </div>
@@ -361,7 +358,7 @@ function SidebarPanel({
             <button
               type="button"
               aria-label="Close navigation"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--line)] bg-white/60 text-[var(--foreground)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-button border border-[var(--border)] bg-[var(--card)] text-[var(--text-primary)]"
               onClick={onClose}
             >
               <X className="h-4 w-4" />
@@ -372,7 +369,7 @@ function SidebarPanel({
               variant="secondary"
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
-              className="h-9 w-9 shrink-0 rounded-xl px-0"
+              className="h-9 w-9 shrink-0 rounded-button px-0"
               onClick={onToggleCollapse}
             >
               {collapsed ? (
@@ -395,13 +392,13 @@ function SidebarPanel({
                 href={item.href}
                 title={collapsed && !mobile ? item.label : undefined}
                 className={cn(
-                  "flex items-center rounded-xl text-sm font-medium transition-colors",
+                  "flex items-center rounded-none border-l-2 text-sm font-medium transition-colors",
                   collapsed && !mobile
                     ? "justify-center px-0 py-2.5"
                     : "gap-3 px-3 py-2.5",
                   active
-                    ? "bg-[var(--foreground)] text-white"
-                    : "text-[var(--foreground)] hover:bg-white/60",
+                    ? "border-l-[var(--accent)] bg-[var(--sidebar)] text-[var(--text-primary)]"
+                    : "border-l-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
                 )}
                 onClick={handleMobileNavigation}
               >
@@ -416,18 +413,18 @@ function SidebarPanel({
       <div className="mt-6 space-y-3">
         {/* Mobile: account section */}
         {mobile ? (
-          <div className="rounded-[20px] border border-[var(--line)] bg-white/60 p-4">
+          <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-4">
             {account ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] text-sm font-semibold text-white">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-button bg-[var(--text-primary)] text-sm font-semibold text-white">
                     {account.initials}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                       {account.displayName}
                     </p>
-                    <p className="truncate text-xs text-[var(--muted)]">{account.email}</p>
+                    <p className="truncate text-xs text-[var(--text-secondary)]">{account.email}</p>
                   </div>
                 </div>
                 <form action={signOutAction}>
@@ -439,12 +436,12 @@ function SidebarPanel({
             ) : (
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold text-[var(--foreground)]">You&apos;re viewing the public briefing</p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">You&apos;re viewing the public briefing</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
                     Sign in to personalize your intelligence.
                   </p>
                 </div>
-                <div className="rounded-[16px] border border-dashed border-[rgba(19,26,34,0.12)] bg-white/60 px-3 py-3 text-xs leading-5 text-[var(--foreground)]">
+                <div className="rounded-card border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-3 text-xs leading-5 text-[var(--text-primary)]">
                   Personalized topics, saved history, and custom alerts unlock when you sign in.
                 </div>
                 <Link
@@ -462,28 +459,28 @@ function SidebarPanel({
         {/* Mode indicator */}
         <div
           className={cn(
-            "rounded-[20px] border border-[var(--line)] bg-[var(--warm)]/70",
+            "rounded-card border border-[var(--border)] bg-[var(--sidebar)]",
             collapsed && !mobile ? "p-3" : "p-4",
           )}
         >
           {collapsed && !mobile ? (
-            <p className="text-center text-xs font-semibold uppercase tracking-[0.15em] text-[var(--muted)]">
+            <p className="text-center text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               {mode === "demo" ? "Demo" : mode === "public" ? "Pub" : "Live"}
             </p>
           ) : (
             <>
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                   Mode
                 </p>
                 <span
                   className={cn(
-                    "h-2 w-2 rounded-full",
-                    mode === "live" ? "bg-[var(--accent)]" : "bg-[var(--muted)]/50",
+                    "h-2 w-2 rounded-button",
+                    mode === "live" ? "bg-[var(--text-primary)]" : "bg-[var(--text-secondary)]/50",
                   )}
                 />
               </div>
-              <p className="mt-2 text-xs leading-5 text-[var(--foreground)]">{modeText}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-primary)]">{modeText}</p>
               {mode !== "live" ? (
                 <Link
                   href="/settings"

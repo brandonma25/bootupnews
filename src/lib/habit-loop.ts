@@ -139,9 +139,9 @@ export function getDisplayStateLabel(state?: EventDisplayState) {
 }
 
 export function getDisplayStateTone(state?: EventDisplayState) {
-  if (state === "new") return "text-[var(--accent)]";
-  if (state === "changed") return "text-[#7A4E1D]";
-  if (state === "escalated") return "text-[#9C2F2F]";
+  if (state === "new") return "text-[var(--text-primary)]";
+  if (state === "changed") return "text-[var(--text-secondary)]";
+  if (state === "escalated") return "text-[var(--text-primary)]";
   return "text-[var(--muted)]";
 }
 

@@ -8,7 +8,7 @@ export default function HeroSection({ onGetStarted }: Props) {
   return (
     <section className="flex flex-col items-center justify-center text-center px-6 py-24">
       <div className="mx-auto max-w-3xl">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl">
+        <h1 className="mb-4 text-4xl font-bold tracking-normal text-[var(--text-primary)] sm:text-5xl">
           Understand the news in 10 minutes, not 60.
         </h1>
 
@@ -19,7 +19,7 @@ export default function HeroSection({ onGetStarted }: Props) {
         <button
           type="button"
           onClick={onGetStarted}
-          className="inline-flex items-center justify-center rounded-full bg-[var(--foreground)] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(19,26,34,0.18)] transition-transform duration-150 hover:-translate-y-0.5"
+          className="inline-flex items-center justify-center rounded-button bg-[var(--accent)] px-6 py-3 text-sm font-medium text-white transition-colors duration-150 hover:bg-[var(--accent-hover)]"
         >
           Get Started
         </button>
