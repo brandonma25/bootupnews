@@ -8,7 +8,7 @@ export function Panel({
   ...props
 }: PropsWithChildren<ComponentPropsWithoutRef<"div">>) {
   return (
-    <div className={cn("glass-panel rounded-[28px]", className)} {...props}>
+    <div className={cn("glass-panel rounded-card", className)} {...props}>
       {children}
     </div>
   );

@@ -33,22 +33,22 @@ export function GuestValuePreview({
   return (
     <div
       className={cn(
-        "rounded-[24px] border border-[rgba(19,26,34,0.08)] bg-[rgba(245,241,233,0.72)] p-5",
+        "rounded-card border border-[var(--border)] bg-[var(--bg)] p-5",
         className,
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgba(19,26,34,0.08)] text-[var(--foreground)]">
+        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-[var(--sidebar)] text-[var(--text-primary)]">
           <Sparkles className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <Badge className="border-[rgba(19,26,34,0.08)] bg-white/70 text-[var(--foreground)]">
+          <Badge className="border-[var(--border)] bg-[var(--card)] text-[var(--text-primary)]">
             You&apos;re viewing the public briefing
           </Badge>
-          <h2 className={cn("mt-3 text-lg font-semibold text-[var(--foreground)]", compact && "text-base")}>
+          <h2 className={cn("mt-3 text-lg font-semibold text-[var(--text-primary)]", compact && "text-base")}>
             Sign in to personalize your intelligence
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+          <p className="mt-2 max-w-2xl text-base text-[var(--text-secondary)]">
             Preview today&apos;s ranked briefing now, then unlock your own topics, saved briefings, and tailored monitoring when you sign in.
           </p>
           <Link
@@ -64,13 +64,13 @@ export function GuestValuePreview({
         {lockedFeatures.map((feature) => (
           <div
             key={feature.title}
-            className="rounded-[18px] border border-dashed border-[rgba(19,26,34,0.12)] bg-white/65 px-4 py-4"
+            className="rounded-card border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-4"
           >
-            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
-              <LockKeyhole className="h-4 w-4 text-[var(--muted)]" />
+            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+              <LockKeyhole className="h-4 w-4 text-[var(--text-secondary)]" />
               <span>{feature.title}</span>
             </div>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{feature.description}</p>
+            <p className="mt-2 text-base text-[var(--text-secondary)]">{feature.description}</p>
           </div>
         ))}
       </div>

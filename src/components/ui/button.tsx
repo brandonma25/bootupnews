@@ -1,31 +1,44 @@
-import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, PropsWithChildren } from "react";
 
 import { cn } from "@/lib/utils";
 
-type ButtonProps = PropsWithChildren<
-  ButtonHTMLAttributes<HTMLButtonElement> & {
+type BaseButtonProps = PropsWithChildren<{
     variant?: "primary" | "secondary" | "ghost";
-  }
->;
+  }>;
+
+type ButtonProps =
+  | (BaseButtonProps & ButtonHTMLAttributes<HTMLButtonElement> & { as?: "button" })
+  | (BaseButtonProps & AnchorHTMLAttributes<HTMLAnchorElement> & { as: "a" });
 
 export function Button({
+  as = "button",
   children,
   className,
   variant = "primary",
   ...props
 }: ButtonProps) {
+  const classes = cn(
+    "inline-flex items-center justify-center rounded-button px-4 py-2 text-sm font-medium leading-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+    variant === "primary" &&
+      "bg-[var(--accent)] !text-[#FFFFFF] hover:bg-[var(--accent-hover)] hover:!text-[#FFFFFF] active:bg-[var(--accent-hover)] active:!text-[#FFFFFF]",
+    variant === "secondary" &&
+      "border border-[var(--text-primary)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg)] active:bg-[var(--sidebar)]",
+    variant === "ghost" && "text-[var(--text-primary)] hover:bg-[var(--bg)] active:bg-[var(--sidebar)]",
+    className,
+  );
+
+  if (as === "a") {
+    return (
+      <a className={classes} {...(props as AnchorHTMLAttributes<HTMLAnchorElement>)}>
+        {children}
+      </a>
+    );
+  }
+
   return (
     <button
-      className={cn(
-        "inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition-transform duration-150 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50",
-        variant === "primary" &&
-          "bg-[var(--foreground)] text-white shadow-[0_12px_30px_rgba(19,26,34,0.18)]",
-        variant === "secondary" &&
-          "border border-[var(--line-strong)] bg-[var(--surface-strong)] text-[var(--foreground)]",
-        variant === "ghost" && "text-[var(--foreground)]",
-        className,
-      )}
-      {...props}
+      className={classes}
+      {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
     >
       {children}
     </button>

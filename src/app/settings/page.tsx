@@ -129,18 +129,18 @@ export default async function SettingsPage() {
         {allConnected ? (
           <Panel className="p-4">
             <div className="flex flex-wrap items-center gap-4">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[rgba(31,79,70,0.10)]">
-                <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card bg-[var(--sidebar)]">
+                <CheckCircle2 className="h-4 w-4 text-[var(--text-primary)]" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[var(--foreground)]">All services connected</p>
-                <p className="text-xs text-[var(--muted)]">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">All services connected</p>
+                <p className="text-xs text-[var(--text-secondary)]">
                   Supabase and AI provider are live. The app is running in connected mode.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className="text-[var(--accent)]">Supabase</Badge>
-                <Badge className="text-[var(--accent)]">AI provider</Badge>
+                <Badge className="text-[var(--text-primary)]">Supabase</Badge>
+                <Badge className="text-[var(--text-primary)]">AI provider</Badge>
               </div>
             </div>
           </Panel>
@@ -149,16 +149,16 @@ export default async function SettingsPage() {
             {/* Progress indicator */}
             <Panel className="p-4">
               <div className="flex items-center justify-between gap-4">
-                <p className="text-sm font-semibold text-[var(--foreground)]">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
                   Setup progress
                 </p>
-                <Badge className={connectedCount === 3 ? "text-[var(--accent)]" : ""}>
+                <Badge className={connectedCount === 3 ? "text-[var(--text-primary)]" : ""}>
                   {connectedCount} / 3 connected
                 </Badge>
               </div>
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--line)]">
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-button bg-[var(--border)]">
                 <div
-                  className="h-full rounded-full bg-[var(--accent)] transition-all"
+                  className="h-full rounded-button bg-[var(--text-primary)] transition-all"
                   style={{ width: `${(connectedCount / 3) * 100}%` }}
                 />
               </div>
@@ -172,19 +172,19 @@ export default async function SettingsPage() {
                   <Panel key={item.label} className="p-5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${item.ready ? "bg-[rgba(31,79,70,0.10)]" : "bg-[var(--warm)]"}`}>
-                          <Icon className={`h-4 w-4 ${item.ready ? "text-[var(--accent)]" : "text-[var(--muted)]"}`} />
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-card ${item.ready ? "bg-[var(--sidebar)]" : "bg-[var(--warm)]"}`}>
+                          <Icon className={`h-4 w-4 ${item.ready ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`} />
                         </span>
-                        <p className="text-sm font-semibold text-[var(--foreground)] truncate">
+                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
                           {item.label}
                         </p>
                       </div>
-                      <Badge className={item.ready ? "shrink-0 text-[var(--accent)]" : "shrink-0"}>
+                      <Badge className={item.ready ? "shrink-0 text-[var(--text-primary)]" : "shrink-0"}>
                         {item.ready ? "Ready" : "Pending"}
                       </Badge>
                     </div>
 
-                    <p className={`mt-3 text-xs leading-5 ${item.ready ? "text-[var(--muted)]" : "text-[var(--foreground)]"}`}>
+                    <p className={`mt-3 text-xs ${item.ready ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}`}>
                       {item.ready ? item.value : item.helpText}
                     </p>
 
@@ -210,32 +210,32 @@ export default async function SettingsPage() {
         <Panel id="account-settings" className="scroll-mt-24 p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
                 Account settings
               </p>
-              <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
+              <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
                 Personal preferences
               </h2>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-2 max-w-xl text-base text-[var(--text-secondary)]">
                 Settings that shape how each signed-in reader experiences the product.
               </p>
             </div>
 
             {viewer ? (
-              <div className="flex shrink-0 items-center gap-3 rounded-[22px] border border-[var(--line)] bg-white/70 px-4 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] text-sm font-semibold text-white">
+              <div className="flex shrink-0 items-center gap-3 rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-button bg-[var(--text-primary)] text-sm font-semibold text-white">
                   {viewer.initials}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                  <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                     {viewer.displayName}
                   </p>
-                  <p className="truncate text-xs text-[var(--muted)]">{viewer.email}</p>
+                  <p className="truncate text-xs text-[var(--text-secondary)]">{viewer.email}</p>
                 </div>
               </div>
             ) : (
-              <div className="flex shrink-0 flex-col gap-3 rounded-[22px] border border-[var(--line)] bg-white/70 px-4 py-3 sm:flex-row sm:items-center">
-                <p className="text-sm text-[var(--foreground)]">
+              <div className="flex shrink-0 flex-col gap-3 rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3 sm:flex-row sm:items-center">
+                <p className="text-sm text-[var(--text-primary)]">
                   Sign in to unlock personal account controls.
                 </p>
                 <Link href="/#email-access">
@@ -267,29 +267,29 @@ export default async function SettingsPage() {
               return (
                 <div
                   key={item.title}
-                  className="flex flex-col rounded-[20px] border border-[var(--line)] bg-white/60 p-4"
+                  className="flex flex-col rounded-card border border-[var(--border)] bg-[var(--card)] p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--warm)]">
-                      <Icon className="h-4 w-4 text-[var(--muted)]" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-button bg-[var(--warm)]">
+                      <Icon className="h-4 w-4 text-[var(--text-secondary)]" />
                     </span>
-                    {!viewer && <Lock className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" />}
+                    {!viewer && <Lock className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />}
                   </div>
-                  <h3 className="mt-3 text-sm font-semibold text-[var(--foreground)]">
+                  <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
                     {item.title}
                   </h3>
-                  <p className="mt-1.5 flex-1 text-xs leading-5 text-[var(--muted)]">
+                  <p className="mt-1.5 flex-1 text-xs text-[var(--text-secondary)]">
                     {item.description}
                   </p>
                   {"supportingNote" in item ? (
-                    <p className="mt-3 rounded-[16px] border border-[var(--line)] bg-[var(--panel)]/45 px-3 py-2 text-xs leading-5 text-[var(--foreground)]">
+                    <p className="mt-3 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 px-3 py-2 text-xs text-[var(--text-primary)]">
                       {item.supportingNote}
                     </p>
                   ) : null}
                   {viewer && item.href ? (
                     <Link
                       href={item.href}
-                      className="mt-3 flex items-center gap-1 text-xs font-semibold text-[var(--foreground)] hover:underline"
+                      className="mt-3 flex items-center gap-1 text-xs font-semibold text-[var(--text-primary)] hover:underline"
                     >
                       {item.hrefLabel}
                       <ArrowRight className="h-3 w-3" />
@@ -311,13 +311,13 @@ export default async function SettingsPage() {
         {/* Account Management */}
         <Panel id="account-management" className="scroll-mt-24 p-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
               Account management
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
+            <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
               Ownership and controls
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">
+            <p className="mt-2 max-w-xl text-base text-[var(--text-secondary)]">
               Account-level governance, privacy, and lifecycle controls.
             </p>
           </div>
@@ -342,7 +342,7 @@ export default async function SettingsPage() {
         {/* Launch requirements — only in demo/unconfigured mode */}
         {!isSupabaseConfigured && (
           <Panel className="p-5">
-            <h2 className="text-sm font-semibold text-[var(--foreground)]">What you need for launch</h2>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">What you need for launch</h2>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               {[
                 { icon: Database, text: "A Supabase project for login and the database." },
@@ -352,12 +352,12 @@ export default async function SettingsPage() {
               ].map(({ icon: Icon, text }) => (
                 <div
                   key={text}
-                  className="flex items-start gap-3 rounded-[18px] border border-[var(--line)] bg-white/60 p-4"
+                  className="flex items-start gap-3 rounded-card border border-[var(--border)] bg-[var(--card)] p-4"
                 >
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[var(--warm)]">
-                    <Icon className="h-3.5 w-3.5 text-[var(--muted)]" />
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-button bg-[var(--warm)]">
+                    <Icon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                   </span>
-                  <p className="text-sm leading-6 text-[var(--foreground)]">{text}</p>
+                  <p className="text-base text-[var(--text-primary)]">{text}</p>
                 </div>
               ))}
             </div>

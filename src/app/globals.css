@@ -1,23 +1,51 @@
 @import "tailwindcss";
+@config "../../tailwind.config.ts";
 
 :root {
-  --background: #f4f1ea;
-  --foreground: #131a22;
-  --muted: #6d7681;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-strong: rgba(255, 255, 255, 0.9);
-  --line: rgba(19, 26, 34, 0.12);
-  --line-strong: rgba(19, 26, 34, 0.18);
-  --accent: #1f4f46;
-  --accent-soft: rgba(31, 79, 70, 0.1);
-  --warm: #ede5d8;
+  --bg: #F5F4F2;
+  --sidebar: #EEECE9;
+  --card: #FFFFFF;
+  --text-primary: #1A1A18;
+  --text-secondary: #6B6B68;
+  --border: #E2E0DC;
+  --accent: #2C5F2E;
+  --accent-hover: #1E4220;
+  --error: #C0392B;
+  --skeleton: #E8E6E2;
+  --skeleton-shimmer: #F0EDE9;
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --muted: var(--text-secondary);
+  --surface: var(--card);
+  --surface-strong: var(--card);
+  --line: var(--border);
+  --line-strong: var(--border);
+  --warm: var(--sidebar);
+  --panel: var(--sidebar);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --color-bg: var(--bg);
+  --color-sidebar: var(--sidebar);
+  --color-card: var(--card);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-error: var(--error);
+  --color-skeleton: var(--skeleton);
+  --color-skeleton-shimmer: var(--skeleton-shimmer);
+  --color-background: var(--bg);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-inter), "Inter", sans-serif;
+  --font-heading: var(--font-lora), "Lora", serif;
+  --radius-card: 6px;
+  --radius-input: 6px;
+  --radius-button: 6px;
+  --radius-sidebar: 0px;
+  --radius-page: 0px;
 }
 
 * {
@@ -25,42 +53,145 @@
 }
 
 html {
-  background:
-    radial-gradient(circle at top left, rgba(237, 229, 216, 0.95), transparent 30%),
-    radial-gradient(circle at top right, rgba(189, 206, 192, 0.45), transparent 28%),
-    linear-gradient(180deg, #f5f2ec 0%, #f1eee7 42%, #ede8dd 100%);
+  background: var(--bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-inter), "Inter", sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 a {
-  color: inherit;
+  color: var(--accent);
   text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
 }
 
 button {
   cursor: pointer;
+  font-family: var(--font-inter), "Inter", sans-serif;
+  line-height: 1;
+}
+
+input:not([type="hidden"]),
+textarea,
+select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-inter), "Inter", sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+input:not([type="hidden"]):hover,
+textarea:hover,
+select:hover {
+  border-color: var(--text-secondary);
+}
+
+input:not([type="hidden"]):focus,
+textarea:focus,
+select:focus {
+  border-color: var(--text-primary);
+  outline: none;
+}
+
+input:not([type="hidden"]):disabled,
+textarea:disabled,
+select:disabled {
+  background: var(--bg);
+  opacity: 0.4;
 }
 
 ::selection {
-  background: rgba(31, 79, 70, 0.16);
+  background: rgba(44, 95, 46, 0.16);
 }
 
 .glass-panel {
-  background: var(--surface);
-  backdrop-filter: blur(18px);
-  border: 1px solid var(--line);
-  box-shadow: 0 18px 60px rgba(24, 30, 37, 0.08);
+  background: var(--card);
+  border: 1px solid var(--border);
 }
 
 .hairline {
-  border-color: var(--line);
+  border-color: var(--border);
 }
 
-.display-font {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+.briefing-title {
+  font-family: var(--font-lora), "Lora", serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+.briefing-detail-title {
+  font-family: var(--font-lora), "Lora", serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+.section-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.skeleton-line,
+.skeleton-card {
+  overflow: hidden;
+  position: relative;
+  background: var(--skeleton);
+}
+
+.skeleton-line {
+  border-radius: 4px;
+}
+
+.skeleton-card {
+  border-radius: 6px;
+}
+
+.skeleton-line::after,
+.skeleton-card::after {
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, var(--skeleton-shimmer), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (min-width: 768px) {
+  body {
+    font-size: 15px;
+  }
+
+  .briefing-title {
+    font-size: 22px;
+    line-height: 1.35;
+  }
+
+  .briefing-detail-title {
+    font-size: 28px;
+    line-height: 1.3;
+  }
 }

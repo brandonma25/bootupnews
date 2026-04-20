@@ -105,11 +105,11 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--line-strong)] bg-[var(--surface)] p-6 shadow-2xl">
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-card border border-[var(--border)] bg-[var(--card)] p-6 ">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">Continue to Daily Intelligence</h2>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Continue to Daily Intelligence</h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
               Use Google for the fastest path, or continue with email and password. Existing onboarding will continue after auth.
             </p>
           </div>
@@ -117,7 +117,7 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full px-3 py-1 text-sm text-[var(--muted-foreground)] hover:bg-[var(--surface-strong)]"
+            className="rounded-button px-3 py-1 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg)]"
           >
             Close
           </button>
@@ -127,35 +127,35 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           <div
             role="alert"
             aria-live="polite"
-            className="mb-4 rounded-xl border border-[rgba(154,52,18,0.18)] bg-[rgba(154,52,18,0.08)] px-4 py-3 text-sm leading-6 text-[var(--foreground)]"
+            className="mb-4 rounded-card border border-[var(--error)] bg-[var(--card)] px-4 py-3 text-base text-[var(--error)]"
           >
             {visibleError}
           </div>
         ) : null}
 
         {configErrorMessage ? (
-          <div className="mb-4 rounded-xl border border-[rgba(154,52,18,0.18)] bg-[rgba(154,52,18,0.08)] px-4 py-3 text-sm leading-6 text-[var(--foreground)]">
+          <div className="mb-4 rounded-card border border-[var(--error)] bg-[var(--card)] px-4 py-3 text-base text-[var(--error)]">
             {configErrorMessage}
           </div>
         ) : null}
 
         <div className="space-y-3">
           <GoogleAuthButton pending={googlePending} onClick={handleGoogleSignIn} disabled={!authConfigured} />
-          <p className="text-xs leading-5 text-[var(--muted)]">
+          <p className="text-xs text-[var(--text-secondary)]">
             Google uses a full-page redirect flow through{" "}
-            <span className="font-medium text-[var(--foreground)]">/auth/callback</span>.
+            <span className="font-medium text-[var(--text-primary)]">/auth/callback</span>.
           </p>
         </div>
 
         <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-[var(--line)]" />
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Or continue with email</span>
-          <div className="h-px flex-1 bg-[var(--line)]" />
+          <div className="h-px flex-1 bg-[var(--border)]" />
+          <span className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">Or continue with email</span>
+          <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
 
         <form action="/auth/password" method="post" className="space-y-4" id="email-access">
           <div className="space-y-2">
-            <label htmlFor="auth-email" className="text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="auth-email" className="text-sm font-medium text-[var(--text-primary)]">
               Email
             </label>
             <input
@@ -165,13 +165,13 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
               autoComplete="email"
               required
               disabled={!authConfigured}
-              className="w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--foreground)]"
+              className="w-full rounded-input border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition hover:border-[var(--text-secondary)] focus:border-[var(--text-primary)] disabled:opacity-40"
               placeholder="you@example.com"
             />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="auth-password" className="text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="auth-password" className="text-sm font-medium text-[var(--text-primary)]">
               Password
             </label>
             <input
@@ -182,7 +182,7 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
               required
               disabled={!authConfigured}
               minLength={8}
-              className="w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--foreground)]"
+              className="w-full rounded-input border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition hover:border-[var(--text-secondary)] focus:border-[var(--text-primary)] disabled:opacity-40"
               placeholder="At least 8 characters"
             />
           </div>
@@ -193,11 +193,11 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
           </div>
         </form>
 
-        <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
+        <p className="mt-4 text-xs text-[var(--text-secondary)]">
           Password sign-up uses the same onboarding bootstrap as Google. If your project requires email confirmation, you may be asked to verify your inbox before the session is ready.
         </p>
 
-        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+        <p className="mt-2 text-xs text-[var(--text-secondary)]">
           Trouble signing in? Check the Google OAuth redirect settings in Supabase and make sure the current environment URL is allowed as a callback.
         </p>
       </div>
@@ -219,9 +219,9 @@ function GoogleAuthButton({
       type="button"
       onClick={onClick}
       disabled={pending || disabled}
-      className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--line-strong)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-medium text-[var(--foreground)] transition hover:translate-y-[-1px] disabled:translate-y-0 disabled:opacity-70"
+      className="flex w-full items-center justify-center gap-3 rounded-button border border-[var(--text-primary)] bg-transparent px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg)] active:bg-[var(--sidebar)] disabled:opacity-40"
     >
-      <GoogleMark />
+      {pending ? <span className="h-3.5 w-3.5 animate-spin rounded-button border-2 border-current border-t-transparent" /> : <GoogleMark />}
       <span>{pending ? "Redirecting to Google..." : "Continue with Google"}</span>
     </button>
   );
@@ -251,7 +251,7 @@ function EmailAuthButton({
       idleLabel={idleLabel}
       pendingLabel={pendingLabel}
       variant={mode === "signin" ? "secondary" : "primary"}
-      className="w-full rounded-xl px-4 py-3"
+      className="w-full rounded-button px-4 py-3"
       name="mode"
       value={mode}
       disabled={disabled}
