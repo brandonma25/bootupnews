@@ -166,18 +166,7 @@ select:disabled {
 
 .skeleton-line::after,
 .skeleton-card::after {
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  background: linear-gradient(90deg, transparent, var(--skeleton-shimmer), transparent);
-  content: "";
-  inset: 0;
-  position: absolute;
-  transform: translateX(-100%);
-}
-
-@keyframes skeleton-shimmer {
-  100% {
-    transform: translateX(100%);
-  }
+  content: none;
 }
 
 @media (min-width: 768px) {

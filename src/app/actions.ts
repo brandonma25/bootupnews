@@ -9,6 +9,7 @@ import {
   buildAuthCallbackUrl,
   buildAuthConfigErrorPath,
   resolveRequestOrigin,
+  safePostAuthRedirectPath,
 } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
@@ -36,6 +37,8 @@ const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(72),
 });
+const accountCategorySchema = z.array(z.enum(["tech", "finance", "politics"])).min(1);
+const accountFeedUrlSchema = z.url();
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type UserEventStateUpsert = {
@@ -95,7 +98,7 @@ async function requireActionSession(unauthenticatedRedirect: string, route: stri
     } = await supabase.auth.getUser();
 
     if (!user) {
-      redirect("/?auth=1");
+      redirect(unauthenticatedRedirect);
     }
 
     return { supabase, user };
@@ -209,6 +212,7 @@ export async function signUpWithPasswordAction(formData: FormData) {
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  const redirectTo = safePostAuthRedirectPath(formData.get("redirectTo")?.toString());
 
   if (!isSupabaseConfigured) {
     redirect(buildAuthConfigErrorPath());
@@ -225,7 +229,7 @@ export async function signUpWithPasswordAction(formData: FormData) {
       email,
       password,
       options: {
-        emailRedirectTo: buildAuthCallbackUrl({ origin: requestOrigin }),
+        emailRedirectTo: buildAuthCallbackUrl({ origin: requestOrigin, next: redirectTo }),
       },
     })
     .catch((error) => {
@@ -248,8 +252,8 @@ export async function signUpWithPasswordAction(formData: FormData) {
 
   if (data.session) {
     revalidatePath("/");
-    revalidatePath("/dashboard");
-    redirect("/dashboard");
+    revalidatePath(redirectTo);
+    redirect(redirectTo);
   }
 
   redirect("/?auth=confirm");
@@ -260,6 +264,7 @@ export async function signInWithPasswordAction(formData: FormData) {
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  const redirectTo = safePostAuthRedirectPath(formData.get("redirectTo")?.toString());
 
   if (!isSupabaseConfigured) {
     redirect(buildAuthConfigErrorPath());
@@ -292,8 +297,8 @@ export async function signInWithPasswordAction(formData: FormData) {
   await syncUserProfile();
 
   revalidatePath("/");
-  revalidatePath("/dashboard");
-  redirect("/dashboard");
+  revalidatePath(redirectTo);
+  redirect(redirectTo);
 }
 
 export async function signOutAction() {
@@ -313,12 +318,214 @@ export async function signOutAction() {
   }
 
   revalidatePath("/");
+  revalidatePath("/briefing");
   revalidatePath("/dashboard");
   revalidatePath("/topics");
   revalidatePath("/sources");
   revalidatePath("/history");
-  revalidatePath("/settings");
+  revalidatePath("/account");
   redirect("/");
+}
+
+function accountStorageBlockedMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (message.toLowerCase().includes("column")) {
+    return "Account preference storage is pending the Artifact 6 profile migration.";
+  }
+
+  return "Account controls could not be saved right now.";
+}
+
+function accountFeedLabelFromUrl(feedUrl: string) {
+  try {
+    return new URL(feedUrl).hostname.replace(/^www\./, "");
+  } catch {
+    return "RSS feed";
+  }
+}
+
+export async function addAccountFeedAction(feedUrl: string) {
+  if (!isSupabaseConfigured) {
+    return { ok: false, message: "Supabase is required before RSS feeds can be saved." };
+  }
+
+  const parsedFeedUrl = accountFeedUrlSchema.safeParse(feedUrl);
+  if (!parsedFeedUrl.success) {
+    return { ok: false, message: "Invalid URL format" };
+  }
+
+  const { supabase, user } = await requireActionSession(
+    "/login?redirectTo=/account",
+    "addAccountFeedAction",
+  );
+  const label = accountFeedLabelFromUrl(parsedFeedUrl.data);
+
+  try {
+    const existing = await supabase
+      .from("sources")
+      .select("id, name, feed_url")
+      .eq("user_id", user.id)
+      .eq("feed_url", parsedFeedUrl.data)
+      .maybeSingle();
+
+    if (existing.error) {
+      throw existing.error;
+    }
+
+    if (existing.data) {
+      return {
+        ok: true,
+        feed: {
+          feed_id: existing.data.id,
+          url: existing.data.feed_url,
+          label: existing.data.name,
+        },
+        message: "Feed already exists",
+      };
+    }
+
+    const topicId = await ensureDefaultTopic(supabase, user.id);
+    const inserted = await supabase
+      .from("sources")
+      .insert({
+        user_id: user.id,
+        name: label,
+        feed_url: parsedFeedUrl.data,
+        homepage_url: new URL(parsedFeedUrl.data).origin,
+        topic_id: topicId,
+        status: "active",
+      })
+      .select("id, name, feed_url")
+      .single();
+
+    if (inserted.error) {
+      throw inserted.error;
+    }
+
+    revalidatePath("/account");
+    revalidatePath("/");
+
+    return {
+      ok: true,
+      feed: {
+        feed_id: inserted.data.id,
+        url: inserted.data.feed_url,
+        label: inserted.data.name,
+      },
+      message: "Feed added",
+    };
+  } catch (error) {
+    logServerEvent("error", "Account RSS feed save failed", {
+      route: "/account",
+      userId: user.id,
+      ...errorContext(error),
+    });
+    return { ok: false, message: accountStorageBlockedMessage(error) };
+  }
+}
+
+export async function removeAccountFeedAction(feedId: string) {
+  if (!isSupabaseConfigured) {
+    return { ok: false, message: "Supabase is required before RSS feeds can be removed." };
+  }
+
+  const { supabase, user } = await requireActionSession(
+    "/login?redirectTo=/account",
+    "removeAccountFeedAction",
+  );
+
+  try {
+    const deleted = await supabase
+      .from("sources")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("id", feedId);
+
+    if (deleted.error) {
+      throw deleted.error;
+    }
+
+    revalidatePath("/account");
+    revalidatePath("/");
+
+    return { ok: true, message: "Feed removed" };
+  } catch (error) {
+    logServerEvent("error", "Account RSS feed removal failed", {
+      route: "/account",
+      userId: user.id,
+      ...errorContext(error),
+    });
+    return { ok: false, message: "Feed not removed" };
+  }
+}
+
+export async function saveAccountCategoryPreferencesAction(categories: string[]) {
+  if (!isSupabaseConfigured) {
+    return { ok: false, message: "Supabase is required before preferences can be saved." };
+  }
+
+  const parsedCategories = accountCategorySchema.safeParse(categories);
+  if (!parsedCategories.success) {
+    return { ok: false, message: "Choose at least one valid category." };
+  }
+
+  const { supabase, user } = await requireActionSession(
+    "/login?redirectTo=/account",
+    "saveAccountCategoryPreferencesAction",
+  );
+
+  try {
+    const update = await supabase
+      .from("user_profiles")
+      .update({ category_preferences: parsedCategories.data })
+      .eq("id", user.id);
+
+    if (update.error) {
+      throw update.error;
+    }
+
+    revalidatePath("/account");
+    return { ok: true, categories: parsedCategories.data, message: "Preferences saved" };
+  } catch (error) {
+    logServerEvent("warn", "Account category preferences not saved", {
+      route: "/account",
+      userId: user.id,
+      ...errorContext(error),
+    });
+    return { ok: false, message: accountStorageBlockedMessage(error) };
+  }
+}
+
+export async function setNewsletterPreferenceAction(enabled: boolean) {
+  if (!isSupabaseConfigured) {
+    return { ok: false, message: "Supabase is required before newsletter preferences can be saved." };
+  }
+
+  const { supabase, user } = await requireActionSession(
+    "/login?redirectTo=/account",
+    "setNewsletterPreferenceAction",
+  );
+
+  try {
+    const update = await supabase
+      .from("user_profiles")
+      .update({ newsletter_enabled: enabled })
+      .eq("id", user.id);
+
+    if (update.error) {
+      throw update.error;
+    }
+
+    revalidatePath("/account");
+    return { ok: true, enabled, message: "Newsletter preference saved" };
+  } catch (error) {
+    logServerEvent("warn", "Newsletter preference not saved", {
+      route: "/account",
+      userId: user.id,
+      ...errorContext(error),
+    });
+    return { ok: false, message: accountStorageBlockedMessage(error) };
+  }
 }
 
 export async function createTopicAction(formData: FormData) {

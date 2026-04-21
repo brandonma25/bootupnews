@@ -39,7 +39,7 @@ export function NewsletterToggle({ enabled, onToggle }: NewsletterToggleProps) {
 
   return (
     <div className="w-full space-y-2">
-      <div className="flex w-full items-center justify-between gap-4 rounded-2xl border border-[var(--line)] p-4">
+      <div className="flex w-full items-center justify-between gap-4 rounded-card border border-[var(--line)] p-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[var(--foreground)]">Daily email digest</p>
           <p className="text-sm text-[var(--muted)]">
@@ -56,7 +56,7 @@ export function NewsletterToggle({ enabled, onToggle }: NewsletterToggleProps) {
           />
         </div>
       </div>
-      {error ? <p className="px-4 text-sm font-medium text-red-600">{error}</p> : null}
+      {error ? <p className="px-4 text-sm font-medium text-[var(--error)]">{error}</p> : null}
     </div>
   );
 }

@@ -49,13 +49,9 @@ describe("history components", () => {
     render(<HistoryEmptyState />);
 
     expect(screen.getByText(/Your daily briefing history starts today/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "New here? Sign up free" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Back to Home" })).toHaveAttribute(
       "href",
-      "/signup",
-    );
-    expect(screen.getByRole("link", { name: "Already a member? Sign in" })).toHaveAttribute(
-      "href",
-      "/login",
+      "/",
     );
   });
 

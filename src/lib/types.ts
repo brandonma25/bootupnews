@@ -179,4 +179,5 @@ export type ViewerAccount = {
   email: string;
   displayName: string;
   initials: string;
+  avatarUrl?: string | null;
 };

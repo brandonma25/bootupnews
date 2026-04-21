@@ -5,7 +5,7 @@ import {
   buildAuthConfigErrorPath,
   hasSupabaseCodeVerifierCookie,
   hasSupabaseSessionCookie,
-  safeRedirectPath,
+  safePostAuthRedirectPath,
 } from "@/lib/auth";
 import { bootstrapUserDefaults } from "@/lib/default-topics";
 import { env, isSupabaseConfigured } from "@/lib/env";
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const providerError = requestUrl.searchParams.get("error");
   const providerErrorCode = requestUrl.searchParams.get("error_code");
   const providerErrorDescription = requestUrl.searchParams.get("error_description");
-  const next = safeRedirectPath(requestUrl.searchParams.get("next"));
+  const next = safePostAuthRedirectPath(requestUrl.searchParams.get("next"));
   const sessionCookiePresent = hasSupabaseSessionCookie(requestCookies);
   const codeVerifierCookiePresent = hasSupabaseCodeVerifierCookie(requestCookies);
   const supabaseUrlHost = env.supabaseUrl

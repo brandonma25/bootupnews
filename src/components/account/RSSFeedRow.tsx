@@ -29,7 +29,7 @@ export function RSSFeedRow({ feed, onRemove }: RSSFeedRowProps) {
 
   return (
     <div className="w-full space-y-2">
-      <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--line)] p-3 transition-colors lg:hover:bg-[var(--warm)]">
+      <div className="flex w-full items-center justify-between gap-3 rounded-card border border-[var(--line)] p-3 transition-colors lg:hover:bg-[var(--warm)]">
         <div className="min-w-0">
           {feed.label ? (
             <p className="truncate text-sm font-semibold text-[var(--foreground)]">{feed.label}</p>
@@ -53,7 +53,7 @@ export function RSSFeedRow({ feed, onRemove }: RSSFeedRowProps) {
           </Button>
         </div>
       </div>
-      {error ? <p className="px-3 text-sm font-medium text-red-600">{error}</p> : null}
+      {error ? <p className="px-3 text-sm font-medium text-[var(--error)]">{error}</p> : null}
     </div>
   );
 }

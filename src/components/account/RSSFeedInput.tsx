@@ -73,7 +73,7 @@ export function RSSFeedInput({ onAdd }: RSSFeedInputProps) {
         </Button>
       </div>
       {error ? (
-        <p id="rss-feed-input-error" className="text-sm font-medium text-red-600">
+        <p id="rss-feed-input-error" className="text-sm font-medium text-[var(--error)]">
           {error}
         </p>
       ) : null}

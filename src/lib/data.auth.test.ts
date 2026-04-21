@@ -65,6 +65,7 @@ describe("auth-driven SSR viewer detection", () => {
       email: "analyst@example.com",
       displayName: "Alex Analyst",
       initials: "AA",
+      avatarUrl: null,
     });
   });
 

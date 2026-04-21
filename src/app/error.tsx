@@ -29,7 +29,7 @@ export default function Error({ error, reset }: Props) {
               This page hit a server problem, but the app is still recoverable.
             </h1>
             <p className="max-w-2xl text-base text-[var(--text-secondary)]">
-              Try the page again, or head back to the dashboard shell while we fall back to safer defaults.
+              Try the page again, or head back home while we fall back to safer defaults.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
@@ -41,22 +41,11 @@ export default function Error({ error, reset }: Props) {
                 Retry page
               </button>
               <Link
-                href="/dashboard"
+                href="/"
                 className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]"
               >
-                Open Today
+                Open Home
               </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  window.localStorage.removeItem("daily-intel-sidebar-collapsed");
-                  window.localStorage.removeItem("daily-intel-preferences");
-                  window.location.href = "/";
-                }}
-                className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]"
-              >
-                Reset local state
-              </button>
             </div>
             {error.digest ? (
               <p className="text-xs leading-6 text-[var(--text-secondary)]">Error digest: {error.digest}</p>

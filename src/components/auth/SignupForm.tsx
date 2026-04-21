@@ -11,6 +11,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export type SignupFormProps = {
   className?: string;
+  redirectTo?: string;
 };
 
 const minimumPasswordLength = 8;
@@ -19,7 +20,7 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-export function SignupForm({ className }: SignupFormProps) {
+export function SignupForm({ className, redirectTo = "/" }: SignupFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,7 +67,7 @@ export function SignupForm({ className }: SignupFormProps) {
       return;
     }
 
-    router.push("/");
+    router.push(redirectTo);
     router.refresh();
   }
 
@@ -88,7 +89,7 @@ export function SignupForm({ className }: SignupFormProps) {
           onChange={(event) => setEmail(event.target.value)}
         />
         {emailError ? (
-          <p id="signup-email-error" role="alert" className="text-sm font-medium text-red-700">
+          <p id="signup-email-error" role="alert" className="text-sm font-medium text-[var(--error)]">
             {emailError}
           </p>
         ) : null}
@@ -122,14 +123,14 @@ export function SignupForm({ className }: SignupFormProps) {
           </button>
         </div>
         {passwordError ? (
-          <p id="signup-password-error" role="alert" className="text-sm font-medium text-red-700">
+          <p id="signup-password-error" role="alert" className="text-sm font-medium text-[var(--error)]">
             {passwordError}
           </p>
         ) : null}
       </div>
 
       {formError ? (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-[var(--error)]">
           {formError}
         </p>
       ) : null}

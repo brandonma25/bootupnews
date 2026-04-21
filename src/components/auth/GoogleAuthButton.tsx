@@ -71,7 +71,7 @@ export function GoogleAuthButton({
         )}
       </Button>
       {errorMessage ? (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-[var(--error)]">
           {errorMessage}
         </p>
       ) : null}

@@ -48,7 +48,7 @@ export function CategoryPreferenceCheckboxes({
         return (
           <label
             key={option.key}
-            className="flex items-center gap-3 rounded-2xl border border-[var(--line)] p-3 text-sm font-medium text-[var(--foreground)]"
+            className="flex items-center gap-3 rounded-card border border-[var(--line)] p-3 text-sm font-medium text-[var(--foreground)]"
           >
             <Checkbox
               aria-label={option.label}

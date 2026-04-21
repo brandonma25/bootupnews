@@ -14,7 +14,7 @@ export function HistoryErrorState({ onRetry, isRetrying, className }: HistoryErr
     <section
       role="alert"
       className={cn(
-        "mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-4 rounded-2xl border border-[var(--line)] bg-white/70 p-6 text-center",
+        "mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-4 rounded-card border border-[var(--line)] bg-[var(--card)] p-6 text-center",
         className,
       )}
     >

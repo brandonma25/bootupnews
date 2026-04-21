@@ -126,14 +126,14 @@ export function ResetPasswordForm({ className }: ResetPasswordFormProps) {
           </button>
         </div>
         {passwordError ? (
-          <p id="reset-password-error" role="alert" className="text-sm font-medium text-red-700">
+          <p id="reset-password-error" role="alert" className="text-sm font-medium text-[var(--error)]">
             {passwordError}
           </p>
         ) : null}
       </div>
 
       {visibleTokenError ? (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-[var(--error)]">
           {visibleTokenError}{" "}
           <Link href="/forgot-password" className="underline underline-offset-4">
             Request a new one

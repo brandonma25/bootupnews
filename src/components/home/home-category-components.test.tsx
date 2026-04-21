@@ -125,24 +125,47 @@ describe("CategoryTabStrip", () => {
 
     fetchSpy.mockRestore();
   });
+
+  it("renders an inline gate for signed-out category tabs", () => {
+    render(
+      <CategoryTabStrip
+        topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
+        categorySections={[
+          createSection({ key: "tech", label: "Tech", events: [createEvent({ id: "tech-1", title: "Tech category event" })], state: "sparse" }),
+        ]}
+        isAuthenticated={false}
+        gatedCategoryState={<div>Sign in to view category briefings</div>}
+        renderTopEvent={(event) => <article>{event.title}</article>}
+        renderCategoryEvent={(event) => <article>{event.title}</article>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+
+    expect(screen.getByText("Sign in to view category briefings")).toBeInTheDocument();
+    expect(screen.queryByText("Tech category event")).not.toBeInTheDocument();
+  });
 });
 
 describe("BriefingCardCategory", () => {
-  it("renders title, what happened, and source pills from matched keywords", () => {
+  it("renders title, what happened, and source pills from source titles", () => {
     render(
       <BriefingCardCategory
         item={{
           title: "Bank earnings reset expectations",
           whatHappened: "Banks are changing guidance after earnings.",
-          matchedKeywords: ["earnings", "banking"],
+          sources: [
+            { title: "Reuters", url: "https://www.reuters.com/example" },
+            { title: "Bloomberg", url: "https://www.bloomberg.com/example" },
+          ],
         }}
       />,
     );
 
     expect(screen.getByText("Bank earnings reset expectations")).toBeInTheDocument();
     expect(screen.getByText("Banks are changing guidance after earnings.")).toBeInTheDocument();
-    expect(screen.getByText("earnings")).toBeInTheDocument();
-    expect(screen.getByText("banking")).toBeInTheDocument();
+    expect(screen.getByText("Reuters")).toBeInTheDocument();
+    expect(screen.getByText("Bloomberg")).toBeInTheDocument();
     expect(screen.queryByText(/why it matters/i)).not.toBeInTheDocument();
   });
 

@@ -31,6 +31,8 @@ export type CategoryTabStripProps = {
     index: number,
   ) => ReactNode;
   topEventsEmptyState?: ReactNode;
+  isAuthenticated?: boolean;
+  gatedCategoryState?: ReactNode;
   className?: string;
 };
 
@@ -45,6 +47,8 @@ export function CategoryTabStrip({
   renderTopEvent,
   renderCategoryEvent,
   topEventsEmptyState,
+  isAuthenticated = true,
+  gatedCategoryState,
   className,
 }: CategoryTabStripProps) {
   const [activeTab, setActiveTab] = useState<HomeTabKey>(topEventsTab.key);
@@ -66,6 +70,7 @@ export function CategoryTabStrip({
   const activeTabIsVisible =
     activeTab === topEventsTab.key || visibleCategorySections.some((section) => section.key === activeTab);
   const safeActiveTab = activeTabIsVisible ? activeTab : topEventsTab.key;
+  const activeCategoryIsGated = !isAuthenticated && safeActiveTab !== topEventsTab.key;
 
   useEffect(() => {
     triggerRefs.current[safeActiveTab]?.scrollIntoView?.({
@@ -113,11 +118,15 @@ export function CategoryTabStrip({
           id={`${section.key}-panel`}
           active={safeActiveTab === section.key}
         >
-          <div className="grid gap-4">
-            {section.events.map((event, index) => (
-              <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
-            ))}
-          </div>
+          {activeCategoryIsGated ? (
+            gatedCategoryState
+          ) : (
+            <div className="grid gap-4">
+              {section.events.map((event, index) => (
+                <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
+              ))}
+            </div>
+          )}
         </TabsContent>
       ))}
     </Tabs>

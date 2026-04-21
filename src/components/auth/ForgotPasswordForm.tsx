@@ -92,7 +92,7 @@ export function ForgotPasswordForm({ className }: ForgotPasswordFormProps) {
           onChange={(event) => setEmail(event.target.value)}
         />
         {fieldError ? (
-          <p id="forgot-password-email-error" role="alert" className="text-sm font-medium text-red-700">
+          <p id="forgot-password-email-error" role="alert" className="text-sm font-medium text-[var(--error)]">
             {fieldError}
           </p>
         ) : null}

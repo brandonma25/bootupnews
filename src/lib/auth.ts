@@ -1,8 +1,16 @@
 import { env } from "@/lib/env";
 
 export const AUTH_CONFIG_ERROR = "config-error";
-export const DEFAULT_AUTH_NEXT_PATH = "/dashboard";
+export const DEFAULT_AUTH_NEXT_PATH = "/";
 const AUTH_RETURN_PARAMS = ["code", "token_hash", "type", "state"];
+const AUTH_ENTRY_PATHS = new Set([
+  "/auth/callback",
+  "/auth/password",
+  "/forgot-password",
+  "/login",
+  "/reset-password",
+  "/signup",
+]);
 
 export function safeRedirectPath(value: string | null | undefined, fallback = DEFAULT_AUTH_NEXT_PATH) {
   if (!value) {
@@ -18,6 +26,13 @@ export function safeRedirectPath(value: string | null | undefined, fallback = DE
   return normalized;
 }
 
+export function safePostAuthRedirectPath(value: string | null | undefined, fallback = DEFAULT_AUTH_NEXT_PATH) {
+  const normalized = safeRedirectPath(value, fallback);
+  const pathname = normalized.split(/[?#]/, 1)[0] || fallback;
+
+  return AUTH_ENTRY_PATHS.has(pathname) ? fallback : normalized;
+}
+
 export function buildAuthRedirectPath(path: string, authState: string) {
   const [pathWithoutHash, hash = ""] = path.split("#", 2);
   const url = new URL(pathWithoutHash || "/", "http://localhost");
@@ -27,7 +42,7 @@ export function buildAuthRedirectPath(path: string, authState: string) {
   return `${url.pathname}${url.search}${hash ? `#${hash}` : ""}`;
 }
 
-export function buildAuthConfigErrorPath(path = "/#email-access") {
+export function buildAuthConfigErrorPath(path = "/") {
   return buildAuthRedirectPath(path, AUTH_CONFIG_ERROR);
 }
 
@@ -38,7 +53,7 @@ export function buildAuthCallbackUrl({
   next?: string;
   origin?: string;
 }) {
-  const normalizedNext = safeRedirectPath(next);
+  const normalizedNext = safePostAuthRedirectPath(next);
   const normalizedOrigin = origin?.trim() || env.appUrl;
 
   return `${normalizedOrigin}/auth/callback?next=${encodeURIComponent(normalizedNext)}`;

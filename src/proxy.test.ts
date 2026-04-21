@@ -43,7 +43,7 @@ describe("proxy auth return handling", () => {
     );
 
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/auth/callback?code=oauth-code&next=%2Fdashboard",
+      "http://localhost:3000/auth/callback?code=oauth-code&next=%2F",
     );
   });
 

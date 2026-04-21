@@ -11,9 +11,10 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export type LoginFormProps = {
   className?: string;
+  redirectTo?: string;
 };
 
-export function LoginForm({ className }: LoginFormProps) {
+export function LoginForm({ className, redirectTo = "/" }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,7 +50,7 @@ export function LoginForm({ className }: LoginFormProps) {
       return;
     }
 
-    router.push("/");
+    router.push(redirectTo);
     router.refresh();
   }
 
@@ -98,7 +99,7 @@ export function LoginForm({ className }: LoginFormProps) {
       </div>
 
       {formError ? (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-[var(--error)]">
           {formError}
         </p>
       ) : null}

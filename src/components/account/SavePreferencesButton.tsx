@@ -31,8 +31,8 @@ export function SavePreferencesButton({
         {isSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         Save Preferences
       </Button>
-      {isSuccess ? <p className="text-sm font-medium text-emerald-700">Preferences saved</p> : null}
-      {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
+      {isSuccess ? <p className="text-sm font-medium text-[var(--accent)]">Preferences saved</p> : null}
+      {error ? <p className="text-sm font-medium text-[var(--error)]">{error}</p> : null}
     </div>
   );
 }

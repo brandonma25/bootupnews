@@ -31,7 +31,7 @@ export function UserProfileBlock({
 }: UserProfileBlockProps) {
   if (isLoading) {
     return (
-      <section className="flex w-full flex-col gap-4 rounded-2xl border border-[var(--line)] p-5">
+      <section className="flex w-full flex-col gap-4 rounded-card border border-[var(--line)] p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <Skeleton className="h-14 w-14 rounded-full" />
           <div className="w-full space-y-2">
@@ -48,7 +48,7 @@ export function UserProfileBlock({
   }
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-2xl border border-[var(--line)] p-5">
+    <section className="flex w-full flex-col gap-4 rounded-card border border-[var(--line)] p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <Avatar className="h-14 w-14">

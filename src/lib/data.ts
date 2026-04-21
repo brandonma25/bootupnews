@@ -4,7 +4,6 @@ import { formatISO } from "date-fns";
 import {
   areMvpDefaultPublicSources,
   demoDashboardData,
-  demoHistory,
   demoTopics,
   getMvpDefaultPublicSources,
 } from "@/lib/demo-data";
@@ -36,6 +35,7 @@ import { withServerFallback } from "@/lib/server-safety";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
 import { buildTimelineGroups } from "@/lib/timeline-builder";
 import { matchTopicsForArticle } from "@/lib/topic-matching";
+import { getBriefingDateKey } from "@/lib/utils";
 import type {
   BriefingItem,
   DailyBriefing,
@@ -132,6 +132,14 @@ type IngestionRunSummary = {
 };
 
 type DashboardDataPath = "public_pipeline" | "personalized_query" | "personalized_fallback_to_public";
+export type AccountCategoryPreference = "tech" | "finance" | "politics";
+
+export type AccountPreferenceSnapshot = {
+  categories: AccountCategoryPreference[];
+  newsletterEnabled: boolean;
+  storageReady: boolean;
+  storageMessage?: string;
+};
 
 const PIPELINE_TOPIC_ALIASES: Record<"tech" | "finance" | "politics", string[]> = {
   tech: ["tech", "technology", "ai", "software", "cybersecurity"],
@@ -145,6 +153,7 @@ type BriefingSummaryFields = Pick<
 >;
 
 const LLM_SUMMARY_TIMEOUT_MS = 7000;
+const DEFAULT_ACCOUNT_CATEGORIES: AccountCategoryPreference[] = ["tech", "finance", "politics"];
 
 function createEmptyBriefing(): DailyBriefing {
   return {
@@ -192,6 +201,12 @@ function buildViewerAccount(user: Awaited<ReturnType<typeof safeGetUser>>["user"
     email: user.email,
     displayName: displayName || user.email,
     initials: initials || user.email.charAt(0).toUpperCase(),
+    avatarUrl:
+      typeof user.user_metadata?.avatar_url === "string"
+        ? user.user_metadata.avatar_url
+        : typeof user.user_metadata?.picture === "string"
+          ? user.user_metadata.picture
+          : null,
   };
 }
 
@@ -237,7 +252,7 @@ function buildNoArgumentRuntimeSourceResolutionAuditContext() {
 }
 
 export async function getDashboardData(
-  route = "/dashboard",
+  route = "/",
   authState?: RequestAuthState,
 ): Promise<DashboardData> {
   const resolvedAuthState = authState ?? (await getRequestAuthState(route));
@@ -435,6 +450,121 @@ export async function getDashboardPageState(route: string): Promise<{
   };
 }
 
+function normalizeAccountCategories(value: unknown): AccountCategoryPreference[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_ACCOUNT_CATEGORIES;
+  }
+
+  const allowed = new Set<AccountCategoryPreference>(DEFAULT_ACCOUNT_CATEGORIES);
+  const normalized = value.filter((candidate): candidate is AccountCategoryPreference =>
+    typeof candidate === "string" && allowed.has(candidate as AccountCategoryPreference),
+  );
+
+  return normalized.length ? normalized : DEFAULT_ACCOUNT_CATEGORIES;
+}
+
+export async function getAccountPageState(route = "/account"): Promise<{
+  data: DashboardData;
+  viewer: ViewerAccount | null;
+  sources: Source[];
+  preferences: AccountPreferenceSnapshot;
+}> {
+  const authState = await getRequestAuthState(route);
+
+  const [data, viewer] = await Promise.all([
+    getDashboardData(route, authState),
+    getViewerAccount(route, authState),
+  ]);
+
+  if (!authState.supabase || !authState.user) {
+    return {
+      data,
+      viewer,
+      sources: [],
+      preferences: {
+        categories: DEFAULT_ACCOUNT_CATEGORIES,
+        newsletterEnabled: false,
+        storageReady: false,
+        storageMessage: "Sign in to save account controls.",
+      },
+    };
+  }
+
+  const supabase = authState.supabase;
+  const user = authState.user;
+  const [profileResult, sourcesResult] = await Promise.all([
+    withServerFallback(
+      "account profile preferences",
+      async () =>
+        supabase
+        .from("user_profiles")
+        .select("category_preferences, newsletter_enabled")
+        .eq("id", user.id)
+        .maybeSingle(),
+      null,
+      { route, userId: user.id },
+    ),
+    withServerFallback(
+      "account sources",
+      async () =>
+        supabase
+          .from("sources")
+          .select("id, user_id, name, feed_url, homepage_url, topic_id, status, created_at, topics(name)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+      null,
+      { route, userId: user.id },
+    ),
+  ]);
+
+  const accountSources: Source[] =
+    sourcesResult && !sourcesResult.error
+      ? sourcesResult.data?.map((source) => ({
+          id: source.id,
+          userId: source.user_id,
+          name: source.name,
+          feedUrl: source.feed_url,
+          homepageUrl: source.homepage_url,
+          topicId: source.topic_id,
+          topicName: Array.isArray(source.topics) ? source.topics[0]?.name : undefined,
+          status: source.status,
+          createdAt: source.created_at,
+        })) ?? []
+      : [];
+
+  if (!profileResult || profileResult.error) {
+    logServerEvent("warn", "Account preference storage is not ready", {
+      route,
+      userId: user.id,
+      errorMessage: profileResult?.error?.message ?? "profile preference query failed",
+    });
+
+    return {
+      data,
+      viewer,
+      sources: accountSources,
+      preferences: {
+        categories: DEFAULT_ACCOUNT_CATEGORIES,
+        newsletterEnabled: false,
+        storageReady: false,
+        storageMessage:
+          "Account preference storage is pending the Artifact 6 profile migration.",
+      },
+    };
+  }
+
+  return {
+    data,
+    viewer,
+    sources: accountSources,
+    preferences: {
+      categories: normalizeAccountCategories(profileResult.data?.category_preferences),
+      newsletterEnabled: Boolean(profileResult.data?.newsletter_enabled),
+      storageReady: true,
+    },
+  };
+}
+
 async function getPipelineBackedDashboardData(input: {
   route: string;
   path: DashboardDataPath;
@@ -511,12 +641,12 @@ export async function getHistory(
   const { supabase, user, sessionCookiePresent } = resolvedAuthState;
   if (!supabase || !user) {
     if (sessionCookiePresent) {
-      logServerEvent("warn", "History SSR fell back to demo history", {
+      logServerEvent("warn", "History SSR withheld private history", {
         route: resolvedAuthState.route,
         sessionCookiePresent,
       });
     }
-    return demoHistory;
+    return [];
   }
 
   const historyResult = await withServerFallback(
@@ -533,17 +663,17 @@ export async function getHistory(
   );
 
   if (!historyResult || historyResult.error) {
-    logServerEvent("warn", "History data degraded to demo history", {
+    logServerEvent("warn", "History data unavailable", {
       route: resolvedAuthState.route,
       userId: user.id,
       errorMessage: historyResult?.error?.message ?? "history query failed",
     });
-    return demoHistory;
+    return [];
   }
 
   const { data } = historyResult;
 
-  if (!data?.length) return demoHistory;
+  if (!data?.length) return [];
 
   return data.map(
     (briefing): DailyBriefing => ({
@@ -588,6 +718,35 @@ export async function getHistoryPageState(route = "/history") {
 
   return {
     history,
+    viewer,
+  };
+}
+
+export async function getBriefingDetailPageState(dateKey: string, route = `/briefing/${dateKey}`): Promise<{
+  data: DashboardData;
+  briefing: DailyBriefing | null;
+  viewer: ViewerAccount | null;
+}> {
+  const authState = await getRequestAuthState(route);
+
+  const [data, viewer] = await Promise.all([
+    getDashboardData(route, authState),
+    getViewerAccount(route, authState),
+  ]);
+
+  const currentBriefingMatches = getBriefingDateKey(data.briefing.briefingDate) === dateKey;
+  let briefing: DailyBriefing | null = currentBriefingMatches ? data.briefing : null;
+
+  if (authState.supabase && authState.user) {
+    const history = await getHistory(route, authState);
+    briefing =
+      history.find((candidate) => getBriefingDateKey(candidate.briefingDate) === dateKey) ??
+      briefing;
+  }
+
+  return {
+    data: briefing ? { ...data, briefing } : data,
+    briefing,
     viewer,
   };
 }

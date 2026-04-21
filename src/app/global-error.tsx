@@ -15,7 +15,7 @@ export default function GlobalError() {
               We hit a larger app error, but the workspace itself is still reachable.
             </h1>
             <p className="mt-3 max-w-2xl text-base text-[var(--text-secondary)]">
-              Use the links below to recover, or clear local state if the browser is holding a stale session.
+              Use the link below to recover.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
@@ -23,12 +23,6 @@ export default function GlobalError() {
                 className="inline-flex items-center rounded-button bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
               >
                 Go home
-              </Link>
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]"
-              >
-                Open Today
               </Link>
             </div>
           </div>

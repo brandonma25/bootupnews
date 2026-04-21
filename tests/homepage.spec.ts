@@ -1,52 +1,21 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("homepage", () => {
-  test("renders the public briefing smoke flow", async ({ page }) => {
+  test("renders the public V1 briefing flow", async ({ page }) => {
     await page.goto("/");
 
     await expect(page).toHaveTitle(/Daily Intelligence/i);
-    await expect(
-      page.getByRole("heading", {
-        name: /preview a structured intelligence briefing before you unlock the full workspace/i,
-      }),
-    ).toBeVisible();
-    await expect(page.getByRole("link", { name: /daily intelligence/i })).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: /confirmed developments, ranked with transparent logic/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /today's briefing/i })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("link", { name: "Open full briefing" })).toBeVisible();
   });
 
-  test("opens the sign-in entry flow for signed-out visitors", async ({ page }) => {
-    await page.goto("/");
-
-    const personalizeButton = page.getByRole("button", { name: /personalize briefing/i });
-
-    await expect(
-      page.getByRole("heading", {
-        name: /preview a structured intelligence briefing before you unlock the full workspace/i,
-      }),
-    ).toBeVisible();
-    await expect(personalizeButton).toBeVisible();
-    await expect(personalizeButton).toBeEnabled();
-    await personalizeButton.click();
-
-    await expect(
-      page.getByRole("heading", { name: /continue to daily intelligence/i }),
-    ).toBeVisible();
-    await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /sign in with email/i })).toBeVisible();
-  });
-
-  test("surfaces callback error state without losing the auth entry flow", async ({ page }) => {
+  test("surfaces callback error state with a login recovery link", async ({ page }) => {
     await page.goto("/?auth=callback-error");
 
     await expect(
       page.getByRole("alert").getByText(/sign-in callback could not be completed/i),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: /continue to daily intelligence/i }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: /continue with google/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /sign in with email/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /return to login/i })).toHaveAttribute("href", "/login");
   });
 });

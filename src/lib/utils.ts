@@ -11,6 +11,14 @@ export function formatBriefingDate(value: string) {
   return isToday(date) ? `Today • ${format(date, "EEEE, MMMM d")}` : format(date, "EEEE, MMMM d, yyyy");
 }
 
+export function getBriefingDateKey(value: string) {
+  return value.trim().slice(0, 10);
+}
+
+export function isValidBriefingDateKey(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(parseISO(value).getTime());
+}
+
 export function stripHtml(value: string | null | undefined) {
   if (!value) return "";
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

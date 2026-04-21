@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { buildAuthCallbackUrl, buildAuthConfigErrorPath } from "@/lib/auth";
+import { buildAuthCallbackUrl, buildAuthConfigErrorPath, safePostAuthRedirectPath } from "@/lib/auth";
 import { bootstrapUserDefaults } from "@/lib/default-topics";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { errorContext, logServerEvent } from "@/lib/observability";
@@ -33,15 +33,17 @@ export async function POST(request: NextRequest) {
   const mode = String(formData.get("mode") ?? "signin");
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const redirectTo = safePostAuthRedirectPath(String(formData.get("redirectTo") ?? "/"));
   const callbackUrl = buildAuthCallbackUrl({
     origin: new URL(request.url).origin,
+    next: redirectTo,
   });
 
   if (!email || !password) {
     return NextResponse.redirect(new URL("/?auth=invalid", request.url));
   }
 
-  const { response, supabase } = createPasswordAuthResponse(request, "/dashboard");
+  const { response, supabase } = createPasswordAuthResponse(request, redirectTo);
 
   try {
     if (mode === "signup") {

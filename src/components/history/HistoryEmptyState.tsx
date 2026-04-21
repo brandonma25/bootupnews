@@ -21,10 +21,7 @@ export function HistoryEmptyState({ className }: HistoryEmptyStateProps) {
       </p>
       <div className="flex w-full flex-col gap-3 sm:max-w-sm sm:flex-row sm:justify-center">
         <Button asChild className="min-h-11 w-full sm:w-auto">
-          <Link href="/signup">New here? Sign up free</Link>
-        </Button>
-        <Button asChild variant="secondary" className="min-h-11 w-full sm:w-auto">
-          <Link href="/login">Already a member? Sign in</Link>
+          <Link href="/">Back to Home</Link>
         </Button>
       </div>
     </section>

@@ -4,9 +4,16 @@ create table if not exists public.user_profiles (
   id uuid primary key,
   email text not null unique,
   full_name text,
+  avatar_url text,
+  category_preferences text[] not null default array['tech', 'finance', 'politics']::text[],
+  newsletter_enabled boolean not null default false,
   last_sign_in_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint user_profiles_category_preferences_check
+    check (
+      category_preferences <@ array['tech', 'finance', 'politics']::text[]
+    )
 );
 
 create table if not exists public.topics (

@@ -16,13 +16,13 @@ export default function NotFound() {
           Page not found
         </h1>
         <p className="mt-3 text-base text-[var(--text-secondary)]">
-          Head back to the dashboard to continue your daily briefing.
+          Head back home to continue your daily briefing.
         </p>
         <Link
-          href="/dashboard"
+          href="/"
           className="mt-5 inline-flex rounded-button bg-[var(--accent)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
         >
-          Go to Today
+          Go home
         </Link>
       </div>
     </div>

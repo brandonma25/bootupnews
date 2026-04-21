@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import type { BriefingItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type CategoryCardItem = Pick<BriefingItem, "title" | "whatHappened" | "matchedKeywords">;
+type CategoryCardItem = Pick<BriefingItem, "title" | "whatHappened" | "sources">;
 
 export type BriefingCardCategoryProps = {
   item?: CategoryCardItem;
@@ -24,8 +24,8 @@ export function BriefingCardCategory({
         className={cn("w-full p-5", className)}
       >
         <div className="space-y-4">
-          <div className="h-5 w-4/5 animate-pulse rounded-full bg-[var(--line)]" />
-          <div className="h-4 w-2/5 animate-pulse rounded-full bg-[var(--line)]" />
+          <div className="h-5 w-4/5 animate-pulse rounded-card bg-[var(--skeleton)]" />
+          <div className="h-4 w-2/5 animate-pulse rounded-card bg-[var(--skeleton)]" />
         </div>
       </Card>
     );
@@ -34,7 +34,7 @@ export function BriefingCardCategory({
   if (errorMessage) {
     return (
       <Card className={cn("w-full p-5", className)}>
-        <p role="alert" className="text-sm font-medium leading-6 text-red-700">
+        <p role="alert" className="text-sm font-medium leading-6 text-[var(--error)]">
           {errorMessage}
         </p>
       </Card>
@@ -45,7 +45,10 @@ export function BriefingCardCategory({
     return null;
   }
 
-  const sourcePills = item.matchedKeywords ?? [];
+  const sourcePills = (item.sources ?? [])
+    .map((source) => source.title.trim())
+    .filter(Boolean)
+    .slice(0, 4);
 
   return (
     <Card className={cn("w-full p-5", className)}>
@@ -58,12 +61,12 @@ export function BriefingCardCategory({
         </p>
         {sourcePills.length ? (
           <div className="flex flex-wrap gap-2">
-            {sourcePills.map((keyword) => (
+            {sourcePills.map((sourceTitle) => (
               <span
-                key={keyword}
-                className="inline-flex max-w-full items-center rounded-full border border-[var(--line)] bg-white/70 px-2.5 py-1 text-xs font-semibold text-[var(--muted)] break-words"
+                key={sourceTitle}
+                className="inline-flex max-w-full items-center rounded-button border border-[var(--line)] bg-[var(--card)] px-2.5 py-1 text-xs font-semibold text-[var(--muted)] break-words"
               >
-                {keyword}
+                {sourceTitle}
               </span>
             ))}
           </div>

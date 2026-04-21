@@ -11,9 +11,9 @@ export function HomeErrorState({ onRetry, isRetrying }: HomeErrorStateProps) {
   return (
     <div
       role="alert"
-      className="mx-auto flex w-full max-w-xl flex-col items-center justify-center rounded-[28px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.72)] px-5 py-8 text-center shadow-[0_16px_50px_rgba(17,24,39,0.05)] sm:px-8 lg:max-w-2xl"
+      className="mx-auto flex w-full max-w-xl flex-col items-center justify-center rounded-card border border-[var(--border)] bg-[var(--card)] px-5 py-8 text-center sm:px-8 lg:max-w-2xl"
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+      <p className="section-label text-[var(--error)]">
         Briefing unavailable
       </p>
       <h2 className="mt-3 text-xl font-semibold text-[var(--foreground)] sm:text-2xl">
