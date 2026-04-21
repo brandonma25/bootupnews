@@ -127,6 +127,57 @@ describe("CategoryTabStrip", () => {
     fetchSpy.mockRestore();
   });
 
+  it("lets signed-in users open populated category tabs without the soft gate", () => {
+    render(
+      <CategoryTabStrip
+        topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
+        categorySections={[
+          createSection({
+            key: "tech",
+            label: "Tech",
+            events: [createEvent({ id: "tech-1", title: "Tech category event" })],
+            state: "sparse",
+          }),
+          createSection({ key: "finance", label: "Finance", events: [] }),
+        ]}
+        isAuthenticated
+        gatedCategoryState={<div>Create a free account to read Tech News, Finance and Politics</div>}
+        renderTopEvent={(event) => <article>{event.title}</article>}
+        renderCategoryEvent={(event) => <article>{event.title}</article>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+
+    expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Tech category event")).toBeInTheDocument();
+    expect(screen.queryByText("Top ranked event")).not.toBeInTheDocument();
+    expect(screen.queryByText("Create a free account to read Tech News, Finance and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Finance" })).not.toBeInTheDocument();
+  });
+
+  it("does not fabricate signed-in category tabs for empty model sections", () => {
+    render(
+      <CategoryTabStrip
+        topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
+        categorySections={[
+          createSection({ key: "tech", label: "Tech", events: [] }),
+          createSection({ key: "finance", label: "Finance", events: [] }),
+          createSection({ key: "politics", label: "Politics", events: [] }),
+        ]}
+        isAuthenticated
+        renderTopEvent={(event) => <article>{event.title}</article>}
+        renderCategoryEvent={(event) => <article>{event.title}</article>}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: "Tech News" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Finance" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Politics" })).not.toBeInTheDocument();
+    expect(screen.getByText("Top ranked event")).toBeInTheDocument();
+  });
+
   it("renders a dismissible inline gate for signed-out category tabs while keeping Top Events visible", () => {
     render(
       <CategoryTabStrip

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ErrorBoundaryPage from "@/app/error";
@@ -244,6 +244,134 @@ describe("LandingHomepage", () => {
     );
 
     expect(screen.getAllByTestId("home-top-event-card")).toHaveLength(5);
+  });
+
+  it("lets signed-in users read populated category tabs without showing the signed-out gate", () => {
+    const data = createData([
+      createItem({
+        id: "top-finance",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Treasury yields climb after inflation surprise",
+        matchedKeywords: ["treasury", "inflation", "rates"],
+        importanceScore: 95,
+        sourceCount: 4,
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 0, finance: 12, politics: 0 },
+          matchedSignals: { tech: [], finance: ["treasury"], politics: [] },
+        },
+      }),
+      createItem({
+        id: "top-politics",
+        topicId: "politics",
+        topicName: "Politics",
+        title: "White House weighs new export controls",
+        matchedKeywords: ["white house", "exports", "policy"],
+        importanceScore: 92,
+        sourceCount: 4,
+        homepageClassification: {
+          primaryCategory: "politics",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 0, finance: 0, politics: 12 },
+          matchedSignals: { tech: [], finance: [], politics: ["white house"] },
+        },
+      }),
+      createItem({
+        id: "top-tech",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Cloud providers expand AI capacity plans",
+        matchedKeywords: ["cloud", "ai", "capacity"],
+        importanceScore: 90,
+        sourceCount: 4,
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 12, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["ai"], finance: [], politics: [] },
+        },
+      }),
+      createItem({
+        id: "top-energy",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Oil markets react to shipping disruption",
+        matchedKeywords: ["oil", "shipping", "energy"],
+        importanceScore: 88,
+        sourceCount: 4,
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 0, finance: 11, politics: 0 },
+          matchedSignals: { tech: [], finance: ["oil"], politics: [] },
+        },
+      }),
+      createItem({
+        id: "top-chip-equipment",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Chip equipment makers lift shipment outlook",
+        matchedKeywords: ["chips", "equipment", "shipments"],
+        importanceScore: 86,
+        sourceCount: 4,
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 11, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["chips"], finance: [], politics: [] },
+        },
+      }),
+      createItem({
+        id: "category-tech",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Open source database maintainers ship a query planner update",
+        whatHappened: "Database maintainers shipped a query planner update for production workloads.",
+        matchedKeywords: ["database", "query planner", "open source"],
+        importanceScore: 64,
+        sourceCount: 2,
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.92,
+          scores: { tech: 10, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["database"], finance: [], politics: [] },
+        },
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={{
+          id: "viewer-1",
+          email: "newsweb2026@example.com",
+          displayName: "Newsweb2026",
+          initials: "N",
+          avatarUrl: null,
+        }}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
+    expect(screen.queryByText("Create a free account to read Tech News, Finance and Politics")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+
+    expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryAllByTestId("home-top-event-card")).toHaveLength(0);
+    expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Create a free account to read Tech News, Finance and Politics")).not.toBeInTheDocument();
   });
 
   it("renders debug diagnostics for QA when enabled", () => {
