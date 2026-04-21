@@ -56,6 +56,14 @@
   - `release-governance-gate`
 - GitHub branch protection must separately require those checks; the repo workflows alone do not make them blocking.
 - These jobs automate install, lint, build, unit/integration tests, Chromium plus WebKit Playwright smoke coverage, artifact upload, and PR summary generation.
+- Upload-aware fast path:
+  - The PR Gate workflow still runs for every PR targeting `main`.
+  - `classify-upload-changes` classifies the PR diff before heavy jobs run.
+  - Approved upload-only changes may skip the heavy required jobs by job-level conditions, which gives those job checks skipped-success conclusions instead of leaving required checks pending.
+  - `pr-summary` remains a required running check and fails if the upload lightweight validation job does not pass.
+  - The only approved upload-only path is `public/uploads/` with added or modified `.avif`, `.gif`, `.ico`, `.jpeg`, `.jpg`, `.png`, or `.webp` files no larger than 10 MiB.
+  - Unapproved, ambiguous, deleted, renamed, copied, executable, config, workflow, source, docs, Supabase, or governance files run the full CI path.
+  - Detailed rules live in `docs/engineering/protocols/ci-fast-path-and-emergency-bypass.md`.
 
 ### 2a. Release Governance Gate
 - Workflow: [release-governance-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/release-governance-gate.yml)
@@ -172,6 +180,7 @@
 
 ## Required External Configuration
 - GitHub branch protection must require the PR checks listed above.
+- GitHub rulesets or branch protection may configure narrowly scoped admin-only bypass actors for emergency use, but normal required checks must remain in force for everyday work.
 - Vercel preview automation must provide a preview URL to the Preview Gate workflow.
 - GitHub repo variable `PRODUCTION_BASE_URL` is optional overall and should point at the canonical production URL only if automatic post-merge verification and `Merged -> Built` promotion are desired.
 - GitHub secrets `GOOGLE_SERVICE_ACCOUNT_JSON` and `GOOGLE_SHEET_ID` must be configured for Google Sheets status sync.
@@ -188,8 +197,10 @@
   - `pr-e2e-webkit`
   - `pr-summary`
   - `release-governance-gate`
+- Confirm `classify-upload-changes` and `upload-lightweight-validation` are visible as PR Gate contexts, while the stable required names above remain unchanged.
 - Confirm the rule applies to pull requests targeting `main`.
 - Confirm a failing required check blocks merge instead of allowing a maintainer merge-through by default.
+- Confirm any bypass actor list is restricted to authorized emergency admins and is not available to routine contributors or automation by default.
 - Re-verify on a real pull request by checking that the merge box reports required checks and refuses merge when one required check is failing.
 - Repo evidence note:
   - PR #34 proved that the workflow could fail without blocking merge before branch protection was aligned.
