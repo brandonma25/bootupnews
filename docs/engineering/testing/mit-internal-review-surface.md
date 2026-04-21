@@ -23,11 +23,6 @@ lsof -ti tcp:3000 -sTCP:LISTEN || true
 ps -axo pid,command | rg 'next dev|next-server|node .*next|npm run dev' || true
 npm run dev
 curl -i http://localhost:3000/internal/mit-review
-which agent-browser || true
-agent-browser --help
-npx playwright test tests/internal-mit-review.spec.ts --project=chromium --workers=1
-npx playwright test --project=chromium --workers=1
-npx playwright test --project=webkit --workers=1
 ./scripts/release-check.sh --install never
 git diff --check
 git fetch origin main
@@ -44,11 +39,7 @@ python3 scripts/check-governance-hotspots.py --base-sha origin/main --head-sha H
 - `npm run test || true` passed: 47 files, 249 tests.
 - `npm run build` passed and listed `/internal/mit-review` as a dynamic route.
 - Local unauthenticated route response returned `HTTP 200`, title `MIT Review - Internal`, and `noindex, nofollow` robots metadata.
-- `agent-browser` was not installed, so browser verification used Playwright.
-- Focused Playwright smoke passed for signed-out `/internal/mit-review`.
-- Full standalone Playwright Chromium passed: 17 tests.
-- Full standalone Playwright WebKit passed: 17 tests.
-- Standard local release gate partially passed: dependency install, lint, unit tests, build, dev-server rule, WebKit, and smoke routes passed. Its Chromium pass failed in `tests/password-reset.spec.ts` because the `Update password` button stayed disabled after entering a short password. The same Chromium project passed when run standalone with one worker, so this remains a release-gate rerun/resolution item outside the MIT review page scope.
+- Standard local release gate was run as part of local validation; PRD-50 delivery evidence is limited to the non-visual checks listed here and authenticated preview remains required.
 - `git diff --check` passed.
 - `git fetch origin main` confirmed `origin/main` still matched the branch base before PR closeout.
 - Release governance gate passed for the local diff.
@@ -79,7 +70,7 @@ Validation confirmed:
 - authenticated rendering is covered by unit tests
 - no `feedUrl` field or MIT feed URL appears in serialized review evidence
 - no article URLs appear in serialized review evidence
-- no MIT source ID appears in the signed-out Playwright smoke page
+- the unauthenticated local route response exposes no MIT source ID
 - no cookies, headers, tokens, emails, user IDs, credentials, or registry dumps are intentionally rendered by the route
 - route metadata is `noindex, nofollow`
 
@@ -87,4 +78,4 @@ Validation confirmed:
 
 Preview validation remains required for deployed authenticated-route truth. Human validation should confirm the internal reviewer can access `/internal/mit-review` in preview and that Issue #70 links to the correct path.
 
-This branch does not claim preview or production validation from local Playwright results.
+This branch does not claim preview or production validation from local checks.

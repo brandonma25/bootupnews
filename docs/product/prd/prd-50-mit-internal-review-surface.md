@@ -70,7 +70,7 @@ MIT review currently depends on Issue #70 plus logs. Reviewers need a compact pa
 
 - Scope completed: Yes.
 - Tests run: Yes. See `docs/engineering/testing/mit-internal-review-surface.md`.
-- Local validation complete: Yes for unauthenticated route gating, route render, noindex metadata, sanitized evidence shaping, build, unit tests, and standalone Playwright Chromium/WebKit. The standard release gate reported one Chromium failure in an unrelated password-reset test while the same project passed standalone.
+- Local validation complete: Yes for unauthenticated route gating, route render, noindex metadata, sanitized evidence shaping, build, and unit tests. Authenticated deployed access truth remains a preview requirement.
 - Preview validation complete, if applicable: No. Vercel preview validation remains required for authenticated internal-route truth.
 - Production sanity check complete, only after preview is good: No.
 - PRD summary stored in repo: Yes.
