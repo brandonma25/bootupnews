@@ -70,8 +70,11 @@ test.describe("dashboard", () => {
     await expect(navToggle).toHaveAttribute("aria-expanded", "false");
 
     await navToggle.click();
+    await expect(navToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(mobileDrawer.getByRole("link", { name: /^Topics$/ })).toBeVisible();
+
     await Promise.all([
-      page.waitForURL(/\/topics$/),
+      page.waitForURL((url) => url.pathname === "/topics"),
       mobileDrawer.getByRole("link", { name: /^Topics$/ }).click(),
     ]);
 

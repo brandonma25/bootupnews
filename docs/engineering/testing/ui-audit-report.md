@@ -1,21 +1,19 @@
 # UI Audit Playwright Report
 
-- Generated: 2026-04-20T06:52:13.640Z
+- Generated: 2026-04-21T02:42:56.668Z
 - Base URL: `http://localhost:3000`
 - Audit mode: `local`
-- Summary source: `test-results/ui-audit-summary.json`
+- Summary source: `test-results/playwright-results.json`
 
 ## Pass / Fail Summary
 
 | Total | Passed | Failed | Skipped |
 | ---: | ---: | ---: | ---: |
-| 72 | 70 | 0 | 2 |
+| 22 | 22 | 0 | 0 |
 
 ## Projects / Viewports
 
 - chromium
-- firefox
-- mobile-chromium
 - webkit
 
 ## Routes Covered
@@ -30,12 +28,11 @@
 ## Behaviors Covered
 
 - Desktop sidebar traversal across first-class app routes.
-- Mobile drawer open, outside-click close, and route-change close behavior.
-- Signed-out homepage auth entry and callback-error auth state.
-- Signed-out dashboard reload truth and safe CTA visibility.
-- Honest placeholder states on topics, sources, history, and settings.
+- Mobile drawer open, close, and route-change close behavior.
+- Signed-out homepage CTA and auth-entry modal.
+- Signed-out dashboard rendering, visible content, and named controls.
 - Route-level screenshots attached to Playwright artifacts.
-- Console/page/request diagnostics attached when detected.
+- Console, page, and failed-request diagnostics attached when detected.
 
 ## Failed Tests
 
@@ -45,8 +42,9 @@
 
 - HTML report: `playwright-report/index.html`
 - JSON summary: `test-results/ui-audit-summary.json`
+- Raw Playwright JSON: `test-results/playwright-results.json`
 - Per-test screenshots and diagnostics: `test-results/**`
-- Traces: retained on first retry/failure per Playwright configuration.
+- Traces: retained on failure by Playwright configuration.
 
 ## Known Gaps
 

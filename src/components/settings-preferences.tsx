@@ -202,6 +202,7 @@ export function SettingsPreferences({
             </div>
             <button
               type="button"
+              aria-label="Toggle personalized ranking"
               aria-pressed={preferences.personalizationEnabled}
               onClick={() => updatePreference("personalizationEnabled", !preferences.personalizationEnabled)}
               className={`relative inline-flex h-7 w-12 items-center rounded-button transition-colors disabled:opacity-40 ${
