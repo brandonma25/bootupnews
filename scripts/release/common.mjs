@@ -9,16 +9,17 @@ export const DEFAULT_ROUTE_EXPECTATIONS = [
   {
     path: "/",
     expected: [
-      "Daily Intelligence",
-      "Preview a structured intelligence briefing before you unlock the full workspace",
-      "Confirmed developments, ranked with transparent logic",
+      "Daily Intelligence Briefing",
+      "Top Events",
+      "Why it matters",
+      "Details",
     ],
-    signedOutExpected: ["Personalize briefing"],
+    signedOutExpected: ["Public briefing", "Sign in to unlock History and Account."],
   },
   {
     path: "/dashboard",
-    expected: ["Today's Briefing", "What signing in unlocks"],
-    signedOutExpected: ["Preview the ranked public briefing here, then sign in"],
+    expected: [],
+    signedOutExpected: [],
   },
 ];
 

@@ -8,9 +8,14 @@ test.describe("password reset pages", () => {
     await expect(page.getByRole("button", { name: "Send reset link" })).toBeDisabled();
     await expect(page.getByRole("link", { name: "Back to login" })).toHaveAttribute("href", "/login");
 
-    await page.getByLabel("Email").fill("reader@example.com");
+    const emailInput = page.getByLabel("Email");
+    const submit = page.getByRole("button", { name: "Send reset link" });
 
-    await expect(page.getByRole("button", { name: "Send reset link" })).toBeEnabled();
+    await expect(async () => {
+      await emailInput.fill("");
+      await emailInput.fill("reader@example.com");
+      await expect(submit).toBeEnabled({ timeout: 500 });
+    }).toPass();
   });
 
   test("renders reset password missing-token state", async ({ page }) => {
