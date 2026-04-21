@@ -21,9 +21,11 @@
   - `npm run test`
   - `npm run build`
   - Dev Server Rule on port `3000`
+  - `npx playwright test --project=chromium`
+  - `npx playwright test --project=webkit`
   - route probes for `/` and `/dashboard`
 - Build failure is blocking.
-- Lint and unit-test failures are reported explicitly and still return a non-zero exit code.
+- Lint, unit-test, and Playwright failures are reported explicitly and still return a non-zero exit code.
 
 ### 1a. Feature Tracking Sync Gate
 - Workflow: [github-sheets-status-sync.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/github-sheets-status-sync.yml)
@@ -48,10 +50,12 @@
   - `pr-lint`
   - `pr-unit-tests`
   - `pr-build`
+  - `pr-e2e-chromium`
+  - `pr-e2e-webkit`
   - `pr-summary`
   - `release-governance-gate`
 - GitHub branch protection must separately require those checks; the repo workflows alone do not make them blocking.
-- These jobs automate install, lint, build, unit/integration tests, and PR summary generation.
+- These jobs automate install, lint, build, unit/integration tests, Chromium plus WebKit Playwright smoke coverage, artifact upload, and PR summary generation.
 
 ### 2a. Release Governance Gate
 - Workflow: [release-governance-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/release-governance-gate.yml)
@@ -61,7 +65,7 @@
 - Standalone coverage validator: `python scripts/validate-documentation-coverage.py`
 - Reuses the feature-system CSV validator and inspects the PR diff.
 - In CI PR mode, the gate inspects only the explicit `base...head` PR diff so generated or untracked runner artifacts cannot change classification. Local validation remains allowed to include staged, unstaged, and untracked working-tree changes when run intentionally.
-- Monitored change areas include `src/`, `supabase/`, `scripts/`, `.github/workflows/`, and key root config files such as `package.json`, `next.config.ts`, and `tsconfig.json`.
+- Monitored change areas include `src/`, `supabase/`, `scripts/`, `.github/workflows/`, and key root config files such as `package.json`, `next.config.ts`, `playwright.config.ts`, and `tsconfig.json`.
 - Classification:
   - docs-only
   - trivial-code-change
@@ -140,6 +144,8 @@
 - lint
 - unit/integration tests
 - build
+- local Chromium Playwright smoke
+- local WebKit Playwright smoke
 - deterministic auth entry, signed-out refresh, and callback-error redirect smoke
 - preview route probe
 - production route probe
@@ -178,6 +184,8 @@
   - `pr-lint`
   - `pr-unit-tests`
   - `pr-build`
+  - `pr-e2e-chromium`
+  - `pr-e2e-webkit`
   - `pr-summary`
   - `release-governance-gate`
 - Confirm the rule applies to pull requests targeting `main`.

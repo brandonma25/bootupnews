@@ -38,12 +38,17 @@ function envForAppBootstrap(baseUrl) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || "test-service-role-key",
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || "test-openai-key",
     THE_NEWS_API_KEY: process.env.THE_NEWS_API_KEY || "test-news-api-key",
+    PLAYWRIGHT_MANAGED_WEBSERVER: "0",
   };
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const installMode = args.install || "if-needed";
+  const e2eProjects = String(args["e2e-project"] || "chromium,webkit")
+    .split(",")
+    .map((project) => project.trim())
+    .filter(Boolean);
   const baseUrl = args["base-url"] || DEFAULT_LOCAL_BASE_URL;
   const env = envForLocalRun();
   const appEnv = envForAppBootstrap(baseUrl);
@@ -53,6 +58,7 @@ async function main() {
     createStep("unit tests", { soft: true }),
     createStep("build"),
     createStep("dev server rule"),
+    ...e2eProjects.map((project) => createStep(`playwright (${project})`, { soft: true })),
     createStep("local smoke routes"),
   ];
   const installStep = steps[0];
@@ -60,6 +66,7 @@ async function main() {
   const testStep = steps[2];
   const buildStep = steps[3];
   const devStep = steps[4];
+  const playwrightSteps = steps.slice(5, 5 + e2eProjects.length);
   const smokeStep = steps.at(-1);
   let devServer;
 
@@ -125,6 +132,14 @@ async function main() {
       portOwners.length > 0
         ? `Freed port ${DEFAULT_PORT} from PID(s): ${portOwners.join(", ")}`
         : `Dev server ready at ${baseUrl}`;
+
+    for (const [index, project] of e2eProjects.entries()) {
+      runCommand("npx", ["playwright", "test", "--project", project], {
+        step: playwrightSteps[index],
+        allowFailure: true,
+        env: appEnv,
+      });
+    }
 
     const smokeStartedAt = Date.now();
     const smokeResults = await probeRoutes({

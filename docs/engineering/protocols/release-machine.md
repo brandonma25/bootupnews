@@ -46,6 +46,7 @@ Minimum required validation:
 - lint
 - build
 - tests
+- Chromium and WebKit Playwright smoke when technically appropriate
 - local smoke validation
 
 ### Gate 2 — Preview Gate

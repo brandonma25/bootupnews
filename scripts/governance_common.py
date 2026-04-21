@@ -21,6 +21,7 @@ MONITORED_EXACT_PATHS = (
     "package-lock.json",
     "next.config.ts",
     "tsconfig.json",
+    "playwright.config.ts",
     "vitest.config.ts",
     "eslint.config.mjs",
     "postcss.config.mjs",

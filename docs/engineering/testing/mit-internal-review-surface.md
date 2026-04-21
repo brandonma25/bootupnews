@@ -28,6 +28,11 @@ git diff --check
 git fetch origin main
 python3 scripts/release-governance-gate.py --base-sha origin/main --head-sha HEAD --branch-name feature/prd-50-mit-internal-review --pr-title "Add internal MIT probationary review surface" --diff-mode local
 python3 scripts/check-governance-hotspots.py --base-sha origin/main --head-sha HEAD --branch-name feature/prd-50-mit-internal-review --pr-title "Add internal MIT probationary review surface" --diff-mode local --require-fresh
+npm run lint
+npm run test -- src/lib/internal/mit-review.test.ts src/app/internal/mit-review/page.test.tsx
+npm run build
+PLAYWRIGHT_MANAGED_WEBSERVER=1 npm run test:e2e:chromium -- tests/internal-mit-review.spec.ts
+PLAYWRIGHT_MANAGED_WEBSERVER=1 npm run test:e2e:webkit -- tests/internal-mit-review.spec.ts
 ```
 
 ## Results
@@ -44,6 +49,12 @@ python3 scripts/check-governance-hotspots.py --base-sha origin/main --head-sha H
 - `git fetch origin main` confirmed `origin/main` still matched the branch base before PR closeout.
 - Release governance gate passed for the local diff.
 - Governance hotspot check passed with the expected warning that `docs/product/feature-system.csv` is a serialized hotspot and must be re-synced before PR/merge.
+- PR required-context repair restored the `pr-e2e-chromium` and `pr-e2e-webkit` workflow jobs, Playwright config, Playwright package scripts/dependency, release-local Playwright steps, and e2e specs that had been removed from the PR branch.
+- Post-repair `npm run lint` passed.
+- Post-repair focused MIT review tests passed: 2 files, 4 tests.
+- Post-repair `npm run build` passed.
+- Post-repair focused Playwright Chromium smoke passed for `tests/internal-mit-review.spec.ts`.
+- Post-repair focused Playwright WebKit smoke passed for `tests/internal-mit-review.spec.ts`.
 
 ## Local Route Checks
 

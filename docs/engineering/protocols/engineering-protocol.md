@@ -75,6 +75,7 @@
 ## 6. Validation Sequence
 - Validation order is `Local -> Vercel Preview -> Production`.
 - Local is for code correctness, rendering checks, and fast debugging.
+- Playwright is the default automated E2E and functional testing layer for UI flows, smoke coverage, and regression coverage.
 - Preview is the real deployment-like truth layer.
 - Production is for final sanity checks only.
 - If auth, cookies, redirects, SSR, or environment logic has not been tested in preview, it is not validated.
@@ -87,13 +88,19 @@
 - `npm run build`
 - the Dev Server Rule
 - `npm run dev`
+- Playwright is the default local E2E and functional automation layer for UI flows.
+- After coding is complete, Codex should run the local Playwright workflow when technically possible.
+- Minimum required local Playwright paths are `npx playwright test --project=chromium` and `npx playwright test --project=webkit`.
+- Codex should broaden to `npx playwright test` when the feature scope meaningfully affects multiple UI flows.
+- Release-sensitive browser coverage should prioritize Chromium baseline correctness plus WebKit smoke coverage for Safari-class behavior.
 - Deterministic auth/session smoke should cover signed-out truth, auth entry state, and callback-error or redirect handling when those checks are safely automatable.
 - basic smoke validation
 - a concise test report
 - a repo-safe docs update
 - Build failure is blocking.
 - Lint and test failures must be reported explicitly.
-- Codex must report the exact commands run, Local URL, preview-required checks, and human-only checks.
+- Codex must report the exact commands run, Local URL, Playwright results, preview-required checks, and human-only checks.
+- Local Playwright passing does not replace preview validation for auth, cookies, redirects, SSR, or env-sensitive behavior.
 
 ## 8. Human Validation Requirements
 - The user must validate in preview when relevant:
@@ -315,6 +322,8 @@ Do not proceed until this is confirmed.
 ## 15. Enforcement Behavior
 - Do not recommend merge when:
 - preview validation is missing for env, auth, cookies, redirects, or SSR work
+- required Playwright local automation has not been run for the branch scope
+- required Playwright coverage is failing for the branch scope
 - scope is mixed
 - docs are missing
 - build is broken
