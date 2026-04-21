@@ -13,14 +13,16 @@ Before ANY substantial implementation work, you MUST read:
 
 ## Git Worktree / Branch Attachment Protocol (Mandatory)
 
-Before installs, edits, tests, refactors, or any prompt step that assumes branch context, Codex must confirm the active workspace identity.
+A branch may have only one owning worktree at a time in normal operation. The owner is the path shown by `git worktree list`.
+
+Before installs, edits, tests, branch switches, continuation work, refactors, or any prompt step that assumes branch context, Codex must confirm the active workspace identity.
 
 Run first:
 
 ```bash
 pwd
 git branch --show-current
-git status
+git status --short --branch
 git worktree list
 ```
 
@@ -28,16 +30,28 @@ Codex must report:
 - current folder
 - current branch
 - full worktree list
+- whether the requested branch already exists
 - whether the requested branch is already owned by another worktree
 - whether the current session is attached to the correct owning worktree for the task
 
-If the requested branch is already used by another worktree:
+Hard stop conditions:
+- If the requested branch is shown in `git worktree list` at another path, stop before installs, edits, tests, or branch switches.
+- Report the owning worktree path and ask the user to continue from that folder.
 - do not run `git checkout` for that branch
-- do not use `--ignore-other-worktrees`
-- do not create a duplicate worktree for the same branch
-- stop and instruct the user to open or use the owning worktree directly
+- do not create a duplicate worktree for that branch
+- do not use `--force` or `--ignore-other-worktrees` to bypass branch/worktree safety for ordinary repo work
+- If the current folder is not the requested branch's owning worktree, stop before making changes and switch to or create the correct worktree first.
 
-All work on an existing feature, fix, docs, or chore branch must happen inside that branch's owning worktree folder.
+Existing branch continuation:
+- All work on an existing feature, fix, docs, or chore branch must happen inside that branch's owning worktree folder.
+- If the correct owning worktree already exists, use it; do not improvise a new folder.
+- Do not switch into a branch already owned by another worktree.
+
+New scoped work:
+- Start from updated `main`.
+- Create exactly one scoped branch for the feature, fix, docs update, or chore.
+- When using worktrees, create a dedicated named worktree for that branch from updated `main`.
+- Do not create backup branches like `*-wip`, `*-backup`, or `*-final`.
 
 Reusable prompt block:
 
@@ -46,22 +60,27 @@ WORKSPACE IDENTITY CHECK — REQUIRED FIRST STEP
 Run:
 pwd
 git branch --show-current
-git status
+git status --short --branch
 git worktree list
 
 Report:
 - current folder
 - current branch
+- full worktree list
+- requested branch
+- whether the requested branch already exists
+- owner path if the requested branch is shown in git worktree list
 - whether this is the correct owning worktree for the requested task
 
-Do not proceed until this is confirmed.
+Stop before installs, edits, tests, or branch switches if branch ownership does not match.
+Never bypass worktree safety with --force or --ignore-other-worktrees for ordinary repo work.
 ```
 
 Before starting any new development:
 
 1. Always start from `main`.
 2. Always update `main` first.
-3. Create exactly one branch per feature/fix.
+3. Create exactly one branch per feature, fix, docs update, or chore.
 4. Do not stack new work on old feature branches.
 5. Do not create backup branches like `*-wip`, `*-backup`, or `*-final`.
 6. If more work is needed for the same feature, continue on the same branch unless the feature has already been merged.
@@ -76,6 +95,21 @@ pwd
 git checkout main
 git pull
 git checkout -b feature/prd-<number>-<short-name>
+```
+
+Required worktree creation flow when a dedicated worktree is requested:
+
+```bash
+cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
+pwd
+git checkout main
+git pull
+git worktree add "/Users/bm/Documents/daily-intelligence-aggregator-<short-name>" -b <branch-name>
+cd "/Users/bm/Documents/daily-intelligence-aggregator-<short-name>"
+pwd
+git branch --show-current
+git status --short --branch
+git worktree list
 ```
 
 Required post-merge cleanup flow:

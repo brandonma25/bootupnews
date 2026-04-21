@@ -240,22 +240,31 @@ are true:
 
 ## 10c. Local Repo and Worktree Discipline
 
+- This rule prevents dirty-tree confusion, wrong-branch continuation, duplicate branch ownership, and accidental cross-lane contamination.
 - The canonical local project root is `/Users/bm/Documents/daily-intelligence-aggregator-main`.
 - Do not use `/Users/bm/Documents/Daily news intel aggregator` for Git or Codex work; it is a symlink alias and increases directory-confusion risk.
-- Before installs, edits, tests, refactors, or any prompt step that assumes branch context, Codex must confirm the active workspace identity.
-- Before every Git or Codex task, run:
+- A branch may have only one owning worktree at a time in normal operation. The owner is the path shown by `git worktree list`.
+- Before installs, edits, tests, branch switches, continuation work, refactors, or any prompt step that assumes branch context, Codex must confirm the active workspace identity.
+- Run this identity check first:
 
 ```bash
 pwd
 git branch --show-current
-git status
+git status --short --branch
 git worktree list
 ```
 
-- Codex must report the current folder, current branch, full worktree list, whether the requested branch is already owned by another worktree, and whether the current session is attached to the correct owning worktree for the task.
-- If the requested branch is already used by another worktree, Codex must not run `git checkout` for that branch, must not use `--ignore-other-worktrees`, must not create a duplicate worktree for the same branch, and must stop and instruct the user to open or use the owning worktree directly.
-- All work on an existing feature, fix, docs, or chore branch must happen inside that branch's owning worktree folder.
-- Use additional worktrees only when intentionally isolating parallel branch work.
+- Codex must report the current folder, current branch, full worktree list, whether the requested branch already exists, whether the requested branch is already owned by another worktree, and whether the current session is attached to the correct owning worktree for the task.
+- If the requested branch is shown in `git worktree list` at another path, Codex must stop before installs, edits, tests, or branch switches, report the owning worktree path, and ask the user to continue from that folder.
+- Codex must never run `git checkout` for a branch already owned by another worktree.
+- Codex must never create a duplicate worktree for a branch already owned by another worktree.
+- Codex must never use `--force` or `--ignore-other-worktrees` to bypass branch/worktree safety for ordinary repo work.
+- If the current folder is not the requested branch's owning worktree, Codex must stop before making changes and switch to or create the correct worktree first.
+- All work on an existing feature, fix, docs, or chore branch must continue inside that branch's owning worktree folder.
+- If the correct owning worktree already exists, use it; do not improvise a new folder.
+- New scoped work must start from updated `main` on exactly one freshly scoped branch.
+- When using worktrees for new scoped work, create a dedicated named worktree for that branch from updated `main`.
+- Use additional worktrees only when intentionally isolating branch work.
 - Before removing any worktree, run `git status --short` inside that exact worktree.
 - Never auto-clean a worktree that contains modified or untracked files; preserve ambiguous work before cleanup.
 
@@ -266,15 +275,20 @@ WORKSPACE IDENTITY CHECK — REQUIRED FIRST STEP
 Run:
 pwd
 git branch --show-current
-git status
+git status --short --branch
 git worktree list
 
 Report:
 - current folder
 - current branch
+- full worktree list
+- requested branch
+- whether the requested branch already exists
+- owner path if the requested branch is shown in git worktree list
 - whether this is the correct owning worktree for the requested task
 
-Do not proceed until this is confirmed.
+Stop before installs, edits, tests, or branch switches if branch ownership does not match.
+Never bypass worktree safety with --force or --ignore-other-worktrees for ordinary repo work.
 ```
 
 ## 11. Merge Checklist
