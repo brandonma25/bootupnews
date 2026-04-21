@@ -102,9 +102,11 @@ describe("LandingHomepage", () => {
 
 describe("supporting states", () => {
   it("renders the loading shell", () => {
-    render(<Loading />);
+    const { container } = render(<Loading />);
     expect(screen.getAllByRole("main")).toHaveLength(1);
-    expect(screen.getByText("Setting up your feed (10–20 seconds)...")).toBeInTheDocument();
+    expect(screen.getByText("Preparing your feed...")).toBeInTheDocument();
+    expect(screen.queryByText(/10[–-]20 seconds/)).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".skeleton-line, .skeleton-card").length).toBeGreaterThan(0);
   });
 
   it("renders the route error state", () => {

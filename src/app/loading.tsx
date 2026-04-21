@@ -2,7 +2,7 @@ export default function Loading() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-24">
       <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-8">
-        <p className="text-sm font-medium text-[var(--text-secondary)]">Setting up your feed (10–20 seconds)...</p>
+        <p className="text-sm font-medium text-[var(--text-secondary)]">Preparing your feed...</p>
         <div className="skeleton-line h-4 w-40" />
         <div className="skeleton-card mt-4 h-12 max-w-2xl" />
         <div className="skeleton-line mt-4 h-6 max-w-xl" />
