@@ -112,6 +112,28 @@
 - `npx playwright test --project=chromium` had one transient route-traversal timeout while 29 tests passed; rerunning `npx playwright test tests/audit/route-traversal.spec.ts --project=chromium` passed.
 - `npx playwright test --project=webkit` passed: 30 tests.
 
+## Homepage Editorial Preview Follow-Up — 2026-04-23
+
+- Root cause: the homepage model preserved generated copy as a single sentence by calling `summarize(value, 1)` inside `sanitizeWhyItMatters`, and published editorial overrides were flowing through that same model path. The database override remained full text, but the homepage view model reduced it before rendering.
+- Updated the homepage model to preserve full text when a briefing item is a published editorial override.
+- Added a card-level `WhyItMattersPreview` UI that shows long notes with a `line-clamp-3` preview and inline `Read more` / `Show less` controls. The full text remains the single source of truth in the rendered card content.
+- Short notes do not show expand/collapse controls.
+- Focused tests validate:
+  - full published editorial text survives the homepage model.
+  - generated copy remains concise.
+  - long published editorial text is collapsed by default in the UI.
+  - `Read more` expands to the full note.
+  - `Show less` returns to the preview state.
+  - short notes do not render unnecessary controls.
+- `npm run lint` passed.
+- `npm run test -- src/components/landing/homepage.test.tsx src/lib/homepage-model.test.ts src/lib/homepage-editorial-overrides.test.ts src/app/page.test.tsx` passed: 4 files, 38 tests.
+- `npm run test` passed: 55 files, 291 tests.
+- `npm run build` passed.
+- Dev server restarted from this worktree at `http://localhost:3000`.
+- Local HTTP route probes returned `200` for `/`, `/signals`, and `/dashboard/signals/editorial-review`.
+- `npx playwright test --project=chromium` passed: 30 tests.
+- `npx playwright test --project=webkit` passed: 30 tests.
+
 ## Preview-Required Checks
 
 - Confirm Google OAuth login with an email listed in `ADMIN_EMAILS`.
@@ -121,6 +143,7 @@
 - Confirm historical Approved and Published posts can be edited from the All Posts view without losing their status.
 - Confirm Approved cards show a per-card Publish action and become visible on homepage after publishing.
 - Confirm a published signal edited from the editorial page updates the matching homepage signal card after refresh.
+- Confirm a long published editorial note on the homepage defaults to a short preview, expands with `Read more`, and collapses with `Show less`.
 - Confirm `/signals` reads published rows through the server-side sanitized public route in preview.
 - Confirm env-sensitive behavior with `ADMIN_EMAILS` and `SUPABASE_SERVICE_ROLE_KEY` configured in Vercel preview.
 

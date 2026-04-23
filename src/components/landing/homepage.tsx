@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ExternalLink, X } from "lucide-react";
 
@@ -186,7 +187,7 @@ function HomeTopEventCard({
 
         <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
           <p className="section-label">Why it matters</p>
-          <p className="mt-2 text-base text-[var(--text-primary)]">{event.whyItMatters}</p>
+          <WhyItMattersPreview text={event.whyItMatters} />
         </div>
 
         {sourceNames.length ? (
@@ -232,6 +233,37 @@ function HomeTopEventCard({
         ) : null}
       </article>
     </Panel>
+  );
+}
+
+const WHY_IT_MATTERS_PREVIEW_THRESHOLD = 220;
+
+function WhyItMattersPreview({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const shouldCollapse = text.trim().length > WHY_IT_MATTERS_PREVIEW_THRESHOLD;
+
+  return (
+    <div className="mt-2">
+      <p
+        className={cn(
+          "text-base text-[var(--text-primary)]",
+          shouldCollapse && !expanded && "line-clamp-3",
+        )}
+        data-testid="home-why-it-matters-text"
+      >
+        {text}
+      </p>
+      {shouldCollapse ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          className="mt-2 inline-flex text-sm font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

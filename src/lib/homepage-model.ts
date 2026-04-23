@@ -324,7 +324,9 @@ export function buildHomepageEvents(
         (candidate) => candidate.id !== item.id && candidate.topicId === item.topicId,
       );
       const sourceCount = intelligence.sourceCount;
-      const whyItMatters = sanitizeWhyItMatters(item.whyItMatters, item.title);
+      const whyItMatters = sanitizeWhyItMatters(item.whyItMatters, item.title, {
+        preserveFullText: item.editorialStatus === "published" && Boolean(item.publishedWhyItMatters),
+      });
       const signalRole = item.signalRole ?? item.explanationPacket?.signal_role ?? classifyBriefingSignalRole(item);
       const keyPoints = normalizeKeyPoints(item.keyPoints);
 
@@ -473,8 +475,14 @@ function buildWhyThisIsHere(
   return `Visible in ${primaryCategory} because it is recent and potentially meaningful, but the sourcing is still thin enough that it remains a watch item rather than a lead event.`;
 }
 
-function sanitizeWhyItMatters(value: string, title: string) {
-  const trimmed = summarize(value, 1).replace(/\s+/g, " ").trim();
+function sanitizeWhyItMatters(
+  value: string,
+  title: string,
+  options: {
+    preserveFullText?: boolean;
+  } = {},
+) {
+  const trimmed = (options.preserveFullText ? value : summarize(value, 1)).replace(/\s+/g, " ").trim();
   if (!trimmed) {
     return `This development is worth watching because it can change assumptions around ${title.toLowerCase()}.`;
   }

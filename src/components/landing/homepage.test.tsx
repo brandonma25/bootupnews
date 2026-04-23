@@ -18,6 +18,8 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
       ? overrides.keyPoints as BriefingItem["keyPoints"]
       : ["Point one", "Point two", "Point three"],
     whyItMatters: overrides.whyItMatters ?? "Capacity changes platform plans.",
+    publishedWhyItMatters: overrides.publishedWhyItMatters,
+    editorialStatus: overrides.editorialStatus,
     sources:
       overrides.sources ?? [
         { title: "Reuters", url: "https://www.reuters.com/example" },
@@ -126,6 +128,86 @@ describe("LandingHomepage", () => {
     expect(screen.getByText("Model-selected Top Event")).toBeInTheDocument();
     expect(screen.getByText("Model key point")).toBeInTheDocument();
     expect(screen.queryByText("Raw briefing item should not render directly")).not.toBeInTheDocument();
+  });
+
+  it("shows long published editorial Why it matters as a collapsed UI preview by default", () => {
+    const longEditorialText =
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth. This third sentence gives the editor enough space to explain the real-world consequence. This fourth sentence makes the note long enough to require a preview control on the homepage.";
+    const data = createData([
+      createItem({
+        id: "published-editorial-card",
+        whyItMatters: longEditorialText,
+        publishedWhyItMatters: longEditorialText,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const whyItMatters = screen.getByTestId("home-why-it-matters-text");
+    expect(whyItMatters).toHaveTextContent(longEditorialText);
+    expect(whyItMatters).toHaveClass("line-clamp-3");
+    expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("expands and collapses long published editorial Why it matters inline", () => {
+    const longEditorialText =
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth. This third sentence gives the editor enough space to explain the real-world consequence. This fourth sentence makes the note long enough to require a preview control on the homepage.";
+    const data = createData([
+      createItem({
+        id: "published-editorial-card",
+        whyItMatters: longEditorialText,
+        publishedWhyItMatters: longEditorialText,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Read more" }));
+    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-3");
+    expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("does not show a Read more control for short Why it matters text", () => {
+    const data = createData([
+      createItem({
+        id: "short-editorial-card",
+        whyItMatters: "Short published editorial note.",
+        publishedWhyItMatters: "Short published editorial note.",
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    expect(screen.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
   });
 
   it("renders keyPoints from BriefingItem.keyPoints without substituting internal fields", () => {

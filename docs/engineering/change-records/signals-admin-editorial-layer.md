@@ -17,6 +17,7 @@ This change adds an in-app admin/editor workflow for the Top 5 Signals editorial
 - Expands the editorial route into an all-posts management surface with status filters while preserving the Review Queue workflow.
 - Applies published editorial `Why it matters` copy to matching homepage signal cards so the homepage no longer falls back to generated briefing copy after a published manual edit.
 - Makes workflow state coherent for all-post editing: Approved rows can now be published individually, and Top 5 publishing accepts a mix of Approved and already Published rows instead of blocking on previously published records.
+- Preserves full published editorial `Why it matters` copy through the homepage model and applies homepage truncation only as a card-level preview with inline expand/collapse controls.
 - Adds `public.signal_posts` for AI draft reference text, human edited text, published text, editorial status, and edit/approval/publish metadata.
 - Uses server-side service-role persistence only after verifying the logged-in user email against `ADMIN_EMAILS`.
 - Public rendering is handled by the server-side `/signals` route, which reads with the service role and renders only sanitized published fields. No direct anonymous table-read policy is added for `signal_posts`.
