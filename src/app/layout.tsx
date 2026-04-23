@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Inter, Lora } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +17,7 @@ const lora = Lora({
 });
 
 const enableVercelAnalytics = process.env.VERCEL === "1";
+const enableVercelSpeedInsights = process.env.VERCEL === "1";
 
 export const metadata: Metadata = {
   title: "Daily Intelligence Briefing",
@@ -32,6 +34,7 @@ export default function RootLayout({
       <body className="min-h-screen font-sans">
         {children}
         {enableVercelAnalytics ? <Analytics /> : null}
+        {enableVercelSpeedInsights ? <SpeedInsights /> : null}
       </body>
     </html>
   );
