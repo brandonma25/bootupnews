@@ -60,3 +60,7 @@ Because the symptom reproduces on `main`, it is classified as pre-existing and u
 - `npm run build`: passed after all three commits.
 - `npm run dev`: passed after all three commits; `http://localhost:3000/` and `http://localhost:3000/dashboard` returned `200`.
 - Dev-server TypeError investigation: classified as pre-existing because the exact `curl -I` sequence reproduced on `main`; no speculative fix applied.
+
+## PR gate remediation
+
+After the branch was pushed, `release-governance-gate` classified the new `src/lib/source-manifest.ts` module as a new feature/system surface and required canonical PRD mapping. The PR gate remediation commit adds `docs/product/prd/prd-54-public-source-manifest.md` and the matching `docs/product/feature-system.csv` row so the manifest is governed by PRD-54 instead of relying only on ADR/change-note documentation.
