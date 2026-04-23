@@ -23,6 +23,7 @@ import {
   rankNewsClusters,
 } from "@/lib/ranking";
 import { fetchFeedArticles, type FeedArticle } from "@/lib/rss";
+import { getSourcesForPublicSurface } from "@/lib/source-manifest";
 import {
   applySignalFiltering,
   type EventType,
@@ -576,7 +577,7 @@ async function getPipelineBackedDashboardData(input: {
   fallbackReason?: string;
 }): Promise<DashboardData> {
   const fallbackTopics = input.topics?.length ? input.topics : demoTopics;
-  const fallbackSources = input.sources?.length ? input.sources : getMvpDefaultPublicSources();
+  const fallbackSources = input.sources?.length ? input.sources : getSourcesForPublicSurface("public.home");
   const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources);
   const explanationModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
     const mode = item.explanationPacket?.explanation_mode ?? "missing";
