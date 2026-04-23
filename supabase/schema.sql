@@ -126,7 +126,8 @@ create table if not exists public.briefing_items (
 
 create table if not exists public.signal_posts (
   id uuid primary key default gen_random_uuid(),
-  rank integer not null unique check (rank between 1 and 5),
+  briefing_date date not null default current_date,
+  rank integer not null check (rank between 1 and 5),
   title text not null,
   source_name text not null default '',
   source_url text not null default '',
@@ -144,8 +145,10 @@ create table if not exists public.signal_posts (
   approved_by text,
   approved_at timestamptz,
   published_at timestamptz,
+  is_live boolean not null default false,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (briefing_date, rank)
 );
 
 create or replace function public.set_updated_at()

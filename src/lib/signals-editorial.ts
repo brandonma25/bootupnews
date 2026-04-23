@@ -20,6 +20,7 @@ export const PUBLIC_SIGNALS_ROUTE = "/signals";
 
 const SIGNAL_POST_SELECT = [
   "id",
+  "briefing_date",
   "rank",
   "title",
   "source_name",
@@ -39,14 +40,18 @@ const SIGNAL_POST_SELECT = [
   "approved_by",
   "approved_at",
   "published_at",
+  "is_live",
   "created_at",
   "updated_at",
 ].join(", ");
+
+const EDITORIAL_PAGE_SIZE = 20;
 
 type EditorialClient = NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
 
 type StoredSignalPost = {
   id: string;
+  briefing_date: string | null;
   rank: number;
   title: string;
   source_name: string | null;
@@ -66,12 +71,14 @@ type StoredSignalPost = {
   approved_by: string | null;
   approved_at: string | null;
   published_at: string | null;
+  is_live: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 export type EditorialSignalPost = {
   id: string;
+  briefingDate: string | null;
   rank: number;
   title: string;
   sourceName: string;
@@ -91,12 +98,22 @@ export type EditorialSignalPost = {
   approvedBy: string | null;
   approvedAt: string | null;
   publishedAt: string | null;
+  isLive: boolean;
   createdAt: string | null;
   updatedAt: string | null;
   persisted: boolean;
 };
 
 export type EditorialPostStatusFilter = "all" | "review" | EditorialStatus;
+export type EditorialScopeFilter = "all" | "current" | "historical";
+
+export type EditorialReviewQuery = {
+  status?: EditorialPostStatusFilter;
+  scope?: EditorialScopeFilter;
+  date?: string | null;
+  query?: string | null;
+  page?: number;
+};
 
 export type EditorialReviewState =
   | {
@@ -111,8 +128,17 @@ export type EditorialReviewState =
       kind: "authorized";
       adminEmail: string;
       posts: EditorialSignalPost[];
+      currentTopFive: EditorialSignalPost[];
       storageReady: boolean;
       warning: string | null;
+      page: number;
+      pageSize: number;
+      totalMatchingPosts: number;
+      latestBriefingDate: string | null;
+      appliedScope: EditorialScopeFilter;
+      appliedStatus: EditorialPostStatusFilter;
+      appliedQuery: string;
+      appliedDate: string | null;
     };
 
 export type EditorialMutationResult = {
@@ -137,9 +163,23 @@ function normalizeEditorialText(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
+function normalizeDateValue(value: string | null | undefined) {
+  const normalized = value?.trim() ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+}
+
+function normalizeSearchQuery(value: string | null | undefined) {
+  return value?.trim() ?? "";
+}
+
+function normalizePageNumber(page?: number) {
+  return Number.isFinite(page) && page && page > 0 ? Math.floor(page) : 1;
+}
+
 function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
   return {
     id: row.id,
+    briefingDate: row.briefing_date,
     rank: row.rank,
     title: row.title,
     sourceName: row.source_name ?? "",
@@ -159,6 +199,7 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
     publishedAt: row.published_at,
+    isLive: Boolean(row.is_live),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     persisted: true,
@@ -176,6 +217,7 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
 
   return {
     id: `candidate-${index + 1}`,
+    briefingDate: null,
     rank: index + 1,
     title: item.title,
     sourceName: leadSource?.title ?? "Unknown source",
@@ -195,27 +237,65 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
     approvedBy: null,
     approvedAt: null,
     publishedAt: null,
+    isLive: false,
     createdAt: null,
     updatedAt: null,
     persisted: false,
   };
 }
 
-async function loadStoredSignalPosts(client: EditorialClient) {
-  const result = await client
+async function loadStoredSignalPosts(
+  client: EditorialClient,
+  input: {
+    status: EditorialPostStatusFilter;
+    scope: EditorialScopeFilter;
+    query: string;
+    date: string | null;
+    page: number;
+    latestBriefingDate: string | null;
+  },
+) {
+  let queryBuilder = client
     .from("signal_posts")
-    .select(SIGNAL_POST_SELECT)
-    .order("rank", { ascending: true });
+    .select(SIGNAL_POST_SELECT, { count: "exact" });
+
+  if (input.date) {
+    queryBuilder = queryBuilder.eq("briefing_date", input.date);
+  } else if (input.scope === "current" && input.latestBriefingDate) {
+    queryBuilder = queryBuilder.eq("briefing_date", input.latestBriefingDate);
+  } else if (input.scope === "historical" && input.latestBriefingDate) {
+    queryBuilder = queryBuilder.lt("briefing_date", input.latestBriefingDate);
+  }
+
+  if (input.status === "review") {
+    queryBuilder = queryBuilder.in("editorial_status", ["draft", "needs_review"]);
+  } else if (input.status !== "all") {
+    queryBuilder = queryBuilder.eq("editorial_status", input.status);
+  }
+
+  if (input.query) {
+    const escaped = input.query.replace(/[%_,]/g, "");
+    queryBuilder = queryBuilder.or(`title.ilike.%${escaped}%,source_name.ilike.%${escaped}%`);
+  }
+
+  const from = (input.page - 1) * EDITORIAL_PAGE_SIZE;
+  const to = from + EDITORIAL_PAGE_SIZE - 1;
+  const result = await queryBuilder
+    .order("briefing_date", { ascending: false })
+    .order("rank", { ascending: true })
+    .range(from, to);
 
   if (result.error) {
     return {
       posts: [],
+      totalCount: 0,
       errorMessage: result.error.message,
     };
   }
 
   return {
     posts: ((result.data ?? []) as unknown as StoredSignalPost[]).map(mapStoredSignalPost),
+    totalCount: result.count ?? 0,
     errorMessage: null,
   };
 }
@@ -223,24 +303,97 @@ async function loadStoredSignalPosts(client: EditorialClient) {
 async function buildCurrentSignalCandidates() {
   const { briefing } = await generateDailyBriefing();
 
-  return briefing.items
-    .slice(0, 5)
-    .map(mapBriefingItemToSignalPost);
+  return {
+    briefingDate: normalizeDateValue(briefing.briefingDate.slice(0, 10)) ?? new Date().toISOString().slice(0, 10),
+    candidates: briefing.items
+      .slice(0, 5)
+      .map(mapBriefingItemToSignalPost),
+  };
 }
 
-async function seedSignalPosts(client: EditorialClient) {
-  const candidates = await buildCurrentSignalCandidates();
+async function getLatestBriefingDate(client: EditorialClient) {
+  const result = await client
+    .from("signal_posts")
+    .select("briefing_date")
+    .order("briefing_date", { ascending: false })
+    .limit(1);
+
+  if (result.error) {
+    return {
+      latestBriefingDate: null,
+      errorMessage: result.error.message,
+    };
+  }
+
+  const row = ((result.data ?? []) as Array<{ briefing_date: string | null }>)[0];
+  return {
+    latestBriefingDate: row?.briefing_date ?? null,
+    errorMessage: null,
+  };
+}
+
+async function loadCurrentTopFive(client: EditorialClient, briefingDate: string | null) {
+  if (!briefingDate) {
+    return [];
+  }
+
+  const result = await client
+    .from("signal_posts")
+    .select(SIGNAL_POST_SELECT)
+    .eq("briefing_date", briefingDate)
+    .order("rank", { ascending: true })
+    .limit(5);
+
+  if (result.error) {
+    return [];
+  }
+
+  return ((result.data ?? []) as unknown as StoredSignalPost[]).map(mapStoredSignalPost);
+}
+
+async function ensureCurrentSignalPosts(client: EditorialClient) {
+  const { briefingDate, candidates } = await buildCurrentSignalCandidates();
 
   if (candidates.length !== 5) {
     return {
+      briefingDate,
       posts: candidates,
       warning: `The current signal pipeline returned ${candidates.length} signal posts. Publishing requires exactly five.`,
     };
   }
 
+  const existingResult = await client
+    .from("signal_posts")
+    .select("id, rank")
+    .eq("briefing_date", briefingDate);
+
+  if (existingResult.error) {
+    return {
+      briefingDate,
+      posts: candidates,
+      warning: `The current signal snapshot could not be checked: ${existingResult.error.message}`,
+    };
+  }
+
+  const existingRanks = new Set(
+    (((existingResult.data ?? []) as Array<{ rank: number | null }>))
+      .map((row) => row.rank)
+      .filter((rank): rank is number => typeof rank === "number"),
+  );
+  const missingCandidates = candidates.filter((post) => !existingRanks.has(post.rank));
+
+  if (missingCandidates.length === 0) {
+    return {
+      briefingDate,
+      posts: await loadCurrentTopFive(client, briefingDate),
+      warning: null,
+    };
+  }
+
   const now = new Date().toISOString();
   const insertResult = await client.from("signal_posts").insert(
-    candidates.map((post) => ({
+    missingCandidates.map((post) => ({
+      briefing_date: briefingDate,
       rank: post.rank,
       title: post.title,
       source_name: post.sourceName,
@@ -251,6 +404,7 @@ async function seedSignalPosts(client: EditorialClient) {
       selection_reason: post.selectionReason,
       ai_why_it_matters: post.aiWhyItMatters,
       editorial_status: "needs_review",
+      is_live: false,
       created_at: now,
       updated_at: now,
     })),
@@ -258,13 +412,15 @@ async function seedSignalPosts(client: EditorialClient) {
 
   if (insertResult.error) {
     return {
+      briefingDate,
       posts: candidates,
       warning: `The current Top 5 could not be persisted for editing: ${insertResult.error.message}`,
     };
   }
 
   return {
-    posts: (await loadStoredSignalPosts(client)).posts,
+    briefingDate,
+    posts: await loadCurrentTopFive(client, briefingDate),
     warning: null,
   };
 }
@@ -323,8 +479,14 @@ async function getAdminEditorialContext(route: string): Promise<
 
 export async function getEditorialReviewState(
   route = SIGNALS_EDITORIAL_ROUTE,
+  input: EditorialReviewQuery = {},
 ): Promise<EditorialReviewState> {
   const context = await getAdminEditorialContext(route);
+  const normalizedStatus = input.status ?? "all";
+  const normalizedScope = input.scope ?? "all";
+  const normalizedDate = normalizeDateValue(input.date ?? null);
+  const normalizedQuery = normalizeSearchQuery(input.query ?? null);
+  const normalizedPage = normalizePageNumber(input.page);
 
   if (!context.ok) {
     if (context.code === "not_authenticated") {
@@ -345,12 +507,38 @@ export async function getEditorialReviewState(
       kind: "authorized",
       adminEmail: context.userEmail ?? "",
       posts: [],
+      currentTopFive: [],
       storageReady: false,
       warning: context.message,
+      page: normalizedPage,
+      pageSize: EDITORIAL_PAGE_SIZE,
+      totalMatchingPosts: 0,
+      latestBriefingDate: null,
+      appliedScope: normalizedScope,
+      appliedStatus: normalizedStatus,
+      appliedQuery: normalizedQuery,
+      appliedDate: normalizedDate,
     };
   }
 
-  const loaded = await loadStoredSignalPosts(context.client);
+  const ensured = await ensureCurrentSignalPosts(context.client);
+  const latest = await getLatestBriefingDate(context.client);
+  const latestBriefingDate = ensured.briefingDate ?? latest.latestBriefingDate;
+  const loaded = await loadStoredSignalPosts(context.client, {
+    status: normalizedStatus,
+    scope: normalizedScope,
+    query: normalizedQuery,
+    date: normalizedDate,
+    page: normalizedPage,
+    latestBriefingDate,
+  });
+
+  if (latest.errorMessage) {
+    logServerEvent("warn", "Editorial latest briefing date could not be loaded", {
+      route,
+      errorMessage: latest.errorMessage,
+    });
+  }
 
   if (loaded.errorMessage) {
     logServerEvent("warn", "Editorial signal posts could not be loaded", {
@@ -362,39 +550,53 @@ export async function getEditorialReviewState(
       kind: "authorized",
       adminEmail: context.user.email ?? "",
       posts: [],
+      currentTopFive: [],
       storageReady: false,
       warning: `Editorial signal storage could not be read: ${loaded.errorMessage}`,
+      page: normalizedPage,
+      pageSize: EDITORIAL_PAGE_SIZE,
+      totalMatchingPosts: 0,
+      latestBriefingDate,
+      appliedScope: normalizedScope,
+      appliedStatus: normalizedStatus,
+      appliedQuery: normalizedQuery,
+      appliedDate: normalizedDate,
     };
   }
 
-  if (loaded.posts.length === 0) {
-    const seeded = await seedSignalPosts(context.client);
-
-    return {
-      kind: "authorized",
-      adminEmail: context.user.email ?? "",
-      posts: seeded.posts,
-      storageReady: true,
-      warning: seeded.warning,
-    };
-  }
+  const currentTopFive = await loadCurrentTopFive(context.client, latestBriefingDate);
+  const warningParts = [
+    ensured.warning,
+    getEditorialStorageWarning(loaded.totalCount, normalizedScope),
+  ].filter(Boolean);
 
   return {
     kind: "authorized",
     adminEmail: context.user.email ?? "",
     posts: loaded.posts,
+    currentTopFive,
     storageReady: true,
-    warning: getEditorialStorageWarning(loaded.posts.length),
+    warning: warningParts[0] ?? warningParts[1] ?? null,
+    page: normalizedPage,
+    pageSize: EDITORIAL_PAGE_SIZE,
+    totalMatchingPosts: loaded.totalCount,
+    latestBriefingDate,
+    appliedScope: normalizedScope,
+    appliedStatus: normalizedStatus,
+    appliedQuery: normalizedQuery,
+    appliedDate: normalizedDate,
   };
 }
 
-function getEditorialStorageWarning(postCount: number) {
+function getEditorialStorageWarning(postCount: number, scope: EditorialScopeFilter) {
   if (postCount < 5) {
-    return `Editorial storage currently has ${postCount} signal posts. Publishing requires exactly five ranked signal posts.`;
+    return scope === "historical"
+      ? `Editorial archive currently has ${postCount} matching historical signal posts.`
+      : `Editorial storage currently has ${postCount} matching signal posts. Publishing requires exactly five ranked signal posts in the current set.`;
   }
 
-  if (postCount > 5) {
-    return `Editorial storage has ${postCount} total signal posts. This page shows all posts; publishing uses the five lowest-ranked posts.`;
+  if (postCount > 5 && scope === "all") {
+    return `Editorial storage has ${postCount} matching signal posts. This page is paginated; publishing still uses only the latest five ranked posts.`;
   }
 
   return null;
@@ -586,9 +788,12 @@ export async function approveSignalPosts(input: {
     };
   }
 
-  const loaded = await loadStoredSignalPosts(context.client);
+  const eligibilityLookup = await context.client
+    .from("signal_posts")
+    .select("id, editorial_status")
+    .in("id", uniquePosts.map((post) => post.postId));
 
-  if (loaded.errorMessage) {
+  if (eligibilityLookup.error) {
     return {
       ok: false,
       code: "storage_error",
@@ -597,8 +802,8 @@ export async function approveSignalPosts(input: {
   }
 
   const eligibleIds = new Set(
-    loaded.posts
-      .filter((post) => post.editorialStatus === "draft" || post.editorialStatus === "needs_review")
+    (((eligibilityLookup.data ?? []) as Array<Pick<StoredSignalPost, "id" | "editorial_status">>))
+      .filter((post) => post.editorial_status === "draft" || post.editorial_status === "needs_review")
       .map((post) => post.id),
   );
   const eligiblePosts = uniquePosts.filter((post) => eligibleIds.has(post.postId));
@@ -710,20 +915,16 @@ export async function publishApprovedSignals(input: {
     };
   }
 
-  const { posts, errorMessage } = await loadStoredSignalPosts(context.client);
+  const latest = await getLatestBriefingDate(context.client);
+  const topFivePosts = await loadCurrentTopFive(context.client, latest.latestBriefingDate);
 
-  if (errorMessage) {
+  if (latest.errorMessage) {
     return {
       ok: false,
       code: "storage_error",
       message: "The Top 5 list could not be loaded for publishing.",
     };
   }
-
-  const topFivePosts = posts
-    .slice()
-    .sort((left, right) => left.rank - right.rank)
-    .slice(0, 5);
 
   if (topFivePosts.length !== 5) {
     return {
@@ -758,6 +959,22 @@ export async function publishApprovedSignals(input: {
   }
 
   const now = new Date().toISOString();
+  const deactivateOldLiveSet = await context.client
+    .from("signal_posts")
+    .update({
+      is_live: false,
+      updated_at: now,
+    })
+    .eq("is_live", true);
+
+  if (deactivateOldLiveSet.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The previous live signal set could not be archived before publishing.",
+    };
+  }
+
   const updateResults = await Promise.all(
     topFivePosts.map((post) => {
       const structuredContent =
@@ -774,6 +991,7 @@ export async function publishApprovedSignals(input: {
           ),
           published_why_it_matters_payload: structuredContent,
           editorial_status: "published",
+          is_live: true,
           published_at: now,
           updated_at: now,
         })
@@ -884,6 +1102,8 @@ export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> 
   const result = await supabase
     .from("signal_posts")
     .select(SIGNAL_POST_SELECT)
+    .eq("is_live", true)
+    .eq("editorial_status", "published")
     .order("rank", { ascending: true })
     .limit(5);
 

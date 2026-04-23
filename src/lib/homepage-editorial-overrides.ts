@@ -110,9 +110,10 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
   const result = await client
     .from("signal_posts")
     .select("title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status")
+    .eq("is_live", true)
     .eq("editorial_status", "published")
     .order("rank", { ascending: true })
-    .limit(200);
+    .limit(5);
 
   if (result.error) {
     return [];

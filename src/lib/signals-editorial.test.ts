@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type SignalPostRow = {
   id: string;
+  briefing_date: string;
   rank: number;
   title: string;
   source_name: string;
@@ -21,6 +22,7 @@ type SignalPostRow = {
   approved_by: string | null;
   approved_at: string | null;
   published_at: string | null;
+  is_live: boolean;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -42,6 +44,7 @@ vi.mock("@/lib/data", () => ({
 function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
   return {
     id: overrides.id ?? `signal-${overrides.rank ?? 1}`,
+    briefing_date: overrides.briefing_date ?? "2026-04-24",
     rank: overrides.rank ?? 1,
     title: overrides.title ?? `Signal ${overrides.rank ?? 1}`,
     source_name: overrides.source_name ?? "Source",
@@ -61,6 +64,7 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     approved_by: overrides.approved_by ?? null,
     approved_at: overrides.approved_at ?? null,
     published_at: overrides.published_at ?? null,
+    is_live: overrides.is_live ?? false,
     created_at: overrides.created_at ?? null,
     updated_at: overrides.updated_at ?? null,
   };
@@ -75,11 +79,21 @@ function createSupabaseMock(rows: SignalPostRow[]) {
       let operation: "select" | "update" | null = null;
       let updateValues: Partial<SignalPostRow> = {};
       const filters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
+      const inclusionFilters: Array<{ column: keyof SignalPostRow; values: unknown[] }> = [];
+      const lessThanFilters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
+      let orSearch = "";
       let sortColumn: keyof SignalPostRow | null = null;
+      let rangeStart: number | null = null;
+      let rangeEnd: number | null = null;
 
       function applyFilters() {
         return rows.filter((row) =>
-          filters.every((filter) => row[filter.column] === filter.value),
+          filters.every((filter) => row[filter.column] === filter.value) &&
+          inclusionFilters.every((filter) => filter.values.includes(row[filter.column])) &&
+          lessThanFilters.every((filter) => String(row[filter.column]) < String(filter.value)) &&
+          (orSearch
+            ? row.title.toLowerCase().includes(orSearch) || row.source_name.toLowerCase().includes(orSearch)
+            : true),
         );
       }
 
@@ -87,12 +101,24 @@ function createSupabaseMock(rows: SignalPostRow[]) {
         let data = applyFilters();
 
         if (sortColumn) {
-          data = data.slice().sort((left, right) => Number(left[sortColumn!]) - Number(right[sortColumn!]));
+          data = data.slice().sort((left, right) => {
+            const leftValue = left[sortColumn!];
+            const rightValue = right[sortColumn!];
+            if (typeof leftValue === "number" && typeof rightValue === "number") {
+              return leftValue - rightValue;
+            }
+            return String(leftValue).localeCompare(String(rightValue));
+          });
+        }
+
+        if (rangeStart !== null && rangeEnd !== null) {
+          data = data.slice(rangeStart, rangeEnd + 1);
         }
 
         return Promise.resolve({
           data: typeof limit === "number" ? data.slice(0, limit) : data,
           error: null,
+          count: applyFilters().length,
         });
       }
 
@@ -107,6 +133,11 @@ function createSupabaseMock(rows: SignalPostRow[]) {
         },
         limit(count: number) {
           return selectResult(count);
+        },
+        range(from: number, to: number) {
+          rangeStart = from;
+          rangeEnd = to;
+          return selectResult();
         },
         maybeSingle() {
           return Promise.resolve({
@@ -139,15 +170,28 @@ function createSupabaseMock(rows: SignalPostRow[]) {
 
           return builder;
         },
+        in(column: keyof SignalPostRow, values: unknown[]) {
+          inclusionFilters.push({ column, values });
+          return builder;
+        },
+        lt(column: keyof SignalPostRow, value: unknown) {
+          lessThanFilters.push({ column, value });
+          return builder;
+        },
+        or(value: string) {
+          const match = value.match(/%(.+)%/);
+          orSearch = (match?.[1] ?? "").toLowerCase();
+          return builder;
+        },
         then<TResult1 = unknown, TResult2 = never>(
-          onfulfilled?: ((value: { data: SignalPostRow[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+          onfulfilled?: ((value: { data: SignalPostRow[]; error: null; count: number }) => TResult1 | PromiseLike<TResult1>) | null,
           onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
         ) {
           if (operation === "select" || operation === null) {
             return selectResult().then(onfulfilled, onrejected);
           }
 
-          return Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected);
+          return Promise.resolve({ data: [], error: null, count: 0 }).then(onfulfilled, onrejected);
         },
       };
 
@@ -443,7 +487,8 @@ describe("signals editorial workflow", () => {
     const rows = [
       createRow({
         id: "signal-1",
-        rank: 6,
+        rank: 1,
+        briefing_date: "2026-04-20",
         edited_why_it_matters: "Approved historical editorial update.",
         editorial_status: "approved",
       }),
@@ -473,7 +518,8 @@ describe("signals editorial workflow", () => {
     const rows = [
       createRow({
         id: "signal-1",
-        rank: 6,
+        rank: 1,
+        briefing_date: "2026-04-20",
         edited_why_it_matters: "Structured thesis.\n\nWhy now: The signal changes near-term planning.",
         edited_why_it_matters_payload: structured,
         editorial_status: "approved",
@@ -509,5 +555,41 @@ describe("signals editorial workflow", () => {
     expect(result.message).toBe("Approve this signal post before publishing it.");
     expect(rows[0].editorial_status).toBe("draft");
     expect(rows[0].published_why_it_matters).toBeNull();
+  });
+
+  it("loads only the live published Top 5 for the public signals surface", async () => {
+    const rows = [
+      createRow({
+        id: "live-1",
+        rank: 1,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: "Live published 1",
+        is_live: true,
+      }),
+      createRow({
+        id: "live-2",
+        rank: 2,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: "Live published 2",
+        is_live: true,
+      }),
+      createRow({
+        id: "archived-1",
+        rank: 1,
+        briefing_date: "2026-04-23",
+        editorial_status: "published",
+        published_why_it_matters: "Archived published 1",
+        is_live: false,
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { getPublishedSignalPosts } = await loadEditorialModule();
+    const posts = await getPublishedSignalPosts();
+
+    expect(posts).toHaveLength(2);
+    expect(posts.map((post) => post.id)).toEqual(["live-1", "live-2"]);
   });
 });

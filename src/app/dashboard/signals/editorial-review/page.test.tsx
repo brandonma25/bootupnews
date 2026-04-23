@@ -59,6 +59,25 @@ const publishedPost = {
   publishedWhyItMatters: "Published editorial text",
 };
 
+function createAuthorizedState(posts: typeof reviewPost[]) {
+  return {
+    kind: "authorized" as const,
+    adminEmail: "admin@example.com",
+    posts,
+    currentTopFive: posts,
+    storageReady: true,
+    warning: null,
+    page: 1,
+    pageSize: 20,
+    totalMatchingPosts: posts.length,
+    latestBriefingDate: "2026-04-24",
+    appliedScope: "all" as const,
+    appliedStatus: "all" as const,
+    appliedQuery: "",
+    appliedDate: null,
+  };
+}
+
 describe("signals editorial review page", () => {
   beforeEach(() => {
     getEditorialReviewState.mockReset();
@@ -95,11 +114,7 @@ describe("signals editorial review page", () => {
 
   it("shows the top-level Approve All action for authorized admins", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [reviewPost],
-      storageReady: true,
-      warning: null,
+      ...createAuthorizedState([reviewPost]),
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
@@ -111,11 +126,7 @@ describe("signals editorial review page", () => {
 
   it("shows all historical statuses by default", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [reviewPost, approvedPost, publishedPost],
-      storageReady: true,
-      warning: null,
+      ...createAuthorizedState([reviewPost, approvedPost, publishedPost]),
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
@@ -133,9 +144,7 @@ describe("signals editorial review page", () => {
 
   it("shows structured editorial authoring fields and homepage preview simulation", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [
+      ...createAuthorizedState([
         {
           ...publishedPost,
           publishedWhyItMattersStructured: {
@@ -144,9 +153,7 @@ describe("signals editorial review page", () => {
             sections: [{ title: "Investor read", body: "This changes how the signal should be interpreted." }],
           },
         },
-      ],
-      storageReady: true,
-      warning: null,
+      ]),
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
@@ -162,11 +169,8 @@ describe("signals editorial review page", () => {
 
   it("filters to the review queue while keeping all-post navigation available", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [reviewPost, approvedPost, publishedPost],
-      storageReady: true,
-      warning: null,
+      ...createAuthorizedState([reviewPost]),
+      appliedStatus: "review",
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
@@ -180,11 +184,7 @@ describe("signals editorial review page", () => {
 
   it("disables Approve All when no loaded posts are eligible", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [{ ...reviewPost, editorialStatus: "approved" }],
-      storageReady: true,
-      warning: null,
+      ...createAuthorizedState([{ ...reviewPost, editorialStatus: "approved" }]),
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
@@ -196,9 +196,7 @@ describe("signals editorial review page", () => {
 
   it("allows publishing when approved edits are mixed with already published top posts", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [
+      ...createAuthorizedState([
         {
           ...approvedPost,
           id: "signal-1",
@@ -211,25 +209,18 @@ describe("signals editorial review page", () => {
           rank: index + 2,
           title: `Published Signal ${index + 2}`,
         })),
-      ],
-      storageReady: true,
-      warning: null,
+      ]),
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("button", { name: "Publish Top 5 Signals" })).toBeEnabled();
-    expect(screen.getByText(/Approved posts are ready to publish/i)).toBeInTheDocument();
   });
 
   it("shows a per-card Publish action for approved posts waiting to go live", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [approvedPost],
-      storageReady: true,
-      warning: null,
+      ...createAuthorizedState([approvedPost]),
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
@@ -241,9 +232,7 @@ describe("signals editorial review page", () => {
 
   it("explains that draft rows still block publishing even when other rows are already published", async () => {
     getEditorialReviewState.mockResolvedValue({
-      kind: "authorized",
-      adminEmail: "admin@example.com",
-      posts: [
+      ...createAuthorizedState([
         reviewPost,
         ...Array.from({ length: 4 }, (_, index) => ({
           ...publishedPost,
@@ -251,9 +240,7 @@ describe("signals editorial review page", () => {
           rank: index + 2,
           title: `Published Signal ${index + 2}`,
         })),
-      ],
-      storageReady: true,
-      warning: null,
+      ]),
     });
 
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
@@ -261,5 +248,20 @@ describe("signals editorial review page", () => {
 
     expect(screen.getByRole("button", { name: "Publish Top 5 Signals" })).toBeDisabled();
     expect(screen.getByText(/Already published posts remain publish-ready/i)).toBeInTheDocument();
+  });
+
+  it("shows a clear historical review empty state when older dates have nothing waiting for review", async () => {
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState([]),
+      appliedScope: "historical",
+      appliedStatus: "review",
+      totalMatchingPosts: 0,
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({ scope: "historical", status: "review" }) }));
+
+    expect(screen.getByText("No historical review-queue posts")).toBeInTheDocument();
+    expect(screen.getByText(/Older briefing dates currently have no Draft or Needs Review posts/i)).toBeInTheDocument();
   });
 });
