@@ -380,6 +380,7 @@ describe("getDashboardData fallback behavior", () => {
       "source-ft",
       "source-reuters-business",
       "source-bbc-world",
+      "source-foreign-affairs",
     ]);
     expect(runClusterFirstPipeline).toHaveBeenCalledTimes(1);
     expect(logServerEvent).toHaveBeenCalledWith(

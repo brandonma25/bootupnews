@@ -17,11 +17,11 @@ describe("public source manifest", () => {
     expect(sources).toHaveLength(PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"].length);
   });
 
-  it("includes MIT Technology Review, Reuters Business, and BBC World News in the public.home source plan", () => {
+  it("includes Category 1 sources in the public.home source plan", () => {
     const sources = getSourcesForPublicSurface("public.home");
     const sourceIds = sources.map((source) => source.id);
 
-    expect(sources).toHaveLength(8);
+    expect(sources).toHaveLength(9);
     expect(sourceIds[2]).toBe("source-mit-tech-review");
     expect(sources.find((source) => source.id === "source-mit-tech-review")).toMatchObject({
       name: "MIT Technology Review",
@@ -47,12 +47,47 @@ describe("public source manifest", () => {
       topicName: "World",
       status: "active",
     });
+    expect(sourceIds[8]).toBe("source-foreign-affairs");
+    expect(sources.find((source) => source.id === "source-foreign-affairs")).toMatchObject({
+      name: "Foreign Affairs",
+      feedUrl: "https://www.foreignaffairs.com/rss.xml",
+      homepageUrl: "https://www.foreignaffairs.com",
+      topicName: "World",
+      status: "active",
+    });
   });
 
   it("preserves manifest ordering", () => {
     const sources = getSourcesForPublicSurface("public.home");
 
     expect(sources.map((source) => source.id)).toEqual([...PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]]);
+  });
+
+  it("groups the final public.home ordering by category", () => {
+    const sources = getSourcesForPublicSurface("public.home");
+
+    expect(sources.map((source) => source.id)).toEqual([
+      "source-verge",
+      "source-ars",
+      "source-mit-tech-review",
+      "source-tldr-tech",
+      "source-techcrunch",
+      "source-ft",
+      "source-reuters-business",
+      "source-bbc-world",
+      "source-foreign-affairs",
+    ]);
+    expect(sources.map((source) => source.topicName)).toEqual([
+      "Tech",
+      "Tech",
+      "Tech",
+      "Tech",
+      "Tech",
+      "Finance",
+      "Finance",
+      "World",
+      "World",
+    ]);
   });
 
   it("throws a descriptive error when a declared source is missing from demoSources", async () => {

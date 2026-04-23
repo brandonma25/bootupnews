@@ -100,6 +100,15 @@ export const demoSources: Source[] = [
     status: "active",
   },
   {
+    id: "source-foreign-affairs",
+    name: "Foreign Affairs",
+    feedUrl: "https://www.foreignaffairs.com/rss.xml",
+    homepageUrl: "https://www.foreignaffairs.com",
+    topicId: "topic-politics",
+    topicName: "World",
+    status: "active",
+  },
+  {
     id: "source-marketwatch",
     name: "MarketWatch",
     feedUrl: "https://www.marketwatch.com/rss/topstories",

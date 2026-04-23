@@ -125,19 +125,13 @@ describe("ingestRawItems", () => {
     expect(result.sources.map((source) => source.source)).not.toContain("MIT Technology Review");
   });
 
-  it("resolves all six manifest-supplied sources when manifest provenance is set", async () => {
+  it("resolves the full manifest-supplied source list when manifest provenance is set", async () => {
     const sources = getSourcesForPublicSurface("public.home");
     const result = await ingestRawItems({ sources, suppliedByManifest: true });
 
-    expect(sources).toHaveLength(6);
-    expect(result.sources.map((source) => source.sourceId)).toEqual([
-      "custom-source-verge",
-      "custom-source-ars",
-      "custom-source-tldr-tech",
-      "custom-source-techcrunch",
-      "custom-source-ft",
-      "custom-source-reuters-world",
-    ]);
+    expect(result.sources.map((source) => source.sourceId)).toEqual(
+      sources.map((source) => `custom-${source.id}`),
+    );
   });
 
   it("preserves the five-source cap for six non-manifest supplied sources", async () => {
@@ -156,11 +150,9 @@ describe("ingestRawItems", () => {
     const sources = getSourcesForPublicSurface("public.home").slice(0, 3);
     const result = await ingestRawItems({ sources, suppliedByManifest: true });
 
-    expect(result.sources.map((source) => source.sourceId)).toEqual([
-      "custom-source-verge",
-      "custom-source-ars",
-      "custom-source-tldr-tech",
-    ]);
+    expect(result.sources.map((source) => source.sourceId)).toEqual(
+      sources.map((source) => `custom-${source.id}`),
+    );
   });
 
   it("resolves all three non-manifest supplied sources when count is below the cap", async () => {

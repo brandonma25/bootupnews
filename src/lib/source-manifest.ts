@@ -11,6 +11,7 @@ export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
     "source-ft",
     "source-reuters-business",
     "source-bbc-world",
+    "source-foreign-affairs",
   ],
 } as const;
 
