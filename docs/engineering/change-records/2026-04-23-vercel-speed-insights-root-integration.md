@@ -12,7 +12,7 @@ This change updates the existing Vercel Speed Insights PR so it can merge agains
 
 - Add `@vercel/speed-insights` to application dependencies.
 - Import `SpeedInsights` from `@vercel/speed-insights/next`.
-- Render `<SpeedInsights />` after the root layout children so Core Web Vitals collection can initialize after deployment.
+- Render `<SpeedInsights />` after the root layout children only when `VERCEL=1`, so Core Web Vitals collection can initialize after deployment without causing local browser tests to fetch the external script.
 
 ## Validation Notes
 
