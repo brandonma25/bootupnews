@@ -106,7 +106,7 @@ describe("signals editorial review page", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("button", { name: "Approve All" })).toBeEnabled();
-    expect(screen.getByLabelText("Why it matters — editorial version")).toHaveValue("Raw AI draft");
+    expect(screen.getByLabelText("Thesis / opening statement")).toHaveValue("Raw AI draft");
   });
 
   it("shows all historical statuses by default", async () => {
@@ -125,8 +125,39 @@ describe("signals editorial review page", () => {
     expect(screen.getByText("Signal 1")).toBeInTheDocument();
     expect(screen.getByText("Approved Signal")).toBeInTheDocument();
     expect(screen.getByText("Published Signal")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Approved editorial text")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Published editorial text")).toBeInTheDocument();
+    expect(screen.getByLabelText("Thesis / opening statement", { selector: "#editorialThesis-signal-approved" }))
+      .toHaveValue("Approved editorial text");
+    expect(screen.getByLabelText("Thesis / opening statement", { selector: "#editorialThesis-signal-published" }))
+      .toHaveValue("Published editorial text");
+  });
+
+  it("shows structured editorial authoring fields and homepage preview simulation", async () => {
+    getEditorialReviewState.mockResolvedValue({
+      kind: "authorized",
+      adminEmail: "admin@example.com",
+      posts: [
+        {
+          ...publishedPost,
+          publishedWhyItMattersStructured: {
+            preview: "Structured collapsed teaser.",
+            thesis: "Structured executive thesis.",
+            sections: [{ title: "Investor read", body: "This changes how the signal should be interpreted." }],
+          },
+        },
+      ],
+      storageReady: true,
+      warning: null,
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByLabelText("Homepage teaser / collapsed preview")).toHaveValue(
+      "Structured collapsed teaser.",
+    );
+    expect(screen.getByLabelText("Thesis / opening statement")).toHaveValue("Structured executive thesis.");
+    expect(screen.getByText("Homepage preview simulation")).toBeInTheDocument();
+    expect(screen.getByText("Collapsed homepage version")).toBeInTheDocument();
   });
 
   it("filters to the review queue while keeping all-post navigation available", async () => {

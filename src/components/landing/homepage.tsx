@@ -15,6 +15,7 @@ import {
   type HomepageViewModel,
   type HomepageEvent,
 } from "@/lib/homepage-model";
+import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
 import type { DashboardData, ViewerAccount } from "@/lib/types";
 import { cn, getBriefingDateKey, minutesToLabel } from "@/lib/utils";
 
@@ -189,7 +190,7 @@ function HomeTopEventCard({
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
             Why it matters
           </p>
-          <WhyItMattersPreview text={event.whyItMatters} />
+          <WhyItMattersPreview text={event.whyItMatters} structuredContent={event.editorialWhyItMatters} />
         </div>
 
         {sourceNames.length ? (
@@ -240,15 +241,25 @@ function HomeTopEventCard({
 
 const WHY_IT_MATTERS_PREVIEW_THRESHOLD = 220;
 
-function WhyItMattersPreview({ text }: { text: string }) {
+function WhyItMattersPreview({
+  text,
+  structuredContent,
+}: {
+  text: string;
+  structuredContent?: EditorialWhyItMattersContent | null;
+}) {
   const [expanded, setExpanded] = useState(false);
   const normalizedText = text.trim();
-  const shouldCollapse = normalizedText.length > WHY_IT_MATTERS_PREVIEW_THRESHOLD;
-  const sections = expanded ? formatWhyItMattersSections(normalizedText) : [];
+  const structuredExpandedContent = getStructuredExpandedContent(structuredContent);
+  const shouldCollapse =
+    Boolean(structuredExpandedContent) || normalizedText.length > WHY_IT_MATTERS_PREVIEW_THRESHOLD;
+  const sections = expanded && !structuredExpandedContent ? formatWhyItMattersSections(normalizedText) : [];
 
   return (
     <div className="mt-3">
-      {expanded ? (
+      {expanded && structuredExpandedContent ? (
+        <StructuredWhyItMattersContent content={structuredExpandedContent} />
+      ) : expanded ? (
         <div
           className="space-y-3 border-l-2 border-[var(--border)] pl-3 text-[0.98rem] leading-7 text-[var(--text-primary)]"
           data-testid="home-why-it-matters-text"
@@ -280,6 +291,41 @@ function WhyItMattersPreview({ text }: { text: string }) {
       ) : null}
     </div>
   );
+}
+
+function StructuredWhyItMattersContent({
+  content,
+}: {
+  content: EditorialWhyItMattersContent;
+}) {
+  return (
+    <div
+      className="space-y-4 border-l-2 border-[var(--border)] pl-3 text-[0.98rem] leading-7 text-[var(--text-primary)]"
+      data-testid="home-why-it-matters-text"
+    >
+      {content.thesis ? <p className="font-medium">{content.thesis}</p> : null}
+      {content.sections.map((section, index) => (
+        <section key={`${index}-${section.title}`} className="space-y-1.5">
+          {section.title ? (
+            <h3 className="text-sm font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+              {section.title}
+            </h3>
+          ) : null}
+          {section.body ? <p>{section.body}</p> : null}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function getStructuredExpandedContent(
+  content: EditorialWhyItMattersContent | null | undefined,
+) {
+  if (!content?.thesis && !content?.sections.length) {
+    return null;
+  }
+
+  return content;
 }
 
 function formatWhyItMattersSections(text: string) {

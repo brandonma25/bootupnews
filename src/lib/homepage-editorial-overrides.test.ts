@@ -38,12 +38,36 @@ describe("homepage editorial overrides", () => {
           title: "Fed signals rate path shift",
           sourceUrl: "https://example.com/story",
           whyItMatters: "Human-published editorial explanation.",
+          structuredWhyItMatters: null,
         },
       ],
     );
 
     expect(item.whyItMatters).toBe("Human-published editorial explanation.");
     expect(item.publishedWhyItMatters).toBe("Human-published editorial explanation.");
+    expect(item.editorialStatus).toBe("published");
+  });
+
+  it("carries structured published editorial content into the homepage item", () => {
+    const structuredWhyItMatters = {
+      preview: "Human teaser.",
+      thesis: "Human thesis.",
+      sections: [{ title: "First read", body: "The signal changes near-term interpretation." }],
+    };
+    const [item] = applyPublishedHomepageEditorialOverrides(
+      [createBriefingItem()],
+      [
+        {
+          title: "Fed signals rate path shift",
+          sourceUrl: "https://example.com/story",
+          whyItMatters: "Human thesis.\n\nFirst read: The signal changes near-term interpretation.",
+          structuredWhyItMatters,
+        },
+      ],
+    );
+
+    expect(item.editorialWhyItMatters).toEqual(structuredWhyItMatters);
+    expect(item.publishedWhyItMattersStructured).toEqual(structuredWhyItMatters);
     expect(item.editorialStatus).toBe("published");
   });
 
@@ -55,6 +79,7 @@ describe("homepage editorial overrides", () => {
           title: " Fed   signals rate path shift ",
           sourceUrl: "",
           whyItMatters: "Published title-only editorial explanation.",
+          structuredWhyItMatters: null,
         },
       ],
     );
@@ -70,6 +95,7 @@ describe("homepage editorial overrides", () => {
           title: "Different signal",
           sourceUrl: "https://example.com/other",
           whyItMatters: "Should not replace this card.",
+          structuredWhyItMatters: null,
         },
       ],
     );

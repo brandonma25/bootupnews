@@ -4,6 +4,7 @@ import type {
 } from "@/lib/integration/subsystem-contracts";
 import type { HomepageCategoryClassification } from "@/lib/homepage-taxonomy";
 import type { SignalRole } from "@/lib/output-sanity";
+import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
 
 export type Topic = {
   id: string;
@@ -105,6 +106,9 @@ export type BriefingItem = {
   aiWhyItMatters?: string;
   editedWhyItMatters?: string | null;
   publishedWhyItMatters?: string | null;
+  editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
+  publishedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
+  editorialWhyItMatters?: EditorialWhyItMattersContent | null;
   editorialStatus?: EditorialStatus;
   editedBy?: string | null;
   editedAt?: string | null;

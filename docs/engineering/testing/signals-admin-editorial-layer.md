@@ -168,8 +168,33 @@
 - Confirm a published signal edited from the editorial page updates the matching homepage signal card after refresh.
 - Confirm a long published editorial note on the homepage defaults to a short preview, expands with `Read more`, and collapses with `Show less`.
 - Confirm expanded long-form editorial content is visually chunked and easier to scan than a single wall of text.
+- Confirm structured homepage preview, thesis, and section fields can be edited, approved, published, and then rendered on the homepage as collapsed preview plus expanded structured sections.
+- Confirm older legacy single-block editorial content still renders sensibly when no structured payload exists.
 - Confirm `/signals` reads published rows through the server-side sanitized public route in preview.
 - Confirm env-sensitive behavior with `ADMIN_EMAILS` and `SUPABASE_SERVICE_ROLE_KEY` configured in Vercel preview.
+
+## Structured Editorial Authoring Follow-Up — 2026-04-23
+
+- Added structured homepage editorial authoring fields for collapsed preview, thesis/opening statement, and fixed section title/body slots.
+- Added admin-side preview simulation for collapsed and expanded homepage states.
+- Added nullable `jsonb` payload columns for edited and published structured editorial content while preserving legacy text fields.
+- Applied migration `20260423120000_signal_posts_structured_editorial_payload.sql` to the linked Supabase project after confirming it was pending in remote migration history.
+- Homepage collapsed cards now use the explicit editor-authored preview when published structured content exists.
+- Homepage expanded cards render the structured thesis and sections when available, with legacy single-block editorial text still supported as fallback.
+- Focused tests validate:
+  - structured editorial form rendering and hidden server-action payload sync.
+  - all-post editorial page rendering with structured fields.
+  - structured payload persistence through draft, approval, and publish actions.
+  - structured homepage override bridge behavior.
+  - structured collapsed homepage preview and expanded thesis/section rendering.
+- `npm run lint` passed.
+- `npm run test -- src/app/dashboard/signals/editorial-review/StructuredEditorialFields.test.tsx src/app/dashboard/signals/editorial-review/page.test.tsx src/app/dashboard/signals/editorial-review/ApproveAllButton.test.tsx src/lib/signals-editorial.test.ts src/lib/homepage-editorial-overrides.test.ts src/components/landing/homepage.test.tsx src/lib/homepage-model.test.ts src/app/page.test.tsx` passed: 8 files, 70 tests.
+- `npm run test` passed: 56 files, 301 tests.
+- `npm run build` passed and listed `/`, `/signals`, and `/dashboard/signals/editorial-review` as server-rendered routes.
+- Dev server restarted from this worktree at `http://localhost:3000`.
+- Local HTTP route probes returned `200` for `/`, `/signals`, and `/dashboard/signals/editorial-review`; after applying the migration, the prior missing-column warning for structured payload fields no longer appeared.
+- `npx playwright test --project=chromium` initially reported 27 passed and 3 route/navigation timing failures; rerunning the exact failures with `npx playwright test tests/audit/route-traversal.spec.ts tests/dashboard.spec.ts:59 tests/routes/core-routes.spec.ts --project=chromium` passed: 9 tests.
+- `npx playwright test --project=webkit` initially reported 25 passed, 2 route/navigation timing failures, and 3 tests skipped after the first failure; rerunning the exact failures with `npx playwright test tests/audit/route-traversal.spec.ts tests/dashboard.spec.ts:20 --project=webkit` passed: 2 tests.
 
 ## Human-Only Checks
 

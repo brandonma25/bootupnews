@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
+  normalizeEditorialWhyItMattersContent,
+  parseEditorialWhyItMattersContent,
+} from "@/lib/editorial-content";
+import {
   PUBLIC_SIGNALS_ROUTE,
   SIGNALS_EDITORIAL_ROUTE,
   approveSignalPost,
@@ -28,10 +32,42 @@ function revalidateEditorialRoutes() {
   revalidatePath(PUBLIC_SIGNALS_ROUTE);
 }
 
+function readStructuredEditorialInput(formData: FormData) {
+  const sectionTitles = formData.getAll("sectionTitle").map((value) => String(value));
+  const sectionBodies = formData.getAll("sectionBody").map((value) => String(value));
+  const structuredFromJson = parseEditorialWhyItMattersContent(
+    parseStructuredJson(String(formData.get("structuredWhyItMatters") ?? "")),
+  );
+
+  return normalizeEditorialWhyItMattersContent({
+    preview: String(formData.get("homepagePreview") ?? structuredFromJson?.preview ?? ""),
+    thesis: String(formData.get("editorialThesis") ?? structuredFromJson?.thesis ?? ""),
+    sections: sectionTitles.length || sectionBodies.length
+      ? sectionTitles.map((title, index) => ({
+          title,
+          body: sectionBodies[index] ?? "",
+        }))
+      : structuredFromJson?.sections,
+  });
+}
+
+function parseStructuredJson(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export async function saveSignalDraftAction(formData: FormData) {
   const result = await saveSignalDraft({
     postId: String(formData.get("postId") ?? ""),
     editedWhyItMatters: String(formData.get("editedWhyItMatters") ?? ""),
+    editedWhyItMattersStructured: readStructuredEditorialInput(formData),
   });
 
   if (result.ok) {
@@ -45,6 +81,7 @@ export async function approveSignalPostAction(formData: FormData) {
   const result = await approveSignalPost({
     postId: String(formData.get("postId") ?? ""),
     editedWhyItMatters: String(formData.get("editedWhyItMatters") ?? ""),
+    editedWhyItMattersStructured: readStructuredEditorialInput(formData),
   });
 
   if (result.ok) {
@@ -59,10 +96,14 @@ export async function approveAllSignalPostsAction(formData: FormData) {
   const editedWhyItMattersValues = formData
     .getAll("editedWhyItMatters")
     .map((value) => String(value));
+  const structuredValues = formData
+    .getAll("structuredWhyItMatters")
+    .map((value) => parseEditorialWhyItMattersContent(parseStructuredJson(String(value))));
   const result = await approveSignalPosts({
     posts: postIds.map((postId, index) => ({
       postId,
       editedWhyItMatters: editedWhyItMattersValues[index] ?? "",
+      editedWhyItMattersStructured: structuredValues[index] ?? null,
     })),
   });
 

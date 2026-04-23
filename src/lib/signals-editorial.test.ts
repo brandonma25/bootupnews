@@ -13,6 +13,8 @@ type SignalPostRow = {
   ai_why_it_matters: string;
   edited_why_it_matters: string | null;
   published_why_it_matters: string | null;
+  edited_why_it_matters_payload: unknown | null;
+  published_why_it_matters_payload: unknown | null;
   editorial_status: "draft" | "needs_review" | "approved" | "published";
   edited_by: string | null;
   edited_at: string | null;
@@ -51,6 +53,8 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     ai_why_it_matters: overrides.ai_why_it_matters ?? "Raw AI draft",
     edited_why_it_matters: overrides.edited_why_it_matters ?? null,
     published_why_it_matters: overrides.published_why_it_matters ?? null,
+    edited_why_it_matters_payload: overrides.edited_why_it_matters_payload ?? null,
+    published_why_it_matters_payload: overrides.published_why_it_matters_payload ?? null,
     editorial_status: overrides.editorial_status ?? "needs_review",
     edited_by: overrides.edited_by ?? null,
     edited_at: overrides.edited_at ?? null,
@@ -202,6 +206,36 @@ describe("signals editorial workflow", () => {
     expect(rows[0].edited_why_it_matters).toBe("Human edited draft");
     expect(rows[0].editorial_status).toBe("draft");
     expect(rows[0].edited_by).toBe("admin@example.com");
+  });
+
+  it("stores structured editorial draft content while preserving legacy text output", async () => {
+    const rows = [createRow({ id: "signal-1" })];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const structured = {
+      preview: "Short homepage teaser.",
+      thesis: "Core editorial thesis.",
+      sections: [
+        { title: "Demand signal", body: "The update changes what buyers are likely to do next." },
+      ],
+    };
+    const { saveSignalDraft } = await loadEditorialModule();
+    const result = await saveSignalDraft({
+      postId: "signal-1",
+      editedWhyItMatters: "Fallback copy",
+      editedWhyItMattersStructured: structured,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].edited_why_it_matters).toBe(
+      "Core editorial thesis.\n\nDemand signal: The update changes what buyers are likely to do next.",
+    );
+    expect(rows[0].edited_why_it_matters_payload).toEqual(structured);
   });
 
   it("lets an admin edit approved posts without moving them back to draft", async () => {
@@ -428,6 +462,35 @@ describe("signals editorial workflow", () => {
     expect(result.message).toBe("Signal post published.");
     expect(rows[0].editorial_status).toBe("published");
     expect(rows[0].published_why_it_matters).toBe("Approved historical editorial update.");
+  });
+
+  it("publishes structured approved signal post payloads for homepage rendering", async () => {
+    const structured = {
+      preview: "Structured teaser.",
+      thesis: "Structured thesis.",
+      sections: [{ title: "Why now", body: "The signal changes near-term planning." }],
+    };
+    const rows = [
+      createRow({
+        id: "signal-1",
+        rank: 6,
+        edited_why_it_matters: "Structured thesis.\n\nWhy now: The signal changes near-term planning.",
+        edited_why_it_matters_payload: structured,
+        editorial_status: "approved",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishSignalPost } = await loadEditorialModule();
+    const result = await publishSignalPost({ postId: "signal-1" });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].published_why_it_matters_payload).toEqual(structured);
   });
 
   it("blocks individual publishing until the signal post is approved", async () => {

@@ -23,9 +23,9 @@ export function ApproveAllButton({
     fieldContainer.replaceChildren();
 
     document
-      .querySelectorAll<HTMLTextAreaElement>("textarea[data-approve-all-post-id]")
-      .forEach((textarea) => {
-        const postId = textarea.dataset.approveAllPostId;
+      .querySelectorAll<HTMLInputElement>("input[data-approve-all-post-id]")
+      .forEach((input) => {
+        const postId = input.dataset.approveAllPostId;
 
         if (!postId) {
           return;
@@ -39,9 +39,20 @@ export function ApproveAllButton({
         const editorialInput = document.createElement("input");
         editorialInput.type = "hidden";
         editorialInput.name = "editedWhyItMatters";
-        editorialInput.value = textarea.value;
+        editorialInput.value = input.value;
 
         fieldContainer.append(postIdInput, editorialInput);
+      });
+
+    document
+      .querySelectorAll<HTMLInputElement>("input[data-approve-all-structured-post-id]")
+      .forEach((input) => {
+        const structuredInput = document.createElement("input");
+        structuredInput.type = "hidden";
+        structuredInput.name = "structuredWhyItMatters";
+        structuredInput.value = input.value;
+
+        fieldContainer.append(structuredInput);
       });
   }
 

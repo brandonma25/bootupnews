@@ -19,6 +19,7 @@ import {
   saveSignalDraftAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
 import { ApproveAllButton } from "@/app/dashboard/signals/editorial-review/ApproveAllButton";
+import { StructuredEditorialFields } from "@/app/dashboard/signals/editorial-review/StructuredEditorialFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -414,6 +415,8 @@ function SignalPostEditor({
   storageReady: boolean;
 }) {
   const editableText = post.editedWhyItMatters || post.publishedWhyItMatters || post.aiWhyItMatters;
+  const structuredContent =
+    post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
   const controlsDisabled = !storageReady || !post.persisted;
   const eligibleForApproveAll =
     post.persisted && ["draft", "needs_review"].includes(post.editorialStatus);
@@ -467,22 +470,13 @@ function SignalPostEditor({
           </div>
         </div>
 
-        <div>
-          <label
-            htmlFor={`editedWhyItMatters-${post.id}`}
-            className="text-sm font-semibold text-[var(--text-primary)]"
-          >
-            Why it matters — editorial version
-          </label>
-          <textarea
-            id={`editedWhyItMatters-${post.id}`}
-            name="editedWhyItMatters"
-            defaultValue={editableText}
-            data-approve-all-post-id={eligibleForApproveAll ? post.id : undefined}
-            rows={5}
-            className="mt-2 w-full resize-y rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm leading-6 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
-          />
-        </div>
+        <StructuredEditorialFields
+          postId={post.id}
+          aiWhyItMatters={post.aiWhyItMatters}
+          legacyText={editableText}
+          structuredContent={structuredContent}
+          eligibleForApproveAll={eligibleForApproveAll}
+        />
 
         <div className="flex flex-wrap gap-2">
           <Button

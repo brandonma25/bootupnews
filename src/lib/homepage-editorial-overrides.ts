@@ -1,10 +1,15 @@
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import {
+  parseEditorialWhyItMattersContent,
+  type EditorialWhyItMattersContent,
+} from "@/lib/editorial-content";
 import type { BriefingItem, DashboardData } from "@/lib/types";
 
 type PublishedSignalPostRow = {
   title: string | null;
   source_url: string | null;
   published_why_it_matters: string | null;
+  published_why_it_matters_payload: unknown | null;
   editorial_status: string | null;
 };
 
@@ -12,6 +17,7 @@ export type PublishedHomepageEditorialOverride = {
   title: string;
   sourceUrl: string;
   whyItMatters: string;
+  structuredWhyItMatters: EditorialWhyItMattersContent | null;
 };
 
 function normalizeMatchValue(value: string | null | undefined) {
@@ -85,6 +91,8 @@ export function applyPublishedHomepageEditorialOverrides(
       ...item,
       whyItMatters: override.whyItMatters,
       publishedWhyItMatters: override.whyItMatters,
+      publishedWhyItMattersStructured: override.structuredWhyItMatters,
+      editorialWhyItMatters: override.structuredWhyItMatters,
       editorialStatus: "published" as const,
     };
   });
@@ -101,7 +109,7 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
 
   const result = await client
     .from("signal_posts")
-    .select("title, source_url, published_why_it_matters, editorial_status")
+    .select("title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status")
     .eq("editorial_status", "published")
     .order("rank", { ascending: true })
     .limit(200);
@@ -115,6 +123,7 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
       title: normalizeEditorialText(row.title),
       sourceUrl: normalizeEditorialText(row.source_url),
       whyItMatters: normalizeEditorialText(row.published_why_it_matters),
+      structuredWhyItMatters: parseEditorialWhyItMattersContent(row.published_why_it_matters_payload),
     }))
     .filter((override) => override.title && override.whyItMatters);
 }

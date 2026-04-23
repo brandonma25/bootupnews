@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ApproveAllButton } from "@/app/dashboard/signals/editorial-review/ApproveAllButton";
 
 describe("ApproveAllButton", () => {
-  it("copies current eligible textarea values into the bulk approval form", () => {
+  it("copies current eligible structured editor values into the bulk approval form", () => {
     render(
       <div>
         <form
@@ -15,9 +15,9 @@ describe("ApproveAllButton", () => {
           <div data-approve-all-fields hidden />
           <ApproveAllButton disabled={false} />
         </form>
-        <textarea data-approve-all-post-id="signal-1" defaultValue="Edited value 1" />
-        <textarea data-approve-all-post-id="signal-2" defaultValue="Edited value 2" />
-        <textarea defaultValue="Not eligible" />
+        <input data-approve-all-post-id="signal-1" defaultValue="Edited value 1" />
+        <input data-approve-all-post-id="signal-2" defaultValue="Edited value 2" />
+        <input defaultValue="Not eligible" />
       </div>,
     );
 

@@ -2,6 +2,12 @@ import type { User } from "@supabase/supabase-js";
 
 import { isAdminUser } from "@/lib/admin-auth";
 import { generateDailyBriefing } from "@/lib/data";
+import {
+  buildEditorialWhyItMattersText,
+  createEditorialContentFromLegacyText,
+  parseEditorialWhyItMattersContent,
+  type EditorialWhyItMattersContent,
+} from "@/lib/editorial-content";
 import { logServerEvent } from "@/lib/observability";
 import {
   createSupabaseServiceRoleClient,
@@ -25,6 +31,8 @@ const SIGNAL_POST_SELECT = [
   "ai_why_it_matters",
   "edited_why_it_matters",
   "published_why_it_matters",
+  "edited_why_it_matters_payload",
+  "published_why_it_matters_payload",
   "editorial_status",
   "edited_by",
   "edited_at",
@@ -50,6 +58,8 @@ type StoredSignalPost = {
   ai_why_it_matters: string | null;
   edited_why_it_matters: string | null;
   published_why_it_matters: string | null;
+  edited_why_it_matters_payload: unknown | null;
+  published_why_it_matters_payload: unknown | null;
   editorial_status: EditorialStatus;
   edited_by: string | null;
   edited_at: string | null;
@@ -73,6 +83,8 @@ export type EditorialSignalPost = {
   aiWhyItMatters: string;
   editedWhyItMatters: string | null;
   publishedWhyItMatters: string | null;
+  editedWhyItMattersStructured: EditorialWhyItMattersContent | null;
+  publishedWhyItMattersStructured: EditorialWhyItMattersContent | null;
   editorialStatus: EditorialStatus;
   editedBy: string | null;
   editedAt: string | null;
@@ -139,6 +151,8 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
     aiWhyItMatters: row.ai_why_it_matters ?? "",
     editedWhyItMatters: row.edited_why_it_matters,
     publishedWhyItMatters: row.published_why_it_matters,
+    editedWhyItMattersStructured: parseEditorialWhyItMattersContent(row.edited_why_it_matters_payload),
+    publishedWhyItMattersStructured: parseEditorialWhyItMattersContent(row.published_why_it_matters_payload),
     editorialStatus: row.editorial_status,
     editedBy: row.edited_by,
     editedAt: row.edited_at,
@@ -173,6 +187,8 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
     aiWhyItMatters,
     editedWhyItMatters: null,
     publishedWhyItMatters: null,
+    editedWhyItMattersStructured: null,
+    publishedWhyItMattersStructured: null,
     editorialStatus: "needs_review",
     editedBy: null,
     editedAt: null,
@@ -387,6 +403,7 @@ function getEditorialStorageWarning(postCount: number) {
 export async function saveSignalDraft(input: {
   postId: string;
   editedWhyItMatters: string;
+  editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
   route?: string;
 }): Promise<EditorialMutationResult> {
   const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
@@ -416,12 +433,23 @@ export async function saveSignalDraft(input: {
 
   const currentStatus = (lookup.data as Pick<StoredSignalPost, "editorial_status">).editorial_status;
   const shouldPreserveStatus = currentStatus === "approved" || currentStatus === "published";
-  const editorialText = normalizeEditorialText(input.editedWhyItMatters);
+  const structuredContent =
+    input.editedWhyItMattersStructured ??
+    createEditorialContentFromLegacyText(input.editedWhyItMatters);
+  const editorialText = normalizeEditorialText(
+    buildEditorialWhyItMattersText(structuredContent, input.editedWhyItMatters),
+  );
   const updateResult = await context.client
     .from("signal_posts")
     .update({
       edited_why_it_matters: editorialText,
-      ...(currentStatus === "published" ? { published_why_it_matters: editorialText } : {}),
+      edited_why_it_matters_payload: structuredContent,
+      ...(currentStatus === "published"
+        ? {
+            published_why_it_matters: editorialText,
+            published_why_it_matters_payload: structuredContent,
+          }
+        : {}),
       editorial_status: shouldPreserveStatus ? currentStatus : "draft",
       edited_by: context.user.email ?? null,
       edited_at: now,
@@ -452,9 +480,15 @@ async function approveSignalPostWithContext(
   input: {
     postId: string;
     editedWhyItMatters: string;
+    editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
   },
 ): Promise<EditorialMutationResult> {
-  const editorialText = normalizeEditorialText(input.editedWhyItMatters);
+  const structuredContent =
+    input.editedWhyItMattersStructured ??
+    createEditorialContentFromLegacyText(input.editedWhyItMatters);
+  const editorialText = normalizeEditorialText(
+    buildEditorialWhyItMattersText(structuredContent, input.editedWhyItMatters),
+  );
 
   if (!editorialText) {
     return {
@@ -469,6 +503,7 @@ async function approveSignalPostWithContext(
     .from("signal_posts")
     .update({
       edited_why_it_matters: editorialText,
+      edited_why_it_matters_payload: structuredContent,
       editorial_status: "approved",
       edited_by: context.user.email ?? null,
       edited_at: now,
@@ -496,6 +531,7 @@ async function approveSignalPostWithContext(
 export async function approveSignalPost(input: {
   postId: string;
   editedWhyItMatters: string;
+  editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
   route?: string;
 }): Promise<EditorialMutationResult> {
   const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
@@ -515,6 +551,7 @@ export async function approveSignalPosts(input: {
   posts: Array<{
     postId: string;
     editedWhyItMatters: string;
+    editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
   }>;
   route?: string;
 }): Promise<EditorialMutationResult> {
@@ -534,6 +571,7 @@ export async function approveSignalPosts(input: {
         .map((post) => ({
           postId: normalizeEditorialText(post.postId),
           editedWhyItMatters: post.editedWhyItMatters,
+          editedWhyItMattersStructured: post.editedWhyItMattersStructured,
         }))
         .filter((post) => post.postId)
         .map((post) => [post.postId, post]),
@@ -636,6 +674,7 @@ export async function resetSignalPostToAiDraft(input: {
     .from("signal_posts")
     .update({
       edited_why_it_matters: aiDraft,
+      edited_why_it_matters_payload: null,
       editorial_status: "draft",
       edited_by: context.user.email ?? null,
       edited_at: now,
@@ -720,19 +759,26 @@ export async function publishApprovedSignals(input: {
 
   const now = new Date().toISOString();
   const updateResults = await Promise.all(
-    topFivePosts.map((post) =>
-      context.client
+    topFivePosts.map((post) => {
+      const structuredContent =
+        post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
+
+      return context.client
         .from("signal_posts")
         .update({
           published_why_it_matters: normalizeEditorialText(
-            post.editedWhyItMatters || post.publishedWhyItMatters,
+            buildEditorialWhyItMattersText(
+              structuredContent,
+              post.editedWhyItMatters || post.publishedWhyItMatters || "",
+            ),
           ),
+          published_why_it_matters_payload: structuredContent,
           editorial_status: "published",
           published_at: now,
           updated_at: now,
         })
-        .eq("id", post.id),
-    ),
+        .eq("id", post.id);
+    }),
   );
 
   if (updateResults.some((result) => result.error)) {
@@ -788,7 +834,10 @@ export async function publishSignalPost(input: {
     };
   }
 
-  const editorialText = normalizeEditorialText(post.editedWhyItMatters);
+  const structuredContent = post.editedWhyItMattersStructured;
+  const editorialText = normalizeEditorialText(
+    buildEditorialWhyItMattersText(structuredContent, post.editedWhyItMatters || ""),
+  );
 
   if (!editorialText) {
     return {
@@ -803,6 +852,7 @@ export async function publishSignalPost(input: {
     .from("signal_posts")
     .update({
       published_why_it_matters: editorialText,
+      published_why_it_matters_payload: structuredContent,
       editorial_status: "published",
       published_at: now,
       updated_at: now,

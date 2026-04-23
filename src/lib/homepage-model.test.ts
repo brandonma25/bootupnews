@@ -14,6 +14,8 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
     keyPoints: overrides.keyPoints ?? ["Point one", "Point two", "Point three"],
     whyItMatters: overrides.whyItMatters ?? "It matters because it changes expectations.",
     publishedWhyItMatters: overrides.publishedWhyItMatters,
+    publishedWhyItMattersStructured: overrides.publishedWhyItMattersStructured,
+    editorialWhyItMatters: overrides.editorialWhyItMatters,
     editorialStatus: overrides.editorialStatus,
     sources: overrides.sources ?? [
       { title: "Reuters", url: "https://www.reuters.com/world/example" },
@@ -636,6 +638,26 @@ describe("buildHomepageViewModel", () => {
     ]);
 
     expect(event?.whyItMatters).toBe(fullEditorialText);
+  });
+
+  it("uses structured published editorial preview for collapsed homepage copy", () => {
+    const structuredWhyItMatters = {
+      preview: "Collapsed editorial teaser.",
+      thesis: "Expanded editorial thesis.",
+      sections: [{ title: "Operator read", body: "This is the structured supporting point." }],
+    };
+    const [event] = buildHomepageEvents([
+      createItem({
+        id: "structured-editorial",
+        whyItMatters: "Expanded editorial thesis.\n\nOperator read: This is the structured supporting point.",
+        publishedWhyItMatters: "Expanded editorial thesis.\n\nOperator read: This is the structured supporting point.",
+        publishedWhyItMattersStructured: structuredWhyItMatters,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    expect(event?.whyItMatters).toBe("Collapsed editorial teaser.");
+    expect(event?.editorialWhyItMatters).toEqual(structuredWhyItMatters);
   });
 
   it("keeps generated Why it matters concise for default homepage cards", () => {

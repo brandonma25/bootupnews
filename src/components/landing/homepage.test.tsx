@@ -19,6 +19,8 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
       : ["Point one", "Point two", "Point three"],
     whyItMatters: overrides.whyItMatters ?? "Capacity changes platform plans.",
     publishedWhyItMatters: overrides.publishedWhyItMatters,
+    publishedWhyItMattersStructured: overrides.publishedWhyItMattersStructured,
+    editorialWhyItMatters: overrides.editorialWhyItMatters,
     editorialStatus: overrides.editorialStatus,
     sources:
       overrides.sources ?? [
@@ -155,6 +157,76 @@ describe("LandingHomepage", () => {
     expect(whyItMatters).toHaveTextContent(longEditorialText);
     expect(whyItMatters).toHaveClass("line-clamp-3");
     expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("uses structured editorial preview for the collapsed homepage state", () => {
+    const structuredContent = {
+      preview: "Short editor-authored homepage teaser.",
+      thesis: "Expanded thesis should not replace collapsed preview.",
+      sections: [{ title: "First implication", body: "Expanded body copy." }],
+    };
+    const data = createData([
+      createItem({
+        id: "structured-editorial-card",
+        whyItMatters: "Legacy combined fallback.",
+        publishedWhyItMatters: "Legacy combined fallback.",
+        publishedWhyItMattersStructured: structuredContent,
+        editorialWhyItMatters: structuredContent,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveTextContent(
+      "Short editor-authored homepage teaser.",
+    );
+    expect(screen.getByRole("button", { name: "Read more" })).toBeInTheDocument();
+  });
+
+  it("renders structured thesis and sections in the expanded homepage state", () => {
+    const structuredContent = {
+      preview: "Short editor-authored homepage teaser.",
+      thesis: "This is the executive thesis.",
+      sections: [
+        { title: "Investor read", body: "Markets get a cleaner signal about durability." },
+        { title: "Operating impact", body: "Teams can adjust planning assumptions." },
+      ],
+    };
+    const data = createData([
+      createItem({
+        id: "structured-editorial-card",
+        whyItMatters: "Legacy combined fallback.",
+        publishedWhyItMatters: "Legacy combined fallback.",
+        publishedWhyItMattersStructured: structuredContent,
+        editorialWhyItMatters: structuredContent,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Read more" }));
+
+    expect(screen.getByText("This is the executive thesis.")).toBeInTheDocument();
+    expect(screen.getByText("Investor read")).toBeInTheDocument();
+    expect(screen.getByText("Markets get a cleaner signal about durability.")).toBeInTheDocument();
+    expect(screen.getByText("Operating impact")).toBeInTheDocument();
+    expect(screen.getByText("Teams can adjust planning assumptions.")).toBeInTheDocument();
   });
 
   it("expands and collapses long published editorial Why it matters inline", () => {
