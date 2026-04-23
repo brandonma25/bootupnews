@@ -134,6 +134,29 @@
 - `npx playwright test --project=chromium` passed: 30 tests.
 - `npx playwright test --project=webkit` passed: 30 tests.
 
+## Homepage Expanded Editorial Readability Follow-Up — 2026-04-23
+
+- Root cause: the expanded homepage `Why it matters` state rendered the full editorial note as one dense paragraph. Data correctness and expand/collapse behavior were already working; the issue was visual hierarchy and text chunking.
+- Updated expanded rendering to show long editorial content as paragraph sections with improved line-height, section spacing, a subtle left rule, and stronger label styling.
+- Added deterministic display-only formatting:
+  - explicit blank-line paragraphs are preserved when present.
+  - otherwise, expanded long-form text with three or more sentences is split into sentence paragraphs.
+  - collapsed preview still uses the same full text with `line-clamp-3`.
+- This formatting does not rewrite, summarize, store, or mutate the editorial source text.
+- Focused tests validate:
+  - expanded long-form editorial copy renders as readable paragraph sections.
+  - preview/collapse behavior still works.
+  - short content remains clean without expand controls.
+  - full published editorial source-of-truth behavior remains unchanged.
+- `npm run lint` passed.
+- `npm run test -- src/components/landing/homepage.test.tsx src/lib/homepage-model.test.ts src/lib/homepage-editorial-overrides.test.ts src/app/page.test.tsx` passed: 4 files, 39 tests.
+- `npm run test` passed: 55 files, 292 tests.
+- `npm run build` passed.
+- Dev server restarted from this worktree at `http://localhost:3000`.
+- Local HTTP route probes returned `200` for `/`, `/signals`, and `/dashboard/signals/editorial-review`.
+- `npx playwright test --project=chromium` passed: 30 tests.
+- `npx playwright test --project=webkit` passed: 30 tests.
+
 ## Preview-Required Checks
 
 - Confirm Google OAuth login with an email listed in `ADMIN_EMAILS`.
@@ -144,6 +167,7 @@
 - Confirm Approved cards show a per-card Publish action and become visible on homepage after publishing.
 - Confirm a published signal edited from the editorial page updates the matching homepage signal card after refresh.
 - Confirm a long published editorial note on the homepage defaults to a short preview, expands with `Read more`, and collapses with `Show less`.
+- Confirm expanded long-form editorial content is visually chunked and easier to scan than a single wall of text.
 - Confirm `/signals` reads published rows through the server-side sanitized public route in preview.
 - Confirm env-sensitive behavior with `ADMIN_EMAILS` and `SUPABASE_SERVICE_ROLE_KEY` configured in Vercel preview.
 

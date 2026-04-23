@@ -185,8 +185,10 @@ function HomeTopEventCard({
           </ul>
         ) : null}
 
-        <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
-          <p className="section-label">Why it matters</p>
+        <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-4">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+            Why it matters
+          </p>
           <WhyItMattersPreview text={event.whyItMatters} />
         </div>
 
@@ -240,24 +242,37 @@ const WHY_IT_MATTERS_PREVIEW_THRESHOLD = 220;
 
 function WhyItMattersPreview({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
-  const shouldCollapse = text.trim().length > WHY_IT_MATTERS_PREVIEW_THRESHOLD;
+  const normalizedText = text.trim();
+  const shouldCollapse = normalizedText.length > WHY_IT_MATTERS_PREVIEW_THRESHOLD;
+  const sections = expanded ? formatWhyItMattersSections(normalizedText) : [];
 
   return (
-    <div className="mt-2">
-      <p
-        className={cn(
-          "text-base text-[var(--text-primary)]",
-          shouldCollapse && !expanded && "line-clamp-3",
-        )}
-        data-testid="home-why-it-matters-text"
-      >
-        {text}
-      </p>
+    <div className="mt-3">
+      {expanded ? (
+        <div
+          className="space-y-3 border-l-2 border-[var(--border)] pl-3 text-[0.98rem] leading-7 text-[var(--text-primary)]"
+          data-testid="home-why-it-matters-text"
+        >
+          {sections.map((section, index) => (
+            <p key={`${index}-${section.slice(0, 24)}`}>{section}</p>
+          ))}
+        </div>
+      ) : (
+        <p
+          className={cn(
+            "text-base leading-7 text-[var(--text-primary)]",
+            shouldCollapse && "line-clamp-3",
+          )}
+          data-testid="home-why-it-matters-text"
+        >
+          {normalizedText}
+        </p>
+      )}
       {shouldCollapse ? (
         <button
           type="button"
           aria-expanded={expanded}
-          className="mt-2 inline-flex text-sm font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+          className="mt-3 inline-flex text-sm font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
           onClick={() => setExpanded((current) => !current)}
         >
           {expanded ? "Show less" : "Read more"}
@@ -265,6 +280,29 @@ function WhyItMattersPreview({ text }: { text: string }) {
       ) : null}
     </div>
   );
+}
+
+function formatWhyItMattersSections(text: string) {
+  const explicitParagraphs = text
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (explicitParagraphs.length > 1) {
+    return explicitParagraphs;
+  }
+
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const sentences = normalized
+    .match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean) ?? [normalized];
+
+  if (sentences.length < 3) {
+    return [normalized];
+  }
+
+  return sentences;
 }
 
 function CategorySoftGate({

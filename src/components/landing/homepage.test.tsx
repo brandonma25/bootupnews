@@ -187,6 +187,38 @@ describe("LandingHomepage", () => {
     expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("renders expanded long-form editorial copy as readable paragraph sections", () => {
+    const longEditorialText =
+      "First, the company changed its capacity plan. Second, suppliers now have a clearer demand signal to plan against. Third, competitors may need to adjust their own capital spending. Finally, investors get a cleaner read on whether the growth story is durable.";
+    const data = createData([
+      createItem({
+        id: "structured-editorial-card",
+        whyItMatters: longEditorialText,
+        publishedWhyItMatters: longEditorialText,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Read more" }));
+
+    const expandedBody = screen.getByTestId("home-why-it-matters-text");
+    const paragraphs = expandedBody.querySelectorAll("p");
+    expect(Array.from(paragraphs).map((paragraph) => paragraph.textContent).join(" ")).toBe(longEditorialText);
+    expect(expandedBody).toHaveClass("space-y-3");
+    expect(paragraphs).toHaveLength(4);
+    expect(paragraphs[0]).toHaveTextContent("First, the company changed its capacity plan.");
+    expect(paragraphs[3]).toHaveTextContent("Finally, investors get a cleaner read on whether the growth story is durable.");
+  });
+
   it("does not show a Read more control for short Why it matters text", () => {
     const data = createData([
       createItem({
