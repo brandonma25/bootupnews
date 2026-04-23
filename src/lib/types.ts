@@ -92,6 +92,7 @@ export type EventIntelligence = {
 };
 
 export type EventDisplayState = "new" | "changed" | "escalated" | "unchanged";
+export type EditorialStatus = "draft" | "needs_review" | "approved" | "published";
 
 export type BriefingItem = {
   id: string;
@@ -101,6 +102,14 @@ export type BriefingItem = {
   whatHappened: string;
   keyPoints: [string, string, string];
   whyItMatters: string;
+  aiWhyItMatters?: string;
+  editedWhyItMatters?: string | null;
+  publishedWhyItMatters?: string | null;
+  editorialStatus?: EditorialStatus;
+  editedBy?: string | null;
+  editedAt?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
   sources: Array<{ title: string; url: string }>;
   estimatedMinutes: number;
   read: boolean;

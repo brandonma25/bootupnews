@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AccountPageClient } from "@/components/account/AccountPageClient";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
+import { isAdminUser } from "@/lib/admin-auth";
 import { getAccountPageState } from "@/lib/data";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default async function AccountPage() {
           viewer={viewer}
           sources={sources}
           preferences={preferences}
+          isAdmin={isAdminUser({ email: viewer.email })}
         />
       </div>
     </AppShell>

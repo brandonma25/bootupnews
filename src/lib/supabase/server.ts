@@ -1,9 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { User } from "@supabase/supabase-js";
+import { createClient, type User } from "@supabase/supabase-js";
 
 import { hasSupabaseSessionCookie } from "@/lib/auth";
-import { env, isSupabaseConfigured } from "@/lib/env";
+import { env, isSupabaseConfigured, isSupabaseServerConfigured } from "@/lib/env";
 import { errorContext, logServerEvent } from "@/lib/observability";
 
 export async function createSupabaseServerClient() {
@@ -30,6 +30,19 @@ export async function createSupabaseServerClient() {
           // middleware, route handlers, or the next navigation.
         }
       },
+    },
+  });
+}
+
+export function createSupabaseServiceRoleClient() {
+  if (!isSupabaseServerConfigured) {
+    return null;
+  }
+
+  return createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   });
 }

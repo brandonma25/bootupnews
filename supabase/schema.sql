@@ -124,6 +124,30 @@ create table if not exists public.briefing_items (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.signal_posts (
+  id uuid primary key default gen_random_uuid(),
+  rank integer not null unique check (rank between 1 and 5),
+  title text not null,
+  source_name text not null default '',
+  source_url text not null default '',
+  summary text not null default '',
+  tags text[] not null default '{}'::text[],
+  signal_score numeric,
+  selection_reason text not null default '',
+  ai_why_it_matters text not null default '',
+  edited_why_it_matters text,
+  published_why_it_matters text,
+  editorial_status text not null default 'needs_review'
+    check (editorial_status in ('draft', 'needs_review', 'approved', 'published')),
+  edited_by text,
+  edited_at timestamptz,
+  approved_by text,
+  approved_at timestamptz,
+  published_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -149,6 +173,7 @@ alter table public.article_topics enable row level security;
 alter table public.daily_briefings enable row level security;
 alter table public.briefing_items enable row level security;
 alter table public.user_event_state enable row level security;
+alter table public.signal_posts enable row level security;
 
 create policy "Users manage their own profile" on public.user_profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -200,3 +225,9 @@ create policy "Users manage their own briefing items" on public.briefing_items
 
 create policy "Users manage their own event state" on public.user_event_state
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop trigger if exists set_signal_posts_updated_at on public.signal_posts;
+create trigger set_signal_posts_updated_at
+before update on public.signal_posts
+for each row
+execute function public.set_updated_at();

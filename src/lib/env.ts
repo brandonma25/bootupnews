@@ -65,6 +65,7 @@ export function getSupabasePublicEnvDiagnostics() {
 
 export const env = {
   appUrl: publicSupabaseConfig.appUrl,
+  adminEmails: normalizeEnv(process.env.ADMIN_EMAILS),
   homepageDebug,
   supabaseUrl: publicSupabaseConfig.url,
   supabaseAnonKey: publicSupabaseConfig.key,
