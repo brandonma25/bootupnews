@@ -12,7 +12,7 @@ This change updates the existing Vercel Web Analytics PR so it can merge against
 
 - Preserve the current `Inter` and `Lora` font setup in `src/app/layout.tsx`.
 - Import `Analytics` from `@vercel/analytics/next`.
-- Render `<Analytics />` after the root layout children so page-view tracking can initialize across routes after deployment.
+- Render `<Analytics />` after the root layout children only when `VERCEL=1`, so page-view tracking initializes across deployed Vercel routes without causing local browser tests to fetch the external debug script.
 
 ## Validation Notes
 

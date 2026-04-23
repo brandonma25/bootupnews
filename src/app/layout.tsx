@@ -15,6 +15,8 @@ const lora = Lora({
   display: "swap",
 });
 
+const enableVercelAnalytics = process.env.VERCEL === "1";
+
 export const metadata: Metadata = {
   title: "Daily Intelligence Briefing",
   description: "A premium daily intelligence dashboard for high-signal briefings.",
@@ -29,7 +31,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${lora.variable} antialiased`}>
       <body className="min-h-screen font-sans">
         {children}
-        <Analytics />
+        {enableVercelAnalytics ? <Analytics /> : null}
       </body>
     </html>
   );
