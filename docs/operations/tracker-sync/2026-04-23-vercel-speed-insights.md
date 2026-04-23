@@ -1,7 +1,7 @@
-# Tracker Sync Fallback - Vercel Speed Insights
+# Tracker Sync Fallback — Vercel Speed Insights
 
 - Date: 2026-04-23
-- Work item: Vercel Speed Insights app shell integration
+- Work item: Vercel Speed Insights root integration
 - Branch: `vercel/install-vercel-speed-insights-pxxd61`
 - PR: `#2`
 - Tracker destination: `Intake Queue`
@@ -11,10 +11,10 @@
 | Field | Value |
 | --- | --- |
 | Layer | Operations |
-| Feature Name | Vercel Speed Insights app shell integration |
+| Feature Name | Vercel Speed Insights root integration |
 | Priority | Medium |
 | Status | In Review |
-| Description | Install and mount Vercel Speed Insights in the Next.js App Router shell so Core Web Vitals can be collected after Vercel deployment. |
+| Description | Install and mount Vercel Speed Insights in the Next.js root layout so Core Web Vitals can be collected after Vercel deployment. |
 | Owner | Codex |
 | Dependency | Vercel project Speed Insights enabled in dashboard |
 | Decision | review |
