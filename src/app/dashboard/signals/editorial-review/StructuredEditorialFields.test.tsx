@@ -68,4 +68,53 @@ describe("StructuredEditorialFields", () => {
       sections: [{ title: "First point", body: "Supporting explanation." }],
     });
   });
+
+  it("renders the collapsed homepage simulation with a complete sentence preview", () => {
+    const longPreview =
+      "Full Self-Driving improvements are gaining attention because the update reframes investor expectations around autonomy economics and forces operators to reconsider how quickly deployment assumptions can change across the fleet.";
+
+    render(
+      <StructuredEditorialFields
+        postId="signal-1"
+        aiWhyItMatters="AI draft fallback."
+        legacyText="Legacy editorial text."
+        structuredContent={{
+          preview: longPreview,
+          thesis: "Expanded thesis.",
+          sections: [],
+        }}
+        eligibleForApproveAll={false}
+      />,
+    );
+
+    const collapsedPreview = screen.getByText(longPreview, { selector: "p" });
+
+    expect(collapsedPreview).not.toHaveClass("line-clamp-3");
+    expect(collapsedPreview.textContent).toMatch(/[.!?]$/);
+    expect(collapsedPreview).not.toHaveTextContent("...");
+  });
+
+  it("cleans pre-truncated collapsed preview simulation text", () => {
+    render(
+      <StructuredEditorialFields
+        postId="signal-1"
+        aiWhyItMatters="AI draft fallback."
+        legacyText="Legacy editorial text."
+        structuredContent={{
+          preview: "Tesla resets the corporate baseline because Full Self-Driving wa...",
+          thesis: "Expanded thesis.",
+          sections: [],
+        }}
+        eligibleForApproveAll={false}
+      />,
+    );
+
+    const collapsedPreview = screen.getByText(
+      "Tesla resets the corporate baseline because Full Self-Driving.",
+      { selector: "p" },
+    );
+
+    expect(collapsedPreview.textContent).toMatch(/[.!?]$/);
+    expect(collapsedPreview).not.toHaveTextContent("...");
+  });
 });

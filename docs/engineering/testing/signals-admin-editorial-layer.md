@@ -196,6 +196,17 @@
 - `npx playwright test --project=chromium` initially reported 27 passed and 3 route/navigation timing failures; rerunning the exact failures with `npx playwright test tests/audit/route-traversal.spec.ts tests/dashboard.spec.ts:59 tests/routes/core-routes.spec.ts --project=chromium` passed: 9 tests.
 - `npx playwright test --project=webkit` initially reported 25 passed, 2 route/navigation timing failures, and 3 tests skipped after the first failure; rerunning the exact failures with `npx playwright test tests/audit/route-traversal.spec.ts tests/dashboard.spec.ts:20 --project=webkit` passed: 2 tests.
 
+## Homepage Editorial Preview Truncation Follow-Up — 2026-04-23
+
+- Root cause: collapsed homepage `Why it matters` rendered the full editorial note and relied on `line-clamp-3`, allowing browser clipping to end previews mid-word.
+- Updated collapsed rendering to use a code-generated preview string that prefers complete sentence boundaries and cleans stored pre-truncated snippets so the summary box does not end with broken `...` text.
+- Expanded rendering still shows the full editorial text and preserves the existing `Read more` / `Show less` interaction.
+- `npm run test -- src/components/landing/homepage.test.tsx src/app/dashboard/signals/editorial-review/StructuredEditorialFields.test.tsx` passed: 2 files, 23 tests.
+- `npm run lint` passed.
+- `npm run build` passed.
+- Local browser verification at `http://localhost:3000/` found five collapsed homepage `Why it matters` boxes; all five ended with complete sentence punctuation and none contained literal `...` or `…`.
+- `npx playwright test --project=chromium` reported 27 passed and 3 unrelated route/navigation wait failures.
+
 ## Human-Only Checks
 
 - Real Google OAuth provider flow.

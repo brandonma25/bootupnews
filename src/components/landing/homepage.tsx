@@ -15,7 +15,10 @@ import {
   type HomepageViewModel,
   type HomepageEvent,
 } from "@/lib/homepage-model";
-import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
+import {
+  buildIntentionalEditorialPreview,
+  type EditorialWhyItMattersContent,
+} from "@/lib/editorial-content";
 import type { DashboardData, ViewerAccount } from "@/lib/types";
 import { cn, getBriefingDateKey, minutesToLabel } from "@/lib/utils";
 
@@ -253,6 +256,11 @@ function WhyItMattersPreview({
   const structuredExpandedContent = getStructuredExpandedContent(structuredContent);
   const shouldCollapse =
     Boolean(structuredExpandedContent) || normalizedText.length > WHY_IT_MATTERS_PREVIEW_THRESHOLD;
+  const collapsedPreview = buildIntentionalEditorialPreview(
+    normalizedText,
+    WHY_IT_MATTERS_PREVIEW_THRESHOLD,
+  );
+  const displayedPreview = collapsedPreview === normalizedText ? normalizedText : collapsedPreview;
   const sections = expanded && !structuredExpandedContent ? formatWhyItMattersSections(normalizedText) : [];
 
   return (
@@ -270,13 +278,10 @@ function WhyItMattersPreview({
         </div>
       ) : (
         <p
-          className={cn(
-            "text-base leading-7 text-[var(--text-primary)]",
-            shouldCollapse && "line-clamp-3",
-          )}
+          className="text-base leading-7 text-[var(--text-primary)]"
           data-testid="home-why-it-matters-text"
         >
-          {normalizedText}
+          {shouldCollapse ? collapsedPreview : displayedPreview}
         </p>
       )}
       {shouldCollapse ? (

@@ -118,6 +118,90 @@ export function getEditorialHomepagePreviewText(
   return normalizeText(content?.preview) || normalizeText(fallbackText);
 }
 
+export function buildIntentionalEditorialPreview(text: string, maxLength: number) {
+  const normalizedText = normalizeText(text);
+
+  if (hasTerminalEllipsis(normalizedText)) {
+    return cleanPreTruncatedPreview(normalizedText, maxLength);
+  }
+
+  if (normalizedText.length <= maxLength) {
+    return normalizedText;
+  }
+
+  const sentencePreview = buildSentenceBoundaryPreview(normalizedText, maxLength);
+
+  if (sentencePreview) {
+    return sentencePreview;
+  }
+
+  const wordBoundaryPreview = trimToWordBoundary(normalizedText, maxLength);
+
+  return ensureSentenceEnding(wordBoundaryPreview);
+}
+
+function buildSentenceBoundaryPreview(text: string, maxLength: number) {
+  const sentences = text.match(/[^.!?]+[.!?]+(?:["')\]]+)?/g)?.map((sentence) => sentence.trim()) ?? [];
+  const selected: string[] = [];
+
+  for (const sentence of sentences.slice(0, 2)) {
+    const candidate = [...selected, sentence].join(" ");
+
+    if (candidate.length > maxLength) {
+      break;
+    }
+
+    selected.push(sentence);
+  }
+
+  return selected.join(" ") || sentences[0] || "";
+}
+
+function trimToWordBoundary(text: string, maxLength: number) {
+  const clipped = text.slice(0, maxLength + 1);
+  const lastWhitespaceIndex = clipped.search(/\s+\S*$/);
+  const candidate = lastWhitespaceIndex > 0 ? clipped.slice(0, lastWhitespaceIndex) : text;
+
+  return candidate.replace(/[,:;—-]+$/, "").trim();
+}
+
+function hasTerminalEllipsis(text: string) {
+  return /(?:\.\.\.|…)\s*$/.test(text);
+}
+
+function cleanPreTruncatedPreview(text: string, maxLength: number) {
+  const withoutEllipsis = text.replace(/(?:\.\.\.|…)\s*$/, "").trim();
+  const sentencePreview = buildSentenceBoundaryPreview(withoutEllipsis, maxLength);
+
+  if (sentencePreview) {
+    return sentencePreview;
+  }
+
+  const wordBoundaryPreview = trimToWordBoundary(withoutEllipsis, maxLength);
+
+  return ensureSentenceEnding(dropLikelyTrailingFragment(wordBoundaryPreview));
+}
+
+function dropLikelyTrailingFragment(text: string) {
+  return text
+    .replace(
+      /,?\s+(?:so|which|that|and|but)\s+(?:it\s+)?(?:could|may|might|can|will|would|should)(?:\s+[a-z]+)?$/iu,
+      "",
+    )
+    .replace(/\s+[a-z]{1,2}$/u, "")
+    .trim();
+}
+
+function ensureSentenceEnding(text: string) {
+  const cleanText = text.replace(/[,:;—-]+$/, "").trim();
+
+  if (!cleanText || /[.!?]["')\]]?$/.test(cleanText)) {
+    return cleanText;
+  }
+
+  return `${cleanText}.`;
+}
+
 export function getEditorialSectionSlots(
   content: EditorialWhyItMattersContent | null | undefined,
 ) {

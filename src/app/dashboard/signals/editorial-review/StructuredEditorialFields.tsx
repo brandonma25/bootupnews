@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import {
+  buildIntentionalEditorialPreview,
   buildEditorialWhyItMattersText,
   createEditorialContentFromLegacyText,
   getEditorialHomepagePreviewText,
@@ -48,7 +49,10 @@ export function StructuredEditorialFields({
     [homepagePreview, sectionBodies, sectionTitles, thesis],
   );
   const fullEditorialText = buildEditorialWhyItMattersText(content, legacyText || aiWhyItMatters);
-  const collapsedPreview = getEditorialHomepagePreviewText(content, fullEditorialText);
+  const collapsedPreview = buildIntentionalEditorialPreview(
+    getEditorialHomepagePreviewText(content, fullEditorialText),
+    220,
+  );
   const structuredJson = JSON.stringify(content);
 
   return (
@@ -174,7 +178,7 @@ export function StructuredEditorialFields({
           {previewMode === "collapsed" ? (
             <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
               <p className="section-label">Collapsed homepage version</p>
-              <p className="mt-2 line-clamp-3 text-base leading-7 text-[var(--text-primary)]">
+              <p className="mt-2 text-base leading-7 text-[var(--text-primary)]">
                 {collapsedPreview}
               </p>
             </div>

@@ -154,9 +154,91 @@ describe("LandingHomepage", () => {
     );
 
     const whyItMatters = screen.getByTestId("home-why-it-matters-text");
-    expect(whyItMatters).toHaveTextContent(longEditorialText);
-    expect(whyItMatters).toHaveClass("line-clamp-3");
+    expect(whyItMatters).toHaveTextContent(
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
+    );
+    expect(whyItMatters).not.toHaveClass("line-clamp-3");
     expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("uses a complete sentence for collapsed editorial copy even when the first sentence exceeds the preview budget", () => {
+    const longSentence =
+      "Full Self-Driving improvements are gaining attention because the update reframes investor expectations around autonomy economics and forces operators to reconsider how quickly deployment assumptions can change across the fleet.";
+    const data = createData([
+      createItem({
+        id: "word-boundary-editorial-card",
+        whyItMatters: longSentence,
+        publishedWhyItMatters: longSentence,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const collapsedText = screen.getByTestId("home-why-it-matters-text").textContent ?? "";
+    expect(collapsedText).toBe(longSentence);
+    expect(collapsedText).toMatch(/[.!?]$/);
+    expect(collapsedText).not.toContain("...");
+  });
+
+  it("cleans pre-truncated generated previews so collapsed editorial cards do not end mid-word", () => {
+    const truncatedPreview =
+      "Tesla resets the corporate baseline because Full Self-Driving wa...";
+    const data = createData([
+      createItem({
+        id: "pre-truncated-editorial-card",
+        whyItMatters: truncatedPreview,
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const collapsedText = screen.getByTestId("home-why-it-matters-text").textContent ?? "";
+    expect(collapsedText).toBe("Tesla resets the corporate baseline because Full Self-Driving.");
+    expect(collapsedText).toMatch(/[.!?]$/);
+    expect(collapsedText).not.toContain("...");
+    expect(collapsedText).not.toMatch(/\bwa[.!?]$/);
+  });
+
+  it("drops cut-off trailing clauses from pre-truncated collapsed editorial previews", () => {
+    const truncatedPreview =
+      "Tesla resets the corporate baseline because this changes revenue expectations, so it could move...";
+    const data = createData([
+      createItem({
+        id: "cut-off-clause-editorial-card",
+        whyItMatters: truncatedPreview,
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const collapsedText = screen.getByTestId("home-why-it-matters-text").textContent ?? "";
+    expect(collapsedText).toBe(
+      "Tesla resets the corporate baseline because this changes revenue expectations.",
+    );
+    expect(collapsedText).not.toContain("...");
+    expect(collapsedText).not.toMatch(/\bso it could[.!?]$/);
   });
 
   it("uses structured editorial preview for the collapsed homepage state", () => {
@@ -251,11 +333,20 @@ describe("LandingHomepage", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Read more" }));
-    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    const expandedBody = screen.getByTestId("home-why-it-matters-text");
+    expect(expandedBody).not.toHaveClass("line-clamp-3");
+    expect(
+      Array.from(expandedBody.querySelectorAll("p"))
+        .map((paragraph) => paragraph.textContent)
+        .join(" "),
+    ).toBe(longEditorialText);
     expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(screen.getByRole("button", { name: "Show less" }));
-    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-3");
+    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveTextContent(
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
+    );
     expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
   });
 
