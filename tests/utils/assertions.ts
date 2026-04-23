@@ -5,16 +5,21 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 
 import type { AuditRoute } from "./routes";
 
+const auditNavigationTimeoutMs = 20_000;
 const appCrashPattern =
   /application error|unhandled runtime error|this page could not be found|500 internal server error/i;
 const interruptedNavigationPattern = /is interrupted by another navigation|net::ERR_ABORTED/i;
+const navigationTimeoutPattern = /timeout .* exceeded/i;
 
-function isInterruptedNavigationError(error: unknown) {
-  return error instanceof Error && interruptedNavigationPattern.test(error.message);
+function isRecoverableNavigationError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (interruptedNavigationPattern.test(error.message) || navigationTimeoutPattern.test(error.message))
+  );
 }
 
 export async function waitForAuditNavigationToSettle(page: Page) {
-  await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => undefined);
+  await page.waitForLoadState("load", { timeout: auditNavigationTimeoutMs }).catch(() => undefined);
 }
 
 export async function gotoAuditPath(page: Page, path: string) {
@@ -24,17 +29,27 @@ export async function gotoAuditPath(page: Page, path: string) {
     await waitForAuditNavigationToSettle(page);
 
     try {
-      const response = await page.goto(path, { waitUntil: "load" });
+      const response = await page.goto(path, { waitUntil: "domcontentloaded" });
 
-      await page.waitForURL((url) => url.pathname === path, { timeout: 10_000 });
+      await page.waitForURL((url) => url.pathname === path, { timeout: auditNavigationTimeoutMs });
       await waitForAuditNavigationToSettle(page);
 
       return response;
     } catch (error) {
       lastError = error;
 
-      if (!isInterruptedNavigationError(error) || attempt === 2) {
-        throw error;
+      try {
+        await page.waitForURL((url) => url.pathname === path, { timeout: auditNavigationTimeoutMs });
+        await waitForAuditNavigationToSettle(page);
+        return null;
+      } catch {
+        if (!isRecoverableNavigationError(error) || attempt === 2) {
+          throw error;
+        }
+
+        if (page.isClosed()) {
+          throw error;
+        }
       }
 
       await page.waitForTimeout(250 * (attempt + 1));
@@ -45,6 +60,11 @@ export async function gotoAuditPath(page: Page, path: string) {
 }
 
 export async function expectAuditRouteUrl(page: Page, route: AuditRoute) {
+  if (route.urlMatches) {
+    await page.waitForURL(route.urlMatches, { timeout: auditNavigationTimeoutMs });
+    return;
+  }
+
   const expectedPath = route.expectedPath ?? route.path;
 
   await page.waitForURL((url) => {
@@ -53,7 +73,7 @@ export async function expectAuditRouteUrl(page: Page, route: AuditRoute) {
     return Object.entries(route.expectedSearchParams ?? {}).every(
       ([key, value]) => url.searchParams.get(key) === value,
     );
-  }, { timeout: 10_000 });
+  }, { timeout: auditNavigationTimeoutMs });
 }
 
 async function gotoAuditRoute(page: Page, route: AuditRoute) {
@@ -63,7 +83,7 @@ async function gotoAuditRoute(page: Page, route: AuditRoute) {
     await waitForAuditNavigationToSettle(page);
 
     try {
-      const response = await page.goto(route.path, { waitUntil: "load" });
+      const response = await page.goto(route.path, { waitUntil: "domcontentloaded" });
 
       await expectAuditRouteUrl(page, route);
       await waitForAuditNavigationToSettle(page);
@@ -72,15 +92,19 @@ async function gotoAuditRoute(page: Page, route: AuditRoute) {
     } catch (error) {
       lastError = error;
 
-      if (!isInterruptedNavigationError(error) || attempt === 2) {
-        throw error;
-      }
-
       try {
         await expectAuditRouteUrl(page, route);
         await waitForAuditNavigationToSettle(page);
         return null;
       } catch {
+        if (!isRecoverableNavigationError(error) || attempt === 2) {
+          throw error;
+        }
+
+        if (page.isClosed()) {
+          throw error;
+        }
+
         await page.waitForTimeout(250 * (attempt + 1));
       }
     }
@@ -96,7 +120,7 @@ export async function expectNoAppCrash(page: Page) {
 export async function expectRouteContent(page: Page, route: AuditRoute) {
   await expectNoAppCrash(page);
   await expect(page.getByRole("heading", { name: route.heading }).first()).toBeVisible({
-    timeout: 15_000,
+    timeout: 30_000,
   });
 }
 

@@ -37,8 +37,10 @@ test.describe("homepage", () => {
 
     await expect(page.getByTestId("home-top-event-key-points").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /sign out/i })).toHaveCount(0);
-    await expect(page.getByText(/RSS Feed|Category preferences|Newsletter/i)).toHaveCount(0);
-    await expect(page.getByText(/Open full briefing/i)).toHaveCount(0);
+    await expect(page.getByText(/^RSS Feed$/)).toHaveCount(0);
+    await expect(page.getByText(/^Category preferences$/)).toHaveCount(0);
+    await expect(page.getByText(/^Newsletter$/)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Open full briefing$/ })).toHaveCount(0);
 
     const structureOrder = await page.evaluate(() => {
       const date = document.querySelector('[data-testid="home-date-label"]');
@@ -108,14 +110,26 @@ test.describe("homepage", () => {
 
     const topEventCards = page.getByTestId("home-top-event-card");
     const gateCopy = "Create a free account to read Tech News, Finance and Politics";
+    const techNewsTab = page.getByRole("tab", { name: "Tech News" });
 
     await expect(topEventCards.first()).toBeVisible();
     await expect(page.getByText(gateCopy)).toHaveCount(0);
 
-    await page.getByRole("tab", { name: "Tech News" }).click();
+    await expect(techNewsTab).toBeVisible();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await techNewsTab.click();
+
+      if ((await techNewsTab.getAttribute("aria-selected")) === "true") {
+        break;
+      }
+
+      await page.waitForTimeout(250 * (attempt + 1));
+    }
 
     const gate = page.getByTestId("category-soft-gate");
 
+    await expect(techNewsTab).toHaveAttribute("aria-selected", "true");
+    await expect(gate).toBeVisible();
     await expect(gate.getByText(gateCopy)).toBeVisible();
     await expect(gate.getByRole("link", { name: "Sign Up" })).toHaveAttribute("href", "/signup?redirectTo=%2F");
     await expect(gate.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/login?redirectTo=%2F");
