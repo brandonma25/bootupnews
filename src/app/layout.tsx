@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Inter, Lora } from "next/font/google";
 import "./globals.css";
@@ -15,6 +16,7 @@ const lora = Lora({
   display: "swap",
 });
 
+const enableVercelAnalytics = process.env.VERCEL === "1";
 const enableVercelSpeedInsights = process.env.VERCEL === "1";
 
 export const metadata: Metadata = {
@@ -31,6 +33,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${lora.variable} antialiased`}>
       <body className="min-h-screen font-sans">
         {children}
+        {enableVercelAnalytics ? <Analytics /> : null}
         {enableVercelSpeedInsights ? <SpeedInsights /> : null}
       </body>
     </html>
