@@ -7,6 +7,7 @@ import {
   PUBLIC_SIGNALS_ROUTE,
   SIGNALS_EDITORIAL_ROUTE,
   approveSignalPost,
+  approveSignalPosts,
   publishApprovedSignals,
   resetSignalPostToAiDraft,
   saveSignalDraft,
@@ -42,6 +43,25 @@ export async function approveSignalPostAction(formData: FormData) {
   const result = await approveSignalPost({
     postId: String(formData.get("postId") ?? ""),
     editedWhyItMatters: String(formData.get("editedWhyItMatters") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialRoutes();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function approveAllSignalPostsAction(formData: FormData) {
+  const postIds = formData.getAll("postId").map((value) => String(value));
+  const editedWhyItMattersValues = formData
+    .getAll("editedWhyItMatters")
+    .map((value) => String(value));
+  const result = await approveSignalPosts({
+    posts: postIds.map((postId, index) => ({
+      postId,
+      editedWhyItMatters: editedWhyItMattersValues[index] ?? "",
+    })),
   });
 
   if (result.ok) {

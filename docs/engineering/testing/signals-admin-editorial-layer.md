@@ -55,6 +55,17 @@
   - `/dashboard/signals/editorial-review` returns `200` and renders the unauthenticated admin sign-in state without cookies.
   - `/signals` returns `200` and no longer logs `Invalid API key`.
 
+## Approve All Follow-Up — 2026-04-23
+
+- Added a top-page `Approve All` admin action on `/dashboard/signals/editorial-review`.
+- The bulk action submits only eligible currently loaded posts and refreshes hidden values from the visible editorial textareas just before submit.
+- Bulk approval reuses the same server-side approval update path as individual post approval and keeps the existing admin authorization gate.
+- Focused tests validate:
+  - `Approve All` renders enabled for eligible review posts.
+  - `Approve All` is disabled when no draft or review-ready posts are eligible.
+  - Admin bulk approval updates multiple posts.
+  - Partial bulk approval failures report a mixed outcome instead of silently hiding failures.
+
 ## Preview-Required Checks
 
 - Confirm Google OAuth login with an email listed in `ADMIN_EMAILS`.

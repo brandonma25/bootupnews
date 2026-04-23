@@ -13,6 +13,7 @@ This change adds an in-app admin/editor workflow for the Top 5 Signals editorial
 - Adds `/dashboard/signals/editorial-review` for private editorial review.
 - Adds `/signals` for public published Top 5 Signals.
 - Adds an Account-page entry point to editorial review for users authorized through `ADMIN_EMAILS`.
+- Adds a top-page `Approve All` editorial action that bulk-approves currently loaded eligible posts without bypassing the admin gate.
 - Adds `public.signal_posts` for AI draft reference text, human edited text, published text, editorial status, and edit/approval/publish metadata.
 - Uses server-side service-role persistence only after verifying the logged-in user email against `ADMIN_EMAILS`.
 - Public rendering is handled by the server-side `/signals` route, which reads with the service role and renders only sanitized published fields. No direct anonymous table-read policy is added for `signal_posts`.

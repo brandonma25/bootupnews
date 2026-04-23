@@ -11,11 +11,34 @@ vi.mock("@/lib/signals-editorial", () => {
 });
 
 vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
+  approveAllSignalPostsAction: vi.fn(),
   saveSignalDraftAction: vi.fn(),
   approveSignalPostAction: vi.fn(),
   resetSignalPostToAiDraftAction: vi.fn(),
   publishTopSignalsAction: vi.fn(),
 }));
+
+const reviewPost = {
+  id: "signal-1",
+  rank: 1,
+  title: "Signal 1",
+  sourceName: "Source",
+  sourceUrl: "https://example.com/source",
+  summary: "Signal summary",
+  tags: ["tech"],
+  signalScore: 88,
+  selectionReason: "Strong ranking signal",
+  aiWhyItMatters: "Raw AI draft",
+  editedWhyItMatters: null,
+  publishedWhyItMatters: null,
+  editorialStatus: "needs_review",
+  editedBy: null,
+  editedAt: null,
+  approvedBy: null,
+  approvedAt: null,
+  publishedAt: null,
+  persisted: true,
+};
 
 describe("signals editorial review page", () => {
   beforeEach(() => {
@@ -49,5 +72,37 @@ describe("signals editorial review page", () => {
 
     expect(screen.getByRole("heading", { name: "Not authorized" })).toBeInTheDocument();
     expect(screen.getByText(/reader@example.com does not have admin\/editor access/i)).toBeInTheDocument();
+  });
+
+  it("shows the top-level Approve All action for authorized admins", async () => {
+    getEditorialReviewState.mockResolvedValue({
+      kind: "authorized",
+      adminEmail: "admin@example.com",
+      posts: [reviewPost],
+      storageReady: true,
+      warning: null,
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("button", { name: "Approve All" })).toBeEnabled();
+    expect(screen.getByLabelText("Why it matters — editorial version")).toHaveValue("Raw AI draft");
+  });
+
+  it("disables Approve All when no loaded posts are eligible", async () => {
+    getEditorialReviewState.mockResolvedValue({
+      kind: "authorized",
+      adminEmail: "admin@example.com",
+      posts: [{ ...reviewPost, editorialStatus: "approved" }],
+      storageReady: true,
+      warning: null,
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("button", { name: "Approve All" })).toBeDisabled();
+    expect(screen.getByText(/No draft or review-ready signal posts are eligible/i)).toBeInTheDocument();
   });
 });

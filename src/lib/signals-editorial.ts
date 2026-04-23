@@ -104,6 +104,7 @@ export type EditorialMutationResult = {
   message: string;
   code:
     | "approved"
+    | "bulk_approved"
     | "draft_saved"
     | "empty_editorial_text"
     | "not_admin"
@@ -408,11 +409,16 @@ export async function saveSignalDraft(input: {
   };
 }
 
-export async function approveSignalPost(input: {
-  postId: string;
-  editedWhyItMatters: string;
-  route?: string;
-}): Promise<EditorialMutationResult> {
+async function approveSignalPostWithContext(
+  context: {
+    client: EditorialClient;
+    user: User;
+  },
+  input: {
+    postId: string;
+    editedWhyItMatters: string;
+  },
+): Promise<EditorialMutationResult> {
   const editorialText = normalizeEditorialText(input.editedWhyItMatters);
 
   if (!editorialText) {
@@ -420,16 +426,6 @@ export async function approveSignalPost(input: {
       ok: false,
       code: "empty_editorial_text",
       message: "Add editorial Why it matters text before approving.",
-    };
-  }
-
-  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
-
-  if (!context.ok) {
-    return {
-      ok: false,
-      code: context.code,
-      message: context.message,
     };
   }
 
@@ -459,6 +455,88 @@ export async function approveSignalPost(input: {
     ok: true,
     code: "approved",
     message: "Signal post approved.",
+  };
+}
+
+export async function approveSignalPost(input: {
+  postId: string;
+  editedWhyItMatters: string;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  return approveSignalPostWithContext(context, input);
+}
+
+export async function approveSignalPosts(input: {
+  posts: Array<{
+    postId: string;
+    editedWhyItMatters: string;
+  }>;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  const uniquePosts = Array.from(
+    new Map(
+      input.posts
+        .map((post) => ({
+          postId: normalizeEditorialText(post.postId),
+          editedWhyItMatters: post.editedWhyItMatters,
+        }))
+        .filter((post) => post.postId)
+        .map((post) => [post.postId, post]),
+    ).values(),
+  );
+
+  if (uniquePosts.length === 0) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "There are no eligible signal posts to approve.",
+    };
+  }
+
+  const results = await Promise.all(
+    uniquePosts.map((post) => approveSignalPostWithContext(context, post)),
+  );
+  const approvedCount = results.filter((result) => result.ok).length;
+  const failedResults = results.filter((result) => !result.ok);
+
+  if (failedResults.length > 0) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message:
+        approvedCount > 0
+          ? `Approved ${approvedCount} signal posts. ${failedResults.length} could not be approved.`
+          : failedResults[0]?.message ?? "No signal posts could be approved.",
+    };
+  }
+
+  return {
+    ok: true,
+    code: "bulk_approved",
+    message:
+      approvedCount === 1
+        ? "Approved 1 signal post."
+        : `Approved ${approvedCount} signal posts.`,
   };
 }
 

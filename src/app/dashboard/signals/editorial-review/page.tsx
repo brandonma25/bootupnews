@@ -11,11 +11,13 @@ import {
 } from "lucide-react";
 
 import {
+  approveAllSignalPostsAction,
   approveSignalPostAction,
   publishTopSignalsAction,
   resetSignalPostToAiDraftAction,
   saveSignalDraftAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
+import { ApproveAllButton } from "@/app/dashboard/signals/editorial-review/ApproveAllButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -79,7 +81,9 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
   const posts = state.posts.slice().sort((left, right) => left.rank - right.rank);
   const allApproved = posts.length === 5 && posts.every((post) => post.editorialStatus === "approved");
   const allPublished = posts.length === 5 && posts.every((post) => post.editorialStatus === "published");
+  const approveAllPosts = posts.filter((post) => post.persisted && ["draft", "needs_review"].includes(post.editorialStatus));
   const publishBlockedReason = getPublishBlockedReason(posts, state.storageReady, allApproved, allPublished);
+  const approveAllBlockedReason = getApproveAllBlockedReason(posts, state.storageReady, approveAllPosts.length);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6">
@@ -99,21 +103,43 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
                 Review, edit, approve, and publish the final ‘Why it matters’ layer.
               </p>
             </div>
-            <form action={publishTopSignalsAction} className="space-y-2">
-              <Button
-                type="submit"
-                disabled={!allApproved}
-                className="w-full gap-2 sm:w-auto"
-              >
-                <Send className="h-4 w-4" />
-                Publish Top 5 Signals
-              </Button>
-              {publishBlockedReason ? (
-                <p className="max-w-md text-sm leading-6 text-[var(--text-secondary)]">
-                  {publishBlockedReason}
-                </p>
-              ) : null}
-            </form>
+            <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[34rem]">
+              <form action={approveAllSignalPostsAction} className="space-y-2">
+                <div data-approve-all-fields hidden>
+                  {approveAllPosts.map((post) => (
+                    <span key={post.id}>
+                    <input type="hidden" name="postId" value={post.id} />
+                    <input
+                      type="hidden"
+                      name="editedWhyItMatters"
+                      value={post.editedWhyItMatters || post.aiWhyItMatters}
+                    />
+                    </span>
+                  ))}
+                </div>
+                <ApproveAllButton disabled={Boolean(approveAllBlockedReason)} />
+                {approveAllBlockedReason ? (
+                  <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                    {approveAllBlockedReason}
+                  </p>
+                ) : null}
+              </form>
+              <form action={publishTopSignalsAction} className="space-y-2">
+                <Button
+                  type="submit"
+                  disabled={!allApproved}
+                  className="w-full gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  Publish Top 5 Signals
+                </Button>
+                {publishBlockedReason ? (
+                  <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                    {publishBlockedReason}
+                  </p>
+                ) : null}
+              </form>
+            </div>
           </div>
         </header>
 
@@ -136,6 +162,37 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
       </div>
     </main>
   );
+}
+
+function getApproveAllBlockedReason(
+  posts: EditorialSignalPost[],
+  storageReady: boolean,
+  eligibleCount: number,
+) {
+  if (!storageReady) {
+    return "Bulk approval is blocked until editorial storage is configured.";
+  }
+
+  if (posts.length === 0) {
+    return "No signal posts are loaded for approval.";
+  }
+
+  if (eligibleCount === 0) {
+    return "No draft or review-ready signal posts are eligible for bulk approval.";
+  }
+
+  const missingEditorialTextCount = posts.filter(
+    (post) =>
+      post.persisted &&
+      ["draft", "needs_review"].includes(post.editorialStatus) &&
+      !normalizeEditorialText(post.editedWhyItMatters || post.aiWhyItMatters),
+  ).length;
+
+  if (missingEditorialTextCount > 0) {
+    return `${missingEditorialTextCount} eligible signal posts need editorial text before bulk approval.`;
+  }
+
+  return null;
 }
 
 function getPublishBlockedReason(
@@ -161,6 +218,10 @@ function getPublishBlockedReason(
   }
 
   return null;
+}
+
+function normalizeEditorialText(value: string | null | undefined) {
+  return value?.trim() ?? "";
 }
 
 function AccessState({
@@ -221,6 +282,8 @@ function SignalPostEditor({
 }) {
   const editableText = post.editedWhyItMatters || post.aiWhyItMatters;
   const controlsDisabled = !storageReady || !post.persisted;
+  const eligibleForApproveAll =
+    post.persisted && ["draft", "needs_review"].includes(post.editorialStatus);
 
   return (
     <Panel className="p-5">
@@ -281,6 +344,7 @@ function SignalPostEditor({
             id={`editedWhyItMatters-${post.id}`}
             name="editedWhyItMatters"
             defaultValue={editableText}
+            data-approve-all-post-id={eligibleForApproveAll ? post.id : undefined}
             rows={5}
             className="mt-2 w-full resize-y rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm leading-6 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
           />

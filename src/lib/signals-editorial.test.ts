@@ -225,6 +225,60 @@ describe("signals editorial workflow", () => {
     expect(rows[0].approved_by).toBe("admin@example.com");
   });
 
+  it("lets an admin approve multiple loaded signal posts", async () => {
+    const rows = Array.from({ length: 3 }, (_, index) =>
+      createRow({
+        id: `signal-${index + 1}`,
+        rank: index + 1,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { approveSignalPosts } = await loadEditorialModule();
+    const result = await approveSignalPosts({
+      posts: rows.map((row) => ({
+        postId: row.id,
+        editedWhyItMatters: `Bulk approved ${row.rank}`,
+      })),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("Approved 3 signal posts.");
+    expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
+    expect(rows.every((row) => row.approved_by === "admin@example.com")).toBe(true);
+  });
+
+  it("reports partial bulk approval failures without hiding successful approvals", async () => {
+    const rows = [
+      createRow({ id: "signal-1", rank: 1 }),
+      createRow({ id: "signal-2", rank: 2 }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { approveSignalPosts } = await loadEditorialModule();
+    const result = await approveSignalPosts({
+      posts: [
+        { postId: "signal-1", editedWhyItMatters: "Ready for approval." },
+        { postId: "signal-2", editedWhyItMatters: " " },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toBe("Approved 1 signal posts. 1 could not be approved.");
+    expect(rows[0].editorial_status).toBe("approved");
+    expect(rows[1].editorial_status).toBe("needs_review");
+  });
+
   it("blocks publishing unless all five signal posts are approved", async () => {
     const rows = Array.from({ length: 5 }, (_, index) =>
       createRow({
