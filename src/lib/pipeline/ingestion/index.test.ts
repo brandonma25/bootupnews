@@ -5,6 +5,8 @@ import {
   ingestRawItems,
   resolveNoArgumentRuntimeSourceResolutionSnapshot,
 } from "@/lib/pipeline/ingestion";
+import { getSourcesForPublicSurface } from "@/lib/source-manifest";
+import type { Source } from "@/lib/types";
 
 vi.mock("@/lib/rss", () => ({
   fetchFeedArticles: vi.fn(async (feedUrl: string, sourceName: string) => [
@@ -18,6 +20,21 @@ vi.mock("@/lib/rss", () => ({
     },
   ]),
 }));
+
+function createUserSuppliedSources(count: number): Source[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sourceNumber = index + 1;
+
+    return {
+      id: `user-source-${sourceNumber}`,
+      name: `User Source ${sourceNumber}`,
+      feedUrl: `https://example.com/source-${sourceNumber}.xml`,
+      homepageUrl: `https://example.com/source-${sourceNumber}`,
+      topicName: sourceNumber % 2 === 0 ? "Finance" : "Tech",
+      status: "active",
+    };
+  });
+}
 
 describe("ingestRawItems", () => {
   it("preserves canonical source metadata for donor-backed sources", async () => {
@@ -106,6 +123,54 @@ describe("ingestRawItems", () => {
 
     expect(result.sources.map((source) => source.sourceId)).not.toContain("mit-technology-review");
     expect(result.sources.map((source) => source.source)).not.toContain("MIT Technology Review");
+  });
+
+  it("resolves all six manifest-supplied sources when manifest provenance is set", async () => {
+    const sources = getSourcesForPublicSurface("public.home");
+    const result = await ingestRawItems({ sources, suppliedByManifest: true });
+
+    expect(sources).toHaveLength(6);
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-source-verge",
+      "custom-source-ars",
+      "custom-source-tldr-tech",
+      "custom-source-techcrunch",
+      "custom-source-ft",
+      "custom-source-reuters-world",
+    ]);
+  });
+
+  it("preserves the five-source cap for six non-manifest supplied sources", async () => {
+    const result = await ingestRawItems({ sources: createUserSuppliedSources(6) });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-user-source-1",
+      "custom-user-source-2",
+      "custom-user-source-3",
+      "custom-user-source-4",
+      "custom-user-source-5",
+    ]);
+  });
+
+  it("resolves all three manifest-supplied sources when count is below the cap", async () => {
+    const sources = getSourcesForPublicSurface("public.home").slice(0, 3);
+    const result = await ingestRawItems({ sources, suppliedByManifest: true });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-source-verge",
+      "custom-source-ars",
+      "custom-source-tldr-tech",
+    ]);
+  });
+
+  it("resolves all three non-manifest supplied sources when count is below the cap", async () => {
+    const result = await ingestRawItems({ sources: createUserSuppliedSources(3) });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-user-source-1",
+      "custom-user-source-2",
+      "custom-user-source-3",
+    ]);
   });
 
   it("exposes an ID-only no-argument source-resolution audit snapshot without fetching feeds", () => {

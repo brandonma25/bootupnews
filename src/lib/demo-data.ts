@@ -73,6 +73,15 @@ export const demoSources: Source[] = [
     status: "active",
   },
   {
+    id: "source-reuters-world",
+    name: "Reuters World",
+    feedUrl: "https://feeds.reuters.com/Reuters/worldNews",
+    homepageUrl: "https://www.reuters.com/world/",
+    topicId: "topic-politics",
+    topicName: "World",
+    status: "active",
+  },
+  {
     id: "source-marketwatch",
     name: "MarketWatch",
     feedUrl: "https://www.marketwatch.com/rss/topstories",

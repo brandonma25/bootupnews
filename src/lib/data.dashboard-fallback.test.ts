@@ -371,6 +371,14 @@ describe("getDashboardData fallback behavior", () => {
     expect(data.briefing.items).toHaveLength(1);
     expect(data.topics.length).toBeGreaterThan(0);
     expect(data.sources.length).toBeGreaterThan(0);
+    expect(data.sources.map((source) => source.id)).toEqual([
+      "source-verge",
+      "source-ars",
+      "source-tldr-tech",
+      "source-techcrunch",
+      "source-ft",
+      "source-reuters-world",
+    ]);
     expect(runClusterFirstPipeline).toHaveBeenCalledTimes(1);
     expect(logServerEvent).toHaveBeenCalledWith(
       "info",

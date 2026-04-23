@@ -187,6 +187,73 @@ describe("buildHomepageViewModel", () => {
     expect(financeSection?.fallbackEvents).toHaveLength(0);
   });
 
+  it("does not borrow tech or finance fallback cards into an empty politics section", () => {
+    const items = [
+      createItem({
+        id: "tech-1",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "AI chip suppliers expand data center capacity",
+        matchedKeywords: ["ai", "chips", "data center"],
+        importanceScore: 94,
+      }),
+      createItem({
+        id: "finance-1",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Bond markets reprice after inflation data",
+        matchedKeywords: ["bond", "markets", "inflation"],
+        importanceScore: 90,
+      }),
+      createItem({
+        id: "tech-2",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Cloud platforms update enterprise AI tooling",
+        matchedKeywords: ["cloud", "platform", "ai"],
+        importanceScore: 84,
+      }),
+      createItem({
+        id: "finance-2",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Banks trim guidance as credit costs rise",
+        matchedKeywords: ["banks", "credit", "guidance"],
+        importanceScore: 81,
+      }),
+      createItem({
+        id: "tech-3",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Security vendors disclose browser exploit response",
+        matchedKeywords: ["security", "browser", "exploit"],
+        importanceScore: 78,
+      }),
+      createItem({
+        id: "finance-3",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Currency volatility pressures exporter forecasts",
+        matchedKeywords: ["currency", "volatility", "forecasts"],
+        importanceScore: 74,
+      }),
+    ];
+
+    const model = buildHomepageViewModel(createData(items));
+    const politicsSection = model.categorySections.find((section) => section.key === "politics");
+
+    expect(politicsSection?.events).toHaveLength(0);
+    expect(politicsSection?.fallbackEvents).toHaveLength(0);
+    expect(politicsSection?.state).toBe("empty");
+    expect(politicsSection?.emptyReason).toBe("No politics stories in today's briefing.");
+    expect(
+      [
+        ...(politicsSection?.events.map((event) => event.id) ?? []),
+        ...(politicsSection?.fallbackEvents.map((event) => event.id) ?? []),
+      ],
+    ).not.toEqual(expect.arrayContaining(["tech-1", "tech-2", "tech-3", "finance-1", "finance-2", "finance-3"]));
+  });
+
   it("keeps the top visible set anchored around core signals before context signals when enough candidates exist", () => {
     const coreOne = createItem({
       id: "core-1",

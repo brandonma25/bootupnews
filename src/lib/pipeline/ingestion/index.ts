@@ -64,7 +64,12 @@ function buildCustomSourceDefinition(source: Source): SourceDefinition {
   };
 }
 
-function resolveIngestionSources(sources?: Source[]): SourceDefinition[] {
+function resolveIngestionSources(options: {
+  sources?: Source[];
+  suppliedByManifest?: boolean;
+} = {}): SourceDefinition[] {
+  const { sources, suppliedByManifest = false } = options;
+
   if (!sources?.length) {
     const sourceRegistryById = new Map(getActiveSourceRegistry().map((source) => [source.sourceId, source]));
 
@@ -90,10 +95,17 @@ function resolveIngestionSources(sources?: Source[]): SourceDefinition[] {
     ];
   }
 
-  return sources
-    .filter((source) => source.status === "active")
-    .slice(0, 5)
-    .map(buildCustomSourceDefinition);
+  const activeSources = sources.filter((source) => source.status === "active");
+  /*
+   * Keep user-supplied source lists capped so a signed-in account with many
+   * Supabase sources cannot expand live fetch load without product review.
+   * Public manifest lists are exempt because the manifest is the governed
+   * size-bounding layer for public surfaces. Any future caller that passes
+   * suppliedByManifest: true must be reviewed against this provenance rule.
+   */
+  const cappedSources = suppliedByManifest ? activeSources : activeSources.slice(0, 5);
+
+  return cappedSources.map(buildCustomSourceDefinition);
 }
 
 export function resolveNoArgumentRuntimeSourceResolutionSnapshot(): RuntimeSourceResolutionSnapshot {
@@ -145,8 +157,11 @@ function toRawItem(entry: Awaited<ReturnType<typeof fetchSourceWithAdapter>>[num
   };
 }
 
-export async function ingestRawItems(options: { sources?: Source[] } = {}): Promise<IngestionResult> {
-  const sources = resolveIngestionSources(options.sources);
+export async function ingestRawItems(options: {
+  sources?: Source[];
+  suppliedByManifest?: boolean;
+} = {}): Promise<IngestionResult> {
+  const sources = resolveIngestionSources(options);
   const sourceResolution = buildRuntimeSourceResolutionSnapshot({
     resolutionMode: options.sources?.length ? "supplied_sources" : "no_argument_runtime",
     resolvedSources: sources,

@@ -23,6 +23,7 @@ import {
   rankNewsClusters,
 } from "@/lib/ranking";
 import { fetchFeedArticles, type FeedArticle } from "@/lib/rss";
+import { getSourcesForPublicSurface } from "@/lib/source-manifest";
 import {
   applySignalFiltering,
   type EventType,
@@ -576,8 +577,11 @@ async function getPipelineBackedDashboardData(input: {
   fallbackReason?: string;
 }): Promise<DashboardData> {
   const fallbackTopics = input.topics?.length ? input.topics : demoTopics;
-  const fallbackSources = input.sources?.length ? input.sources : getMvpDefaultPublicSources();
-  const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources);
+  const suppliedByManifest = !input.sources?.length;
+  const fallbackSources = input.sources?.length ? input.sources : getSourcesForPublicSurface("public.home");
+  const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources, {
+    suppliedByManifest,
+  });
   const explanationModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
     const mode = item.explanationPacket?.explanation_mode ?? "missing";
     counts[mode] = (counts[mode] ?? 0) + 1;
@@ -754,8 +758,13 @@ export async function getBriefingDetailPageState(dateKey: string, route = `/brie
 export async function generateDailyBriefing(
   topics: Topic[] = demoTopics,
   sources: Source[] = getMvpDefaultPublicSources(),
+  options: { suppliedByManifest?: boolean } = {},
 ): Promise<{ briefing: DailyBriefing; pipelineRun: Awaited<ReturnType<typeof runClusterFirstPipeline>>["run"] }> {
-  const { run, ranked_clusters } = await runClusterFirstPipeline({ sources });
+  const pipelineOptions: Parameters<typeof runClusterFirstPipeline>[0] & { suppliedByManifest?: boolean } = {
+    sources,
+    suppliedByManifest: options.suppliedByManifest,
+  };
+  const { run, ranked_clusters } = await runClusterFirstPipeline(pipelineOptions);
   const topicFallback = topics[0] ?? demoTopics[0];
 
   const candidateItems: BriefingItem[] = ranked_clusters.map(({ cluster, ranked }) => {

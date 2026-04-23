@@ -226,7 +226,7 @@ export function buildHomepageViewModel(
   const reservedFallbackIds = new Set(surfacedEvents.map((event) => event.id));
   const categorySections = sectionDrafts.map((section) => {
     const fallbackSelection =
-      section.events.length === 0
+      section.events.length === 0 && section.key !== "politics"
         ? allocateFallbackEvents(section.key, confirmedEvents, earlySignals, reservedFallbackIds, surfacedEvents)
         : { events: [], suppressedCount: 0 };
     semanticDuplicateSuppressedCount += fallbackSelection.suppressedCount;
@@ -515,6 +515,10 @@ function getEmptyReason(categoryKey: HomepageCategoryKey, visibleCount: number, 
 
   if (fallbackCount > 0) {
     return `No ${label.toLowerCase()} events qualified yet, so the section borrows the best available ranked coverage instead of collapsing into an empty rail.`;
+  }
+
+  if (categoryKey === "politics") {
+    return "No politics stories in today's briefing.";
   }
 
   return `No eligible ${label.toLowerCase()} events qualified in the current ranked briefing.`;
