@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Inter, Lora } from "next/font/google";
 import "./globals.css";
 
@@ -15,8 +14,6 @@ const lora = Lora({
   display: "swap",
 });
 
-const enableVercelSpeedInsights = process.env.VERCEL === "1";
-
 export const metadata: Metadata = {
   title: "Daily Intelligence Briefing",
   description: "A premium daily intelligence dashboard for high-signal briefings.",
@@ -31,7 +28,6 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${lora.variable} antialiased`}>
       <body className="min-h-screen font-sans">
         {children}
-        {enableVercelSpeedInsights ? <SpeedInsights /> : null}
       </body>
     </html>
   );
