@@ -19,7 +19,7 @@ The site can produce ranked signal posts, but the final public “Why it matters
 - Add an environment-variable based admin/editor authorization helper using `ADMIN_EMAILS`.
 - Grant admin/editor access to configured Google-authenticated users, including `brandonma25@gmail.com` when configured.
 - Add `/dashboard/signals/editorial-review` as the private review route.
-- Add a persisted `signal_posts` editorial model for the current Top 5 list and its historical daily snapshots.
+- Add a persisted `signal_posts` editorial model for the current Top 5 list.
 - Support draft save, approval, reset to AI draft, and full-list publishing.
 - Add `/signals` as the public published Top 5 Signals route.
 - Ensure the public route renders `publishedWhyItMatters`, not raw AI draft copy.
@@ -27,7 +27,6 @@ The site can produce ranked signal posts, but the final public “Why it matters
 - Preserve legacy single-block editorial copy as a safe fallback when structured content is absent.
 - Render homepage `Why it matters` cards with collapsed previews that end at complete sentence boundaries and expand inline to the full published editorial note.
 - Clean pre-truncated stored snippets so collapsed summaries do not end with broken `...` fragments such as `wa...`.
-- Support admin filtering for current versus historical daily Top 5 sets, status, briefing date, and text search with paginated results.
 
 ## Non-Goals
 
@@ -41,9 +40,7 @@ The site can produce ranked signal posts, but the final public “Why it matters
 
 - `src/lib/admin-auth.ts` parses comma-separated admin emails and checks the authenticated Supabase user email.
 - `src/lib/signals-editorial.ts` owns server-side editorial reads and mutations. Mutations require an authenticated admin/editor and use the Supabase service-role key only after that in-app authorization check.
-- `public.signal_posts` stores daily Top 5 signal snapshots with briefing-date scope, AI draft reference copy, human edited copy, published copy, status, and edit/approval/publish metadata.
-- The latest briefing date is the admin "current" working set; older dates remain editable as historical archive rows.
-- A row-level `is_live` flag protects the homepage and public `/signals` route from historical overflow. Only the explicitly live published set can power public surfaces.
+- `public.signal_posts` stores ranked signal metadata, AI draft reference copy, human edited copy, published copy, status, and edit/approval/publish metadata.
 - RLS does not grant direct anonymous table reads. The public `/signals` route reads published rows server-side and renders only sanitized public fields.
 - `/dashboard/signals/editorial-review` is noindexed and blocks unauthenticated and non-admin users.
 - `/signals` shows the final published editorial layer only when all five posts have been published.
@@ -58,8 +55,7 @@ The site can produce ranked signal posts, but the final public “Why it matters
 - Requires `ADMIN_EMAILS` to include the editor’s Google-auth email in each deployed environment.
 - Vercel preview remains required for auth, cookies, redirects, SSR, and env-sensitive confirmation.
 - Open PR #98 already edits the hotspot feature registry and adds PRD-52, so this branch uses PRD-53 and must be synced with `origin/main` after #98 lands.
-- Historical archive expansion is forward-safe but only as complete as the currently persisted signal snapshots. Production did not previously store a global historical archive beyond the live Top 5 set.
-- The current Top 5 import uses the existing briefing pipeline output as the AI draft source and inserts only missing rows for the latest briefing date to avoid clobbering human work.
+- The initial current Top 5 import uses the existing briefing pipeline output as the AI draft source and does not refresh over an already edited table to avoid clobbering human work.
 - The preview cleanup is display-layer remediation. It must not rewrite stored editorial text, ranking inputs, source ingestion, or AI-generation templates.
 
 ## Acceptance Criteria
@@ -73,9 +69,6 @@ The site can produce ranked signal posts, but the final public “Why it matters
 - `/signals` displays only the final published editorial text.
 - Raw `aiWhyItMatters` is not exposed on the public page.
 - The homepage uses published manual editorial content when available.
-- Admins can browse the historical daily Top 5 archive without loading an unbounded dataset, using current versus historical filters plus pagination.
-- The current working set can coexist with an older live published set until the full latest Top 5 is published.
-- Homepage/public Top 5 behavior remains capped to the explicitly live published set and does not spill over into historical rows.
 - Each of the five collapsed homepage `Why it matters` summary boxes ends with complete sentence punctuation and does not show broken terminal `...` snippets.
 - `Read more` expands inline to the full published editorial note, and `Show less` returns to the clean collapsed preview.
 - Short complete notes do not show unnecessary expand/collapse controls.
