@@ -30,6 +30,7 @@ type SignalPostRow = {
 const safeGetUser = vi.fn();
 const createSupabaseServiceRoleClient = vi.fn();
 const createSupabaseServerClient = vi.fn();
+const generateDailyBriefing = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   safeGetUser,
@@ -38,7 +39,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 vi.mock("@/lib/data", () => ({
-  generateDailyBriefing: vi.fn(),
+  generateDailyBriefing,
 }));
 
 function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
@@ -67,6 +68,31 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     is_live: overrides.is_live ?? false,
     created_at: overrides.created_at ?? null,
     updated_at: overrides.updated_at ?? null,
+  };
+}
+
+function createBriefingItem(rank: number) {
+  return {
+    id: `generated-${rank}`,
+    topicId: "topic-1",
+    topicName: "Tech",
+    title: `Generated Signal ${rank}`,
+    whatHappened: `Generated summary ${rank}`,
+    keyPoints: [`Point ${rank}`],
+    whyItMatters: `Generated Why it matters ${rank}`,
+    sources: [{ title: "Source", url: `https://example.com/source-${rank}` }],
+    relatedArticles: [{ title: "Source", url: `https://example.com/source-${rank}`, sourceName: "Source", note: "Lead coverage" }],
+    sourceCount: 1,
+    estimatedMinutes: 4,
+    read: false,
+    priority: "top" as const,
+    matchedKeywords: ["tech"],
+    matchScore: 90 - rank,
+    publishedAt: "2026-04-25T08:00:00.000Z",
+    importanceScore: 90 - rank,
+    importanceLabel: "Critical",
+    rankingSignals: [`Ranking signal ${rank}`],
+    signalRole: "Core signal",
   };
 }
 
@@ -212,6 +238,7 @@ describe("signals editorial workflow", () => {
     safeGetUser.mockReset();
     createSupabaseServiceRoleClient.mockReset();
     createSupabaseServerClient.mockReset();
+    generateDailyBriefing.mockReset();
   });
 
   it("withholds editorial review state from non-admin users", async () => {
@@ -481,6 +508,71 @@ describe("signals editorial workflow", () => {
     expect(rows.every((row) => row.editorial_status === "published")).toBe(true);
     expect(rows[0].published_why_it_matters).toBe("Newly approved editorial update.");
     expect(rows[1].published_why_it_matters).toBe("Existing edited 2");
+  });
+
+  it("persists a new daily Top 5 snapshot and archives the previous live set", async () => {
+    const rows = Array.from({ length: 5 }, (_, index) =>
+      createRow({
+        id: `live-${index + 1}`,
+        briefing_date: "2026-04-24",
+        rank: index + 1,
+        editorial_status: "published",
+        published_why_it_matters: `Published ${index + 1}`,
+        is_live: true,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-04-25",
+      items: Array.from({ length: 5 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.insertedCount).toBe(5);
+    expect(rows.filter((row) => row.briefing_date === "2026-04-24").every((row) => row.is_live === false)).toBe(true);
+
+    const insertedRows = rows.filter((row) => row.briefing_date === "2026-04-25");
+    expect(insertedRows).toHaveLength(5);
+    expect(insertedRows.every((row) => row.is_live === true)).toBe(true);
+    expect(insertedRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("does not overwrite an existing daily snapshot for the same briefing date", async () => {
+    const rows = Array.from({ length: 5 }, (_, index) =>
+      createRow({
+        id: `existing-${index + 1}`,
+        briefing_date: "2026-04-25",
+        rank: index + 1,
+        title: `Existing Signal ${index + 1}`,
+        edited_why_it_matters: `Existing editorial ${index + 1}`,
+        editorial_status: "approved",
+        is_live: true,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-04-25",
+      items: Array.from({ length: 5 }, (_, index) => ({
+        ...createBriefingItem(index + 1),
+        title: `Replacement Signal ${index + 1}`,
+      })),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.insertedCount).toBe(0);
+    expect(rows).toHaveLength(5);
+    expect(rows.map((row) => row.title)).toEqual([
+      "Existing Signal 1",
+      "Existing Signal 2",
+      "Existing Signal 3",
+      "Existing Signal 4",
+      "Existing Signal 5",
+    ]);
+    expect(rows.every((row) => row.is_live === true)).toBe(true);
   });
 
   it("publishes an individual approved signal post for homepage visibility", async () => {

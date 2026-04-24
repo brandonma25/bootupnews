@@ -159,6 +159,13 @@ export type EditorialMutationResult = {
     | "storage_error";
 };
 
+export type SignalSnapshotPersistenceResult = {
+  ok: boolean;
+  briefingDate: string;
+  insertedCount: number;
+  message: string;
+};
+
 function normalizeEditorialText(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
@@ -244,6 +251,10 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
   };
 }
 
+function buildSignalPostCandidates(items: BriefingItem[]) {
+  return items.slice(0, 5).map(mapBriefingItemToSignalPost);
+}
+
 async function loadStoredSignalPosts(
   client: EditorialClient,
   input: {
@@ -305,10 +316,140 @@ async function buildCurrentSignalCandidates() {
 
   return {
     briefingDate: normalizeDateValue(briefing.briefingDate.slice(0, 10)) ?? new Date().toISOString().slice(0, 10),
-    candidates: briefing.items
-      .slice(0, 5)
-      .map(mapBriefingItemToSignalPost),
+    candidates: buildSignalPostCandidates(briefing.items),
   };
+}
+
+async function persistSignalPostCandidates(
+  client: EditorialClient,
+  input: {
+    briefingDate: string;
+    candidates: EditorialSignalPost[];
+  },
+): Promise<SignalSnapshotPersistenceResult> {
+  const briefingDate = normalizeDateValue(input.briefingDate) ?? new Date().toISOString().slice(0, 10);
+
+  if (input.candidates.length !== 5) {
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      message: `The current signal pipeline returned ${input.candidates.length} signal posts. Persisting the daily snapshot requires exactly five.`,
+    };
+  }
+
+  const existingResult = await client
+    .from("signal_posts")
+    .select("id, rank, is_live")
+    .eq("briefing_date", briefingDate);
+
+  if (existingResult.error) {
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      message: `The current signal snapshot could not be checked: ${existingResult.error.message}`,
+    };
+  }
+
+  const existingRows = ((existingResult.data ?? []) as Array<{ id: string; rank: number | null; is_live: boolean | null }>);
+  const existingRanks = new Set(
+    existingRows
+      .map((row) => row.rank)
+      .filter((rank): rank is number => typeof rank === "number"),
+  );
+  const missingCandidates = input.candidates.filter((post) => !existingRanks.has(post.rank));
+
+  if (missingCandidates.length === 0) {
+    return {
+      ok: true,
+      briefingDate,
+      insertedCount: 0,
+      message: "The daily signal snapshot already exists for this briefing date.",
+    };
+  }
+
+  const shouldActivateInsertedRows =
+    existingRows.length > 0 ? existingRows.some((row) => Boolean(row.is_live)) : true;
+  const now = new Date().toISOString();
+
+  if (existingRows.length === 0 && shouldActivateInsertedRows) {
+    const deactivateOldLiveSet = await client
+      .from("signal_posts")
+      .update({
+        is_live: false,
+        updated_at: now,
+      })
+      .eq("is_live", true);
+
+    if (deactivateOldLiveSet.error) {
+      return {
+        ok: false,
+        briefingDate,
+        insertedCount: 0,
+        message: `The previous live signal set could not be archived before the new daily snapshot was inserted: ${deactivateOldLiveSet.error.message}`,
+      };
+    }
+  }
+
+  const insertResult = await client.from("signal_posts").insert(
+    missingCandidates.map((post) => ({
+      briefing_date: briefingDate,
+      rank: post.rank,
+      title: post.title,
+      source_name: post.sourceName,
+      source_url: post.sourceUrl,
+      summary: post.summary,
+      tags: post.tags,
+      signal_score: post.signalScore,
+      selection_reason: post.selectionReason,
+      ai_why_it_matters: post.aiWhyItMatters,
+      editorial_status: "needs_review",
+      is_live: shouldActivateInsertedRows,
+      created_at: now,
+      updated_at: now,
+    })),
+  );
+
+  if (insertResult.error) {
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      message: `The current Top 5 could not be persisted for editing: ${insertResult.error.message}`,
+    };
+  }
+
+  return {
+    ok: true,
+    briefingDate,
+    insertedCount: missingCandidates.length,
+    message:
+      missingCandidates.length === 5
+        ? "Persisted a new daily Top 5 snapshot."
+        : `Persisted ${missingCandidates.length} missing signal snapshot rows.`,
+  };
+}
+
+export async function persistSignalPostsForBriefing(input: {
+  briefingDate: string;
+  items: BriefingItem[];
+}): Promise<SignalSnapshotPersistenceResult> {
+  const client = createSupabaseServiceRoleClient();
+
+  if (!client) {
+    return {
+      ok: false,
+      briefingDate: normalizeDateValue(input.briefingDate) ?? new Date().toISOString().slice(0, 10),
+      insertedCount: 0,
+      message: "Editorial storage is unavailable. Configure Supabase and SUPABASE_SERVICE_ROLE_KEY.",
+    };
+  }
+
+  return persistSignalPostCandidates(client, {
+    briefingDate: input.briefingDate,
+    candidates: buildSignalPostCandidates(input.items),
+  });
 }
 
 async function getLatestBriefingDate(client: EditorialClient) {
@@ -353,73 +494,21 @@ async function loadCurrentTopFive(client: EditorialClient, briefingDate: string 
 
 async function ensureCurrentSignalPosts(client: EditorialClient) {
   const { briefingDate, candidates } = await buildCurrentSignalCandidates();
+  const persisted = await persistSignalPostCandidates(client, {
+    briefingDate,
+    candidates,
+  });
 
-  if (candidates.length !== 5) {
+  if (!persisted.ok) {
     return {
       briefingDate,
       posts: candidates,
-      warning: `The current signal pipeline returned ${candidates.length} signal posts. Publishing requires exactly five.`,
-    };
-  }
-
-  const existingResult = await client
-    .from("signal_posts")
-    .select("id, rank")
-    .eq("briefing_date", briefingDate);
-
-  if (existingResult.error) {
-    return {
-      briefingDate,
-      posts: candidates,
-      warning: `The current signal snapshot could not be checked: ${existingResult.error.message}`,
-    };
-  }
-
-  const existingRanks = new Set(
-    (((existingResult.data ?? []) as Array<{ rank: number | null }>))
-      .map((row) => row.rank)
-      .filter((rank): rank is number => typeof rank === "number"),
-  );
-  const missingCandidates = candidates.filter((post) => !existingRanks.has(post.rank));
-
-  if (missingCandidates.length === 0) {
-    return {
-      briefingDate,
-      posts: await loadCurrentTopFive(client, briefingDate),
-      warning: null,
-    };
-  }
-
-  const now = new Date().toISOString();
-  const insertResult = await client.from("signal_posts").insert(
-    missingCandidates.map((post) => ({
-      briefing_date: briefingDate,
-      rank: post.rank,
-      title: post.title,
-      source_name: post.sourceName,
-      source_url: post.sourceUrl,
-      summary: post.summary,
-      tags: post.tags,
-      signal_score: post.signalScore,
-      selection_reason: post.selectionReason,
-      ai_why_it_matters: post.aiWhyItMatters,
-      editorial_status: "needs_review",
-      is_live: false,
-      created_at: now,
-      updated_at: now,
-    })),
-  );
-
-  if (insertResult.error) {
-    return {
-      briefingDate,
-      posts: candidates,
-      warning: `The current Top 5 could not be persisted for editing: ${insertResult.error.message}`,
+      warning: persisted.message,
     };
   }
 
   return {
-    briefingDate,
+    briefingDate: persisted.briefingDate,
     posts: await loadCurrentTopFive(client, briefingDate),
     warning: null,
   };

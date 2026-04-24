@@ -6,15 +6,16 @@
 
 ## Objective
 
-Extend the signals editorial workflow so admin users can browse and manage dated daily Top 5 signal snapshots over time, while keeping homepage and public signals pinned to the explicitly live published set.
+Expand the briefing generation pipeline so each run persists a dated daily Top 5 snapshot in `signal_posts`, while the editorial workflow can browse and manage those snapshots over time and homepage/public signals stay pinned to the explicitly live published set.
 
 ## User Problem
 
-The editorial workflow currently persists only one active Top 5 set. That supports the current publish flow, but it does not preserve older daily sets for later editorial review, QA, or correction. Editors need an archive model that keeps prior daily signal cards available without accidentally flooding homepage or public surfaces with historical rows.
+The current Top 5 persistence path behaves like a rolling overwrite and can lag behind the real briefing pipeline because rows are materialized lazily from the editorial layer. Editors need the pipeline itself to preserve each day’s Top 5 snapshot so historical rows accumulate reliably without flooding homepage or public surfaces with archived sets.
 
 ## Scope
 
 - Expand `signal_posts` into a dated daily archive keyed by `briefing_date` plus `rank`.
+- Persist the daily Top 5 snapshot during briefing generation instead of waiting for the editorial page to seed rows.
 - Add `is_live` so only one published Top 5 set powers homepage and public `/signals`.
 - Preserve the existing admin editorial route and actions while adding scope-aware browsing for current, historical, and all-date views.
 - Add admin filters for status, briefing date, text search, and pagination.
@@ -31,8 +32,9 @@ The editorial workflow currently persists only one active Top 5 set. That suppor
 ## Implementation Shape / System Impact
 
 - `public.signal_posts` stores daily Top 5 snapshots, using unique `(briefing_date, rank)` instead of a globally unique `rank`.
+- `src/app/actions.ts` persists the current daily Top 5 snapshot when briefing generation succeeds so the archive follows the real pipeline.
 - A partial unique live-rank index ensures only one live published row exists for each homepage slot.
-- `src/lib/signals-editorial.ts` loads current, historical, or all-date sets from the dated archive and supports date/query/status filters plus pagination.
+- `src/lib/signals-editorial.ts` owns idempotent daily snapshot persistence, loads current, historical, or all-date sets from the dated archive, and supports date/query/status filters plus pagination.
 - Publishing flips the previous live set off and marks the new published Top 5 as live.
 - `src/lib/homepage-editorial-overrides.ts` and the public `/signals` data path read only `is_live = true` and `editorial_status = 'published'`.
 
@@ -41,13 +43,16 @@ The editorial workflow currently persists only one active Top 5 set. That suppor
 - Depends on PRD-53 editorial workflow foundations already being present.
 - Requires the Supabase migration `20260424083000_signal_posts_historical_archive.sql` before app code promotion.
 - Historical archive growth is forward-only unless a real backfill source is introduced later.
+- If snapshot persistence fails during briefing generation, the generation flow should fail rather than silently leaving homepage/editorial state stale.
 - Preview validation remains required for SSR, env, and auth-sensitive behavior before merge.
 
 ## Acceptance Criteria
 
 - Admins can browse the latest dated Top 5 set as the current working set.
+- Running briefing generation adds five rows for a new `briefing_date` without overwriting prior dates.
 - Admins can browse older dated sets through the historical scope without loading an unbounded dataset.
 - Status, search, briefing-date, and pagination filters work together on the editorial page.
+- Re-running the same `briefing_date` does not overwrite existing rows or erase editorial overrides.
 - Publishing a new Top 5 set does not expose historical rows on homepage or public `/signals`.
 - Homepage and public `/signals` remain capped to the explicitly live published Top 5 set.
 - Existing production rows migrate safely into the new dated model without destructive data loss.
@@ -55,6 +60,7 @@ The editorial workflow currently persists only one active Top 5 set. That suppor
 ## Evidence and Confidence
 
 - Repo evidence used:
+  - `src/app/actions.ts`
   - `src/lib/signals-editorial.ts`
   - `src/app/dashboard/signals/editorial-review/page.tsx`
   - `src/lib/homepage-editorial-overrides.ts`
