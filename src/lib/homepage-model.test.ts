@@ -254,6 +254,39 @@ describe("buildHomepageViewModel", () => {
     ).not.toEqual(expect.arrayContaining(["tech-1", "tech-2", "tech-3", "finance-1", "finance-2", "finance-3"]));
   });
 
+  it("keeps homepage tab category mapping aligned to tech, finance, and politics", () => {
+    const [techEvent, financeEvent, politicsEvent] = buildHomepageEvents([
+      createItem({
+        id: "tech-tab-item",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Chipmakers expand AI server capacity",
+        matchedKeywords: ["ai", "chips", "cloud"],
+        importanceScore: 94,
+      }),
+      createItem({
+        id: "finance-tab-item",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Bond traders reset rate expectations",
+        matchedKeywords: ["bond", "rates", "markets"],
+        importanceScore: 93,
+      }),
+      createItem({
+        id: "politics-tab-item",
+        topicId: "politics",
+        topicName: "Politics",
+        title: "Diplomats react to a new sanctions package",
+        matchedKeywords: ["diplomacy", "sanctions", "government"],
+        importanceScore: 92,
+      }),
+    ]);
+
+    expect(techEvent?.classification.primaryCategory).toBe("tech");
+    expect(financeEvent?.classification.primaryCategory).toBe("finance");
+    expect(politicsEvent?.classification.primaryCategory).toBe("politics");
+  });
+
   it("keeps the top visible set anchored around core signals before context signals when enough candidates exist", () => {
     const coreOne = createItem({
       id: "core-1",
