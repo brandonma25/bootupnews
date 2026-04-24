@@ -189,7 +189,12 @@ export function buildHomepageViewModel(
   const volumeLayers = buildVolumeLayersViewModel(depthLayerEvents, topSignalEventIds);
   let semanticDuplicateSuppressedCount = topRankedSelection.suppressedCount;
   const visibleSelectionAdjustmentsCount = topRankedSelection.adjustmentsCount;
-  const surfacedEvents = [...featuredContext, ...topRanked, ...volumeLayers.developingNow];
+  const surfacedEvents = [
+    ...featuredContext,
+    ...topRanked,
+    ...volumeLayers.developingNow,
+    ...Object.values(volumeLayers.categoryPreviews).flat(),
+  ];
   const excludedCategoryTabIds = new Set(surfacedEvents.map((event) => event.id));
   const categorySections = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
     const sectionSelection = selectCategoryTabEvents({

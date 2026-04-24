@@ -538,7 +538,7 @@ describe("buildHomepageViewModel", () => {
     expect(result.events.map((event) => event.id)).toEqual(["tech-1", "tech-2"]);
   });
 
-  it("keeps Top 5 and Developing Now items out of category tabs", () => {
+  it("keeps Top 5, Developing Now, and By Category items out of category tabs", () => {
     const items = [
       createItem({
         id: "tech-top",
@@ -647,6 +647,9 @@ describe("buildHomepageViewModel", () => {
     const model = buildHomepageViewModel(createData(items));
     const topIds = new Set([model.featured, ...model.topRanked].filter(Boolean).map((event) => event.id));
     const developingNowIds = new Set(model.developingNowEvents.map((event) => event.id));
+    const categoryPreviewIds = new Set(
+      Object.values(model.categoryPreviewEvents).flatMap((events) => events.map((event) => event.id)),
+    );
     const tabIds = new Set(model.categorySections.flatMap((section) => section.events.map((event) => event.id)));
 
     for (const id of topIds) {
@@ -654,6 +657,10 @@ describe("buildHomepageViewModel", () => {
     }
 
     for (const id of developingNowIds) {
+      expect(tabIds.has(id)).toBe(false);
+    }
+
+    for (const id of categoryPreviewIds) {
       expect(tabIds.has(id)).toBe(false);
     }
   });

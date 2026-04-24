@@ -731,6 +731,57 @@ describe("LandingHomepage", () => {
           },
           priority: "normal",
         }),
+        createItem({
+          id: "depth-tech-2",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "API observability vendors add real-time anomaly tracing",
+          whatHappened: "Observability vendors shipped a tracing update for engineering teams.",
+          matchedKeywords: ["observability", "tracing", "anomaly"],
+          publishedAt: "2026-04-15T08:10:00.000Z",
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.92,
+            scores: { tech: 10, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["observability"], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
+        createItem({
+          id: "depth-tech-3",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "Developer platform teams standardize rollout telemetry dashboards",
+          whatHappened: "Platform teams standardized rollout telemetry dashboards for incident response.",
+          matchedKeywords: ["platform", "telemetry", "dashboards"],
+          publishedAt: "2026-04-15T07:50:00.000Z",
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.91,
+            scores: { tech: 9, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["platform"], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
+        createItem({
+          id: "depth-tech-4",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "Cloud security teams automate secrets rotation across edge workloads",
+          whatHappened: "Cloud security teams automated secrets rotation for edge workloads.",
+          matchedKeywords: ["security", "secrets", "edge"],
+          publishedAt: "2026-04-15T07:30:00.000Z",
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.91,
+            scores: { tech: 9, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["security"], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
       ],
     });
 
@@ -749,8 +800,9 @@ describe("LandingHomepage", () => {
 
     expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
     expect(techPanel).not.toBeNull();
-    expect(techPanel).toHaveTextContent("Open source database maintainers ship a query planner update");
+    expect(techPanel).toHaveTextContent("Cloud security teams automate secrets rotation across edge workloads");
     expect(screen.queryByText("Cloud providers expand AI capacity plans")).not.toBeInTheDocument();
+    expect(techPanel).not.toHaveTextContent("Open source database maintainers ship a query planner update");
     expect(techPanel).not.toHaveTextContent("No major technology signals in today's briefing.");
   });
 
