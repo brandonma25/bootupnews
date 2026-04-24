@@ -6,6 +6,7 @@ import { ExternalLink, X } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { BriefingCardCategory } from "@/components/home/BriefingCardCategory";
+import { CategoryPreviewGrid } from "@/components/home/CategoryPreviewGrid";
 import { CategoryTabStrip } from "@/components/home/CategoryTabStrip";
 import { DevelopingNow } from "@/components/home/DevelopingNow";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,7 @@ export default function LandingHomepage({
   homepageViewModel,
 }: LandingHomepageProps) {
   const signedIn = Boolean(viewer);
-  const { featured, topRanked, developingNowEvents, categorySections, debug } = homepageViewModel;
+  const { featured, topRanked, developingNowEvents, categoryPreviewEvents, categorySections, debug } = homepageViewModel;
   const topEvents = dedupeEvents([featured, ...topRanked]);
   const briefingDateKey = getBriefingDateKey(data.briefing.briefingDate);
   const detailHref = `/briefing/${briefingDateKey}`;
@@ -98,6 +99,8 @@ export default function LandingHomepage({
         />
 
         <DevelopingNow events={developingNowEvents} />
+
+        <CategoryPreviewGrid categoryPreviews={categoryPreviewEvents} />
 
         {debugEnabled ? (
           <Panel className="p-5">
