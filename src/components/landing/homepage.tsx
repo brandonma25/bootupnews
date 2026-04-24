@@ -6,7 +6,9 @@ import { ExternalLink, X } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { BriefingCardCategory } from "@/components/home/BriefingCardCategory";
+import { CategoryPreviewGrid } from "@/components/home/CategoryPreviewGrid";
 import { CategoryTabStrip } from "@/components/home/CategoryTabStrip";
+import { DevelopingNow } from "@/components/home/DevelopingNow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -40,7 +42,7 @@ export default function LandingHomepage({
   homepageViewModel,
 }: LandingHomepageProps) {
   const signedIn = Boolean(viewer);
-  const { featured, topRanked, categorySections, debug } = homepageViewModel;
+  const { featured, topRanked, developingNowEvents, categoryPreviewEvents, categorySections, debug } = homepageViewModel;
   const topEvents = dedupeEvents([featured, ...topRanked]);
   const briefingDateKey = getBriefingDateKey(data.briefing.briefingDate);
   const detailHref = `/briefing/${briefingDateKey}`;
@@ -95,6 +97,10 @@ export default function LandingHomepage({
             />
           )}
         />
+
+        <DevelopingNow events={developingNowEvents} />
+
+        <CategoryPreviewGrid categoryPreviews={categoryPreviewEvents} />
 
         {debugEnabled ? (
           <Panel className="p-5">
@@ -368,7 +374,7 @@ function CategorySoftGate({
       <div className="flex items-start justify-between gap-4">
         <div className="max-w-xl">
           <p className="text-base font-semibold text-[var(--text-primary)]">
-            Create a free account to read Tech News, Finance and Politics
+            Create a free account to read Tech News, Economics, and Politics
           </p>
         </div>
         <Button

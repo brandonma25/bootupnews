@@ -58,10 +58,7 @@ export function CategoryTabStrip({
 }: CategoryTabStripProps) {
   const [activeTab, setActiveTab] = useState<HomeTabKey>(topEventsTab.key);
   const triggerRefs = useRef<Partial<Record<HomeTabKey, HTMLButtonElement | null>>>({});
-  const visibleCategorySections = useMemo(
-    () => categorySections.filter((section) => !isAuthenticated || section.events.length > 0),
-    [categorySections, isAuthenticated],
-  );
+  const visibleCategorySections = useMemo(() => categorySections, [categorySections]);
   const tabs = useMemo(
     () => [
       topEventsTab,
@@ -140,13 +137,35 @@ export function CategoryTabStrip({
           {activeCategoryIsGated ? (
             <div className="space-y-5">
               {renderedGatedCategoryState}
-              {topEventsContent}
+              <div className="grid gap-4">
+                {section.events.length ? (
+                  section.events.map((event, index) => (
+                    <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
+                  ))
+                ) : (
+                  <div
+                    className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-5 text-sm text-[var(--text-secondary)]"
+                    role="status"
+                  >
+                    {section.emptyReason}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid gap-4">
-              {section.events.map((event, index) => (
-                <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
-              ))}
+              {section.events.length ? (
+                section.events.map((event, index) => (
+                  <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
+                ))
+              ) : (
+                <div
+                  className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-5 text-sm text-[var(--text-secondary)]"
+                  role="status"
+                >
+                  {section.emptyReason}
+                </div>
+              )}
             </div>
           )}
         </TabsContent>

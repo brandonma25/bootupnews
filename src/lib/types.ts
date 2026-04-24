@@ -171,6 +171,7 @@ export type DashboardData = {
   briefing: DailyBriefing;
   topics: Topic[];
   sources: Source[];
+  publicRankedItems?: BriefingItem[];
   homepageDiagnostics?: {
     totalArticlesFetched: number | null;
     totalCandidateEvents: number | null;

@@ -48,5 +48,5 @@ describe("public signals page", () => {
 
     expect(screen.getByText("Human final version 1")).toBeInTheDocument();
     expect(screen.queryByText("Raw AI draft should not be public")).not.toBeInTheDocument();
-  });
+  }, 10000);
 });

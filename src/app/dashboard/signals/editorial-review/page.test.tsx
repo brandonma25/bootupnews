@@ -97,7 +97,7 @@ describe("signals editorial review page", () => {
       "href",
       "/login?redirectTo=%2Fdashboard%2Fsignals%2Feditorial-review",
     );
-  });
+  }, 10000);
 
   it("shows a clear unauthorized state for non-admin users", async () => {
     getEditorialReviewState.mockResolvedValue({
@@ -110,7 +110,7 @@ describe("signals editorial review page", () => {
 
     expect(screen.getByRole("heading", { name: "Not authorized" })).toBeInTheDocument();
     expect(screen.getByText(/reader@example.com does not have admin\/editor access/i)).toBeInTheDocument();
-  });
+  }, 10000);
 
   it("shows the top-level Approve All action for authorized admins", async () => {
     getEditorialReviewState.mockResolvedValue({

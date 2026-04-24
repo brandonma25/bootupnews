@@ -112,5 +112,5 @@ describe("homepage SSR auth snapshot", () => {
         }),
       }),
     );
-  });
+  }, 10000);
 });

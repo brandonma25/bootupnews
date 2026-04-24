@@ -579,7 +579,7 @@ async function getPipelineBackedDashboardData(input: {
   const fallbackTopics = input.topics?.length ? input.topics : demoTopics;
   const suppliedByManifest = !input.sources?.length;
   const fallbackSources = input.sources?.length ? input.sources : getSourcesForPublicSurface("public.home");
-  const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources, {
+  const { briefing, publicRankedItems, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources, {
     suppliedByManifest,
   });
   const explanationModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
@@ -624,6 +624,7 @@ async function getPipelineBackedDashboardData(input: {
     briefing,
     topics: fallbackTopics,
     sources: fallbackSources,
+    publicRankedItems,
     homepageDiagnostics: {
       totalArticlesFetched: pipelineRun.num_raw_items,
       totalCandidateEvents: pipelineRun.num_clusters,
@@ -759,7 +760,11 @@ export async function generateDailyBriefing(
   topics: Topic[] = demoTopics,
   sources: Source[] = getMvpDefaultPublicSources(),
   options: { suppliedByManifest?: boolean } = {},
-): Promise<{ briefing: DailyBriefing; pipelineRun: Awaited<ReturnType<typeof runClusterFirstPipeline>>["run"] }> {
+): Promise<{
+  briefing: DailyBriefing;
+  publicRankedItems: BriefingItem[];
+  pipelineRun: Awaited<ReturnType<typeof runClusterFirstPipeline>>["run"];
+}> {
   const pipelineOptions: Parameters<typeof runClusterFirstPipeline>[0] & { suppliedByManifest?: boolean } = {
     sources,
     suppliedByManifest: options.suppliedByManifest,
@@ -870,6 +875,7 @@ export async function generateDailyBriefing(
 
   return {
     briefing,
+    publicRankedItems: candidateItems,
     pipelineRun: run,
   };
 }

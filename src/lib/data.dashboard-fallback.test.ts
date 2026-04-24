@@ -348,6 +348,14 @@ describe("getDashboardData fallback behavior", () => {
     });
   });
 
+  it("preserves the broader ranked candidate pool alongside the capped public briefing items", async () => {
+    const { briefing, publicRankedItems } = await generateDailyBriefing();
+
+    expect(briefing.items).toHaveLength(1);
+    expect(publicRankedItems.length).toBeGreaterThanOrEqual(briefing.items.length);
+    expect(publicRankedItems[0]?.id).toBe(briefing.items[0]?.id);
+  });
+
   it("uses the public pipeline as a live fallback for signed-in users without bootstrap rows", async () => {
     const supabase = createSupabaseMock({});
 

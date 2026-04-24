@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildHomepageEvents, buildHomepageViewModel } from "@/lib/homepage-model";
+import { buildHomepageEvents, buildHomepageViewModel, selectCategoryTabEvents } from "@/lib/homepage-model";
 import { createDefaultPersonalizationProfile } from "@/lib/personalization";
 import type { DashboardData, BriefingItem } from "@/lib/types";
 
@@ -37,7 +37,12 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
   };
 }
 
-function createData(items: BriefingItem[]): DashboardData {
+function createData(
+  items: BriefingItem[],
+  options: {
+    publicRankedItems?: BriefingItem[] | null;
+  } = {},
+): DashboardData {
   return {
     mode: "live",
     briefing: {
@@ -48,6 +53,8 @@ function createData(items: BriefingItem[]): DashboardData {
       readingWindow: "10 minutes",
       items,
     },
+    publicRankedItems:
+      options.publicRankedItems === null ? undefined : (options.publicRankedItems ?? items),
     topics: [],
     sources: [
       { id: "source-tech", name: "TechCrunch", feedUrl: "https://techcrunch.com/feed", status: "active", topicName: "Tech" },
@@ -107,7 +114,7 @@ describe("buildHomepageViewModel", () => {
     expect(model.featured?.id).toBe("finance-1");
     expect(model.topRanked.map((event) => event.id)).not.toContain("finance-1");
     expect(financeSection?.events).toHaveLength(0);
-    expect(model.debug.semanticDuplicateSuppressedCount).toBeGreaterThan(0);
+    expect(model.debug.surfacedDuplicateCount).toBe(0);
   });
 
   it("maps geopolitics coverage into the politics category", () => {
@@ -144,10 +151,198 @@ describe("buildHomepageViewModel", () => {
 
     expect(financeSection?.events).toHaveLength(0);
     expect(financeSection?.state).toBe("empty");
-    expect(financeSection?.emptyReason).toContain("No eligible finance events qualified");
+    expect(financeSection?.emptyReason).toBe("No major economics signals in today's briefing.");
   });
 
-  it("renders sparse fallback behavior when a category has thin data", () => {
+  it("keeps Top 5 sourced from briefing items while depth layers use publicRankedItems", () => {
+    const briefingItems = [
+      createItem({
+        id: "briefing-finance",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Fed signals rates will stay elevated",
+        matchedKeywords: ["fed", "rates", "markets"],
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.9,
+          scores: { tech: 0, finance: 11, politics: 0 },
+          matchedSignals: { tech: [], finance: ["fed"], politics: [] },
+        },
+      }),
+    ];
+    const depthItems = [
+      ...briefingItems,
+      createItem({
+        id: "depth-tech",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Database vendors ship a query planner update",
+        whatHappened: "Database vendors shipped a planner update for production workloads.",
+        matchedKeywords: ["database", "query planner", "open source"],
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.9,
+          scores: { tech: 10, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["database"], finance: [], politics: [] },
+        },
+        priority: "normal",
+      }),
+    ];
+
+    const model = buildHomepageViewModel(createData(briefingItems, { publicRankedItems: depthItems }));
+
+    expect(model.featured?.id).toBe("briefing-finance");
+    expect(model.topRanked.map((event) => event.id)).not.toContain("depth-tech");
+    expect(model.debug.rankedEventsCount).toBe(depthItems.length);
+    expect(model.developingNowEvents.map((event) => event.id)).toContain("depth-tech");
+  });
+
+  it("lets Developing Now surface events from publicRankedItems beyond the Top 5 briefing layer", () => {
+    const briefingItems = [
+      createItem({
+        id: "briefing-tech",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Cloud providers expand AI capacity plans",
+        matchedKeywords: ["cloud", "ai", "capacity"],
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 12, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["ai"], finance: [], politics: [] },
+        },
+      }),
+    ];
+    const depthItems = [
+      ...briefingItems,
+      createItem({
+        id: "depth-finance",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Credit markets reprice after a guidance reset",
+        matchedKeywords: ["credit", "markets", "guidance"],
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 0, finance: 12, politics: 0 },
+          matchedSignals: { tech: [], finance: ["credit"], politics: [] },
+        },
+        sources: [{ title: "Financial Times", url: "https://www.ft.com/content/guidance-reset" }],
+        priority: "normal",
+      }),
+    ];
+
+    const model = buildHomepageViewModel(createData(briefingItems, { publicRankedItems: depthItems }));
+
+    expect(model.developingNowEvents.map((event) => event.id)).toContain("depth-finance");
+    expect(model.developingNowEvents.map((event) => event.id)).not.toContain("briefing-tech");
+  });
+
+  it("lets By Category surface events from publicRankedItems beyond the Top 5 briefing layer", () => {
+    const briefingItems = [
+      createItem({
+        id: "briefing-politics",
+        topicId: "politics",
+        topicName: "Politics",
+        title: "White House weighs new export controls",
+        matchedKeywords: ["white house", "exports", "policy"],
+        homepageClassification: {
+          primaryCategory: "politics",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 0, finance: 0, politics: 12 },
+          matchedSignals: { tech: [], finance: [], politics: ["white house"] },
+        },
+      }),
+    ];
+    const fillerTitles = [
+      "Bank funding costs rise after treasury volatility",
+      "Private equity deal pacing slows in Europe",
+      "Corporate bond issuance rebounds after a pause",
+      "Insurers revise catastrophe pricing assumptions",
+      "Regional lenders tighten commercial real estate terms",
+      "Asset managers prepare for a stronger dollar regime",
+      "Treasury clearing reform changes dealer planning",
+      "Consumer lenders cut promotional balance-transfer offers",
+      "Commodities desks hedge against freight disruptions",
+      "Mortgage originators reset refinance expectations",
+    ];
+    const fillerItems = fillerTitles.map((title, index) =>
+      createItem({
+        id: `depth-finance-${index + 1}`,
+        topicId: "finance",
+        topicName: "Finance",
+        title,
+        matchedKeywords: [`finance-${index + 1}`, `market-${index + 1}`],
+        publishedAt: `2026-04-15T${String(12 + index).padStart(2, "0")}:00:00.000Z`,
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 0, finance: 12, politics: 0 },
+          matchedSignals: { tech: [], finance: ["credit"], politics: [] },
+        },
+        priority: "normal",
+      }),
+    );
+    const depthItems = [
+      ...briefingItems,
+      ...fillerItems,
+      createItem({
+        id: "depth-tech-preview",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Database vendors ship a query planner update",
+        matchedKeywords: ["database", "query planner", "open source"],
+        publishedAt: "2026-04-15T08:30:00.000Z",
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.92,
+          scores: { tech: 10, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["database"], finance: [], politics: [] },
+        },
+        priority: "normal",
+      }),
+    ];
+
+    const model = buildHomepageViewModel(createData(briefingItems, { publicRankedItems: depthItems }));
+
+    expect(model.categoryPreviewEvents.tech.map((event) => event.id)).toContain("depth-tech-preview");
+    expect(model.categoryPreviewEvents.tech.map((event) => event.id)).not.toContain("briefing-politics");
+  });
+
+  it("keeps depth layers empty when publicRankedItems is absent", () => {
+    const model = buildHomepageViewModel(
+      createData(
+        [
+          createItem({
+            id: "briefing-tech",
+            topicId: "tech",
+            topicName: "Tech",
+            title: "Chip makers race to expand AI capacity",
+            matchedKeywords: ["chips", "ai", "capacity"],
+          }),
+        ],
+        { publicRankedItems: null },
+      ),
+    );
+
+    expect(model.featured?.id).toBe("briefing-tech");
+    expect(model.developingNowEvents).toEqual([]);
+    expect(model.categoryPreviewEvents).toEqual({
+      tech: [],
+      finance: [],
+      politics: [],
+    });
+    expect(model.categorySections.every((section) => section.events.length === 0)).toBe(true);
+  });
+
+  it("renders a sparse category tab when a category has thin but eligible data", () => {
     const financeItem = createItem({
       id: "finance-thin",
       topicId: "finance",
@@ -245,13 +440,229 @@ describe("buildHomepageViewModel", () => {
     expect(politicsSection?.events).toHaveLength(0);
     expect(politicsSection?.fallbackEvents).toHaveLength(0);
     expect(politicsSection?.state).toBe("empty");
-    expect(politicsSection?.emptyReason).toBe("No politics stories in today's briefing.");
+    expect(politicsSection?.emptyReason).toBe("No major politics signals in today's briefing.");
     expect(
       [
         ...(politicsSection?.events.map((event) => event.id) ?? []),
         ...(politicsSection?.fallbackEvents.map((event) => event.id) ?? []),
       ],
     ).not.toEqual(expect.arrayContaining(["tech-1", "tech-2", "tech-3", "finance-1", "finance-2", "finance-3"]));
+  });
+
+  it("keeps homepage tab category mapping aligned to tech, finance, and politics", () => {
+    const [techEvent, financeEvent, politicsEvent] = buildHomepageEvents([
+      createItem({
+        id: "tech-tab-item",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Chipmakers expand AI server capacity",
+        matchedKeywords: ["ai", "chips", "cloud"],
+        importanceScore: 94,
+      }),
+      createItem({
+        id: "finance-tab-item",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Bond traders reset rate expectations",
+        matchedKeywords: ["bond", "rates", "markets"],
+        importanceScore: 93,
+      }),
+      createItem({
+        id: "politics-tab-item",
+        topicId: "politics",
+        topicName: "Politics",
+        title: "Diplomats react to a new sanctions package",
+        matchedKeywords: ["diplomacy", "sanctions", "government"],
+        importanceScore: 92,
+      }),
+    ]);
+
+    expect(techEvent?.classification.primaryCategory).toBe("tech");
+    expect(financeEvent?.classification.primaryCategory).toBe("finance");
+    expect(politicsEvent?.classification.primaryCategory).toBe("politics");
+  });
+
+  it("selectCategoryTabEvents keeps only the target category in ranked order", () => {
+    const events = buildHomepageEvents([
+      createItem({
+        id: "tech-1",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "AI capacity expands",
+        importanceScore: 95,
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.8,
+          scores: { tech: 11, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["fixture"], finance: [], politics: [] },
+        },
+      }),
+      createItem({
+        id: "finance-1",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Bond market repricing lands",
+        importanceScore: 90,
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.8,
+          scores: { tech: 0, finance: 11, politics: 0 },
+          matchedSignals: { tech: [], finance: ["fixture"], politics: [] },
+        },
+      }),
+      createItem({
+        id: "tech-2",
+        topicId: "tech-2",
+        topicName: "Tech",
+        title: "Semiconductor roadmap shifts",
+        importanceScore: 84,
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.8,
+          scores: { tech: 10, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["fixture"], finance: [], politics: [] },
+        },
+      }),
+    ]);
+
+    const result = selectCategoryTabEvents({
+      rankedEvents: events,
+      category: "tech",
+      excludedEventIds: new Set(),
+      limit: 6,
+    });
+
+    expect(result.events.map((event) => event.id)).toEqual(["tech-1", "tech-2"]);
+  });
+
+  it("keeps Top 5, Developing Now, and By Category items out of category tabs", () => {
+    const items = [
+      createItem({
+        id: "tech-top",
+        topicId: "tech-top",
+        topicName: "Tech",
+        title: "AI platform resets deployment plans",
+        importanceScore: 99,
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.9,
+          scores: { tech: 12, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["fixture"], finance: [], politics: [] },
+        },
+      }),
+      createItem({
+        id: "finance-top",
+        topicId: "finance-top",
+        topicName: "Finance",
+        title: "Fed policy path reshapes markets",
+        importanceScore: 97,
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.9,
+          scores: { tech: 0, finance: 12, politics: 0 },
+          matchedSignals: { tech: [], finance: ["fixture"], politics: [] },
+        },
+      }),
+      createItem({
+        id: "politics-top",
+        topicId: "politics-top",
+        topicName: "Politics",
+        title: "Sanctions debate widens across allies",
+        importanceScore: 96,
+        homepageClassification: {
+          primaryCategory: "politics",
+          secondaryCategories: [],
+          confidence: 0.9,
+          scores: { tech: 0, finance: 0, politics: 12 },
+          matchedSignals: { tech: [], finance: [], politics: ["fixture"] },
+        },
+      }),
+      createItem({
+        id: "tech-secondary",
+        topicId: "tech-secondary",
+        topicName: "Tech",
+        title: "Cloud vendors update enterprise AI pricing",
+        importanceScore: 83,
+        publishedAt: "2026-04-15T12:00:00.000Z",
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.8,
+          scores: { tech: 10, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["fixture"], finance: [], politics: [] },
+        },
+      }),
+      createItem({
+        id: "finance-secondary",
+        topicId: "finance-secondary",
+        topicName: "Finance",
+        title: "Treasury auction demand softens",
+        importanceScore: 82,
+        publishedAt: "2026-04-15T11:00:00.000Z",
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.8,
+          scores: { tech: 0, finance: 10, politics: 0 },
+          matchedSignals: { tech: [], finance: ["fixture"], politics: [] },
+        },
+      }),
+      createItem({
+        id: "politics-secondary",
+        topicId: "politics-secondary",
+        topicName: "Politics",
+        title: "Ministers reopen ceasefire talks",
+        importanceScore: 81,
+        publishedAt: "2026-04-15T10:00:00.000Z",
+        homepageClassification: {
+          primaryCategory: "politics",
+          secondaryCategories: [],
+          confidence: 0.8,
+          scores: { tech: 0, finance: 0, politics: 10 },
+          matchedSignals: { tech: [], finance: [], politics: ["fixture"] },
+        },
+      }),
+      createItem({
+        id: "tech-tab",
+        topicId: "tech-tab",
+        topicName: "Tech",
+        title: "Chip suppliers revise enterprise forecasts",
+        importanceScore: 78,
+        publishedAt: "2026-04-15T09:00:00.000Z",
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.8,
+          scores: { tech: 10, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["fixture"], finance: [], politics: [] },
+        },
+      }),
+    ];
+
+    const model = buildHomepageViewModel(createData(items));
+    const topIds = new Set([model.featured, ...model.topRanked].filter(Boolean).map((event) => event.id));
+    const developingNowIds = new Set(model.developingNowEvents.map((event) => event.id));
+    const categoryPreviewIds = new Set(
+      Object.values(model.categoryPreviewEvents).flatMap((events) => events.map((event) => event.id)),
+    );
+    const tabIds = new Set(model.categorySections.flatMap((section) => section.events.map((event) => event.id)));
+
+    for (const id of topIds) {
+      expect(tabIds.has(id)).toBe(false);
+    }
+
+    for (const id of developingNowIds) {
+      expect(tabIds.has(id)).toBe(false);
+    }
+
+    for (const id of categoryPreviewIds) {
+      expect(tabIds.has(id)).toBe(false);
+    }
   });
 
   it("keeps the top visible set anchored around core signals before context signals when enough candidates exist", () => {
@@ -388,7 +799,7 @@ describe("buildHomepageViewModel", () => {
     expect(model.debug.coreSignalCount).toBeGreaterThanOrEqual(3);
   });
 
-  it("does not repeat the same fallback card across multiple empty rails or reuse top-ranked cards", () => {
+  it("does not borrow fallback cards or repeat top-ranked items into category tabs", () => {
     const financeEvent = createItem({
       id: "finance-fallback",
       topicId: "finance",
@@ -422,7 +833,8 @@ describe("buildHomepageViewModel", () => {
 
     expect(new Set(fallbackIds).size).toBe(fallbackIds.length);
     expect(fallbackIds).not.toContain("finance-fallback");
-    expect(politicsSection?.events.map((event) => event.id)).toContain("politics-early");
+    expect(fallbackIds).toHaveLength(0);
+    expect(politicsSection?.events.map((event) => event.id)).not.toContain("politics-early");
   });
 
   it("keeps surfaced event ids unique across featured, top-ranked, category, and watchlist rails", () => {
