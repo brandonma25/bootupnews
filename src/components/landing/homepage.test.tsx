@@ -641,14 +641,14 @@ describe("LandingHomepage", () => {
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
-    expect(screen.queryByText("Create a free account to read Tech News, Finance and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
 
     expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryAllByTestId("home-top-event-card")).toHaveLength(0);
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Create a free account to read Tech News, Finance and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
   });
 
   it("renders debug diagnostics for QA when enabled", () => {

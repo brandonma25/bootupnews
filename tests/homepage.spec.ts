@@ -105,11 +105,11 @@ test.describe("homepage", () => {
     expect(diagnostics.entries).toEqual([]);
   });
 
-  test("shows and dismisses the signed-out category soft gate without clearing Top Events", async ({ page, diagnostics }) => {
+  test("shows the signed-out category soft gate without duplicating Top Events", async ({ page, diagnostics }) => {
     await page.goto("/");
 
     const topEventCards = page.getByTestId("home-top-event-card");
-    const gateCopy = "Create a free account to read Tech News, Finance and Politics";
+    const gateCopy = "Create a free account to read Tech News, Economics, and Politics";
     const techNewsTab = page.getByRole("tab", { name: "Tech News" });
 
     await expect(topEventCards.first()).toBeVisible();
@@ -133,7 +133,7 @@ test.describe("homepage", () => {
     await expect(gate.getByText(gateCopy)).toBeVisible();
     await expect(gate.getByRole("link", { name: "Sign Up" })).toHaveAttribute("href", "/signup?redirectTo=%2F");
     await expect(gate.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/login?redirectTo=%2F");
-    await expect(topEventCards.first()).toBeVisible();
+    await expect(topEventCards).toHaveCount(0);
 
     await page.getByRole("button", { name: "Dismiss category gate" }).click();
 

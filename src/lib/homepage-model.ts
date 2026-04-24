@@ -119,7 +119,7 @@ export type HomepageViewModel = {
 
 const TOP_EVENTS_LIMIT = 4;
 const MIN_PUBLIC_TOP_EVENTS = 3;
-const CATEGORY_EVENT_LIMIT = 2;
+const CATEGORY_TAB_LIMIT = 6;
 const DEVELOPING_NOW_EVENT_LIMIT = 10;
 const CATEGORY_PREVIEW_LIMIT = 3;
 const TRENDING_EVENT_LIMIT = 3;
@@ -187,72 +187,68 @@ export function buildHomepageViewModel(
   const volumeLayers = buildVolumeLayersViewModel(events, topSignalEventIds);
   let semanticDuplicateSuppressedCount = topRankedSelection.suppressedCount;
   const visibleSelectionAdjustmentsCount = topRankedSelection.adjustmentsCount;
-  const surfacedEvents = [...featuredContext, ...topRanked];
-  const sectionDrafts = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
-    const eligibleEvents = events.filter(
-      (event) =>
-        event.classification.primaryCategory === category.key &&
-        !topRanked.some((topEvent) => topEvent.id === event.id),
-    );
-    const sectionSelection = selectDistinctEvents(eligibleEvents, surfacedEvents, CATEGORY_EVENT_LIMIT);
-    const displayEvents = sectionSelection.events;
+  const surfacedEvents = [...featuredContext, ...topRanked, ...volumeLayers.developingNow];
+  const excludedCategoryTabIds = new Set(surfacedEvents.map((event) => event.id));
+  const categorySections = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
+    const sectionSelection = selectCategoryTabEvents({
+      rankedEvents: events,
+      category: category.key,
+      excludedEventIds: excludedCategoryTabIds,
+      limit: CATEGORY_TAB_LIMIT,
+    });
     semanticDuplicateSuppressedCount += sectionSelection.suppressedCount;
-    surfacedEvents.push(...displayEvents);
+    const displayEvents = sectionSelection.events;
+    const eligibleEvents = events.filter((event) => event.classification.primaryCategory === category.key);
     const heldBackEvents = eligibleEvents.filter(
-      (event) => !displayEvents.some((displayEvent) => displayEvent.id === event.id),
+      (event) => !excludedCategoryTabIds.has(event.id) && !displayEvents.some((displayEvent) => displayEvent.id === event.id),
     );
-    const placeholderCount =
-      displayEvents.length > 0 ? Math.max(0, CATEGORY_EVENT_LIMIT - displayEvents.length) : 0;
 
+    displayEvents.forEach((event) => {
+      surfacedEvents.push(event);
+      excludedCategoryTabIds.add(event.id);
+    });
+
+    const emptyReason = getCategoryTabEmptyReason(category.key);
     const excludedReasons = [
       ...events
         .filter((event) => event.classification.primaryCategory !== category.key)
         .map((event) => getExclusionReason(event, category.key)),
       ...eligibleEvents
-        .filter((event) => !displayEvents.some((displayEvent) => displayEvent.id === event.id))
+        .filter((event) => excludedCategoryTabIds.has(event.id) && !displayEvents.some((displayEvent) => displayEvent.id === event.id))
         .slice(0, 2)
-        .map((event) => `Held back to avoid repeating a similar ${event.topicName.toLowerCase()} event elsewhere on the page.`),
-      ...heldBackEvents.map(
-        () => `Held back because ${getHomepageCategoryLabel(category.key)} is capped at ${CATEGORY_EVENT_LIMIT} event cards.`,
-      ),
+        .map(
+          (event) =>
+            `Held back to avoid repeating a similar ${event.topicName.toLowerCase()} event already surfaced elsewhere on the homepage.`,
+        ),
+      ...heldBackEvents
+        .slice(0, 2)
+        .map(
+          () =>
+            `Held back because ${getCategoryTabLabel(category.key)} is capped at ${CATEGORY_TAB_LIMIT} items in the current homepage tab.`,
+        ),
     ];
 
     return {
       key: category.key,
-      label: category.label,
+      label: getCategoryTabLabel(category.key),
       description: getHomepageCategoryDescription(category.key),
       events: displayEvents,
-      fallbackEvents: [],
-      placeholderCount,
+      fallbackEvents: [] as HomepageEvent[],
+      placeholderCount: 0,
       state:
-        displayEvents.length >= CATEGORY_EVENT_LIMIT
+        displayEvents.length >= 3
           ? "populated"
           : displayEvents.length > 0
             ? "sparse"
             : "empty",
-      emptyReason: "",
+      emptyReason,
       excludedReasons: dedupeStrings(excludedReasons).slice(0, 6),
     } satisfies HomepageCategorySection;
-  });
-  const reservedFallbackIds = new Set(surfacedEvents.map((event) => event.id));
-  const categorySections = sectionDrafts.map((section) => {
-    const fallbackSelection =
-      section.events.length === 0 && section.key !== "politics"
-        ? allocateFallbackEvents(section.key, confirmedEvents, earlySignals, reservedFallbackIds, surfacedEvents)
-        : { events: [], suppressedCount: 0 };
-    semanticDuplicateSuppressedCount += fallbackSelection.suppressedCount;
-    surfacedEvents.push(...fallbackSelection.events);
-    const fallbackEvents = fallbackSelection.events;
-
-    return {
-      ...section,
-      fallbackEvents,
-      emptyReason: getEmptyReason(section.key, section.events.length, fallbackEvents.length),
-    };
   });
 
   const reservedIds = new Set([
     ...topRanked.map((event) => event.id),
+    ...volumeLayers.developingNow.map((event) => event.id),
     ...categorySections.flatMap((section) => [
       ...section.events.map((event) => event.id),
       ...section.fallbackEvents.map((event) => event.id),
@@ -473,6 +469,49 @@ export function selectCategoryPreviewEvents(
     .slice(0, limit);
 }
 
+export function selectCategoryTabEvents({
+  rankedEvents,
+  category,
+  excludedEventIds,
+  limit = CATEGORY_TAB_LIMIT,
+}: {
+  rankedEvents: HomepageEvent[];
+  category: HomepageCategoryKey;
+  excludedEventIds: Set<string>;
+  limit?: number;
+}) {
+  if (!rankedEvents.length || limit <= 0) {
+    return {
+      events: [],
+      suppressedCount: 0,
+    };
+  }
+
+  const rankedCandidates = rankedEvents
+    .map((event, index) => ({ event, index }))
+    .filter(
+      ({ event }) =>
+        event.classification.primaryCategory === category && !excludedEventIds.has(event.id),
+    )
+    .sort((left, right) => {
+      const rankDelta = right.event.rankScore - left.event.rankScore;
+      if (rankDelta !== 0) {
+        return rankDelta;
+      }
+
+      const freshnessDelta = getFreshnessTimestamp(right.event) - getFreshnessTimestamp(left.event);
+      if (freshnessDelta !== 0) {
+        return freshnessDelta;
+      }
+
+      return left.index - right.index;
+    })
+    .map(({ event }) => event);
+
+  const excludedEvents = rankedEvents.filter((event) => excludedEventIds.has(event.id));
+  return selectDistinctEvents(rankedCandidates, excludedEvents, limit);
+}
+
 export function buildVolumeLayersViewModel(
   rankedEvents: HomepageEvent[],
   topSignalEventIds: Set<string>,
@@ -639,22 +678,26 @@ function sanitizeWhyItMatters(
     .trim();
 }
 
-function getEmptyReason(categoryKey: HomepageCategoryKey, visibleCount: number, fallbackCount: number) {
-  const label = getHomepageCategoryLabel(categoryKey);
-
-  if (visibleCount > 0) {
-    return `${label} has ${visibleCount} eligible event${visibleCount === 1 ? "" : "s"}, so placeholders keep the section calm while more clustered coverage builds.`;
+function getCategoryTabLabel(categoryKey: HomepageCategoryKey) {
+  switch (categoryKey) {
+    case "tech":
+      return "Technology";
+    case "finance":
+      return "Economics";
+    case "politics":
+      return "Politics";
   }
+}
 
-  if (fallbackCount > 0) {
-    return `No ${label.toLowerCase()} events qualified yet, so the section borrows the best available ranked coverage instead of collapsing into an empty rail.`;
+function getCategoryTabEmptyReason(categoryKey: HomepageCategoryKey) {
+  switch (categoryKey) {
+    case "tech":
+      return "No major technology signals in today's briefing.";
+    case "finance":
+      return "No major economics signals in today's briefing.";
+    case "politics":
+      return "No major politics signals in today's briefing.";
   }
-
-  if (categoryKey === "politics") {
-    return "No politics stories in today's briefing.";
-  }
-
-  return `No eligible ${label.toLowerCase()} events qualified in the current ranked briefing.`;
 }
 
 function getExclusionReason(event: HomepageEvent, categoryKey: HomepageCategoryKey) {
@@ -759,50 +802,6 @@ function dedupeStrings(values: string[]) {
 function countDuplicateSurfaceIds(ids: string[]) {
   const uniqueIds = new Set(ids);
   return ids.length - uniqueIds.size;
-}
-
-function allocateFallbackEvents(
-  categoryKey: HomepageCategoryKey,
-  confirmedEvents: HomepageEvent[],
-  earlySignals: HomepageEvent[],
-  reservedIds: Set<string>,
-  surfacedEvents: HomepageEvent[],
-) {
-  const rankedSelection = selectDistinctEvents(
-    confirmedEvents.filter(
-      (event) =>
-        event.classification.primaryCategory !== categoryKey && !reservedIds.has(event.id),
-    ),
-    surfacedEvents,
-    2,
-  );
-  const earlySelection =
-    rankedSelection.events.length < 2
-      ? selectDistinctEvents(
-          earlySignals.filter(
-            (event) =>
-              event.classification.primaryCategory !== categoryKey &&
-              !reservedIds.has(event.id) &&
-              !rankedSelection.events.some((rankedEvent) => rankedEvent.id === event.id),
-          ),
-          [...surfacedEvents, ...rankedSelection.events],
-          2 - rankedSelection.events.length,
-        )
-      : { events: [], suppressedCount: 0 };
-  const selected = [...rankedSelection.events, ...earlySelection.events];
-
-  if (!selected.length) {
-    return {
-      events: [],
-      suppressedCount: rankedSelection.suppressedCount + earlySelection.suppressedCount,
-    };
-  }
-
-  selected.forEach((event) => reservedIds.add(event.id));
-  return {
-    events: selected,
-    suppressedCount: rankedSelection.suppressedCount + earlySelection.suppressedCount,
-  };
 }
 
 function selectDistinctEvents(

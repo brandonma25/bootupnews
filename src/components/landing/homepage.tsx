@@ -374,7 +374,7 @@ function CategorySoftGate({
       <div className="flex items-start justify-between gap-4">
         <div className="max-w-xl">
           <p className="text-base font-semibold text-[var(--text-primary)]">
-            Create a free account to read Tech News, Finance and Politics
+            Create a free account to read Tech News, Economics, and Politics
           </p>
         </div>
         <Button
