@@ -1,4 +1,5 @@
 import type { CanonicalSourceMetadata } from "@/lib/integration/subsystem-contracts";
+import type { TldrDiscoveryMetadata } from "@/lib/tldr";
 
 export interface NormalizedArticle {
   id: string;
@@ -13,4 +14,5 @@ export interface NormalizedArticle {
   title_tokens: string[];
   content_tokens: string[];
   source_metadata?: CanonicalSourceMetadata;
+  discovery_metadata?: TldrDiscoveryMetadata;
 }

@@ -383,7 +383,6 @@ describe("getDashboardData fallback behavior", () => {
       "source-verge",
       "source-ars",
       "source-mit-tech-review",
-      "source-tldr-tech",
       "source-techcrunch",
       "source-ft",
       "source-reuters-business",

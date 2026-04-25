@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 
 import { env } from "@/lib/env";
+import { fetchTldrFeed, isTldrFeedUrl, type TldrDiscoveryMetadata } from "@/lib/tldr";
 import { stripHtml } from "@/lib/utils";
 
 export type FeedArticle = {
@@ -10,6 +11,8 @@ export type FeedArticle = {
   contentText?: string;
   sourceName: string;
   publishedAt: string;
+  stableId?: string;
+  discoveryMetadata?: TldrDiscoveryMetadata;
 };
 
 const parser = new Parser();
@@ -27,6 +30,10 @@ export async function fetchFeedArticles(
   sourceName: string,
   requestOptions: FeedRequestOptions = {},
 ) {
+  if (isTldrFeedUrl(feedUrl)) {
+    return fetchTldrFeed(feedUrl, sourceName, requestFeed);
+  }
+
   if (feedUrl.startsWith("thenewsapi://")) {
     return fetchApiArticles(feedUrl, sourceName, requestOptions);
   }
@@ -204,7 +211,7 @@ function similarity(left: string[], right: string[]) {
   return union === 0 ? 0 : overlap / union;
 }
 
-async function requestFeed(url: string, options: FeedRequestOptions, sourceName: string) {
+export async function requestFeed(url: string, options: FeedRequestOptions, sourceName: string) {
   const timeoutMs = options.timeoutMs ?? DEFAULT_FEED_TIMEOUT_MS;
   const retryCount = options.retryCount ?? DEFAULT_FEED_RETRY_COUNT;
   return fetchWithRetry(

@@ -16,6 +16,17 @@ describe("source catalog governance", () => {
     "politico-congress",
     "politico-defense",
   ];
+  const tldrCategoryIds = [
+    "tldr",
+    "tldr-ai",
+    "tldr-product",
+    "tldr-founders",
+    "tldr-design",
+    "tldr-fintech",
+    "tldr-it",
+    "tldr-crypto",
+    "tldr-marketing",
+  ];
 
   it("keeps BBC and CNBC out of the onboarding catalog", () => {
     const serialized = JSON.stringify(recommendedSources).toLowerCase();
@@ -68,6 +79,22 @@ describe("source catalog governance", () => {
     expect(source?.mvpDefaultAllowed).toBe(false);
     expect(source?.editorialPreference).toBe("none");
     expect(source?.lifecycleStatus).toBe("active_optional");
+  });
+
+  it("includes only validated official TLDR category feeds as paused non-default catalog options", () => {
+    const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
+
+    for (const sourceId of tldrCategoryIds) {
+      const source = sourcesById.get(sourceId);
+
+      expect(source).toBeDefined();
+      expect(source?.importStatus).toBe("ready");
+      expect(source?.validationStatus).toBe("validated");
+      expect(source?.mvpDefaultAllowed).toBe(false);
+      expect(source?.lifecycleStatus).toBe("active_optional");
+      expect(source?.feedUrl).toMatch(/^https:\/\/tldr\.tech\/api\/rss\//);
+      expect(source?.note).toContain("Paused by default");
+    }
   });
 
   it("catalogs politics RSS additions as optional non-default sources", () => {

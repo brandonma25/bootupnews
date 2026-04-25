@@ -184,13 +184,14 @@ async function fetchSourceWithAdapter(source: SourceDefinition) {
 
 function toRawItem(entry: Awaited<ReturnType<typeof fetchSourceWithAdapter>>[number]): RawItem {
   return {
-    id: stableId(entry.sourceDefinition.source, entry.article.url, entry.article.publishedAt),
+    id: entry.article.stableId ?? stableId(entry.sourceDefinition.source, entry.article.url, entry.article.publishedAt),
     source: entry.article.sourceName || entry.sourceDefinition.source,
     title: cleanText(entry.article.title),
     url: entry.article.url,
     published_at: entry.article.publishedAt,
     raw_content: cleanText(entry.article.contentText ?? entry.article.summaryText),
     source_metadata: entry.sourceMetadata,
+    discovery_metadata: entry.article.discoveryMetadata,
   };
 }
 

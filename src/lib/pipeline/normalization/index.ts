@@ -27,6 +27,7 @@ export function normalizeRawItems(items: RawItem[]): NormalizedArticle[] {
       title_tokens: tokenize(title),
       content_tokens: tokenize(content),
       source_metadata: item.source_metadata,
+      discovery_metadata: item.discovery_metadata,
     };
   });
 }

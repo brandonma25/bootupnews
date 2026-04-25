@@ -25,19 +25,28 @@ describe("MVP default source governance", () => {
     "guardian-world",
     "hacker-news-best",
   ];
+  const pausedTldrSourceIds = [
+    "source-tldr-tech",
+    "source-tldr-ai",
+    "source-tldr-product",
+    "source-tldr-founders",
+    "source-tldr-design",
+    "source-tldr-fintech",
+    "source-tldr-it",
+    "source-tldr-crypto",
+    "source-tldr-marketing",
+  ];
 
   it("declares the public MVP default source set explicitly", () => {
     expect(MVP_DEFAULT_PUBLIC_SOURCE_IDS).toEqual([
       "source-verge",
       "source-ars",
-      "source-tldr-tech",
       "source-techcrunch",
       "source-ft",
     ]);
     expect(getMvpDefaultPublicSources().map((source) => source.name)).toEqual([
       "The Verge",
       "Ars Technica",
-      "TLDR",
       "TechCrunch",
       "Financial Times",
     ]);
@@ -53,6 +62,22 @@ describe("MVP default source governance", () => {
     expect(defaultSourceIds.has("source-bbc-world")).toBe(false);
     expect(areMvpDefaultPublicSources(demoSources)).toBe(false);
     expect(recommendedSources.some((source) => source.lifecycleStatus === "active_default")).toBe(false);
+
+    for (const sourceId of pausedTldrSourceIds) {
+      expect(defaultSourceIds.has(sourceId)).toBe(false);
+    }
+  });
+
+  it("keeps all TLDR category sources paused and outside the public default set", () => {
+    const sourcesById = new Map(demoSources.map((source) => [source.id, source]));
+
+    for (const sourceId of pausedTldrSourceIds) {
+      const source = sourcesById.get(sourceId);
+
+      expect(source).toBeDefined();
+      expect(source?.status).toBe("paused");
+      expect(MVP_DEFAULT_PUBLIC_SOURCE_IDS).not.toContain(sourceId);
+    }
   });
 
   it("declares the donor fallback defaults explicitly", () => {

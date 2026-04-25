@@ -21,7 +21,7 @@ describe("public source manifest", () => {
     const sources = getSourcesForPublicSurface("public.home");
     const sourceIds = sources.map((source) => source.id);
 
-    expect(sources).toHaveLength(9);
+    expect(sources).toHaveLength(8);
     expect(sourceIds[2]).toBe("source-mit-tech-review");
     expect(sources.find((source) => source.id === "source-mit-tech-review")).toMatchObject({
       name: "MIT Technology Review",
@@ -30,7 +30,7 @@ describe("public source manifest", () => {
       topicName: "Tech",
       status: "active",
     });
-    expect(sourceIds[6]).toBe("source-reuters-business");
+    expect(sourceIds[5]).toBe("source-reuters-business");
     expect(sources.find((source) => source.id === "source-reuters-business")).toMatchObject({
       name: "Reuters Business",
       feedUrl: "https://feeds.reuters.com/reuters/businessNews",
@@ -39,7 +39,7 @@ describe("public source manifest", () => {
       status: "active",
     });
     expect(sourceIds).toContain("source-bbc-world");
-    expect(sourceIds[7]).toBe("source-bbc-world");
+    expect(sourceIds[6]).toBe("source-bbc-world");
     expect(sources.find((source) => source.id === "source-bbc-world")).toMatchObject({
       name: "BBC World News",
       feedUrl: "http://feeds.bbci.co.uk/news/world/rss.xml",
@@ -47,7 +47,7 @@ describe("public source manifest", () => {
       topicName: "World",
       status: "active",
     });
-    expect(sourceIds[8]).toBe("source-foreign-affairs");
+    expect(sourceIds[7]).toBe("source-foreign-affairs");
     expect(sources.find((source) => source.id === "source-foreign-affairs")).toMatchObject({
       name: "Foreign Affairs",
       feedUrl: "https://www.foreignaffairs.com/rss.xml",
@@ -70,7 +70,6 @@ describe("public source manifest", () => {
       "source-verge",
       "source-ars",
       "source-mit-tech-review",
-      "source-tldr-tech",
       "source-techcrunch",
       "source-ft",
       "source-reuters-business",
@@ -78,7 +77,6 @@ describe("public source manifest", () => {
       "source-foreign-affairs",
     ]);
     expect(sources.map((source) => source.topicName)).toEqual([
-      "Tech",
       "Tech",
       "Tech",
       "Tech",

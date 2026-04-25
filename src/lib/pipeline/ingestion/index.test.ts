@@ -89,7 +89,6 @@ describe("ingestRawItems", () => {
       mvp_default_public_source_ids: [
         "source-verge",
         "source-ars",
-        "source-tldr-tech",
         "source-techcrunch",
         "source-ft",
       ],
@@ -125,7 +124,6 @@ describe("ingestRawItems", () => {
     expect(result.source_resolution.resolved_runtime_source_ids).toEqual([
       "custom-source-verge",
       "custom-source-ars",
-      "custom-source-tldr-tech",
       "custom-source-techcrunch",
       "custom-source-ft",
     ]);
@@ -134,14 +132,12 @@ describe("ingestRawItems", () => {
     expect(result.sources.map((source) => source.sourceId)).toEqual([
       "custom-source-verge",
       "custom-source-ars",
-      "custom-source-tldr-tech",
       "custom-source-techcrunch",
       "custom-source-ft",
     ]);
     expect(result.sources.map((source) => source.source)).toEqual([
       "The Verge",
       "Ars Technica",
-      "TLDR",
       "TechCrunch",
       "Financial Times",
     ]);
@@ -214,7 +210,6 @@ describe("ingestRawItems", () => {
       mvp_default_public_source_ids: [
         "source-verge",
         "source-ars",
-        "source-tldr-tech",
         "source-techcrunch",
         "source-ft",
       ],
