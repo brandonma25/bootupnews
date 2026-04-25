@@ -1,8 +1,8 @@
 import LandingHomepage from "@/components/landing/homepage";
+import { getHomepagePageState } from "@/lib/data";
 import { isHomepageDebugConfigured } from "@/lib/env";
 import { applyHomepageEditorialOverridesToDashboardData } from "@/lib/homepage-editorial-overrides";
 import { buildHomepageViewModel } from "@/lib/homepage-model";
-import { getHomepagePageState } from "@/lib/homepage-read-model";
 import { formatHomeBriefingDateLabel } from "@/lib/utils";
 
 type PageProps = {

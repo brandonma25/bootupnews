@@ -123,6 +123,52 @@ type EventCluster = {
   sources: EventSeedArticle[];
 };
 
+type StoredBriefingItemRow = {
+  id: string;
+  topic_id: string | null;
+  topic_name: string | null;
+  title: string;
+  what_happened: string;
+  key_points: string[] | null;
+  why_it_matters: string;
+  sources: Array<{ title: string; url: string }> | null;
+  estimated_minutes: number | null;
+  priority: BriefingItem["priority"] | null;
+  is_read: boolean | null;
+};
+
+type StoredBriefingRow = {
+  id: string;
+  briefing_date: string;
+  title: string;
+  intro: string;
+  reading_window: string | null;
+  briefing_items: StoredBriefingItemRow[] | null;
+};
+
+type TopicRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  color: string;
+  keywords: string[] | null;
+  exclude_keywords: string[] | null;
+  created_at: string;
+};
+
+type SourceRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  feed_url: string;
+  homepage_url: string | null;
+  topic_id: string | null;
+  status: Source["status"];
+  created_at: string;
+  topics: Array<{ name: string | null }> | null;
+};
+
 type SourceFetchAttempt = {
   label: string;
   feedUrl: string;
@@ -168,6 +214,42 @@ const PIPELINE_TOPIC_ALIASES: Record<"tech" | "finance" | "politics", string[]> 
   politics: ["politics", "policy", "government", "geopolitics", "world"],
 };
 
+const BRIEFING_SELECT =
+  "id, briefing_date, title, intro, reading_window, briefing_items(id, topic_id, topic_name, title, what_happened, key_points, why_it_matters, sources, estimated_minutes, priority, is_read)";
+
+const DEMO_PUBLIC_FALLBACK_ITEMS: BriefingItem[] = [
+  {
+    id: "fallback-politics-1",
+    topicId: "topic-politics",
+    topicName: "Politics",
+    title: "The public politics briefing keeps a ready fallback card so homepage SSR stays stable when published signals are unavailable",
+    whatHappened:
+      "The homepage fallback keeps a politics rail populated from static safe content when the live published signal set is empty, avoiding a broken or under-filled public briefing.",
+    keyPoints: [
+      "This fallback activates only when no published live signal set is available for the public homepage.",
+      "The SSR path stays read-only and avoids feed parsing, ingestion, and runtime source activation.",
+      "The layout still preserves the signed-out homepage contract with a balanced cross-category briefing.",
+    ],
+    whyItMatters:
+      "This preserves the homepage reading experience during storage gaps or rollout transitions without pulling ingestion code back into the render path.",
+    sources: [
+      { title: "BBC World News", url: "https://www.bbc.com/news/world" },
+      { title: "Foreign Affairs", url: "https://www.foreignaffairs.com" },
+    ],
+    sourceCount: 2,
+    estimatedMinutes: 4,
+    read: false,
+    priority: "top",
+    matchedKeywords: ["politics", "world", "fallback"],
+    importanceScore: 70,
+    importanceLabel: "High",
+    rankingSignals: [
+      "Static fallback protects homepage availability.",
+      "Balanced public briefing keeps cross-category coverage visible.",
+    ],
+  },
+];
+
 type BriefingSummaryFields = Pick<
   BriefingItem,
   "title" | "whatHappened" | "keyPoints" | "whyItMatters" | "estimatedMinutes"
@@ -185,6 +267,11 @@ function createEmptyBriefing(): DailyBriefing {
     readingWindow: "0 minutes",
     items: [],
   };
+}
+
+async function loadPublishedSignalPostsSafely() {
+  const { getPublishedSignalPosts } = await import("@/lib/signals-editorial");
+  return getPublishedSignalPosts();
 }
 
 type RequestAuthState = {
@@ -228,6 +315,327 @@ function buildViewerAccount(user: Awaited<ReturnType<typeof safeGetUser>>["user"
         : typeof user.user_metadata?.picture === "string"
           ? user.user_metadata.picture
           : null,
+  };
+}
+
+function mapStoredBriefingItem(row: StoredBriefingItemRow): BriefingItem {
+  const normalizedKeyPoints = Array.isArray(row.key_points)
+    ? row.key_points.filter((point): point is string => typeof point === "string").slice(0, 3)
+    : [];
+  const normalizedSources = Array.isArray(row.sources)
+    ? row.sources.filter((source): source is { title: string; url: string } => Boolean(source?.title && source?.url))
+    : [];
+  while (normalizedKeyPoints.length < 3) {
+    normalizedKeyPoints.push("");
+  }
+
+  return {
+    id: row.id,
+    topicId: row.topic_id ?? "topic-tech",
+    topicName: row.topic_name ?? "Tech",
+    title: row.title,
+    whatHappened: row.what_happened,
+    keyPoints: [normalizedKeyPoints[0], normalizedKeyPoints[1], normalizedKeyPoints[2]],
+    whyItMatters: row.why_it_matters,
+    sources: normalizedSources,
+    sourceCount: normalizedSources.length,
+    estimatedMinutes: row.estimated_minutes ?? 3,
+    read: Boolean(row.is_read),
+    priority: row.priority === "top" ? "top" : "normal",
+    matchedKeywords: [],
+    rankingSignals: [],
+  };
+}
+
+function mapStoredBriefing(row: StoredBriefingRow): DailyBriefing {
+  const items = (row.briefing_items ?? [])
+    .map(mapStoredBriefingItem)
+    .sort((left, right) => {
+      if (left.priority !== right.priority) {
+        return left.priority === "top" ? -1 : 1;
+      }
+
+      return left.title.localeCompare(right.title);
+    });
+
+  return {
+    id: row.id,
+    briefingDate: row.briefing_date,
+    title: row.title,
+    intro: row.intro,
+    readingWindow: deriveReadingWindow(
+      items.map((item) => item.estimatedMinutes),
+      row.reading_window ?? "",
+    ),
+    items,
+  };
+}
+
+function inferTopicName(tags: string[]) {
+  const normalizedTags = tags.map((tag) => tag.trim().toLowerCase());
+
+  if (
+    normalizedTags.some((tag) =>
+      ["finance", "economics", "economy", "markets", "macro", "business"].includes(tag),
+    )
+  ) {
+    return "Finance";
+  }
+
+  if (
+    normalizedTags.some((tag) =>
+      ["politics", "policy", "world", "geopolitics", "government"].includes(tag),
+    )
+  ) {
+    return "Politics";
+  }
+
+  return "Tech";
+}
+
+function getTopicId(topicName: string) {
+  switch (topicName) {
+    case "Finance":
+      return "topic-finance";
+    case "Politics":
+      return "topic-politics";
+    default:
+      return "topic-tech";
+  }
+}
+
+type PublishedSignalPost = Awaited<ReturnType<typeof loadPublishedSignalPostsSafely>>[number];
+
+function buildPublishedSignalKeyPoints(post: PublishedSignalPost): [string, string, string] {
+  const sourcePoint = post.sourceName
+    ? `Lead coverage is anchored by ${post.sourceName}.`
+    : "Lead coverage is anchored by the published signal set.";
+  const rankPoint = `Published as live signal #${post.rank} for the homepage briefing.`;
+  const summaryPoint = post.summary || post.selectionReason || post.publishedWhyItMatters || "";
+
+  return [sourcePoint, rankPoint, summaryPoint];
+}
+
+function mapPublishedSignalPostToBriefingItem(post: PublishedSignalPost): BriefingItem {
+  const topicName = inferTopicName(post.tags);
+
+  return {
+    id: post.id,
+    topicId: getTopicId(topicName),
+    topicName,
+    title: post.title,
+    whatHappened: post.summary || post.selectionReason || post.publishedWhyItMatters || "",
+    keyPoints: buildPublishedSignalKeyPoints(post),
+    whyItMatters: post.publishedWhyItMatters || "",
+    publishedWhyItMatters: post.publishedWhyItMatters || "",
+    editorialWhyItMatters: post.publishedWhyItMattersStructured,
+    publishedWhyItMattersStructured: post.publishedWhyItMattersStructured,
+    editorialStatus: "published",
+    sources: post.sourceUrl ? [{ title: post.sourceName || "Source", url: post.sourceUrl }] : [],
+    sourceCount: post.sourceUrl ? 1 : 0,
+    estimatedMinutes: 4,
+    read: false,
+    priority: post.rank <= 5 ? "top" : "normal",
+    matchedKeywords: post.tags,
+    importanceScore: post.signalScore ?? undefined,
+    importanceLabel: getImportanceLabel(post.signalScore ?? undefined),
+    rankingSignals: [post.selectionReason].filter(Boolean),
+  };
+}
+
+function buildReadOnlyHomepageDiagnostics(
+  sources: Source[],
+  itemCount: number,
+): DashboardData["homepageDiagnostics"] {
+  return {
+    totalArticlesFetched: null,
+    totalCandidateEvents: itemCount,
+    failedSourceCount: 0,
+    fallbackSourceCount: 0,
+    degradedSourceNames: [],
+    sourceCountsByCategory: countSourcesByHomepageCategory(sources),
+  };
+}
+
+function normalizeCalendarSafeBriefingDate(dateKey: string) {
+  return `${dateKey}T12:00:00`;
+}
+
+function buildDemoHomepageData(): DashboardData {
+  const sources = getSourcesForPublicSurface("public.home");
+  const items = [...demoDashboardData.briefing.items, ...DEMO_PUBLIC_FALLBACK_ITEMS].slice(0, 5);
+  const briefingDate = normalizeCalendarSafeBriefingDate(
+    getBriefingDateKey(demoDashboardData.briefing.briefingDate),
+  );
+
+  return {
+    ...demoDashboardData,
+    mode: "public",
+    briefing: {
+      ...demoDashboardData.briefing,
+      briefingDate,
+      readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
+      items,
+    },
+    topics: demoTopics,
+    sources,
+    publicRankedItems: items,
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, items.length),
+  };
+}
+
+async function buildPublicHomepageData(): Promise<DashboardData> {
+  const publishedSignals = await loadPublishedSignalPostsSafely();
+  const sources = getSourcesForPublicSurface("public.home");
+
+  if (publishedSignals.length === 0) {
+    return buildDemoHomepageData();
+  }
+
+  const firstBriefingDate = publishedSignals[0]?.briefingDate;
+  const briefingDateKey =
+    firstBriefingDate && /^\d{4}-\d{2}-\d{2}$/.test(firstBriefingDate)
+      ? firstBriefingDate
+      : getBriefingDateKey(formatISO(new Date()));
+  const briefingDate = normalizeCalendarSafeBriefingDate(briefingDateKey);
+  const items = publishedSignals.map(mapPublishedSignalPostToBriefingItem);
+
+  return {
+    mode: "public",
+    briefing: {
+      id: `published-homepage-${getBriefingDateKey(briefingDate)}`,
+      briefingDate,
+      title: "Daily Executive Briefing",
+      intro:
+        "The homepage renders from the published live signal set instead of triggering feed ingestion during SSR.",
+      readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
+      items,
+    },
+    topics: demoTopics,
+    sources,
+    publicRankedItems: items,
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, items.length),
+  };
+}
+
+async function loadUserTopics(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  userId: string,
+) {
+  const result = await supabase
+    .from("topics")
+    .select("id, user_id, name, description, color, keywords, exclude_keywords, created_at")
+    .eq("user_id", userId)
+    .order("name");
+
+  if (result.error) {
+    logServerEvent("warn", "Homepage topic query failed", {
+      route: "/",
+      userId,
+      errorMessage: result.error.message,
+    });
+    return [] as Topic[];
+  }
+
+  return ((result.data ?? []) as unknown as TopicRow[]).map((topic) => ({
+    id: topic.id,
+    userId: topic.user_id,
+    name: topic.name,
+    description: topic.description,
+    color: topic.color,
+    keywords: topic.keywords ?? [],
+    excludeKeywords: topic.exclude_keywords ?? [],
+    createdAt: topic.created_at,
+  }));
+}
+
+async function loadUserSources(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  userId: string,
+) {
+  const result = await supabase
+    .from("sources")
+    .select("id, user_id, name, feed_url, homepage_url, topic_id, status, created_at, topics(name)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (result.error) {
+    logServerEvent("warn", "Homepage source query failed", {
+      route: "/",
+      userId,
+      errorMessage: result.error.message,
+    });
+    return [] as Source[];
+  }
+
+  return ((result.data ?? []) as unknown as SourceRow[]).map((source) => ({
+    id: source.id,
+    userId: source.user_id,
+    name: source.name,
+    feedUrl: source.feed_url,
+    homepageUrl: source.homepage_url ?? undefined,
+    topicId: source.topic_id ?? undefined,
+    topicName: Array.isArray(source.topics) ? source.topics[0]?.name ?? undefined : undefined,
+    status: source.status,
+    createdAt: source.created_at,
+  }));
+}
+
+async function loadStoredBriefings(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  userId: string,
+  limit: number,
+  route: string,
+) {
+  const result = await supabase
+    .from("daily_briefings")
+    .select(BRIEFING_SELECT)
+    .eq("user_id", userId)
+    .order("briefing_date", { ascending: false })
+    .limit(limit);
+
+  if (result.error) {
+    logServerEvent("warn", "Stored briefing query failed", {
+      route,
+      userId,
+      errorMessage: result.error.message,
+    });
+    return [] as DailyBriefing[];
+  }
+
+  return ((result.data ?? []) as unknown as StoredBriefingRow[]).map(mapStoredBriefing);
+}
+
+async function buildSignedInHomepageData(authState: RequestAuthState): Promise<DashboardData> {
+  if (!authState.supabase || !authState.user) {
+    return buildPublicHomepageData();
+  }
+
+  const [topics, sources, briefings] = await Promise.all([
+    loadUserTopics(authState.supabase, authState.user.id),
+    loadUserSources(authState.supabase, authState.user.id),
+    loadStoredBriefings(authState.supabase, authState.user.id, 1, authState.route),
+  ]);
+  const latestBriefing = briefings[0];
+
+  if (!latestBriefing) {
+    const publicData = await buildPublicHomepageData();
+    return {
+      ...publicData,
+      mode: "live",
+      topics,
+      sources,
+      homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, publicData.briefing.items.length),
+    };
+  }
+
+  return {
+    mode: "live",
+    briefing: latestBriefing,
+    topics,
+    sources,
+    publicRankedItems: latestBriefing.items,
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, latestBriefing.items.length),
   };
 }
 
@@ -455,6 +863,24 @@ export async function getDashboardData(
   };
 }
 
+export async function getHomepagePageState(route = "/"): Promise<{
+  data: DashboardData;
+  viewer: ViewerAccount | null;
+}> {
+  const authState = await getRequestAuthState(route);
+
+  // Keep homepage SSR on persisted read models only. Do not route this page
+  // through the ingestion pipeline or feed parser import chain.
+  const data = authState.user
+    ? await buildSignedInHomepageData(authState)
+    : await buildPublicHomepageData();
+
+  return {
+    data,
+    viewer: authState.viewer,
+  };
+}
+
 export async function getDashboardPageState(route: string): Promise<{
   data: DashboardData;
   viewer: ViewerAccount | null;
@@ -675,63 +1101,7 @@ export async function getHistory(
     return [];
   }
 
-  const historyResult = await withServerFallback(
-    "history query",
-    async () =>
-      supabase
-        .from("daily_briefings")
-        .select("id, briefing_date, title, intro, reading_window, briefing_items(id, topic_id, topic_name, title, what_happened, key_points, why_it_matters, sources, estimated_minutes, priority, is_read)")
-        .eq("user_id", user.id)
-        .order("briefing_date", { ascending: false })
-        .limit(14),
-    null,
-    { route: resolvedAuthState.route, userId: user.id },
-  );
-
-  if (!historyResult || historyResult.error) {
-    logServerEvent("warn", "History data unavailable", {
-      route: resolvedAuthState.route,
-      userId: user.id,
-      errorMessage: historyResult?.error?.message ?? "history query failed",
-    });
-    return [];
-  }
-
-  const { data } = historyResult;
-
-  if (!data?.length) return [];
-
-  return data.map(
-    (briefing): DailyBriefing => ({
-      id: briefing.id,
-      briefingDate: briefing.briefing_date,
-      title: briefing.title,
-      intro: briefing.intro,
-      items:
-        briefing.briefing_items?.map((item) => ({
-          id: item.id,
-          topicId: item.topic_id,
-          topicName: item.topic_name,
-          title: item.title,
-          whatHappened: item.what_happened,
-          keyPoints: item.key_points as [string, string, string],
-          whyItMatters: item.why_it_matters,
-          sources: (item.sources as Array<{ title: string; url: string }>) ?? [],
-          sourceCount: ((item.sources as Array<{ title: string; url: string }>) ?? []).length,
-          estimatedMinutes: item.estimated_minutes,
-          read: item.is_read,
-          priority: item.priority,
-          matchedKeywords: extractMatchedKeywords(item.key_points as string[]),
-          importanceScore: undefined,
-          importanceLabel: undefined,
-          rankingSignals: [],
-        })) ?? [],
-      readingWindow: deriveReadingWindow(
-        briefing.briefing_items?.map((item) => item.estimated_minutes) ?? [],
-        briefing.reading_window,
-      ),
-    }),
-  );
+  return loadStoredBriefings(supabase, user.id, 14, resolvedAuthState.route);
 }
 
 export async function getHistoryPageState(route = "/history") {
@@ -755,25 +1125,21 @@ export async function getBriefingDetailPageState(dateKey: string, route = `/brie
 }> {
   const authState = await getRequestAuthState(route);
 
-  const [data, viewer] = await Promise.all([
-    getDashboardData(route, authState),
-    getViewerAccount(route, authState),
-  ]);
-
-  const currentBriefingMatches = getBriefingDateKey(data.briefing.briefingDate) === dateKey;
-  let briefing: DailyBriefing | null = currentBriefingMatches ? data.briefing : null;
+  const data = authState.user
+    ? await buildSignedInHomepageData(authState)
+    : await buildPublicHomepageData();
+  let briefing: DailyBriefing | null =
+    getBriefingDateKey(data.briefing.briefingDate) === dateKey ? data.briefing : null;
 
   if (authState.supabase && authState.user) {
-    const history = await getHistory(route, authState);
-    briefing =
-      history.find((candidate) => getBriefingDateKey(candidate.briefingDate) === dateKey) ??
-      briefing;
+    const history = await loadStoredBriefings(authState.supabase, authState.user.id, 14, route);
+    briefing = history.find((candidate) => getBriefingDateKey(candidate.briefingDate) === dateKey) ?? null;
   }
 
   return {
     data: briefing ? { ...data, briefing } : data,
     briefing,
-    viewer,
+    viewer: authState.viewer,
   };
 }
 
@@ -2326,16 +2692,6 @@ function jaccardSimilarity(left: string[], right: string[]) {
   const overlap = [...leftSet].filter((word) => rightSet.has(word)).length;
   const union = new Set([...leftSet, ...rightSet]).size;
   return union === 0 ? 0 : overlap / union;
-}
-
-function extractMatchedKeywords(keyPoints: string[]) {
-  const matchedOn = keyPoints.find((point) => point.startsWith("Matched on:"));
-  if (!matchedOn) return [];
-  return matchedOn
-    .replace(/^Matched on:\s*/i, "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
 }
 
 function formatPublishedLabel(value: string | null) {

@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { BriefingDetailView } from "@/components/briefing/BriefingDetailView";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { getBriefingDetailPageState } from "@/lib/homepage-read-model";
+import { getBriefingDetailPageState } from "@/lib/data";
 import { isValidBriefingDateKey } from "@/lib/utils";
 
 export const metadata: Metadata = {

@@ -17,12 +17,12 @@
 - The public homepage path also generated a live briefing during SSR instead of reading persisted data, so `/` remained coupled to ingestion behavior.
 
 ## Fix Applied
-- Added a homepage-safe read model in `src/lib/homepage-read-model.ts` that reads only:
-  - published `signal_posts` for signed-out public homepage content
+- Moved the homepage-safe read path into existing shared modules so the hotfix remains remediation rather than net-new feature surface.
+- `src/lib/data.ts` now exposes SSR-safe homepage/history/detail readers that use only:
+  - published `signal_posts` for the signed-out homepage
   - persisted `daily_briefings` and `briefing_items` for signed-in homepage/history/detail reads
   - static demo fallback content when no published signal set is available
-- Added `src/lib/published-signals.ts` so public routes can read published editorial rows without importing editorial generation code.
-- Switched `/`, `/history`, `/briefing/[date]`, and `/signals` to the SSR-safe read path.
+- Switched `/`, `/history`, `/briefing/[date]`, and `/signals` to the SSR-safe read path, with `/signals` using the existing editorial published-post reader.
 - Hardened `src/lib/data.ts` with lazy imports for pipeline and RSS helpers so query-only routes that still import `data.ts` do not pull the feed parser into module initialization.
 - Preserved ingestion in explicit generation and editorial workflows only.
 
@@ -33,8 +33,6 @@
 - `src/app/signals/page.tsx`
 - `src/app/page.test.tsx`
 - `src/app/signals/page.test.tsx`
-- `src/lib/homepage-read-model.ts`
-- `src/lib/published-signals.ts`
 - `src/lib/data.ts`
 
 ## Validation

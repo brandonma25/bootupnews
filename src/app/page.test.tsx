@@ -32,7 +32,7 @@ const homepageViewModel = {
 const buildHomepageViewModel = vi.fn(() => homepageViewModel);
 const applyHomepageEditorialOverridesToDashboardData = vi.fn(async (data: unknown) => data);
 
-vi.mock("@/lib/homepage-read-model", () => ({
+vi.mock("@/lib/data", () => ({
   getHomepagePageState,
 }));
 

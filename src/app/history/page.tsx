@@ -9,8 +9,8 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { getHistoryPageState } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/env";
-import { getHistoryPageState } from "@/lib/homepage-read-model";
 import { getBriefingDateKey } from "@/lib/utils";
 
 export const metadata: Metadata = {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getPublishedSignalPosts = vi.fn();
 
-vi.mock("@/lib/published-signals", () => {
+vi.mock("@/lib/signals-editorial", () => {
   return {
     getPublishedSignalPosts,
   };

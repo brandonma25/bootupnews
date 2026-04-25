@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
-import { getPublishedSignalPosts } from "@/lib/published-signals";
+import { getPublishedSignalPosts } from "@/lib/signals-editorial";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
