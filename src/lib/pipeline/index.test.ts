@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { seedRawItems } from "@/lib/pipeline/ingestion/seed-items";
 import { runClusterFirstPipeline } from "@/lib/pipeline";
+import type { Source } from "@/lib/types";
 
 vi.mock("@/lib/rss", () => ({
   fetchFeedArticles: vi.fn(async () => {
@@ -56,5 +57,90 @@ describe("runClusterFirstPipeline", () => {
     expect(lead?.short_summary.split(".").length).toBeGreaterThanOrEqual(2);
     expect(lead?.source_links.length).toBeGreaterThan(0);
     expect(lead?.topic_keywords.length).toBeGreaterThan(0);
+  });
+
+  it("continues clustering and ranking when one politics source fails", async () => {
+    const rssModule = await import("@/lib/rss");
+    const fetchFeedArticlesMock = vi.mocked(rssModule.fetchFeedArticles);
+    const politicsSources: Source[] = [
+      {
+        id: "source-ap-politics",
+        name: "AP Politics",
+        feedUrl: "https://apnews.com/politics.rss",
+        homepageUrl: "https://apnews.com/politics",
+        topicName: "Politics",
+        status: "active",
+      },
+      {
+        id: "source-politico-politics",
+        name: "Politico Politics News",
+        feedUrl: "https://rss.politico.com/politics-news.xml",
+        homepageUrl: "https://www.politico.com/news/politics-policy",
+        topicName: "Politics",
+        status: "active",
+      },
+      {
+        id: "source-politico-congress",
+        name: "Politico Congress",
+        feedUrl: "https://rss.politico.com/congress.xml",
+        homepageUrl: "https://www.politico.com/congress",
+        topicName: "Politics",
+        status: "active",
+      },
+    ];
+
+    fetchFeedArticlesMock.mockImplementation(async (feedUrl, sourceName) => {
+      if (feedUrl.includes("politics-news")) {
+        throw new Error("temporary politco outage");
+      }
+
+      return [
+        {
+          title: `${sourceName} lead story`,
+          url: `${feedUrl}/lead-story`,
+          summaryText: `${sourceName} summary`,
+          contentText: `${sourceName} content about congress and policy`,
+          sourceName,
+          publishedAt: "2026-04-25T08:00:00.000Z",
+        },
+        {
+          title: `${sourceName} follow-up`,
+          url: `${feedUrl}/follow-up`,
+          summaryText: `${sourceName} follow-up summary`,
+          contentText: `${sourceName} follow-up content about defense and legislation`,
+          sourceName,
+          publishedAt: "2026-04-25T07:00:00.000Z",
+        },
+      ];
+    });
+
+    const result = await runClusterFirstPipeline({ sources: politicsSources });
+
+    expect(result.run.used_seed_fallback).toBe(false);
+    expect(result.run.feed_failures).toHaveLength(1);
+    expect(result.run.feed_failures[0]).toMatchObject({
+      source: "Politico Politics News",
+    });
+    expect(result.run.num_raw_items).toBe(4);
+    expect(result.run.num_after_dedup).toBeGreaterThan(0);
+    expect(result.run.num_clusters).toBeGreaterThan(0);
+    expect(result.ranked_clusters.length).toBeGreaterThan(0);
+    expect(result.digest.most_important_now.length).toBeGreaterThan(0);
+    expect(result.run.source_contributions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "AP Politics",
+          item_count: 2,
+        }),
+        expect.objectContaining({
+          source: "Politico Politics News",
+          item_count: 0,
+        }),
+        expect.objectContaining({
+          source: "Politico Congress",
+          item_count: 2,
+        }),
+      ]),
+    );
   });
 });

@@ -40,18 +40,55 @@ type IngestionResult = {
   }>;
 };
 
+function classifyCustomSourceTopic(topicName?: string) {
+  const normalized = topicName?.trim().toLowerCase();
+
+  if (normalized === "finance") {
+    return {
+      topic: "Finance" as const,
+      credibility: 80,
+      reliability: 0.8,
+      sourceClass: "business_press" as const,
+      trustTier: "tier_2" as const,
+      provenance: "specialist_analysis" as const,
+    };
+  }
+
+  if (normalized === "world" || normalized === "geopolitics" || normalized === "politics") {
+    return {
+      topic: "World" as const,
+      credibility: 82,
+      reliability: 0.82,
+      sourceClass: "general_newswire" as const,
+      trustTier: "tier_2" as const,
+      provenance: "primary_reporting" as const,
+    };
+  }
+
+  return {
+    topic: "Tech" as const,
+    credibility: 76,
+    reliability: 0.76,
+    sourceClass: "specialist_press" as const,
+    trustTier: "tier_2" as const,
+    provenance: "specialist_analysis" as const,
+  };
+}
+
 function buildCustomSourceDefinition(source: Source): SourceDefinition {
+  const metadata = classifyCustomSourceTopic(source.topicName);
+
   return {
     sourceId: `custom-${source.id}`,
     donor: "openclaw",
     source: source.name,
     homepageUrl: source.homepageUrl ?? source.feedUrl,
-    topic: source.topicName === "Finance" ? "Finance" : source.topicName === "World" ? "World" : "Tech",
-    credibility: source.topicName === "Finance" ? 80 : 76,
-    reliability: source.topicName === "Finance" ? 0.8 : 0.76,
-    sourceClass: source.topicName === "Finance" ? "business_press" : "specialist_press",
-    trustTier: source.topicName === "Finance" ? "tier_2" : "tier_2",
-    provenance: "specialist_analysis",
+    topic: metadata.topic,
+    credibility: metadata.credibility,
+    reliability: metadata.reliability,
+    sourceClass: metadata.sourceClass,
+    trustTier: metadata.trustTier,
+    provenance: metadata.provenance,
     status: source.status === "active" ? "active" : "inactive",
     availability: "custom",
     fetch: {

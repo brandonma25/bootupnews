@@ -12,6 +12,9 @@ describe("source catalog governance", () => {
     "foreign-policy",
     "guardian-world",
     "hacker-news-best",
+    "politico-politics-news",
+    "politico-congress",
+    "politico-defense",
   ];
 
   it("keeps BBC and CNBC out of the onboarding catalog", () => {
@@ -65,6 +68,52 @@ describe("source catalog governance", () => {
     expect(source?.mvpDefaultAllowed).toBe(false);
     expect(source?.editorialPreference).toBe("none");
     expect(source?.lifecycleStatus).toBe("active_optional");
+  });
+
+  it("catalogs politics RSS additions as optional non-default sources", () => {
+    const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
+
+    expect(sourcesById.get("ap-politics")).toMatchObject({
+      sourceFormat: "rss",
+      importStatus: "manual",
+      lifecycleStatus: "catalog_only",
+      validationStatus: "failed",
+      topicLabel: "Politics",
+    });
+    expect(sourcesById.get("politico-politics-news")).toMatchObject({
+      sourceFormat: "rss",
+      importStatus: "ready",
+      lifecycleStatus: "active_optional",
+      validationStatus: "validated",
+      topicLabel: "Politics",
+    });
+    expect(sourcesById.get("politico-congress")).toMatchObject({
+      sourceFormat: "rss",
+      importStatus: "ready",
+      lifecycleStatus: "active_optional",
+      validationStatus: "validated",
+      topicLabel: "Politics",
+    });
+    expect(sourcesById.get("politico-defense")).toMatchObject({
+      sourceFormat: "rss",
+      importStatus: "ready",
+      lifecycleStatus: "active_optional",
+      validationStatus: "validated",
+      topicLabel: "Politics",
+    });
+  });
+
+  it("keeps Congress.gov cataloged without runtime ingestion support", () => {
+    const source = recommendedSources.find((entry) => entry.id === "congress-gov-api");
+
+    expect(source).toMatchObject({
+      sourceFormat: "api",
+      importStatus: "manual",
+      lifecycleStatus: "catalog_only",
+      validationStatus: "requires_key",
+      topicLabel: "Politics",
+    });
+    expect(source?.feedUrl).toBeUndefined();
   });
 
   it("does not duplicate existing or failed batch-one candidates", () => {

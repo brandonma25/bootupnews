@@ -36,6 +36,35 @@ function createUserSuppliedSources(count: number): Source[] {
   });
 }
 
+function createPoliticsSources(): Source[] {
+  return [
+    {
+      id: "source-politico-politics",
+      name: "Politico Politics News",
+      feedUrl: "https://rss.politico.com/politics-news.xml",
+      homepageUrl: "https://www.politico.com/news/politics-policy",
+      topicName: "Politics",
+      status: "active",
+    },
+    {
+      id: "source-politico-congress",
+      name: "Politico Congress",
+      feedUrl: "https://rss.politico.com/congress.xml",
+      homepageUrl: "https://www.politico.com/congress",
+      topicName: "Politics",
+      status: "active",
+    },
+    {
+      id: "source-politico-defense",
+      name: "Politico Defense",
+      feedUrl: "https://rss.politico.com/defense.xml",
+      homepageUrl: "https://www.politico.com/defense",
+      topicName: "Politics",
+      status: "active",
+    },
+  ];
+}
+
 describe("ingestRawItems", () => {
   it("preserves canonical source metadata for donor-backed sources", async () => {
     const result = await ingestRawItems();
@@ -163,6 +192,18 @@ describe("ingestRawItems", () => {
       "custom-user-source-2",
       "custom-user-source-3",
     ]);
+  });
+
+  it("maps supplied politics sources into the World canonical topic metadata", async () => {
+    const result = await ingestRawItems({ sources: createPoliticsSources() });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-source-politico-politics",
+      "custom-source-politico-congress",
+      "custom-source-politico-defense",
+    ]);
+    expect(result.sources.map((source) => source.topic)).toEqual(["World", "World", "World"]);
+    expect(result.sources.map((source) => source.sourceClass)).toEqual(["general_newswire", "general_newswire", "general_newswire"]);
   });
 
   it("exposes an ID-only no-argument source-resolution audit snapshot without fetching feeds", () => {

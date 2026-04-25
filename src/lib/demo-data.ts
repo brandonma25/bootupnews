@@ -135,6 +135,33 @@ export const demoSources: Source[] = [
     topicName: "Geopolitics",
     status: "active",
   },
+  {
+    id: "source-politico-politics",
+    name: "Politico Politics News",
+    feedUrl: "https://rss.politico.com/politics-news.xml",
+    homepageUrl: "https://www.politico.com/news/politics-policy",
+    topicId: "topic-politics",
+    topicName: "Politics",
+    status: "active",
+  },
+  {
+    id: "source-politico-congress",
+    name: "Politico Congress",
+    feedUrl: "https://rss.politico.com/congress.xml",
+    homepageUrl: "https://www.politico.com/congress",
+    topicId: "topic-politics",
+    topicName: "Politics",
+    status: "active",
+  },
+  {
+    id: "source-politico-defense",
+    name: "Politico Defense",
+    feedUrl: "https://rss.politico.com/defense.xml",
+    homepageUrl: "https://www.politico.com/defense",
+    topicId: "topic-politics",
+    topicName: "Politics",
+    status: "active",
+  },
   ...(env.newsApiKey
     ? ([
         {
