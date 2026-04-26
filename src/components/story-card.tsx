@@ -9,6 +9,10 @@ import { buildTrustLayerPresentation } from "@/lib/why-it-matters";
 import { cn } from "@/lib/utils";
 import { minutesToLabel } from "@/lib/utils";
 
+/**
+ * Renders the MVP BriefingItem Card payload. StoryCard is a presentation
+ * boundary and does not define canonical Signal identity.
+ */
 export function StoryCard({ item }: { item: BriefingItem }) {
   const primarySourceUrl = item.sources.find((source) => isValidStoryUrl(source.url))?.url;
   const sourceCount = item.sourceCount ?? item.sources.length;

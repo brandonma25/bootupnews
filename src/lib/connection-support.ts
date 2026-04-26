@@ -4,7 +4,7 @@ import type {
   ConnectionLayerPacket,
   RankingDebug,
 } from "@/lib/integration/subsystem-contracts";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { EventIntelligence } from "@/lib/types";
 
 type AssembleConnectionOptions = {
@@ -13,7 +13,7 @@ type AssembleConnectionOptions = {
   sourceCount: number;
   signalRole: "core" | "context" | "watch";
   rankingDebug?: RankingDebug;
-  cluster?: SignalCluster;
+  cluster?: StoryCluster;
 };
 
 function buildFallbackConnectionPacket(input: ConnectionEvidenceInput): ConnectionLayerPacket {

@@ -50,6 +50,9 @@ const TOP_SIGNAL_SET_SIZE = 5;
 
 type EditorialClient = NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
 
+// Operational contract: signal_posts is Surface Placement + Card copy/public
+// read model storage. It must not be treated as canonical Signal identity.
+// See docs/engineering/SIGNAL_POSTS_OPERATIONAL_CONTRACT.md.
 type StoredSignalPost = {
   id: string;
   briefing_date: string | null;
@@ -221,6 +224,9 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
   };
 }
 
+// Converts MVP BriefingItem view-models into signal_posts placement candidates.
+// The persisted rows are editorial/public placement rows, not durable Signal
+// history or Phase 2 progression identity.
 function mapBriefingItemToSignalPost(item: BriefingItem, index: number): EditorialSignalPost {
   const leadSource = item.sources[0] ?? item.relatedArticles?.[0];
   const tags = [

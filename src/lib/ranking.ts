@@ -7,24 +7,31 @@ type ArticleCluster = {
   sources: FeedArticle[];
 };
 
-export type RankedCluster = ArticleCluster & {
+export type RankedArticleCluster = ArticleCluster & {
   importanceScore: number;
   importanceLabel: "Critical" | "High" | "Watch";
+  // Legacy display evidence labels for BriefingItem cards, not canonical Signal objects.
   rankingSignals: string[];
   eventIntelligence: EventIntelligence;
 };
 
+/**
+ * @deprecated Use RankedArticleCluster. This legacy path ranks Article Cluster
+ * evidence for BriefingItem display and does not create canonical Signal identity.
+ */
+export type RankedCluster = RankedArticleCluster;
+
 export function rankNewsClusters(
   topicName: string,
   clusters: ArticleCluster[],
-): RankedCluster[] {
+): RankedArticleCluster[] {
   return clusters
     .map((cluster) => rankCluster(topicName, cluster))
     .filter((cluster) => cluster.eventIntelligence.isHighSignal)
     .sort(compareRankedClusters);
 }
 
-function rankCluster(topicName: string, cluster: ArticleCluster): RankedCluster {
+function rankCluster(topicName: string, cluster: ArticleCluster): RankedArticleCluster {
   const eventIntelligence = buildEventIntelligence(cluster.sources, {
     topicName,
     createdAt: cluster.representative.publishedAt,
@@ -52,7 +59,7 @@ function rankCluster(topicName: string, cluster: ArticleCluster): RankedCluster 
   };
 }
 
-export function compareRankedClusters(left: RankedCluster, right: RankedCluster) {
+export function compareRankedClusters(left: RankedArticleCluster, right: RankedArticleCluster) {
   const scoreDelta = right.eventIntelligence.rankingScore - left.eventIntelligence.rankingScore;
   if (scoreDelta !== 0) {
     return scoreDelta;
@@ -136,6 +143,8 @@ export function getBriefingRankSnapshot(item: BriefingItem): BriefingRankSnapsho
   };
 }
 
+// Returns Card display labels derived from ranking evidence, not canonical
+// Signal objects.
 export function buildRankingDisplaySignals(item: BriefingItem) {
   const intelligence = item.eventIntelligence;
   const articleCount =

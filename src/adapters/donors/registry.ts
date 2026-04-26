@@ -26,7 +26,7 @@ import type {
   SimilaritySignals,
   SourceDefinition,
 } from "@/lib/integration/subsystem-contracts";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
 import {
   computeTimeProximityScore,
@@ -609,7 +609,7 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
     getKnownSources() {
       return knownSources;
     },
-    mapClusterToRankingFeatures(cluster: SignalCluster) {
+    mapClusterToRankingFeatures(cluster: StoryCluster) {
       const matches = cluster.articles
         .map((article) => sourceIndex.get(article.source.toLowerCase()))
         .filter((entry): entry is CanonicalSourceMetadata => Boolean(entry));

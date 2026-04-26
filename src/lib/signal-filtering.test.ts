@@ -5,11 +5,11 @@ import {
   classifyEventType,
   classifyHeadlineQuality,
   classifySourceTier,
-  evaluateSignalCandidate,
-  type SignalFilterCandidate,
+  evaluateArticleFilterCandidate,
+  type ArticleFilterCandidate,
 } from "@/lib/signal-filtering";
 
-function createCandidate(overrides: Partial<SignalFilterCandidate> = {}): SignalFilterCandidate {
+function createCandidate(overrides: Partial<ArticleFilterCandidate> = {}): ArticleFilterCandidate {
   return {
     id: overrides.id ?? "article-1",
     title: overrides.title ?? "Reuters reports Fed signals new tariff policy on chip imports",
@@ -86,7 +86,7 @@ describe("signal filtering", () => {
   });
 
   it("passes a tier1 strong allowed event with explicit reasons", () => {
-    const evaluation = evaluateSignalCandidate(
+    const evaluation = evaluateArticleFilterCandidate(
       createCandidate({
         title: "Reuters says White House orders new chip export restrictions",
       }),
@@ -98,7 +98,7 @@ describe("signal filtering", () => {
   });
 
   it("rejects low-tier weak filler", () => {
-    const evaluation = evaluateSignalCandidate(
+    const evaluation = evaluateArticleFilterCandidate(
       createCandidate({
         sourceName: "GDELT Finance Monitor",
         url: "https://www.gdeltproject.org/story",

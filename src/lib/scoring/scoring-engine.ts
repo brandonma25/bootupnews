@@ -8,16 +8,22 @@ import type {
   RankingDebug,
   RankingFeatureSet,
 } from "@/lib/integration/subsystem-contracts";
-import type { RankedSignal } from "@/lib/models/ranked-signal";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { RankedStoryCluster } from "@/lib/models/ranked-signal";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { ClusterScoreLog } from "@/lib/observability/pipeline-run";
 import { clipSentence, tokenize } from "@/lib/pipeline/shared/text";
 
-export type RankedClusterResult = {
-  ranked: RankedSignal;
-  cluster: SignalCluster;
+export type RankedStoryClusterResult = {
+  ranked: RankedStoryCluster;
+  cluster: StoryCluster;
   scoringLog: ClusterScoreLog;
 };
+
+/**
+ * @deprecated Use RankedStoryClusterResult. This result is ranked Story Cluster
+ * evidence, not canonical Signal identity.
+ */
+export type RankedClusterResult = RankedStoryClusterResult;
 
 const FEATURE_WEIGHTS = {
   credibility: 0.3,
@@ -78,7 +84,7 @@ function getSourceCredibilityMap() {
   };
 }
 
-function getBaseCredibilitySignals(cluster: SignalCluster) {
+function getBaseCredibilityScores(cluster: StoryCluster) {
   const sourceCredibilityMap = getSourceCredibilityMap();
 
   return cluster.articles.map((article) => {
@@ -91,7 +97,7 @@ function getBaseCredibilitySignals(cluster: SignalCluster) {
   });
 }
 
-function getNoveltyScore(cluster: SignalCluster, allClusters: SignalCluster[]) {
+function getNoveltyScore(cluster: StoryCluster, allClusters: StoryCluster[]) {
   const globalKeywordFrequency = new Map<string, number>();
 
   allClusters.forEach((entry) => {
@@ -104,7 +110,7 @@ function getNoveltyScore(cluster: SignalCluster, allClusters: SignalCluster[]) {
   return clamp(45 + scarceKeywords * 9 + cluster.topic_keywords.length * 2, 0, 100);
 }
 
-function getUrgencyScore(cluster: SignalCluster) {
+function getUrgencyScore(cluster: StoryCluster) {
   const freshestMs = new Date(cluster.representative_article.published_at).getTime();
   const ageHours = Math.max(0, (Date.now() - freshestMs) / (1000 * 60 * 60));
   const urgencyTokens = tokenize(
@@ -117,8 +123,8 @@ function getUrgencyScore(cluster: SignalCluster) {
   return clamp(92 - ageHours * 6 + urgencyKeywordHits * 4, 12, 100);
 }
 
-function getFallbackFeatureSet(cluster: SignalCluster, allClusters: SignalCluster[]): RankingFeatureSet {
-  const baseCredibility = average(getBaseCredibilitySignals(cluster));
+function getFallbackFeatureSet(cluster: StoryCluster, allClusters: StoryCluster[]): RankingFeatureSet {
+  const baseCredibility = average(getBaseCredibilityScores(cluster));
   const sourceConfirmation = clamp(new Set(cluster.articles.map((article) => article.source)).size * 24, 0, 100);
   const trustTier = average(
     cluster.articles.map((article) => {
@@ -156,7 +162,7 @@ function getFallbackFeatureSet(cluster: SignalCluster, allClusters: SignalCluste
   };
 }
 
-function buildRankingFeatureSet(cluster: SignalCluster, allClusters: SignalCluster[]) {
+function buildRankingFeatureSet(cluster: StoryCluster, allClusters: StoryCluster[]) {
   const baseFeatures = getFallbackFeatureSet(cluster, allClusters);
   const providers = getRankingFeatureProviders();
   const provider = providers[0];
@@ -232,7 +238,7 @@ function buildGroupedScores(features: RankingFeatureSet) {
   };
 }
 
-function buildBaseScore(scoreBreakdown: RankedSignal["score_breakdown"]) {
+function buildBaseScore(scoreBreakdown: RankedStoryCluster["score_breakdown"]) {
   return Number(
     (
       FEATURE_WEIGHTS.credibility * scoreBreakdown.credibility +
@@ -346,7 +352,7 @@ function buildRankingExplanation(
 
 function getDiversityAdjustments(
   rankedEntries: Array<{
-    cluster: SignalCluster;
+    cluster: StoryCluster;
     features: RankingFeatureSet;
     baseScore: number;
   }>,
@@ -371,7 +377,7 @@ function getDiversityAdjustments(
   };
 }
 
-export function rankSignalClusters(clusters: SignalCluster[]): RankedClusterResult[] {
+export function rankStoryClusters(clusters: StoryCluster[]): RankedStoryClusterResult[] {
   const scored = clusters.map((cluster) => {
     const featureResult = buildRankingFeatureSet(cluster, clusters);
     const scoreBreakdown = buildScoreBreakdown(featureResult.features);
@@ -458,3 +464,9 @@ export function rankSignalClusters(clusters: SignalCluster[]): RankedClusterResu
       return right.cluster.cluster_size - left.cluster.cluster_size;
     });
 }
+
+/**
+ * @deprecated Use rankStoryClusters. This ranks Story Cluster evidence keyed by
+ * cluster_id; it does not create canonical Signal identity.
+ */
+export const rankSignalClusters = rankStoryClusters;

@@ -6,7 +6,7 @@ import type {
   RankingFeatureSet,
   TrustLayerDebug,
 } from "@/lib/integration/subsystem-contracts";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import { classifyBriefingSignalRole } from "@/lib/output-sanity";
 import type { EventIntelligence } from "@/lib/types";
 import { clipSentence } from "@/lib/pipeline/shared/text";
@@ -21,7 +21,7 @@ type AssembleExplanationOptions = {
   rankingExplanation?: string;
   rankingSignals?: string[];
   rankingDebug?: RankingDebug;
-  cluster?: SignalCluster;
+  cluster?: StoryCluster;
 };
 
 const MATERIAL_FEATURE_LABELS: Array<{
@@ -39,7 +39,7 @@ const MATERIAL_FEATURE_LABELS: Array<{
   { key: "urgency", minScore: 72 },
 ];
 
-function getStrongestTrustTier(cluster?: SignalCluster): "tier_1" | "tier_2" | "tier_3" | "unknown" {
+function getStrongestTrustTier(cluster?: StoryCluster): "tier_1" | "tier_2" | "tier_3" | "unknown" {
   if (!cluster) {
     return "unknown";
   }
