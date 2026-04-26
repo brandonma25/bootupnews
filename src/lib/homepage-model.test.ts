@@ -1058,6 +1058,101 @@ describe("buildHomepageViewModel", () => {
     expect(new Set(visibleTopEventIds)).toEqual(new Set(items.map((item) => item.id)));
   });
 
+  it("keeps distinct published editorial signals visible when tags only contain generic categories and roles", () => {
+    const items = [
+      createItem({
+        id: "published-tech-1",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Google will invest as much as $40 billion in Anthropic",
+        matchedKeywords: ["Tech", "context", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "Ars Technica", url: "https://arstechnica.com/ai/google-anthropic" }],
+        priority: "top",
+        importanceScore: 61,
+      }),
+      createItem({
+        id: "published-tech-2",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Cohere acquires German startup to create transatlantic AI powerhouse",
+        matchedKeywords: ["Tech", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "TechCrunch", url: "https://techcrunch.com/cohere-acquisition" }],
+        priority: "top",
+        importanceScore: 53,
+      }),
+      createItem({
+        id: "published-finance-1",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "The golden age of arbitrage has begun",
+        matchedKeywords: ["Finance", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "Financial Times", url: "https://www.ft.com/arbitrage" }],
+        priority: "top",
+        importanceScore: 46,
+      }),
+      createItem({
+        id: "published-finance-2",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Cloudflare Agents Week reshapes the clip economy",
+        matchedKeywords: ["Finance", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "TLDR", url: "https://tldr.tech/tech/2026-04-24" }],
+        priority: "top",
+        importanceScore: 45,
+      }),
+      createItem({
+        id: "published-politics-1",
+        topicId: "politics",
+        topicName: "Politics",
+        title: "The narrow path to a US-Iran deal",
+        matchedKeywords: ["Politics", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "Financial Times", url: "https://www.ft.com/us-iran-deal" }],
+        priority: "top",
+        importanceScore: 49,
+      }),
+    ];
+
+    const model = buildHomepageViewModel(createData(items));
+    const visibleTopEventIds = [model.featured, ...model.topRanked]
+      .filter((event): event is NonNullable<typeof event> => Boolean(event))
+      .map((event) => event.id);
+
+    expect(visibleTopEventIds).toHaveLength(5);
+    expect(new Set(visibleTopEventIds)).toEqual(new Set(items.map((item) => item.id)));
+    expect(model.debug.semanticDuplicateSuppressedCount).toBe(0);
+  });
+
+  it("filters the editorial Top 5 into category tabs when no broader ranked depth pool exists", () => {
+    const items = [
+      createItem({ id: "published-tech-1", topicId: "tech", topicName: "Tech", title: "AI infrastructure deal expands", matchedKeywords: ["Tech", "watch"], sourceCount: 1 }),
+      createItem({ id: "published-tech-2", topicId: "tech", topicName: "Tech", title: "Enterprise AI merger closes", matchedKeywords: ["Tech", "context"], sourceCount: 1 }),
+      createItem({ id: "published-finance-1", topicId: "finance", topicName: "Finance", title: "Arbitrage spreads widen", matchedKeywords: ["Finance", "watch"], sourceCount: 1 }),
+      createItem({ id: "published-finance-2", topicId: "finance", topicName: "Finance", title: "Credit market repricing accelerates", matchedKeywords: ["Finance", "watch"], sourceCount: 1 }),
+      createItem({ id: "published-politics-1", topicId: "politics", topicName: "Politics", title: "US Iran diplomacy narrows", matchedKeywords: ["Politics", "watch"], sourceCount: 1 }),
+    ];
+
+    const model = buildHomepageViewModel(createData(items));
+
+    expect(model.categorySections.find((section) => section.key === "tech")?.events.map((event) => event.id)).toEqual([
+      "published-tech-1",
+      "published-tech-2",
+    ]);
+    expect(model.categorySections.find((section) => section.key === "finance")?.events.map((event) => event.id)).toEqual([
+      "published-finance-1",
+      "published-finance-2",
+    ]);
+    expect(model.categorySections.find((section) => section.key === "politics")?.events.map((event) => event.id)).toEqual([
+      "published-politics-1",
+    ]);
+    expect(Object.values(model.categoryPreviewEvents).flat()).toHaveLength(0);
+    expect(model.developingNowEvents).toHaveLength(0);
+  });
+
   it("does not fabricate the 3-card minimum when fewer pipeline-selected Top Events exist", () => {
     const items = [
       createItem({

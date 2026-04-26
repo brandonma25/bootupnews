@@ -1,0 +1,24 @@
+# Tracker Sync Fallback — Homepage Tabs + Signal Count Regression
+
+- Date: 2026-04-26
+- Change type: Bug fix
+- Branch: `bugfix/homepage-tabs-signal-regression`
+- Suggested tracker destination: Intake Queue, unless an existing governed bug-fix row already owns homepage signal-count/tab regressions.
+- Suggested status: In Review
+- PRD file: none
+- Bug report: `docs/engineering/bug-fixes/homepage-tabs-signal-regression-politics-tldr.md`
+- Summary: Fix homepage suppression that reduced published Top 5 signals to 3 cards and left category tabs empty when no broader read-only depth pool exists.
+- Validation so far:
+  - `npm install`
+  - `npm run test -- src/lib/homepage-model.test.ts`
+  - `npm run test -- src/lib/homepage-model.test.ts src/lib/source-catalog.test.ts src/lib/source-defaults.test.ts src/lib/source-manifest.test.ts src/lib/pipeline/ingestion/index.test.ts src/lib/pipeline/ingestion/tldr.integration.test.ts src/lib/tldr.test.ts src/lib/rss.test.ts src/lib/signals-editorial.test.ts src/components/home/home-category-components.test.tsx src/components/home/CategoryPreviewGrid.test.tsx`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium`
+  - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=webkit`
+  - Local route probes for `/`, `/signals`, and `/dashboard/signals/editorial-review` returned `200`
+- Notes:
+  - No canonical PRD was created because this is regression repair.
+  - No database migration is required.
+  - No politics or TLDR ingestion activation/removal was performed.

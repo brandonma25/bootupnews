@@ -119,11 +119,36 @@ export type HomepageViewModel = {
 
 const TOP_EVENTS_LIMIT = 4;
 const MIN_PUBLIC_TOP_EVENTS = 3;
+const EDITORIAL_SIGNAL_SET_SIZE = 5;
 const CATEGORY_TAB_LIMIT = 6;
 const DEVELOPING_NOW_EVENT_LIMIT = 10;
 const CATEGORY_PREVIEW_LIMIT = 3;
 const TRENDING_EVENT_LIMIT = 3;
 const EARLY_SIGNAL_LIMIT = 3;
+const GENERIC_SEMANTIC_SIGNALS = new Set([
+  "core",
+  "critical",
+  "developing",
+  "economic",
+  "economics",
+  "finance",
+  "financial",
+  "geopolitics",
+  "government",
+  "high",
+  "live",
+  "normal",
+  "policy",
+  "politics",
+  "published",
+  "signal",
+  "signals",
+  "tech",
+  "technology",
+  "top",
+  "watch",
+  "world",
+]);
 const SEMANTIC_STOPWORDS = new Set([
   "a",
   "an",
@@ -165,6 +190,10 @@ export function buildHomepageViewModel(
   const confirmedTopLayerEvents = topLayerEvents.filter((event) => !event.intelligence.isEarlySignal);
   const confirmedDepthLayerEvents = depthLayerEvents.filter((event) => !event.intelligence.isEarlySignal);
   const earlySignals = depthLayerEvents.filter((event) => event.intelligence.isEarlySignal);
+  const topLayerEventIds = new Set(topLayerEvents.map((event) => event.id));
+  const depthLayerHasDistinctEvents = depthLayerEvents.some((event) => !topLayerEventIds.has(event.id));
+  const shouldFilterTabsFromTopLayer =
+    !depthLayerHasDistinctEvents && topLayerEvents.length === EDITORIAL_SIGNAL_SET_SIZE;
   const featured = topLayerEvents[0] ?? null;
   const featuredContext = featured ? [featured] : [];
   const confirmedTopRankedCandidates = confirmedTopLayerEvents.filter((event) => event.id !== featured?.id);
@@ -195,17 +224,20 @@ export function buildHomepageViewModel(
     ...volumeLayers.developingNow,
     ...Object.values(volumeLayers.categoryPreviews).flat(),
   ];
-  const excludedCategoryTabIds = new Set(surfacedEvents.map((event) => event.id));
+  const categoryTabSourceEvents = shouldFilterTabsFromTopLayer ? topLayerEvents : depthLayerEvents;
+  const excludedCategoryTabIds = new Set(
+    shouldFilterTabsFromTopLayer ? [] : surfacedEvents.map((event) => event.id),
+  );
   const categorySections = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
     const sectionSelection = selectCategoryTabEvents({
-      rankedEvents: depthLayerEvents,
+      rankedEvents: categoryTabSourceEvents,
       category: category.key,
       excludedEventIds: excludedCategoryTabIds,
       limit: CATEGORY_TAB_LIMIT,
     });
     semanticDuplicateSuppressedCount += sectionSelection.suppressedCount;
     const displayEvents = sectionSelection.events;
-    const eligibleEvents = depthLayerEvents.filter(
+    const eligibleEvents = categoryTabSourceEvents.filter(
       (event) => event.classification.primaryCategory === category.key,
     );
     const heldBackEvents = eligibleEvents.filter(
@@ -220,6 +252,7 @@ export function buildHomepageViewModel(
     const emptyReason = getCategoryTabEmptyReason(category.key);
     const excludedReasons = [
       ...depthLayerEvents
+        .filter((event) => !shouldFilterTabsFromTopLayer || !displayEvents.some((displayEvent) => displayEvent.id === event.id))
         .filter((event) => event.classification.primaryCategory !== category.key)
         .map((event) => getExclusionReason(event, category.key)),
       ...eligibleEvents
@@ -878,8 +911,14 @@ function isSemanticDuplicate(left: HomepageEvent, right: HomepageEvent) {
   const leftTitleTokens = normalizeSemanticTokens(left.title);
   const rightTitleTokens = normalizeSemanticTokens(right.title);
   const titleSimilarity = jaccard(leftTitleTokens, rightTitleTokens);
-  const entityOverlap = overlapCount(left.intelligence.keyEntities, right.intelligence.keyEntities);
-  const keywordOverlap = overlapCount(left.matchedKeywords, right.matchedKeywords);
+  const entityOverlap = overlapCount(
+    getSpecificSemanticSignals(left.intelligence.keyEntities),
+    getSpecificSemanticSignals(right.intelligence.keyEntities),
+  );
+  const keywordOverlap = overlapCount(
+    getSpecificSemanticSignals(left.matchedKeywords),
+    getSpecificSemanticSignals(right.matchedKeywords),
+  );
 
   if (titleSimilarity >= 0.7) {
     return true;
@@ -902,10 +941,21 @@ function buildSemanticFingerprint(
   classification: HomepageCategoryClassification,
 ) {
   const categoryKey = classification.primaryCategory ?? item.topicName.toLowerCase();
-  const dominantEntity = normalizeSemanticTokens(intelligence.keyEntities[0] ?? "").join("-");
+  const dominantEntity = normalizeSemanticTokens(getSpecificSemanticSignals(intelligence.keyEntities)[0] ?? "").join("-");
   const titleStem = normalizeSemanticTokens(item.title).slice(0, 4).join("-");
 
   return [categoryKey, dominantEntity, titleStem].filter(Boolean).join(":");
+}
+
+function getSpecificSemanticSignals(values: string[]) {
+  return values.filter((value) => {
+    const normalized = normalizeSemanticSignal(value);
+    return normalized && !GENERIC_SEMANTIC_SIGNALS.has(normalized);
+  });
+}
+
+function normalizeSemanticSignal(value: string) {
+  return normalizeSemanticTokens(value).join(" ");
 }
 
 function normalizeSemanticTokens(value: string) {
