@@ -9,6 +9,8 @@
   - Ignore generic category/status terms when comparing semantic entity and keyword overlap.
   - Preserve distinct published Top 5 signal cards even when their tags are generic editorial labels.
   - When the homepage has exactly the editorial Top 5 and no broader ranked depth pool, use that real published Top 5 as the source for category tab filtering.
+  - Follow-up correction: category tabs now prefer real non-Top category depth from `publicRankedItems` before falling back to Top 5 classification.
+  - Published live homepage snapshots now preserve up to 20 published live rows as read-only `depthPosts` for tabs/depth modules while keeping the public `/signals` surface capped to the current Top 5.
   - Keep Developing Now and By Category depth modules empty in that no-depth-pool case instead of duplicating Top Events as fresh additional intelligence.
 - Related PRD: existing homepage category/depth behavior is governed by `docs/product/prd/prd-46-home-category-tabs.md` and `docs/product/prd/prd-57-homepage-volume-layers.md`; no new canonical PRD is required.
 
@@ -22,6 +24,9 @@
   - `npm run build`
   - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium`
   - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=webkit`
+- Follow-up targeted checks:
+  - `npm run test -- src/lib/homepage-model.test.ts src/lib/data.test.ts src/lib/signals-editorial.test.ts`
+  - Added regression coverage for non-Top category depth, Top 5-only fallback, generic editorial tags, and broader published live snapshot depth.
 - Local route/browser checks:
   - Local URL: `http://localhost:3000`
   - `HEAD /`, `HEAD /signals`, and `HEAD /dashboard/signals/editorial-review` returned `200`

@@ -678,6 +678,10 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const items = homepageSignalSnapshot.posts.map((post) =>
     mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source),
   );
+  const depthItems = (homepageSignalSnapshot.depthPosts?.length
+    ? homepageSignalSnapshot.depthPosts
+    : homepageSignalSnapshot.posts
+  ).map((post) => mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source));
   const intro =
     homepageSignalSnapshot.source === "published_live"
       ? "The homepage renders from the published live signal set instead of triggering feed ingestion during SSR."
@@ -695,8 +699,8 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
     },
     topics: demoTopics,
     sources,
-    publicRankedItems: items,
-    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, items.length),
+    publicRankedItems: depthItems,
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, depthItems.length),
   };
 }
 

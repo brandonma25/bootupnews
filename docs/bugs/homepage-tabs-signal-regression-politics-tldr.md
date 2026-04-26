@@ -14,10 +14,15 @@
 - `/` loads the same published rows, maps them into `BriefingItem` records, and then applies homepage semantic duplicate suppression plus category/depth exclusion.
 - Generic editorial tags and display entities such as `Tech`, `Finance`, `Politics`, `context`, and `Watch` were being treated as story identity signals. Distinct published items in the same category were suppressed as semantic duplicates.
 - The read-only homepage SSR path set `publicRankedItems` to the same 5 published signal posts. Category tabs then excluded already-surfaced Top Events, leaving no separate depth pool for tab content.
+- Follow-up finding: PR #114 fixed the empty-tab case by globally falling back to classifying the Top 5 whenever the depth pool did not contain distinct IDs. That fallback was correct for a pure Top 5-only read model, but the tab model needed a narrower precedence rule: use real non-Top category depth first, and only classify the Top 5 when no broader category-eligible tab pool exists.
 
 ## Files Changed
 - `src/lib/homepage-model.ts`
 - `src/lib/homepage-model.test.ts`
+- `src/lib/data.ts`
+- `src/lib/data.test.ts`
+- `src/lib/signals-editorial.ts`
+- `src/lib/signals-editorial.test.ts`
 - `docs/bugs/homepage-tabs-signal-regression-politics-tldr.md`
 - `docs/engineering/bug-fixes/homepage-tabs-signal-regression-politics-tldr.md`
 - `docs/operations/tracker-sync/2026-04-26-homepage-tabs-signal-regression-politics-tldr.md`
@@ -43,6 +48,11 @@
   - fallback content remained explicitly labeled as placeholder/non-live copy
 - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium`
 - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=webkit`
+- Follow-up targeted regression coverage:
+  - homepage model uses non-homepage category depth when a broader ranked pool exists
+  - homepage model classifies Top 5 into tabs only when no broader tab pool exists
+  - published live signal snapshots preserve additional published rows for homepage depth while `/signals` remains capped to Top 5
+  - public homepage data maps snapshot `depthPosts` into `publicRankedItems`
 
 ## Production / Preview Risk
 - No schema or database migration is required.

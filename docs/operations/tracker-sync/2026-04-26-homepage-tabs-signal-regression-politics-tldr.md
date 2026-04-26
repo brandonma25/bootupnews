@@ -7,7 +7,7 @@
 - Suggested status: In Review
 - PRD file: none
 - Bug report: `docs/engineering/bug-fixes/homepage-tabs-signal-regression-politics-tldr.md`
-- Summary: Fix homepage suppression that reduced published Top 5 signals to 3 cards and left category tabs empty when no broader read-only depth pool exists.
+- Summary: Fix homepage suppression that reduced published Top 5 signals to 3 cards, restore category tabs, and preserve non-Top category depth when a broader published/read-only pool exists.
 - Validation so far:
   - `npm install`
   - `npm run test -- src/lib/homepage-model.test.ts`
@@ -18,7 +18,9 @@
   - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium`
   - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=webkit`
   - Local route probes for `/`, `/signals`, and `/dashboard/signals/editorial-review` returned `200`
+  - Follow-up targeted regression check: `npm run test -- src/lib/homepage-model.test.ts src/lib/data.test.ts src/lib/signals-editorial.test.ts`
 - Notes:
   - No canonical PRD was created because this is regression repair.
   - No database migration is required.
   - No politics or TLDR ingestion activation/removal was performed.
+  - Follow-up correction keeps `/signals` capped to Top 5 while allowing the homepage read model to use additional published live snapshot rows as depth when present.

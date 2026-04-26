@@ -800,9 +800,9 @@ describe("LandingHomepage", () => {
 
     expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
     expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("Open source database maintainers ship a query planner update");
     expect(techPanel).toHaveTextContent("Cloud security teams automate secrets rotation across edge workloads");
     expect(screen.queryByText("Cloud providers expand AI capacity plans")).not.toBeInTheDocument();
-    expect(techPanel).not.toHaveTextContent("Open source database maintainers ship a query planner update");
     expect(techPanel).not.toHaveTextContent("No major technology signals in today's briefing.");
   });
 

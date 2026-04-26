@@ -190,10 +190,6 @@ export function buildHomepageViewModel(
   const confirmedTopLayerEvents = topLayerEvents.filter((event) => !event.intelligence.isEarlySignal);
   const confirmedDepthLayerEvents = depthLayerEvents.filter((event) => !event.intelligence.isEarlySignal);
   const earlySignals = depthLayerEvents.filter((event) => event.intelligence.isEarlySignal);
-  const topLayerEventIds = new Set(topLayerEvents.map((event) => event.id));
-  const depthLayerHasDistinctEvents = depthLayerEvents.some((event) => !topLayerEventIds.has(event.id));
-  const shouldFilterTabsFromTopLayer =
-    !depthLayerHasDistinctEvents && topLayerEvents.length === EDITORIAL_SIGNAL_SET_SIZE;
   const featured = topLayerEvents[0] ?? null;
   const featuredContext = featured ? [featured] : [];
   const confirmedTopRankedCandidates = confirmedTopLayerEvents.filter((event) => event.id !== featured?.id);
@@ -215,19 +211,15 @@ export function buildHomepageViewModel(
   const topSignalEventIds = new Set(
     [featured, ...topRanked].filter((event): event is HomepageEvent => Boolean(event)).map((event) => event.id),
   );
-  const volumeLayers = buildVolumeLayersViewModel(depthLayerEvents, topSignalEventIds);
   let semanticDuplicateSuppressedCount = topRankedSelection.suppressedCount;
   const visibleSelectionAdjustmentsCount = topRankedSelection.adjustmentsCount;
-  const surfacedEvents = [
-    ...featuredContext,
-    ...topRanked,
-    ...volumeLayers.developingNow,
-    ...Object.values(volumeLayers.categoryPreviews).flat(),
-  ];
-  const categoryTabSourceEvents = shouldFilterTabsFromTopLayer ? topLayerEvents : depthLayerEvents;
-  const excludedCategoryTabIds = new Set(
-    shouldFilterTabsFromTopLayer ? [] : surfacedEvents.map((event) => event.id),
-  );
+  const categoryTabPool = resolveCategoryTabPool({
+    topLayerEvents,
+    depthLayerEvents,
+    topSignalEventIds,
+  });
+  const categoryTabSourceEvents = categoryTabPool.sourceEvents;
+  const excludedCategoryTabIds = new Set(categoryTabPool.initialExcludedEventIds);
   const categorySections = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
     const sectionSelection = selectCategoryTabEvents({
       rankedEvents: categoryTabSourceEvents,
@@ -245,14 +237,13 @@ export function buildHomepageViewModel(
     );
 
     displayEvents.forEach((event) => {
-      surfacedEvents.push(event);
       excludedCategoryTabIds.add(event.id);
     });
 
     const emptyReason = getCategoryTabEmptyReason(category.key);
     const excludedReasons = [
       ...depthLayerEvents
-        .filter((event) => !shouldFilterTabsFromTopLayer || !displayEvents.some((displayEvent) => displayEvent.id === event.id))
+        .filter((event) => !categoryTabPool.usesTopLayerFallback || !displayEvents.some((displayEvent) => displayEvent.id === event.id))
         .filter((event) => event.classification.primaryCategory !== category.key)
         .map((event) => getExclusionReason(event, category.key)),
       ...eligibleEvents
@@ -287,6 +278,20 @@ export function buildHomepageViewModel(
       excludedReasons: dedupeStrings(excludedReasons).slice(0, 6),
     } satisfies HomepageCategorySection;
   });
+  const categoryTabEventIds = new Set(
+    categorySections.flatMap((section) => section.events.map((event) => event.id)),
+  );
+  const volumeLayers = buildVolumeLayersViewModel(
+    depthLayerEvents,
+    new Set([...topSignalEventIds, ...categoryTabEventIds]),
+  );
+  const surfacedEvents = [
+    ...featuredContext,
+    ...topRanked,
+    ...categorySections.flatMap((section) => section.events),
+    ...volumeLayers.developingNow,
+    ...Object.values(volumeLayers.categoryPreviews).flat(),
+  ];
 
   const reservedIds = new Set([
     ...topRanked.map((event) => event.id),
@@ -509,6 +514,28 @@ export function selectCategoryPreviewEvents(
       return right.rankScore - left.rankScore;
     })
     .slice(0, limit);
+}
+
+function resolveCategoryTabPool({
+  topLayerEvents,
+  depthLayerEvents,
+  topSignalEventIds,
+}: {
+  topLayerEvents: HomepageEvent[];
+  depthLayerEvents: HomepageEvent[];
+  topSignalEventIds: Set<string>;
+}) {
+  const nonTopCategoryDepthEvents = depthLayerEvents.filter(
+    (event) => Boolean(event.classification.primaryCategory) && !topSignalEventIds.has(event.id),
+  );
+  const usesTopLayerFallback =
+    nonTopCategoryDepthEvents.length === 0 && topLayerEvents.length === EDITORIAL_SIGNAL_SET_SIZE;
+
+  return {
+    sourceEvents: usesTopLayerFallback ? topLayerEvents : depthLayerEvents,
+    initialExcludedEventIds: usesTopLayerFallback ? [] : Array.from(topSignalEventIds),
+    usesTopLayerFallback,
+  };
 }
 
 export function selectCategoryTabEvents({

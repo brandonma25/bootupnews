@@ -45,6 +45,7 @@ const SIGNAL_POST_SELECT = [
 ].join(", ");
 
 const EDITORIAL_PAGE_SIZE = 20;
+const PUBLIC_SIGNAL_DEPTH_LIMIT = 20;
 
 type EditorialClient = NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
 
@@ -168,6 +169,7 @@ export type SignalSnapshotPersistenceResult = {
 export type HomepageSignalSnapshot = {
   source: "published_live" | "latest_snapshot" | "none";
   posts: EditorialSignalPost[];
+  depthPosts: EditorialSignalPost[];
   briefingDate: string | null;
 };
 
@@ -1243,7 +1245,7 @@ export async function publishSignalPost(input: {
   };
 }
 
-export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> {
+async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalPost[]> {
   const supabase = createSupabaseServiceRoleClient();
 
   if (!supabase) {
@@ -1256,7 +1258,7 @@ export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> 
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .order("rank", { ascending: true })
-    .limit(5);
+    .limit(limit);
 
   if (result.error) {
     logServerEvent("warn", "Published signal posts could not be loaded", {
@@ -1268,17 +1270,22 @@ export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> 
 
   return ((result.data ?? []) as unknown as StoredSignalPost[])
     .map(mapStoredSignalPost)
-    .filter((post) => normalizeEditorialText(post.publishedWhyItMatters))
-    .slice(0, 5);
+    .filter((post) => normalizeEditorialText(post.publishedWhyItMatters));
+}
+
+export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> {
+  return (await loadPublishedSignalPosts(5)).slice(0, 5);
 }
 
 export async function getHomepageSignalSnapshot(): Promise<HomepageSignalSnapshot> {
-  const publishedPosts = await getPublishedSignalPosts();
+  const publishedDepthPosts = await loadPublishedSignalPosts(PUBLIC_SIGNAL_DEPTH_LIMIT);
+  const publishedPosts = publishedDepthPosts.slice(0, 5);
 
   if (publishedPosts.length > 0) {
     return {
       source: "published_live",
       posts: publishedPosts,
+      depthPosts: publishedDepthPosts,
       briefingDate: publishedPosts[0]?.briefingDate ?? null,
     };
   }
@@ -1289,6 +1296,7 @@ export async function getHomepageSignalSnapshot(): Promise<HomepageSignalSnapsho
     return {
       source: "none",
       posts: [],
+      depthPosts: [],
       briefingDate: null,
     };
   }
@@ -1304,6 +1312,7 @@ export async function getHomepageSignalSnapshot(): Promise<HomepageSignalSnapsho
     return {
       source: "none",
       posts: [],
+      depthPosts: [],
       briefingDate: null,
     };
   }
@@ -1312,6 +1321,7 @@ export async function getHomepageSignalSnapshot(): Promise<HomepageSignalSnapsho
     return {
       source: "none",
       posts: [],
+      depthPosts: [],
       briefingDate: null,
     };
   }
@@ -1322,6 +1332,7 @@ export async function getHomepageSignalSnapshot(): Promise<HomepageSignalSnapsho
     return {
       source: "none",
       posts: [],
+      depthPosts: [],
       briefingDate: latest.latestBriefingDate,
     };
   }
@@ -1329,6 +1340,7 @@ export async function getHomepageSignalSnapshot(): Promise<HomepageSignalSnapsho
   return {
     source: "latest_snapshot",
     posts,
+    depthPosts: posts,
     briefingDate: latest.latestBriefingDate,
   };
 }

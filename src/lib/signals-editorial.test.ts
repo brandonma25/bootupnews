@@ -771,6 +771,35 @@ describe("signals editorial workflow", () => {
     expect(posts.map((post) => post.id)).toEqual(["live-1", "live-2"]);
   });
 
+  it("keeps a broader published live pool for homepage tab depth", async () => {
+    const rows = Array.from({ length: 7 }, (_, index) =>
+      createRow({
+        id: `live-${index + 1}`,
+        rank: index + 1,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: `Live published ${index + 1}`,
+        is_live: true,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { getHomepageSignalSnapshot } = await loadEditorialModule();
+    const snapshot = await getHomepageSignalSnapshot();
+
+    expect(snapshot.source).toBe("published_live");
+    expect(snapshot.posts.map((post) => post.id)).toEqual(["live-1", "live-2", "live-3", "live-4", "live-5"]);
+    expect(snapshot.depthPosts.map((post) => post.id)).toEqual([
+      "live-1",
+      "live-2",
+      "live-3",
+      "live-4",
+      "live-5",
+      "live-6",
+      "live-7",
+    ]);
+  });
+
   it("falls back to the latest stored snapshot for homepage SSR when no live published set exists", async () => {
     const rows = [
       createRow({
@@ -806,5 +835,6 @@ describe("signals editorial workflow", () => {
     expect(snapshot.source).toBe("latest_snapshot");
     expect(snapshot.briefingDate).toBe("2026-04-25");
     expect(snapshot.posts.map((post) => post.id)).toEqual(["latest-1", "latest-2"]);
+    expect(snapshot.depthPosts.map((post) => post.id)).toEqual(["latest-1", "latest-2"]);
   });
 });
