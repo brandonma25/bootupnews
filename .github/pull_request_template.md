@@ -6,6 +6,14 @@
 - [ ] PR title or branch includes canonical `PRD-XX` when this work maps to a governed feature
 - [ ] If this work is intentionally unmapped, expect Intake Queue review instead of direct `Sheet1` insertion
 
+## Terminology
+- [ ] Read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
+- [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement
+- [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card
+- [ ] If legacy naming is inconsistent, documented it instead of silently expanding it
+- [ ] PRD clearly states which object level the feature modifies, if applicable
+- [ ] PRD does not describe UI cards as signals unless referring to the underlying Signal object
+
 ## Local Validation
 - [ ] App runs locally
 - [ ] Relevant flows tested

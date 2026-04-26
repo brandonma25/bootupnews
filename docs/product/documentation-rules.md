@@ -8,6 +8,7 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - `Record ID` in `Sheet1` is immutable and may only be used as the governed lookup key for automation.
 - Automation must never write formula/computed columns or silently overwrite human-managed fields in Google Sheets.
 - Tracker closeout is part of Definition of Done: update and verify the live Google Sheet, or create a fallback tracker-sync file in `docs/operations/tracker-sync/` with the exact manual update payload.
+- Terminology requirement: before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`. Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions. Do not use cluster, signal, story, or card interchangeably.
 - `docs/product/feature-system.csv` is the repo-side control layer for PRD mapping, build order, and durable governance metadata.
 - The CSV is the product control layer and its schema is locked to exactly 12 columns in this exact order:
   `Layer, Feature Name, Priority, Status, Description, Owner, Dependency, Build Order, Decision, Last Updated, prd_id, prd_file`
@@ -52,13 +53,14 @@ This repository uses a controlled documentation system. The goal is to keep docs
 1. Check `docs/product/feature-system.csv` first.
 2. Work from the next feature marked `decision = build` with the lowest `build_order`.
 3. Respect dependencies before implementation.
-4. If the feature already has a PRD, update that file instead of creating a new one.
-5. Preserve the Google Sheets governance model: mapped work belongs in `Sheet1`, while unmapped or ambiguous work must go to `Intake Queue`.
-6. Do not create governed `Sheet1` rows automatically from GitHub merges or repo automation.
-7. During active branch work, set `status = In Progress`.
-8. When implementation is complete but awaiting merge or review, set `status = In Review`.
-9. After merge or explicit user acceptance, set `status = Built`, `decision = keep`, and update `last_updated`.
-10. Before closeout, verify the Google Sheets tracker row or create a fallback tracker-sync markdown file with the exact manual update payload.
+4. Complete the terminology check and state which object level the work modifies: Article, Story Cluster, Signal, Card, or Surface Placement.
+5. If the feature already has a PRD, update that file instead of creating a new one.
+6. Preserve the Google Sheets governance model: mapped work belongs in `Sheet1`, while unmapped or ambiguous work must go to `Intake Queue`.
+7. Do not create governed `Sheet1` rows automatically from GitHub merges or repo automation.
+8. During active branch work, set `status = In Progress`.
+9. When implementation is complete but awaiting merge or review, set `status = In Review`.
+10. After merge or explicit user acceptance, set `status = Built`, `decision = keep`, and update `last_updated`.
+11. Before closeout, verify the Google Sheets tracker row or create a fallback tracker-sync markdown file with the exact manual update payload.
 
 ## Change Control
 - Do not implement features marked `delay` or `kill`.

@@ -11,6 +11,14 @@
 - Merge only after the automated gates pass, preview is verified, the human auth checklist is completed, and release docs are updated.
 - Production verification happens after merge to `main`.
 
+## Terminology Requirement
+- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
+- Do not use cluster, signal, story, or card interchangeably.
+- [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
+- [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
+- [ ] If legacy naming is inconsistent, document it instead of silently expanding it.
+
 ## Release Gates
 ### 1. Local Gate
 - Command: `npm run release:local`
@@ -129,6 +137,10 @@
 
 ### 7. Closeout Checklist
 - Scope completed.
+- [ ] Terminology check completed against `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
+- [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
+- [ ] If legacy naming is inconsistent, document it instead of silently expanding it.
 - Tests run and results recorded.
 - Local validation complete.
 - Preview validation complete when applicable.

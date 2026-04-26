@@ -66,6 +66,19 @@
 - documentation update requirement
 - sanitization rule
 
+## 4a. Terminology Requirement
+- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
+- Do not use cluster, signal, story, or card interchangeably.
+- Every substantial PRD or implementation prompt must identify which object level the work modifies: Article, Story Cluster, Signal, Card, or Surface Placement.
+- New variable, file, function, component, and database terminology must not blur Cluster vs Signal vs Card.
+- If legacy naming is inconsistent, document the mismatch instead of silently expanding it.
+
+Implementation checklist:
+- [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
+- [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
+- [ ] If legacy naming is inconsistent, document it instead of silently expanding it.
+
 ## 5. Dev Server Rule
 - Before starting the dev server:
 - check port `3000`
@@ -296,6 +309,10 @@ Never bypass worktree safety with --force or --ignore-other-worktrees for ordina
 - Local validation passed.
 - Preview validation passed.
 - Docs updated.
+- [ ] Terminology check completed against `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
+- [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
+- [ ] If legacy naming is inconsistent, document it instead of silently expanding it.
 - No blockers remain.
 
 ## 12. Debugging Protocol

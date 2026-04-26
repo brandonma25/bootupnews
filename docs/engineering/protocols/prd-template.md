@@ -15,6 +15,12 @@
 
 ## Implementation Shape / System Impact
 
+## Terminology Requirement
+- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
+- Do not use cluster, signal, story, or card interchangeably.
+- Object level modified:
+
 ## Dependencies / Risks
 
 ## Acceptance Criteria
@@ -25,6 +31,9 @@
 
 ## Closeout Checklist
 - Scope completed:
+- [ ] Terminology check completed: Article, Story Cluster, Signal, Card, and Surface Placement are used according to the canonical terminology document.
+- [ ] PRD clearly states which object level the feature modifies.
+- [ ] PRD does not describe UI cards as signals unless referring to the underlying Signal object.
 - Tests run:
 - Local validation complete:
 - Preview validation complete, if applicable:

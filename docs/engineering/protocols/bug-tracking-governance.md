@@ -9,6 +9,12 @@
 - Use one bug-fix record per meaningful defect or tightly related defect family.
 - Prefer updating the existing bug-fix record instead of creating `v2`, `final`, `follow-up`, or duplicate files for the same root cause.
 
+## Terminology Requirement
+- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
+- Do not use cluster, signal, story, or card interchangeably.
+- Bug-fix records must state which object level was affected when the defect involves ingestion, clustering, ranking, UI cards, or placement behavior.
+
 ## When a Bug-Fix Record Is Required
 - A branch or PR is explicitly framed as a fix, bug, hotfix, or regression repair.
 - A non-trivial defect changes runtime, data, automation, workflow, or release behavior.
