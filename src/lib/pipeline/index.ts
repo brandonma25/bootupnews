@@ -23,6 +23,7 @@ export type ClusterFirstPipelineResult = {
 
 export async function runClusterFirstPipeline(options: {
   sources?: Source[];
+  suppliedByManifest?: boolean;
 } = {}): Promise<ClusterFirstPipelineResult> {
   const runId = `pipeline-${Date.now()}`;
   const run = createEmptyPipelineRun(runId);

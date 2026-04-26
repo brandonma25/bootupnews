@@ -191,6 +191,32 @@ describe("homepage read model", () => {
           editedWhyItMatters: "Stored tech editorial note",
         }),
       ],
+      depthPosts: [
+        createHomepageSignalPost({
+          id: "finance-1",
+          rank: 1,
+          title: "Stored finance signal",
+          tags: ["finance", "markets"],
+          summary: "Stored finance summary",
+          editedWhyItMatters: "Stored finance editorial note",
+        }),
+        createHomepageSignalPost({
+          id: "tech-1",
+          rank: 2,
+          title: "Stored tech signal",
+          tags: ["tech", "software"],
+          summary: "Stored tech summary",
+          editedWhyItMatters: "Stored tech editorial note",
+        }),
+        createHomepageSignalPost({
+          id: "tech-depth-1",
+          rank: 6,
+          title: "Stored tech depth signal",
+          tags: ["tech", "software"],
+          summary: "Stored tech depth summary",
+          editedWhyItMatters: "Stored tech depth editorial note",
+        }),
+      ],
     });
 
     const { getHomepagePageState } = await loadDataModule();
@@ -204,13 +230,15 @@ describe("homepage read model", () => {
     expect(
       state.data.briefing.items.some((item) => /static sample copy|public finance briefing now surfaces/i.test(item.title)),
     ).toBe(false);
-  });
+    expect(state.data.publicRankedItems?.map((item) => item.title)).toContain("Stored tech depth signal");
+  }, 10_000);
 
   it("uses clearly labeled category-specific placeholders when no stored snapshot exists", async () => {
     getHomepageSignalSnapshot.mockResolvedValue({
       source: "none",
       briefingDate: null,
       posts: [],
+      depthPosts: [],
     });
 
     const { getHomepagePageState } = await loadDataModule();

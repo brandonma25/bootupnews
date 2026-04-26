@@ -196,10 +196,11 @@ describe("buildHomepageViewModel", () => {
     expect(model.featured?.id).toBe("briefing-finance");
     expect(model.topRanked.map((event) => event.id)).not.toContain("depth-tech");
     expect(model.debug.rankedEventsCount).toBe(depthItems.length);
-    expect(model.developingNowEvents.map((event) => event.id)).toContain("depth-tech");
+    expect(model.categorySections.find((section) => section.key === "tech")?.events.map((event) => event.id)).toContain("depth-tech");
+    expect(model.developingNowEvents.map((event) => event.id)).not.toContain("depth-tech");
   });
 
-  it("lets Developing Now surface events from publicRankedItems beyond the Top 5 briefing layer", () => {
+  it("lets category tabs use publicRankedItems beyond the Top 5 briefing layer", () => {
     const briefingItems = [
       createItem({
         id: "briefing-tech",
@@ -218,31 +219,36 @@ describe("buildHomepageViewModel", () => {
     ];
     const depthItems = [
       ...briefingItems,
-      createItem({
-        id: "depth-finance",
-        topicId: "finance",
-        topicName: "Finance",
-        title: "Credit markets reprice after a guidance reset",
-        matchedKeywords: ["credit", "markets", "guidance"],
-        homepageClassification: {
-          primaryCategory: "finance",
-          secondaryCategories: [],
-          confidence: 0.95,
-          scores: { tech: 0, finance: 12, politics: 0 },
-          matchedSignals: { tech: [], finance: ["credit"], politics: [] },
-        },
-        sources: [{ title: "Financial Times", url: "https://www.ft.com/content/guidance-reset" }],
-        priority: "normal",
-      }),
+      ...Array.from({ length: 7 }, (_, index) =>
+        createItem({
+          id: `depth-finance-${index + 1}`,
+          topicId: "finance",
+          topicName: "Finance",
+          title: `Credit markets reprice after guidance reset ${index + 1}`,
+          matchedKeywords: ["credit", `market-${index + 1}`, `guidance-${index + 1}`],
+          publishedAt: `2026-04-15T${String(10 + index).padStart(2, "0")}:00:00.000Z`,
+          homepageClassification: {
+            primaryCategory: "finance",
+            secondaryCategories: [],
+            confidence: 0.95,
+            scores: { tech: 0, finance: 12, politics: 0 },
+            matchedSignals: { tech: [], finance: [`credit-${index + 1}`], politics: [] },
+          },
+          sources: [{ title: `Financial Times ${index + 1}`, url: `https://www.ft.com/content/guidance-reset-${index + 1}` }],
+          priority: "normal",
+        }),
+      ),
     ];
 
     const model = buildHomepageViewModel(createData(briefingItems, { publicRankedItems: depthItems }));
 
-    expect(model.developingNowEvents.map((event) => event.id)).toContain("depth-finance");
-    expect(model.developingNowEvents.map((event) => event.id)).not.toContain("briefing-tech");
+    const financeTabIds = model.categorySections.find((section) => section.key === "finance")?.events.map((event) => event.id) ?? [];
+
+    expect(financeTabIds.some((id) => id.startsWith("depth-finance-"))).toBe(true);
+    expect(financeTabIds).not.toContain("briefing-tech");
   });
 
-  it("lets By Category surface events from publicRankedItems beyond the Top 5 briefing layer", () => {
+  it("keeps downstream category previews from repeating the Top 5 briefing layer", () => {
     const briefingItems = [
       createItem({
         id: "briefing-politics",
@@ -292,27 +298,32 @@ describe("buildHomepageViewModel", () => {
     const depthItems = [
       ...briefingItems,
       ...fillerItems,
-      createItem({
-        id: "depth-tech-preview",
-        topicId: "tech",
-        topicName: "Tech",
-        title: "Database vendors ship a query planner update",
-        matchedKeywords: ["database", "query planner", "open source"],
-        publishedAt: "2026-04-15T08:30:00.000Z",
-        homepageClassification: {
-          primaryCategory: "tech",
-          secondaryCategories: [],
-          confidence: 0.92,
-          scores: { tech: 10, finance: 0, politics: 0 },
-          matchedSignals: { tech: ["database"], finance: [], politics: [] },
-        },
-        priority: "normal",
-      }),
+      ...Array.from({ length: 17 }, (_, index) =>
+        createItem({
+          id: `depth-tech-preview-${index + 1}`,
+          topicId: "tech",
+          topicName: "Tech",
+          title: `Database vendors ship query planner update ${index + 1}`,
+          matchedKeywords: ["database", `query-planner-${index + 1}`, "open source"],
+          publishedAt: `2026-04-15T${String(3 + index).padStart(2, "0")}:30:00.000Z`,
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.92,
+            scores: { tech: 10, finance: 0, politics: 0 },
+            matchedSignals: { tech: [`database-${index + 1}`], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
+      ),
     ];
 
     const model = buildHomepageViewModel(createData(briefingItems, { publicRankedItems: depthItems }));
 
-    expect(model.categoryPreviewEvents.tech.map((event) => event.id)).toContain("depth-tech-preview");
+    const techTabIds = model.categorySections.find((section) => section.key === "tech")?.events.map((event) => event.id) ?? [];
+
+    expect(techTabIds.some((id) => id.startsWith("depth-tech-preview-"))).toBe(true);
+    expect(techTabIds).not.toContain("briefing-politics");
     expect(model.categoryPreviewEvents.tech.map((event) => event.id)).not.toContain("briefing-politics");
   });
 
@@ -799,7 +810,7 @@ describe("buildHomepageViewModel", () => {
     expect(model.debug.coreSignalCount).toBeGreaterThanOrEqual(3);
   });
 
-  it("does not borrow fallback cards or repeat top-ranked items into category tabs", () => {
+  it("does not borrow fallback cards and allows non-top depth in category tabs", () => {
     const financeEvent = createItem({
       id: "finance-fallback",
       topicId: "finance",
@@ -834,7 +845,7 @@ describe("buildHomepageViewModel", () => {
     expect(new Set(fallbackIds).size).toBe(fallbackIds.length);
     expect(fallbackIds).not.toContain("finance-fallback");
     expect(fallbackIds).toHaveLength(0);
-    expect(politicsSection?.events.map((event) => event.id)).not.toContain("politics-early");
+    expect(politicsSection?.events.map((event) => event.id)).toContain("politics-early");
   });
 
   it("keeps surfaced event ids unique across featured, top-ranked, category, and watchlist rails", () => {
@@ -1056,6 +1067,130 @@ describe("buildHomepageViewModel", () => {
 
     expect(visibleTopEventIds).toHaveLength(4);
     expect(new Set(visibleTopEventIds)).toEqual(new Set(items.map((item) => item.id)));
+  });
+
+  it("keeps distinct published editorial signals visible when tags only contain generic categories and roles", () => {
+    const items = [
+      createItem({
+        id: "published-tech-1",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Google will invest as much as $40 billion in Anthropic",
+        matchedKeywords: ["Tech", "context", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "Ars Technica", url: "https://arstechnica.com/ai/google-anthropic" }],
+        priority: "top",
+        importanceScore: 61,
+      }),
+      createItem({
+        id: "published-tech-2",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Cohere acquires German startup to create transatlantic AI powerhouse",
+        matchedKeywords: ["Tech", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "TechCrunch", url: "https://techcrunch.com/cohere-acquisition" }],
+        priority: "top",
+        importanceScore: 53,
+      }),
+      createItem({
+        id: "published-finance-1",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "The golden age of arbitrage has begun",
+        matchedKeywords: ["Finance", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "Financial Times", url: "https://www.ft.com/arbitrage" }],
+        priority: "top",
+        importanceScore: 46,
+      }),
+      createItem({
+        id: "published-finance-2",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Cloudflare Agents Week reshapes the clip economy",
+        matchedKeywords: ["Finance", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "TLDR", url: "https://tldr.tech/tech/2026-04-24" }],
+        priority: "top",
+        importanceScore: 45,
+      }),
+      createItem({
+        id: "published-politics-1",
+        topicId: "politics",
+        topicName: "Politics",
+        title: "The narrow path to a US-Iran deal",
+        matchedKeywords: ["Politics", "watch", "Watch"],
+        sourceCount: 1,
+        sources: [{ title: "Financial Times", url: "https://www.ft.com/us-iran-deal" }],
+        priority: "top",
+        importanceScore: 49,
+      }),
+    ];
+
+    const model = buildHomepageViewModel(createData(items));
+    const visibleTopEventIds = [model.featured, ...model.topRanked]
+      .filter((event): event is NonNullable<typeof event> => Boolean(event))
+      .map((event) => event.id);
+
+    expect(visibleTopEventIds).toHaveLength(5);
+    expect(new Set(visibleTopEventIds)).toEqual(new Set(items.map((item) => item.id)));
+    expect(model.debug.semanticDuplicateSuppressedCount).toBe(0);
+  });
+
+  it("uses non-homepage category depth when a broader ranked pool exists", () => {
+    const topItems = [
+      createItem({ id: "top-tech-1", topicId: "tech", topicName: "Tech", title: "AI infrastructure deal expands", matchedKeywords: ["Tech", "watch"], sourceCount: 1, priority: "top", importanceScore: 95 }),
+      createItem({ id: "top-tech-2", topicId: "tech", topicName: "Tech", title: "Enterprise AI merger closes", matchedKeywords: ["Tech", "context"], sourceCount: 1, priority: "top", importanceScore: 92 }),
+      createItem({ id: "top-finance-1", topicId: "finance", topicName: "Finance", title: "Arbitrage spreads widen", matchedKeywords: ["Finance", "watch"], sourceCount: 1, priority: "top", importanceScore: 89 }),
+      createItem({ id: "top-finance-2", topicId: "finance", topicName: "Finance", title: "Credit market repricing accelerates", matchedKeywords: ["Finance", "watch"], sourceCount: 1, priority: "top", importanceScore: 86 }),
+      createItem({ id: "top-politics-1", topicId: "politics", topicName: "Politics", title: "US Iran diplomacy narrows", matchedKeywords: ["Politics", "watch"], sourceCount: 1, priority: "top", importanceScore: 83 }),
+    ];
+    const depthItems = [
+      ...topItems,
+      createItem({ id: "depth-tech-1", topicId: "tech", topicName: "Tech", title: "Chip supply contracts reset cloud roadmaps", matchedKeywords: ["chips", "cloud", "contracts"], sourceCount: 1, priority: "normal", importanceScore: 77 }),
+      createItem({ id: "depth-finance-1", topicId: "finance", topicName: "Finance", title: "Treasury liquidity strains basis trades", matchedKeywords: ["treasury", "liquidity", "basis"], sourceCount: 1, priority: "normal", importanceScore: 76 }),
+      createItem({ id: "depth-politics-1", topicId: "politics", topicName: "Politics", title: "Sanctions negotiators widen talks", matchedKeywords: ["sanctions", "negotiators", "policy"], sourceCount: 1, priority: "normal", importanceScore: 75 }),
+    ];
+
+    const model = buildHomepageViewModel(createData(topItems, { publicRankedItems: depthItems }));
+    const topIds = new Set(
+      [model.featured, ...model.topRanked]
+        .filter((event): event is NonNullable<typeof event> => Boolean(event))
+        .map((event) => event.id),
+    );
+    const tabIds = model.categorySections.flatMap((section) => section.events.map((event) => event.id));
+
+    expect(topIds).toEqual(new Set(topItems.map((item) => item.id)));
+    expect(tabIds).toEqual(expect.arrayContaining(["depth-tech-1", "depth-finance-1", "depth-politics-1"]));
+    expect(tabIds.every((id) => !topIds.has(id))).toBe(true);
+    expect(tabIds.some((id) => !topIds.has(id))).toBe(true);
+  });
+
+  it("filters the editorial Top 5 into category tabs only when no broader ranked depth pool exists", () => {
+    const items = [
+      createItem({ id: "published-tech-1", topicId: "tech", topicName: "Tech", title: "AI infrastructure deal expands", matchedKeywords: ["Tech", "watch"], sourceCount: 1 }),
+      createItem({ id: "published-tech-2", topicId: "tech", topicName: "Tech", title: "Enterprise AI merger closes", matchedKeywords: ["Tech", "context"], sourceCount: 1 }),
+      createItem({ id: "published-finance-1", topicId: "finance", topicName: "Finance", title: "Arbitrage spreads widen", matchedKeywords: ["Finance", "watch"], sourceCount: 1 }),
+      createItem({ id: "published-finance-2", topicId: "finance", topicName: "Finance", title: "Credit market repricing accelerates", matchedKeywords: ["Finance", "watch"], sourceCount: 1 }),
+      createItem({ id: "published-politics-1", topicId: "politics", topicName: "Politics", title: "US Iran diplomacy narrows", matchedKeywords: ["Politics", "watch"], sourceCount: 1 }),
+    ];
+
+    const model = buildHomepageViewModel(createData(items));
+
+    expect(model.categorySections.find((section) => section.key === "tech")?.events.map((event) => event.id)).toEqual([
+      "published-tech-1",
+      "published-tech-2",
+    ]);
+    expect(model.categorySections.find((section) => section.key === "finance")?.events.map((event) => event.id)).toEqual([
+      "published-finance-1",
+      "published-finance-2",
+    ]);
+    expect(model.categorySections.find((section) => section.key === "politics")?.events.map((event) => event.id)).toEqual([
+      "published-politics-1",
+    ]);
+    expect(Object.values(model.categoryPreviewEvents).flat()).toHaveLength(0);
+    expect(model.developingNowEvents).toHaveLength(0);
   });
 
   it("does not fabricate the 3-card minimum when fewer pipeline-selected Top Events exist", () => {

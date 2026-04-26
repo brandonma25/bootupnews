@@ -127,7 +127,7 @@ create table if not exists public.briefing_items (
 create table if not exists public.signal_posts (
   id uuid primary key default gen_random_uuid(),
   briefing_date date not null default current_date,
-  rank integer not null check (rank between 1 and 5),
+  rank integer not null check (rank between 1 and 20),
   title text not null,
   source_name text not null default '',
   source_url text not null default '',
@@ -150,6 +150,10 @@ create table if not exists public.signal_posts (
   updated_at timestamptz not null default now(),
   unique (briefing_date, rank)
 );
+
+create unique index if not exists signal_posts_live_top_rank_key
+on public.signal_posts (rank)
+where is_live and rank between 1 and 5;
 
 create table if not exists public.pipeline_article_candidates (
   id uuid primary key default gen_random_uuid(),
