@@ -11,7 +11,7 @@ import {
   getRankingFeatureProviders,
   getSourceRegistrySnapshot,
 } from "@/adapters/donors";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
 
 function createArticle(overrides: Partial<NormalizedArticle> = {}): NormalizedArticle {
@@ -86,7 +86,7 @@ describe("donor registry", () => {
   it("maps donor-derived ranking features into canonical source credibility data", () => {
     const providers = getRankingFeatureProviders();
     const provider = providers.find((entry) => entry.donor === "fns")?.provider;
-    const cluster: SignalCluster = {
+    const cluster: StoryCluster = {
       cluster_id: "cluster-1",
       articles: [createArticle()],
       representative_article: createArticle(),
@@ -129,7 +129,7 @@ describe("donor registry", () => {
     const clusteringSupport = getClusteringSupportAdapters().find((entry) => entry.donor === "after_market_agent");
     const connectionSupport = getConnectionSupports().find((entry) => entry.donor === "after_market_agent");
     const diversitySupport = getDiversitySupports().find((entry) => entry.donor === "fns");
-    const cluster: SignalCluster = {
+    const cluster: StoryCluster = {
       cluster_id: "cluster-1",
       articles: [createArticle()],
       representative_article: createArticle(),

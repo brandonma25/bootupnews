@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import { logPipelineEvent } from "@/lib/observability/logger";
 import { jaccardSimilarity, normalizeUrl, tokenize } from "@/lib/pipeline/shared/text";
-import type { RankedClusterResult } from "@/lib/scoring/scoring-engine";
+import type { RankedStoryClusterResult } from "@/lib/scoring/scoring-engine";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const PIPELINE_ARTICLE_CANDIDATES_TABLE = "pipeline_article_candidates";
@@ -202,7 +202,7 @@ export function updateArticleCandidateClusters({
   clusters,
 }: {
   runId: string;
-  clusters: SignalCluster[];
+  clusters: StoryCluster[];
 }) {
   const updates = clusters.flatMap((cluster) =>
     cluster.articles.map((article) => ({
@@ -237,7 +237,7 @@ export function updateArticleCandidateRankingOutcomes({
   runId: string;
   normalizedArticles: NormalizedArticle[];
   dedupedArticles: NormalizedArticle[];
-  rankedClusters: RankedClusterResult[];
+  rankedClusters: RankedStoryClusterResult[];
 }) {
   if (!normalizedArticles.length) {
     return;

@@ -95,6 +95,11 @@ export type EventIntelligence = {
 export type EventDisplayState = "new" | "changed" | "escalated" | "unchanged";
 export type EditorialStatus = "draft" | "needs_review" | "approved" | "published";
 
+/**
+ * MVP compatibility/view-model payload used by briefing, editorial, and card
+ * rendering paths. This can contain ranked Story Cluster evidence, editorial
+ * metadata, and Card fields, but it is not canonical Signal identity.
+ */
 export type BriefingItem = {
   id: string;
   topicId: string;
@@ -126,6 +131,7 @@ export type BriefingItem = {
   timeline?: TimelineGroup[];
   importanceScore?: number;
   importanceLabel?: "Critical" | "High" | "Watch";
+  /** Display/ranking evidence labels for cards; not canonical Signal objects. */
   rankingSignals?: string[];
   eventIntelligence?: EventIntelligence;
   explanationPacket?: ExplanationPacket;

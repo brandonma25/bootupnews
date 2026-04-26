@@ -11,14 +11,14 @@ import { deduplicateArticles } from "@/lib/pipeline/dedup";
 import { buildDigestOutput, type DigestOutput } from "@/lib/pipeline/digest";
 import { ingestRawItems } from "@/lib/pipeline/ingestion";
 import { normalizeRawItems } from "@/lib/pipeline/normalization";
-import { rankSignalClusters } from "@/lib/pipeline/ranking";
+import { rankStoryClusters } from "@/lib/pipeline/ranking";
 import { createEmptyPipelineRun, type PipelineRun } from "@/lib/observability/pipeline-run";
-import type { RankedClusterResult } from "@/lib/scoring/scoring-engine";
+import type { RankedStoryClusterResult } from "@/lib/scoring/scoring-engine";
 
 export type ClusterFirstPipelineResult = {
   digest: DigestOutput;
   run: PipelineRun;
-  ranked_clusters: RankedClusterResult[];
+  ranked_clusters: RankedStoryClusterResult[];
 };
 
 export async function runClusterFirstPipeline(options: {
@@ -49,14 +49,14 @@ export async function runClusterFirstPipeline(options: {
   const deduped = deduplicateArticles(normalized);
   const clusters = clusterNormalizedArticles(deduped);
   updateArticleCandidateClusters({ runId: run.run_id, clusters });
-  const rankedClusters = rankSignalClusters(clusters);
+  const rankedStoryClusters = rankStoryClusters(clusters);
   updateArticleCandidateRankingOutcomes({
     runId: run.run_id,
     normalizedArticles: normalized,
     dedupedArticles: deduped,
-    rankedClusters,
+    rankedClusters: rankedStoryClusters,
   });
-  const digest = buildDigestOutput(rankedClusters);
+  const digest = buildDigestOutput(rankedStoryClusters);
   const singletonCount = clusters.filter((cluster) => cluster.cluster_size === 1).length;
   const preventedMergeCount = clusters.reduce(
     (sum, cluster) => sum + cluster.cluster_debug.prevented_merge_count,
@@ -72,12 +72,12 @@ export async function runClusterFirstPipeline(options: {
       : 0;
   run.singleton_count = singletonCount;
   run.prevented_merge_count = preventedMergeCount;
-  run.top_scores = rankedClusters.slice(0, 5).map((entry) => entry.ranked.score);
-  run.scoring_breakdown = rankedClusters.map((entry) => entry.scoringLog);
-  run.ranking_provider = rankedClusters[0]?.ranked.ranking_debug.provider ?? null;
-  run.diversity_provider = rankedClusters.find((entry) => entry.ranked.ranking_debug.diversity.action !== "none")
-    ?.ranked.ranking_debug.provider ?? rankedClusters[0]?.ranked.ranking_debug.provider ?? null;
-  run.suppressed_ranked_clusters = rankedClusters
+  run.top_scores = rankedStoryClusters.slice(0, 5).map((entry) => entry.ranked.score);
+  run.scoring_breakdown = rankedStoryClusters.map((entry) => entry.scoringLog);
+  run.ranking_provider = rankedStoryClusters[0]?.ranked.ranking_debug.provider ?? null;
+  run.diversity_provider = rankedStoryClusters.find((entry) => entry.ranked.ranking_debug.diversity.action !== "none")
+    ?.ranked.ranking_debug.provider ?? rankedStoryClusters[0]?.ranked.ranking_debug.provider ?? null;
+  run.suppressed_ranked_clusters = rankedStoryClusters
     .filter((entry) => entry.ranked.ranking_debug.diversity.action !== "none")
     .map((entry) => ({
       cluster_id: entry.cluster.cluster_id,
@@ -86,7 +86,7 @@ export async function runClusterFirstPipeline(options: {
       score_delta: entry.ranked.ranking_debug.diversity.scoreDelta,
       related_cluster_id: entry.ranked.ranking_debug.diversity.relatedClusterId,
     }));
-  run.sample_cluster_rationale = rankedClusters.slice(0, 3).map((entry) => ({
+  run.sample_cluster_rationale = rankedStoryClusters.slice(0, 3).map((entry) => ({
     cluster_id: entry.cluster.cluster_id,
     representative_title: entry.cluster.representative_article.title,
     cluster_size: entry.cluster.cluster_size,
@@ -113,6 +113,6 @@ export async function runClusterFirstPipeline(options: {
   return {
     digest,
     run,
-    ranked_clusters: rankedClusters,
+    ranked_clusters: rankedStoryClusters,
   };
 }

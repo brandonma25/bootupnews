@@ -1,10 +1,10 @@
-import type { SignalCluster } from "@/lib/models/signal-cluster";
-import type { RankedSignal } from "@/lib/models/ranked-signal";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
+import type { RankedStoryCluster } from "@/lib/models/ranked-signal";
 import { clipSentence } from "@/lib/pipeline/shared/text";
 
 type RankedClusterView = {
-  cluster: SignalCluster;
-  ranked: RankedSignal;
+  cluster: StoryCluster;
+  ranked: RankedStoryCluster;
 };
 
 export type DigestOutput = {
@@ -14,7 +14,7 @@ export type DigestOutput = {
     short_summary: string;
     source_links: Array<{ title: string; url: string }>;
     score: number;
-    score_breakdown: RankedSignal["score_breakdown"];
+    score_breakdown: RankedStoryCluster["score_breakdown"];
     cluster_size: number;
     topic_keywords: string[];
   }>;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { assembleExplanationPacket } from "@/lib/explanation-support";
 import type { RankingDebug } from "@/lib/integration/subsystem-contracts";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { EventIntelligence } from "@/lib/types";
 
 function createIntelligence(overrides: Partial<EventIntelligence> = {}): EventIntelligence {
@@ -35,7 +35,7 @@ function createIntelligence(overrides: Partial<EventIntelligence> = {}): EventIn
   };
 }
 
-function createCluster(): SignalCluster {
+function createCluster(): StoryCluster {
   const article = {
     id: "article-1",
     title: "Federal Reserve signals a tighter policy path",

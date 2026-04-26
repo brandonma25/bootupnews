@@ -1,1 +1,1 @@
-export { rankSignalClusters } from "@/lib/scoring/scoring-engine";
+export { rankSignalClusters, rankStoryClusters } from "@/lib/scoring/scoring-engine";

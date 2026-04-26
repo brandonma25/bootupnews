@@ -3,7 +3,7 @@ import type {
   ClusterMergeDecision,
   ClusterRepresentativeScore,
   ClusterSimilarityBreakdown,
-  SignalCluster,
+  StoryCluster,
 } from "@/lib/models/signal-cluster";
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
 import type {
@@ -57,7 +57,7 @@ function getClusteringSupportProvider(): { donor: string; support: ClusteringSup
 function createCluster(
   candidate: ClusterCandidate,
   provider: { donor: string; support: ClusteringSupport },
-): SignalCluster {
+): StoryCluster {
   const capabilities = provider.support.describeCapabilities();
 
   return {
@@ -90,7 +90,7 @@ function createCluster(
   };
 }
 
-function refreshCluster(cluster: SignalCluster, provider: { donor: string; support: ClusteringSupport }) {
+function refreshCluster(cluster: StoryCluster, provider: { donor: string; support: ClusteringSupport }) {
   const candidates = provider.support.prepareClusterCandidates(cluster.articles);
   const representativeSupport = provider.support.selectRepresentativeArticle(candidates);
   const capabilities = provider.support.describeCapabilities();
@@ -110,7 +110,7 @@ function refreshCluster(cluster: SignalCluster, provider: { donor: string; suppo
 }
 
 function recordPreventedMerge(
-  cluster: SignalCluster,
+  cluster: StoryCluster,
   candidate: ClusterCandidate,
   decisionSupport: MergeDecisionSupport,
 ) {
@@ -127,7 +127,7 @@ function recordPreventedMerge(
 }
 
 function recordAcceptedMerge(
-  cluster: SignalCluster,
+  cluster: StoryCluster,
   candidate: ClusterCandidate,
   decisionSupport: MergeDecisionSupport,
 ) {
@@ -140,10 +140,10 @@ function recordAcceptedMerge(
   });
 }
 
-export function clusterNormalizedArticles(articles: NormalizedArticle[]): SignalCluster[] {
+export function clusterNormalizedArticles(articles: NormalizedArticle[]): StoryCluster[] {
   const provider = getClusteringSupportProvider();
   const diversitySupports = getDiversitySupports();
-  const clusters: SignalCluster[] = [];
+  const clusters: StoryCluster[] = [];
   const sortedCandidates = provider.support.prepareClusterCandidates(
     articles
       .slice()

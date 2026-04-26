@@ -40,7 +40,7 @@ export interface ClusterDebug {
   diversity_support_available: boolean;
 }
 
-export interface SignalCluster {
+export interface StoryCluster {
   cluster_id: string;
   articles: NormalizedArticle[];
   representative_article: NormalizedArticle;
@@ -48,3 +48,9 @@ export interface SignalCluster {
   cluster_size: number;
   cluster_debug: ClusterDebug;
 }
+
+/**
+ * @deprecated Use StoryCluster. This object is structural grouped evidence,
+ * not canonical Signal identity.
+ */
+export type SignalCluster = StoryCluster;

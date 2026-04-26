@@ -22,7 +22,7 @@ export type EventType =
   | "minor_feature_update"
   | "repetitive_followup_no_new_info";
 
-export type SignalFilterCandidate = {
+export type ArticleFilterCandidate = {
   id: string;
   title: string;
   summaryText?: string | null;
@@ -34,7 +34,13 @@ export type SignalFilterCandidate = {
   topicName?: string | null;
 };
 
-export type SignalFilterEvaluation = {
+/**
+ * @deprecated Use ArticleFilterCandidate. This is an Article-level quality
+ * filter candidate, not canonical Signal identity.
+ */
+export type SignalFilterCandidate = ArticleFilterCandidate;
+
+export type ArticleFilterEvaluation = {
   id: string;
   sourceTier: SourceTier;
   headlineQuality: HeadlineQuality;
@@ -43,12 +49,18 @@ export type SignalFilterEvaluation = {
   filterReasons: string[];
 };
 
+/**
+ * @deprecated Use ArticleFilterEvaluation. This is the evaluation output for
+ * Article-level quality filtering, not canonical Signal identity.
+ */
+export type SignalFilterEvaluation = ArticleFilterEvaluation;
+
 type HeadlineScorecard = {
   score: number;
   reasons: string[];
 };
 
-const SIGNAL_FILTER_CONFIG = {
+const ARTICLE_FILTER_CONFIG = {
   minPassCount: 4,
   fallbackLookbackHours: 48,
 };
@@ -110,10 +122,12 @@ const HIGH_PRIORITY_EVENT_TYPES = new Set<EventType>([
   "macro_market_move",
 ]);
 
+// Legacy function name retained for compatibility. The candidates are Articles
+// being quality-filtered before clustering, not canonical Signal objects.
 export function applySignalFiltering(
-  candidates: SignalFilterCandidate[],
-): SignalFilterEvaluation[] {
-  const baseEvaluations = candidates.map((candidate) => evaluateSignalCandidate(candidate));
+  candidates: ArticleFilterCandidate[],
+): ArticleFilterEvaluation[] {
+  const baseEvaluations = candidates.map((candidate) => evaluateArticleFilterCandidate(candidate));
   const promotedIds = new Set(selectFallbackPromotions(candidates, baseEvaluations));
 
   return baseEvaluations.map((evaluation) => {
@@ -133,9 +147,9 @@ export function applySignalFiltering(
   });
 }
 
-export function evaluateSignalCandidate(
-  candidate: SignalFilterCandidate,
-): SignalFilterEvaluation {
+export function evaluateArticleFilterCandidate(
+  candidate: ArticleFilterCandidate,
+): ArticleFilterEvaluation {
   const sourceTier = classifySourceTier(candidate);
   const headlineQuality = classifyHeadlineQuality(candidate);
   const eventType = classifyEventType(candidate);
@@ -285,14 +299,14 @@ export function evaluateSignalCandidate(
 }
 
 export function classifySourceTier(candidate: Pick<
-  SignalFilterCandidate,
+  ArticleFilterCandidate,
   "sourceName" | "url" | "sourceFeedUrl" | "sourceHomepageUrl"
 >): SourceTier {
   return classifySourcePreference(candidate);
 }
 
 export function classifyHeadlineQuality(
-  candidate: Pick<SignalFilterCandidate, "title" | "summaryText">,
+  candidate: Pick<ArticleFilterCandidate, "title" | "summaryText">,
 ): HeadlineQuality {
   const title = candidate.title.trim();
   const summary = candidate.summaryText?.trim() ?? "";
@@ -316,7 +330,7 @@ export function classifyHeadlineQuality(
 }
 
 export function classifyEventType(
-  candidate: Pick<SignalFilterCandidate, "title" | "summaryText" | "topicName">,
+  candidate: Pick<ArticleFilterCandidate, "title" | "summaryText" | "topicName">,
 ): EventType {
   const text = normalizeText(
     `${candidate.topicName ?? ""} ${candidate.title} ${candidate.summaryText ?? ""}`,
@@ -344,21 +358,21 @@ export function classifyEventType(
 }
 
 function selectFallbackPromotions(
-  candidates: SignalFilterCandidate[],
-  evaluations: SignalFilterEvaluation[],
+  candidates: ArticleFilterCandidate[],
+  evaluations: ArticleFilterEvaluation[],
 ) {
   const eligibleEvaluationById = new Map(evaluations.map((evaluation) => [evaluation.id, evaluation]));
   const activeCandidates = candidates.filter((candidate) => isWithinFallbackWindow(candidate.publishedAt));
   const activeEvaluations = activeCandidates
     .map((candidate) => eligibleEvaluationById.get(candidate.id))
-    .filter((evaluation): evaluation is SignalFilterEvaluation => Boolean(evaluation));
+    .filter((evaluation): evaluation is ArticleFilterEvaluation => Boolean(evaluation));
   const activePassCount = activeEvaluations.filter((evaluation) => evaluation.filterDecision === "pass").length;
 
-  if (activePassCount >= SIGNAL_FILTER_CONFIG.minPassCount) {
+  if (activePassCount >= ARTICLE_FILTER_CONFIG.minPassCount) {
     return [];
   }
 
-  const promotedCount = SIGNAL_FILTER_CONFIG.minPassCount - activePassCount;
+  const promotedCount = ARTICLE_FILTER_CONFIG.minPassCount - activePassCount;
   return activeCandidates
     .map((candidate) => {
       const evaluation = eligibleEvaluationById.get(candidate.id);
@@ -382,8 +396,8 @@ function selectFallbackPromotions(
 }
 
 function scoreFallbackCandidate(
-  candidate: SignalFilterCandidate,
-  evaluation: SignalFilterEvaluation,
+  candidate: ArticleFilterCandidate,
+  evaluation: ArticleFilterEvaluation,
 ) {
   const sourceScore =
     evaluation.sourceTier === "tier1"
@@ -445,5 +459,11 @@ function ageHours(value: string | null | undefined) {
 }
 
 function isWithinFallbackWindow(value: string | null | undefined) {
-  return ageHours(value) <= SIGNAL_FILTER_CONFIG.fallbackLookbackHours;
+  return ageHours(value) <= ARTICLE_FILTER_CONFIG.fallbackLookbackHours;
 }
+
+/**
+ * @deprecated Use evaluateArticleFilterCandidate. This evaluates Article-level
+ * quality candidates before clustering, not canonical Signals.
+ */
+export const evaluateSignalCandidate = evaluateArticleFilterCandidate;

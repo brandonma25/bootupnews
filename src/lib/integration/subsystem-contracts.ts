@@ -1,5 +1,5 @@
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { FeedArticle } from "@/lib/rss";
 
 export type CanonicalTopic = "Tech" | "Finance" | "World";
@@ -152,7 +152,7 @@ export interface RankingFeatureProvider {
     trustSignals: string[];
   };
   getKnownSources(): CanonicalSourceMetadata[];
-  mapClusterToRankingFeatures(cluster: SignalCluster, allClusters: SignalCluster[]): Partial<RankingFeatureSet>;
+  mapClusterToRankingFeatures(cluster: StoryCluster, allClusters: StoryCluster[]): Partial<RankingFeatureSet>;
 }
 
 export interface DiversitySupport {
@@ -160,7 +160,7 @@ export interface DiversitySupport {
   describeRole(): string;
   evaluateDiversityAdjustment(
     rankedClusters: Array<{
-      cluster: SignalCluster;
+      cluster: StoryCluster;
       features: RankingFeatureSet;
       baseScore: number;
     }>,
@@ -323,7 +323,7 @@ export interface EnrichmentSupport {
     output_fields: Array<keyof Pick<ExplanationPacket, "why_it_matters" | "what_to_watch" | "unknowns" | "connection_layer">>;
   };
   prepareEnrichmentPacket(input: {
-    cluster: SignalCluster;
+    cluster: StoryCluster;
     rankingDebug: RankingDebug;
     deterministicExplanation: ExplanationPacket;
   }): EnrichmentRequest | null;
