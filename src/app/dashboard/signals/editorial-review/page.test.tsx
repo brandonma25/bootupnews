@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getEditorialReviewState = vi.fn();
@@ -121,7 +121,36 @@ describe("signals editorial review page", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("button", { name: "Approve All" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
     expect(screen.getByLabelText("Thesis / opening statement")).toHaveValue("Raw AI draft");
+  });
+
+  it("collapses each editorial panel by default and expands only the selected card", async () => {
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState([reviewPost, approvedPost]),
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Signal 1")).toBeInTheDocument();
+    expect(screen.getByText("Approved Signal")).toBeInTheDocument();
+    expect(screen.getAllByText("Strong ranking signal")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Expand" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Save Edits" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Expand" })[0]);
+
+    expect(screen.getByLabelText("Thesis / opening statement", { selector: "#editorialThesis-signal-1" }))
+      .toBeVisible();
+    expect(screen.getByLabelText("Thesis / opening statement", { selector: "#editorialThesis-signal-approved" }))
+      .not.toBeVisible();
+    expect(screen.getByRole("button", { name: "Save Edits" })).toBeVisible();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Collapse" })[0]);
+
+    expect(screen.getAllByRole("button", { name: "Expand" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Save Edits" })).not.toBeInTheDocument();
   });
 
   it("shows all historical statuses by default", async () => {
@@ -136,6 +165,9 @@ describe("signals editorial review page", () => {
     expect(screen.getByText("Signal 1")).toBeInTheDocument();
     expect(screen.getByText("Approved Signal")).toBeInTheDocument();
     expect(screen.getByText("Published Signal")).toBeInTheDocument();
+    const expandButtons = screen.getAllByRole("button", { name: "Expand" });
+    fireEvent.click(expandButtons[1]);
+    fireEvent.click(expandButtons[2]);
     expect(screen.getByLabelText("Thesis / opening statement", { selector: "#editorialThesis-signal-approved" }))
       .toHaveValue("Approved editorial text");
     expect(screen.getByLabelText("Thesis / opening statement", { selector: "#editorialThesis-signal-published" }))
@@ -159,6 +191,7 @@ describe("signals editorial review page", () => {
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
     render(await Page({ searchParams: Promise.resolve({}) }));
 
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
     expect(screen.getByLabelText("Homepage teaser / collapsed preview")).toHaveValue(
       "Structured collapsed teaser.",
     );
@@ -226,6 +259,7 @@ describe("signals editorial review page", () => {
     const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
     render(await Page({ searchParams: Promise.resolve({}) }));
 
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
     expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
     expect(screen.getByText(/Approved and waiting to publish/i)).toBeInTheDocument();
   });
