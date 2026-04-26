@@ -27,6 +27,14 @@ Before implementation starts, Codex must explicitly decide and report:
 - what scope is included
 - what scope is excluded
 
+Terminology Requirement:
+- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
+- Do not use cluster, signal, story, or card interchangeably.
+- [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
+- [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
+- [ ] If legacy naming is inconsistent, document it instead of silently expanding it.
+
 Rules:
 - one feature or fix per branch unless this is an intentional consolidation branch
 - do not mix unrelated work

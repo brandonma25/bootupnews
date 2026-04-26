@@ -127,6 +127,14 @@ git push origin --delete feature/<name>
 - Do not mix unrelated changes.
 - Do not modify unrelated files.
 
+## 2a. Terminology Requirement
+- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
+- Do not use cluster, signal, story, or card interchangeably.
+- Before coding, confirm the object level being changed: Article, Story Cluster, Signal, Card, or Surface Placement.
+- Do not add new variable, file, function, component, or database terminology that blurs Cluster vs Signal vs Card.
+- If legacy naming is inconsistent, document it instead of silently expanding it.
+
 ## GOVERNANCE HOTSPOT RULES
 
 Detailed gate ownership lives in `docs/engineering/protocols/governance-gate-map.md`.

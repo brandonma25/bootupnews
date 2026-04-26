@@ -4,6 +4,9 @@
 - Correct branch is being used.
 - No unrelated changes are included.
 - Scope matches the task.
+- [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
+- [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
+- [ ] If legacy naming is inconsistent, document it instead of silently expanding it.
 
 ## 2. Local Validation
 - App runs locally.
@@ -35,6 +38,9 @@
 
 ## 7. Documentation Check
 - Canonical PRD updated if applicable.
+- [ ] Terminology check completed: Article, Story Cluster, Signal, Card, and Surface Placement are used according to the canonical terminology document.
+- [ ] PRD clearly states which object level the feature modifies.
+- [ ] PRD does not describe UI cards as signals unless referring to the underlying Signal object.
 - Product brief added or updated if the feature work is meaningful.
 - `docs/product/feature-system.csv` updated if applicable.
 - Bug-fix, incident, or change-record doc created if applicable.
