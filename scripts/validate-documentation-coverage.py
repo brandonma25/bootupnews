@@ -32,7 +32,7 @@ def main() -> int:
         print(f"FAIL: Unable to inspect documentation coverage.\n{exc}")
         return 1
 
-    context = classify_changes(changes, branch, args.pr_title)
+    context = classify_changes(changes, branch, args.pr_title, repo_root)
     missing_groups = find_missing_doc_groups(context)
 
     print(f"branch: {context.branch}")
@@ -46,6 +46,11 @@ def main() -> int:
     if context.fix_signal_reasons:
         print("fix signal:")
         for reason in context.fix_signal_reasons:
+            print(f"- {reason}")
+
+    if context.prd_exception_reasons:
+        print("prd exception:")
+        for reason in context.prd_exception_reasons:
             print(f"- {reason}")
 
     if not missing_groups:

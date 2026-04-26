@@ -1,6 +1,11 @@
 import type { Source } from "@/lib/types";
 import { logPipelineEvent } from "@/lib/observability/logger";
 import { getPipelineIntegrationSnapshot } from "@/lib/integration/pipeline-config";
+import {
+  persistNormalizedArticleCandidates,
+  updateArticleCandidateClusters,
+  updateArticleCandidateRankingOutcomes,
+} from "@/lib/pipeline/article-candidates";
 import { clusterNormalizedArticles } from "@/lib/pipeline/clustering";
 import { deduplicateArticles } from "@/lib/pipeline/dedup";
 import { buildDigestOutput, type DigestOutput } from "@/lib/pipeline/digest";
@@ -39,9 +44,17 @@ export async function runClusterFirstPipeline(options: {
   run.used_seed_fallback = ingestion.usedSeedFallback;
 
   const normalized = normalizeRawItems(ingestion.items);
+  persistNormalizedArticleCandidates({ runId: run.run_id, articles: normalized });
   const deduped = deduplicateArticles(normalized);
   const clusters = clusterNormalizedArticles(deduped);
+  updateArticleCandidateClusters({ runId: run.run_id, clusters });
   const rankedClusters = rankSignalClusters(clusters);
+  updateArticleCandidateRankingOutcomes({
+    runId: run.run_id,
+    normalizedArticles: normalized,
+    dedupedArticles: deduped,
+    rankedClusters,
+  });
   const digest = buildDigestOutput(rankedClusters);
   const singletonCount = clusters.filter((cluster) => cluster.cluster_size === 1).length;
   const preventedMergeCount = clusters.reduce(
