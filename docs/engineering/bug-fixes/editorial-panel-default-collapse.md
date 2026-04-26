@@ -14,7 +14,7 @@ Added a client-side `SignalPostEditor` card with per-article collapsed state. Ca
 
 ## Files Changed
 
-- `src/app/dashboard/signals/editorial-review/SignalPostEditor.tsx`
+- `src/app/dashboard/signals/editorial-review/StructuredEditorialFields.tsx`
 - `src/app/dashboard/signals/editorial-review/page.tsx`
 - `src/app/dashboard/signals/editorial-review/page.test.tsx`
 - `docs/bugs/editorial-panel-default-collapse.md`

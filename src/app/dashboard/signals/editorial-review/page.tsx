@@ -12,7 +12,7 @@ import {
   publishTopSignalsAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
 import { ApproveAllButton } from "@/app/dashboard/signals/editorial-review/ApproveAllButton";
-import { SignalPostEditor } from "@/app/dashboard/signals/editorial-review/SignalPostEditor";
+import { SignalPostEditor } from "@/app/dashboard/signals/editorial-review/StructuredEditorialFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
