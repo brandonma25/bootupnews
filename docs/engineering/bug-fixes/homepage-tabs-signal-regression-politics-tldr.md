@@ -12,7 +12,21 @@
   - Follow-up correction: category tabs now prefer real non-Top category depth from `publicRankedItems` before falling back to Top 5 classification.
   - Published live homepage snapshots now preserve up to 20 published live rows as read-only `depthPosts` for tabs/depth modules while keeping the public `/signals` surface capped to the current Top 5.
   - Keep Developing Now and By Category depth modules empty in that no-depth-pool case instead of duplicating Top Events as fresh additional intelligence.
+  - Second follow-up correction: widen `signal_posts` rank storage to a bounded public depth pool and publish non-Top rows as category-depth rows when the approved Top 5 set is published. This preserves the Top 5 editorial contract while giving homepage tabs real non-Top public depth.
 - Related PRD: existing homepage category/depth behavior is governed by `docs/product/prd/prd-46-home-category-tabs.md` and `docs/product/prd/prd-57-homepage-volume-layers.md`; no new canonical PRD is required.
+- Migration/change record: `docs/engineering/change-records/2026-04-26-signal-post-public-depth-migration.md`
+
+## Data-Flow Diagnosis
+| Stage | Result |
+| --- | --- |
+| Ingestion candidate depth | Manifest-provenance pipeline test fetches 7 raw items without the non-manifest five-source cap. |
+| Normalization | 7 normalized articles are retained. |
+| Deduplication | 7 deduped articles are retained in the regression fixture. |
+| Clustering/ranking | More than 5 ranked clusters are produced when source data supports it. |
+| Digest/Top Events | Digest remains intentionally capped at 5. |
+| Publication/public read model before fix | `signal_posts` rank constraint and candidate persistence limited public signal rows to ranks 1-5. |
+| Homepage public pool before fix | Preview debug showed 5 ranked events, so tab-eligible non-Top depth was 0. |
+| Homepage public pool after fix | The table can store ranks 1-20; `/signals` still reads only Top 5; homepage snapshot can read up to 20 published live rows. |
 
 ## Validation
 - Automated checks:
@@ -24,9 +38,12 @@
   - `npm run build`
   - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium`
   - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=webkit`
-- Follow-up targeted checks:
+  - Follow-up targeted checks:
   - `npm run test -- src/lib/homepage-model.test.ts src/lib/data.test.ts src/lib/signals-editorial.test.ts`
   - Added regression coverage for non-Top category depth, Top 5-only fallback, generic editorial tags, and broader published live snapshot depth.
+  - Second follow-up targeted check:
+  - `npm run test -- src/lib/signals-editorial.test.ts src/lib/pipeline/index.test.ts src/lib/homepage-model.test.ts src/lib/data.test.ts`
+  - Added regression coverage for ranked cluster depth beyond the digest Top 5, bounded signal-post depth persistence, depth publication, and `/signals` staying capped to Top 5.
 - Local route/browser checks:
   - Local URL: `http://localhost:3000`
   - `HEAD /`, `HEAD /signals`, and `HEAD /dashboard/signals/editorial-review` returned `200`
@@ -40,3 +57,4 @@
 
 ## Remaining Risks / Follow-up
 - If production needs separate non-Top-5 depth content, a future scoped change should read a real persisted broader candidate pool instead of running ingestion during homepage SSR or presenting fallback data as live intelligence.
+- Existing previews with only five stored rows will continue to show only five until the migration is applied and a new signal snapshot with more than five candidates is persisted/published.

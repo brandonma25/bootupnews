@@ -59,6 +59,57 @@ describe("runClusterFirstPipeline", () => {
     expect(lead?.topic_keywords.length).toBeGreaterThan(0);
   });
 
+  it("keeps ranked cluster depth beyond the Top 5 digest when source data supports it", async () => {
+    const rssModule = await import("@/lib/rss");
+    const fetchFeedArticlesMock = vi.mocked(rssModule.fetchFeedArticles);
+    const sources: Source[] = Array.from({ length: 7 }, (_, index) => {
+      const sourceNumber = index + 1;
+
+      return {
+        id: `source-depth-${sourceNumber}`,
+        name: `Depth Source ${sourceNumber}`,
+        feedUrl: `https://example.com/depth-${sourceNumber}.xml`,
+        homepageUrl: `https://example.com/depth-${sourceNumber}`,
+        topicName: sourceNumber % 3 === 0 ? "Politics" : sourceNumber % 3 === 1 ? "Tech" : "Finance",
+        status: "active",
+      };
+    });
+
+    fetchFeedArticlesMock.mockImplementation(async (feedUrl, sourceName) => {
+      const sourceNumber = Number(feedUrl.match(/depth-(\d+)/)?.[1] ?? "1");
+      const stories = [
+        ["Quantum datacenter buildout accelerates", "Compute buyers reserved new accelerator capacity for frontier model training."],
+        ["Copper spreads widen across warehouses", "Metals traders repriced inventories after smelter disruptions tightened supply."],
+        ["Defense committee rewrites procurement rules", "Lawmakers advanced acquisition changes affecting missile programs and shipyards."],
+        ["Export license review slows chip shipments", "Regulators delayed approvals for advanced semiconductor equipment transfers."],
+        ["Central bank liquidity window narrows", "Money markets adjusted funding plans after overnight facility usage changed."],
+        ["Election administrators test ballot systems", "State officials completed certification drills for tabulation and chain of custody."],
+        ["Enterprise software margins reset guidance", "Cloud vendors revised operating targets after renewal discounts compressed bookings."],
+      ];
+      const [title, body] = stories[sourceNumber - 1] ?? stories[0];
+
+      return [
+        {
+          title,
+          url: `${feedUrl}/lead-story`,
+          summaryText: body,
+          contentText: body,
+          sourceName,
+          publishedAt: `2026-04-25T0${sourceNumber}:00:00.000Z`,
+        },
+      ];
+    });
+
+    const result = await runClusterFirstPipeline({ sources, suppliedByManifest: true });
+
+    expect(result.run.used_seed_fallback).toBe(false);
+    expect(result.run.num_raw_items).toBe(7);
+    expect(result.run.num_after_dedup).toBe(7);
+    expect(result.run.num_clusters).toBeGreaterThan(5);
+    expect(result.ranked_clusters.length).toBeGreaterThan(5);
+    expect(result.digest.most_important_now).toHaveLength(5);
+  });
+
   it("continues clustering and ranking when one politics source fails", async () => {
     const rssModule = await import("@/lib/rss");
     const fetchFeedArticlesMock = vi.mocked(rssModule.fetchFeedArticles);

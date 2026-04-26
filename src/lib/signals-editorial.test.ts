@@ -579,6 +579,18 @@ describe("signals editorial workflow", () => {
           editorial_status: "published",
         }),
       ),
+      createRow({
+        id: "signal-6",
+        rank: 6,
+        ai_why_it_matters: "Generated category-depth context.",
+        editorial_status: "needs_review",
+      }),
+      createRow({
+        id: "signal-7",
+        rank: 7,
+        edited_why_it_matters: "Edited category-depth context.",
+        editorial_status: "draft",
+      }),
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
@@ -594,9 +606,12 @@ describe("signals editorial workflow", () => {
     expect(rows.every((row) => row.editorial_status === "published")).toBe(true);
     expect(rows[0].published_why_it_matters).toBe("Newly approved editorial update.");
     expect(rows[1].published_why_it_matters).toBe("Existing edited 2");
+    expect(rows[5].published_why_it_matters).toBe("Generated category-depth context.");
+    expect(rows[6].published_why_it_matters).toBe("Edited category-depth context.");
+    expect(rows.slice(5).every((row) => row.is_live === true)).toBe(true);
   });
 
-  it("persists a new daily Top 5 snapshot and archives the previous live set", async () => {
+  it("persists a new daily Top 5 snapshot with bounded public depth and archives the previous live set", async () => {
     const rows = Array.from({ length: 5 }, (_, index) =>
       createRow({
         id: `live-${index + 1}`,
@@ -612,17 +627,17 @@ describe("signals editorial workflow", () => {
     const { persistSignalPostsForBriefing } = await loadEditorialModule();
     const result = await persistSignalPostsForBriefing({
       briefingDate: "2026-04-25",
-      items: Array.from({ length: 5 }, (_, index) => createBriefingItem(index + 1)),
+      items: Array.from({ length: 8 }, (_, index) => createBriefingItem(index + 1)),
     });
 
     expect(result.ok).toBe(true);
-    expect(result.insertedCount).toBe(5);
+    expect(result.insertedCount).toBe(8);
     expect(rows.filter((row) => row.briefing_date === "2026-04-24").every((row) => row.is_live === false)).toBe(true);
 
     const insertedRows = rows.filter((row) => row.briefing_date === "2026-04-25");
-    expect(insertedRows).toHaveLength(5);
+    expect(insertedRows).toHaveLength(8);
     expect(insertedRows.every((row) => row.is_live === true)).toBe(true);
-    expect(insertedRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5]);
+    expect(insertedRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it("does not overwrite an existing daily snapshot for the same briefing date", async () => {
@@ -737,22 +752,16 @@ describe("signals editorial workflow", () => {
 
   it("loads only the live published Top 5 for the public signals surface", async () => {
     const rows = [
-      createRow({
-        id: "live-1",
-        rank: 1,
-        briefing_date: "2026-04-24",
-        editorial_status: "published",
-        published_why_it_matters: "Live published 1",
-        is_live: true,
-      }),
-      createRow({
-        id: "live-2",
-        rank: 2,
-        briefing_date: "2026-04-24",
-        editorial_status: "published",
-        published_why_it_matters: "Live published 2",
-        is_live: true,
-      }),
+      ...Array.from({ length: 7 }, (_, index) =>
+        createRow({
+          id: `live-${index + 1}`,
+          rank: index + 1,
+          briefing_date: "2026-04-24",
+          editorial_status: "published",
+          published_why_it_matters: `Live published ${index + 1}`,
+          is_live: true,
+        }),
+      ),
       createRow({
         id: "archived-1",
         rank: 1,
@@ -767,8 +776,8 @@ describe("signals editorial workflow", () => {
     const { getPublishedSignalPosts } = await loadEditorialModule();
     const posts = await getPublishedSignalPosts();
 
-    expect(posts).toHaveLength(2);
-    expect(posts.map((post) => post.id)).toEqual(["live-1", "live-2"]);
+    expect(posts).toHaveLength(5);
+    expect(posts.map((post) => post.id)).toEqual(["live-1", "live-2", "live-3", "live-4", "live-5"]);
   });
 
   it("keeps a broader published live pool for homepage tab depth", async () => {
