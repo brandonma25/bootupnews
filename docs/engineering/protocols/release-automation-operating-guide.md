@@ -83,6 +83,7 @@
   - bug-fix changes require the `docs/engineering/bug-fixes/` lane
   - material feature or system changes require at least one supporting docs update in `docs/product/briefs/`, `docs/product/prd/`, `docs/engineering/bug-fixes/`, `docs/engineering/incidents/`, `docs/engineering/change-records/`, `docs/engineering/testing/`, `docs/engineering/protocols/`, `docs/product/documentation-rules.md`, or `AGENTS.md`
   - new feature or system changes require a canonical `PRD-XX` file in `docs/product/prd/` plus a matching `docs/product/feature-system.csv` mapping
+  - audit/remediation-backed feature additions may use `docs/engineering/change-records/` instead of a new canonical PRD only when the change record explicitly states that a canonical PRD is not required and cites an audit or remediation source of truth
   - material hotspot work must also update governance-facing documentation and contain the latest `origin/main` commit
   - new scripts or workflow files are treated as material governance changes by default, not as new feature/system declarations by themselves
 

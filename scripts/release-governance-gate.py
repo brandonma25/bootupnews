@@ -142,7 +142,7 @@ def main() -> int:
             "\n".join(consistency_errors),
         )
 
-    context = classify_changes(changes, branch, args.pr_title)
+    context = classify_changes(changes, branch, args.pr_title, repo_root)
     full_validation_triggered = CSV_PATH in changes or any(
         path.startswith("docs/product/prd/") for path in context.changed_paths
     )
@@ -156,6 +156,10 @@ def main() -> int:
     if context.fix_signal_reasons:
         print("fix signal:")
         for reason in context.fix_signal_reasons:
+            print(f"- {reason}")
+    if context.prd_exception_reasons:
+        print("prd exception:")
+        for reason in context.prd_exception_reasons:
             print(f"- {reason}")
     if context.hotspot_files_touched:
         print("hotspot files touched:")

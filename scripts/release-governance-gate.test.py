@@ -139,6 +139,45 @@ class GovernanceGateVelocityTests(unittest.TestCase):
         self.assertIn("Fastest valid fix", message)
         self.assertIn("docs/product/prd/prd-XX-<slug>.md", message)
 
+    def test_audit_remediation_feature_with_explicit_no_prd_change_record_uses_documented_lane(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            change_record_path = "docs/engineering/change-records/pipeline-candidate-capture.md"
+            write_file(
+                repo_root,
+                change_record_path,
+                "\n".join(
+                    [
+                        "# Change Record",
+                        "- Canonical PRD required: `no`",
+                        "- Source of truth: audit remediation gap.",
+                    ]
+                ),
+            )
+            changes = {
+                change_record_path: Change(change_record_path, "A", 3, 0),
+                "docs/engineering/testing/pipeline-candidate-capture.md": Change(
+                    "docs/engineering/testing/pipeline-candidate-capture.md", "A", 3, 0
+                ),
+                "src/lib/pipeline/article-candidates.ts": Change(
+                    "src/lib/pipeline/article-candidates.ts", "A", 40, 0
+                ),
+                "supabase/migrations/20260426090000_pipeline_article_candidates.sql": Change(
+                    "supabase/migrations/20260426090000_pipeline_article_candidates.sql", "A", 40, 0
+                ),
+            }
+
+            context = classify_changes(
+                changes,
+                "codex/pipeline-article-candidates",
+                "Add pipeline candidate capture",
+                repo_root,
+            )
+
+        self.assertEqual(context.classification, "material-feature-change")
+        self.assertTrue(context.prd_exception)
+        self.assertEqual(find_missing_doc_groups(context), [])
+
     def test_docs_only_process_change_remains_baseline(self) -> None:
         changes = {
             "docs/engineering/protocols/engineering-protocol.md": Change(
