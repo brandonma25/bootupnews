@@ -60,6 +60,8 @@ Examples:
 
 Surface Placement determines presentation and priority treatment. It does not define Signal identity.
 
+Operational note: `public.signal_posts` is legacy/runtime naming for editorial and published Surface Placement plus Card copy. It is not canonical Signal identity. See `docs/engineering/SIGNAL_POSTS_OPERATIONAL_CONTRACT.md`.
+
 ## Do / Do Not Usage
 
 | Term | Do | Do Not |
