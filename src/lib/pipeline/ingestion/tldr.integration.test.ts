@@ -3,14 +3,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ingestRawItems } from "@/lib/pipeline/ingestion";
 import type { Source } from "@/lib/types";
 
+const RECENT_TLDR_PUBLISHED_AT = new Date(Date.now() - 12 * 60 * 60 * 1000);
+const RECENT_TLDR_DATE_KEY = RECENT_TLDR_PUBLISHED_AT.toISOString().slice(0, 10);
+const RECENT_TLDR_PUB_DATE = RECENT_TLDR_PUBLISHED_AT.toUTCString();
+
 const TLDR_RSS_XML = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0">
   <channel>
     <title>TLDR Fintech RSS Feed</title>
     <item>
       <title>Digest headline</title>
-      <link>https://tldr.tech/fintech/2026-04-23</link>
-      <pubDate>Fri, 24 Apr 2026 00:00:00 GMT</pubDate>
+      <link>https://tldr.tech/fintech/${RECENT_TLDR_DATE_KEY}</link>
+      <pubDate>${RECENT_TLDR_PUB_DATE}</pubDate>
     </item>
   </channel>
 </rss>`;
@@ -74,7 +78,7 @@ describe("ingestRawItems TLDR integration", () => {
         tldrCategory: "fintech",
         normalizedUrl: "https://example.com/story-a",
         sourceDomain: "example.com",
-        tldrDigestUrl: "https://tldr.tech/fintech/2026-04-23",
+        tldrDigestUrl: `https://tldr.tech/fintech/${RECENT_TLDR_DATE_KEY}`,
       },
     });
     expect(result.source_contributions).toEqual([

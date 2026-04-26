@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fetchFeedArticles } from "@/lib/rss";
 
+const RECENT_TLDR_PUBLISHED_AT = new Date(Date.now() - 12 * 60 * 60 * 1000);
+const RECENT_TLDR_DATE_KEY = RECENT_TLDR_PUBLISHED_AT.toISOString().slice(0, 10);
+const RECENT_TLDR_PUB_DATE = RECENT_TLDR_PUBLISHED_AT.toUTCString();
+
 const RSS_XML = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0">
   <channel>
@@ -21,8 +25,8 @@ const TLDR_RSS_XML = `<?xml version="1.0" encoding="UTF-8" ?>
     <title>TLDR Product Management RSS Feed</title>
     <item>
       <title>Digest headline</title>
-      <link>https://tldr.tech/product/2026-04-24</link>
-      <pubDate>Fri, 24 Apr 2026 00:00:00 GMT</pubDate>
+      <link>https://tldr.tech/product/${RECENT_TLDR_DATE_KEY}</link>
+      <pubDate>${RECENT_TLDR_PUB_DATE}</pubDate>
     </item>
   </channel>
 </rss>`;
@@ -95,7 +99,7 @@ describe("fetchFeedArticles", () => {
           originalUrl: "https://www.cnbc.com/story?utm_source=tldrnewsletter",
           normalizedUrl: "https://cnbc.com/story",
           sourceDomain: "cnbc.com",
-          tldrDigestUrl: "https://tldr.tech/product/2026-04-24",
+          tldrDigestUrl: `https://tldr.tech/product/${RECENT_TLDR_DATE_KEY}`,
           ingestionTimestamp: expect.any(String),
         },
       },
