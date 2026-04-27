@@ -23,8 +23,6 @@ export type FlaggedWhyItMattersCard<T> = T & {
 
 const TERMINAL_PUNCTUATION_PATTERN = /[.!?]$/;
 const SIGNAL_SUFFIX_PATTERN = /\s*\(Signal:\s*[^)]+\)\s*$/i;
-const UNRESOLVED_VARIABLE_PATTERN =
-  /(?:\{\{\s*[^{}]+\s*\}\}|\{[a-z][a-z0-9_\s-]*\}|\[[a-z][a-z0-9_\s-]*\]|\$[a-z][a-z0-9_]*)/gi;
 
 const TRUNCATION_PATTERNS = [
   "so it could raise",
@@ -316,15 +314,6 @@ function detectTemplatePlaceholderLanguage(
         `Contains template placeholder phrase: "${phrase}"`,
       );
     }
-  }
-
-  const unresolvedVariables = value.match(UNRESOLVED_VARIABLE_PATTERN) ?? [];
-  for (const variable of unresolvedVariables) {
-    addFailure(
-      failures,
-      "template_placeholder_language",
-      `Contains unresolved template variable: "${variable}"`,
-    );
   }
 }
 

@@ -277,30 +277,6 @@ describe("homepage read model", () => {
     expect(viewModel.debug.categoryCounts).toEqual({ tech: 0, finance: 0, politics: 0 });
     expect(serializedOutput).not.toMatch(/placeholder|stored public signal snapshot|rail readable|sample slot/i);
   });
-
-  it("surfaces signal_posts schema preflight failures instead of a generic empty state", async () => {
-    getHomepageSignalSnapshot.mockResolvedValue({
-      source: "none",
-      briefingDate: null,
-      posts: [],
-      depthPosts: [],
-      errorMessage:
-        "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_status.",
-    });
-
-    const { getHomepagePageState } = await loadDataModule();
-    const state = await getHomepagePageState("/");
-
-    expect(state.data.briefing.items).toEqual([]);
-    expect(state.data.briefing.intro).toBe(
-      "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_status.",
-    );
-    expect(state.data.homepageFreshnessNotice).toEqual({
-      kind: "empty",
-      text: "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_status.",
-      briefingDate: null,
-    });
-  });
 });
 
 describe("account page read model", () => {

@@ -57,8 +57,8 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
     post.persisted &&
     ["draft", "needs_review"].includes(post.editorialStatus) &&
     post.whyItMattersValidationStatus !== "requires_human_rewrite";
+  const canPublishPost = post.editorialStatus === "approved";
   const requiresHumanRewrite = post.whyItMattersValidationStatus === "requires_human_rewrite";
-  const canPublishPost = post.editorialStatus === "approved" && !requiresHumanRewrite;
   const toggleLabel = isExpanded ? "Collapse" : "Expand";
   const panelId = `editorial-panel-${post.id}`;
 
@@ -420,10 +420,6 @@ function FieldBlock({
 }
 
 function getPostStateHint(post: EditorialSignalPost) {
-  if (post.whyItMattersValidationStatus === "requires_human_rewrite") {
-    return "Rewrite the Why it matters copy and approve again before this card can publish.";
-  }
-
   if (post.editorialStatus === "approved") {
     return "Approved and waiting to publish. Publish this card or use Publish Top 5 Signals when the full Top 5 is ready.";
   }

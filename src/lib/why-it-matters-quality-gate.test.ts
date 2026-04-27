@@ -38,22 +38,6 @@ describe("why-it-matters quality gate", () => {
     );
   });
 
-  it("flags unresolved template variables as placeholder language", () => {
-    const result = validateWhyItMatters(
-      "Google changes the [category] baseline because {actor} can move {{market_structure}} expectations.",
-    );
-
-    expect(result.passed).toBe(false);
-    expect(result.failures).toContain("template_placeholder_language");
-    expect(result.failureDetails).toEqual(
-      expect.arrayContaining([
-        'template_placeholder_language: Contains unresolved template variable: "[category]"',
-        'template_placeholder_language: Contains unresolved template variable: "{actor}"',
-        'template_placeholder_language: Contains unresolved template variable: "{{market_structure}}"',
-      ]),
-    );
-  });
-
   it("flags abstract variable lists from homepage audit card #2", () => {
     const result = validateWhyItMatters(AUDIT_CARD_2);
 

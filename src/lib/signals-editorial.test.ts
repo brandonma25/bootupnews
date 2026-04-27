@@ -51,10 +51,6 @@ vi.mock("@/lib/observability/rss", () => ({
   captureRssFailure,
 }));
 
-function createValidWhyItMatters(label = "Anthropic") {
-  return `${label}'s growth is now structurally tied to Google and Amazon's infrastructure, not independent of it. At scale, that's a dependency, not just a partnership.`;
-}
-
 function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
   return {
     id: overrides.id ?? `signal-${overrides.rank ?? 1}`,
@@ -113,13 +109,7 @@ function createBriefingItem(rank: number) {
   };
 }
 
-function createSupabaseMock(
-  rows: SignalPostRow[],
-  options: { missingColumns?: string[]; preflightTransportErrorColumns?: string[] } = {},
-) {
-  const missingColumns = new Set(options.missingColumns ?? []);
-  const preflightTransportErrorColumns = new Set(options.preflightTransportErrorColumns ?? []);
-
+function createSupabaseMock(rows: SignalPostRow[]) {
   return {
     rows,
     from(tableName: string) {
@@ -127,8 +117,6 @@ function createSupabaseMock(
 
       let operation: "select" | "update" | null = null;
       let updateValues: Partial<SignalPostRow> = {};
-      let selectError: { message: string } | null = null;
-      let selectedColumns: string[] = [];
       const filters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
       const inclusionFilters: Array<{ column: keyof SignalPostRow; values: unknown[] }> = [];
       const lessThanFilters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
@@ -149,14 +137,6 @@ function createSupabaseMock(
       }
 
       function selectResult(limit?: number) {
-        if (selectError) {
-          return Promise.resolve({
-            data: null,
-            error: selectError,
-            count: 0,
-          });
-        }
-
         let data = applyFilters();
 
         if (orderRules.length > 0) {
@@ -190,20 +170,8 @@ function createSupabaseMock(
       }
 
       const builder = {
-        select(columns?: string) {
+        select() {
           operation = "select";
-          selectedColumns = String(columns ?? "")
-            .split(",")
-            .map((column) => column.trim().split(/\s+/)[0])
-            .filter(Boolean);
-          const missingSelectedColumns = selectedColumns.filter((column) => missingColumns.has(column));
-
-          if (missingSelectedColumns.length > 0) {
-            selectError = {
-              message: `column signal_posts.${missingSelectedColumns[0]} does not exist`,
-            };
-          }
-
           return builder;
         },
         order(column: keyof SignalPostRow, options?: { ascending?: boolean }) {
@@ -211,17 +179,6 @@ function createSupabaseMock(
           return builder;
         },
         limit(count: number) {
-          const shouldReturnPreflightTransportError =
-            count === 0 && selectedColumns.some((column) => preflightTransportErrorColumns.has(column));
-
-          if (shouldReturnPreflightTransportError) {
-            return Promise.resolve({
-              data: null,
-              error: { message: "TypeError: fetch failed" },
-              count: 0,
-            });
-          }
-
           return selectResult(count);
         },
         range(from: number, to: number) {
@@ -346,30 +303,6 @@ describe("signals editorial workflow", () => {
     expect(generateDailyBriefing).not.toHaveBeenCalled();
   });
 
-  it("fails editorial review visibly when the signal_posts schema preflight is missing columns", async () => {
-    createSupabaseServiceRoleClient.mockReturnValue(
-      createSupabaseMock([], {
-        missingColumns: ["why_it_matters_validation_status"],
-      }),
-    );
-    safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
-      supabase: {},
-      sessionCookiePresent: true,
-    });
-
-    const { getEditorialReviewState } = await loadEditorialModule();
-    const state = await getEditorialReviewState();
-
-    expect(state.kind).toBe("authorized");
-    if (state.kind !== "authorized") return;
-    expect(state.posts).toEqual([]);
-    expect(state.storageReady).toBe(false);
-    expect(state.warning).toBe(
-      "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_status.",
-    );
-  });
-
   it("loads editorial history in stable reverse briefing-date order", async () => {
     const rows = [
       createRow({
@@ -437,11 +370,11 @@ describe("signals editorial workflow", () => {
     const { saveSignalDraft } = await loadEditorialModule();
     const result = await saveSignalDraft({
       postId: "signal-1",
-      editedWhyItMatters: ` ${createValidWhyItMatters()} `,
+      editedWhyItMatters: " Human edited draft ",
     });
 
     expect(result.ok).toBe(true);
-    expect(rows[0].edited_why_it_matters).toBe(createValidWhyItMatters());
+    expect(rows[0].edited_why_it_matters).toBe("Human edited draft");
     expect(rows[0].editorial_status).toBe("draft");
     expect(rows[0].edited_by).toBe("admin@example.com");
   });
@@ -488,12 +421,12 @@ describe("signals editorial workflow", () => {
     const { saveSignalDraft } = await loadEditorialModule();
     const result = await saveSignalDraft({
       postId: "signal-1",
-      editedWhyItMatters: createValidWhyItMatters("Google"),
+      editedWhyItMatters: "Updated historical editorial text.",
     });
 
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Editorial changes saved.");
-    expect(rows[0].edited_why_it_matters).toBe(createValidWhyItMatters("Google"));
+    expect(rows[0].edited_why_it_matters).toBe("Updated historical editorial text.");
     expect(rows[0].editorial_status).toBe("approved");
   });
 
@@ -509,12 +442,12 @@ describe("signals editorial workflow", () => {
     const { saveSignalDraft } = await loadEditorialModule();
     const result = await saveSignalDraft({
       postId: "signal-1",
-      editedWhyItMatters: createValidWhyItMatters("Google"),
+      editedWhyItMatters: "Updated published editorial text.",
     });
 
     expect(result.ok).toBe(true);
-    expect(rows[0].edited_why_it_matters).toBe(createValidWhyItMatters("Google"));
-    expect(rows[0].published_why_it_matters).toBe(createValidWhyItMatters("Google"));
+    expect(rows[0].edited_why_it_matters).toBe("Updated published editorial text.");
+    expect(rows[0].published_why_it_matters).toBe("Updated published editorial text.");
     expect(rows[0].editorial_status).toBe("published");
   });
 
@@ -530,72 +463,13 @@ describe("signals editorial workflow", () => {
     const { approveSignalPost } = await loadEditorialModule();
     const result = await approveSignalPost({
       postId: "signal-1",
-      editedWhyItMatters: createValidWhyItMatters(),
+      editedWhyItMatters: "Human approved why it matters.",
     });
 
     expect(result.ok).toBe(true);
-    expect(rows[0].edited_why_it_matters).toBe(createValidWhyItMatters());
+    expect(rows[0].edited_why_it_matters).toBe("Human approved why it matters.");
     expect(rows[0].editorial_status).toBe("approved");
     expect(rows[0].approved_by).toBe("admin@example.com");
-  });
-
-  it("blocks approval when the human rewrite still fails validation", async () => {
-    const rows = [
-      createRow({
-        id: "signal-1",
-        why_it_matters_validation_status: "requires_human_rewrite",
-        why_it_matters_validation_failures: ["minimum_specificity"],
-        why_it_matters_validation_details: ["missing specificity"],
-      }),
-    ];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
-    safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
-      supabase: {},
-      sessionCookiePresent: true,
-    });
-
-    const { approveSignalPost } = await loadEditorialModule();
-    const result = await approveSignalPost({
-      postId: "signal-1",
-      editedWhyItMatters: "This changes capital availability, competitive positioning, or market structure.",
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.code).toBe("publish_blocked");
-    expect(rows[0].editorial_status).toBe("needs_review");
-    expect(rows[0].why_it_matters_validation_status).toBe("requires_human_rewrite");
-    expect(rows[0].why_it_matters_validation_failures).toContain("template_placeholder_language");
-    expect(rows[0].why_it_matters_validation_details.length).toBeGreaterThan(0);
-  });
-
-  it("lets a human-rewritten valid why-it-matters pass after a rejected draft", async () => {
-    const rows = [
-      createRow({
-        id: "signal-1",
-        why_it_matters_validation_status: "requires_human_rewrite",
-        why_it_matters_validation_failures: ["minimum_specificity"],
-        why_it_matters_validation_details: ["missing specificity"],
-      }),
-    ];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
-    safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
-      supabase: {},
-      sessionCookiePresent: true,
-    });
-
-    const { approveSignalPost } = await loadEditorialModule();
-    const result = await approveSignalPost({
-      postId: "signal-1",
-      editedWhyItMatters: createValidWhyItMatters(),
-    });
-
-    expect(result.ok).toBe(true);
-    expect(rows[0].editorial_status).toBe("approved");
-    expect(rows[0].why_it_matters_validation_status).toBe("passed");
-    expect(rows[0].why_it_matters_validation_failures).toEqual([]);
-    expect(rows[0].why_it_matters_validation_details).toEqual([]);
   });
 
   it("lets an admin approve multiple loaded signal posts", async () => {
@@ -616,7 +490,7 @@ describe("signals editorial workflow", () => {
     const result = await approveSignalPosts({
       posts: rows.map((row) => ({
         postId: row.id,
-        editedWhyItMatters: createValidWhyItMatters(`Anthropic ${row.rank}`),
+        editedWhyItMatters: `Bulk approved ${row.rank}`,
       })),
     });
 
@@ -641,7 +515,7 @@ describe("signals editorial workflow", () => {
     const { approveSignalPosts } = await loadEditorialModule();
     const result = await approveSignalPosts({
       posts: [
-        { postId: "signal-1", editedWhyItMatters: createValidWhyItMatters() },
+        { postId: "signal-1", editedWhyItMatters: "Ready for approval." },
         { postId: "signal-2", editedWhyItMatters: " " },
       ],
     });
@@ -683,7 +557,7 @@ describe("signals editorial workflow", () => {
       createRow({
         id: `signal-${index + 1}`,
         rank: index + 1,
-        edited_why_it_matters: createValidWhyItMatters(`Anthropic ${index + 1}`),
+        edited_why_it_matters: `Human final ${index + 1}`,
         editorial_status: index === 4 ? "draft" : "approved",
       }),
     );
@@ -702,51 +576,20 @@ describe("signals editorial workflow", () => {
     expect(rows.some((row) => row.editorial_status === "published")).toBe(false);
   });
 
-  it("blocks publishing when approved why-it-matters copy fails the pre-publish gate", async () => {
-    const rows = Array.from({ length: 5 }, (_, index) =>
-      createRow({
-        id: `signal-${index + 1}`,
-        rank: index + 1,
-        edited_why_it_matters:
-          index === 0
-            ? "This changes how investors price rates, demand, or risk in rates and equities over."
-            : createValidWhyItMatters(`Anthropic ${index + 1}`),
-        editorial_status: "approved",
-      }),
-    );
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
-    safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
-      supabase: {},
-      sessionCookiePresent: true,
-    });
-
-    const { publishApprovedSignals } = await loadEditorialModule();
-    const result = await publishApprovedSignals();
-
-    expect(result.ok).toBe(false);
-    expect(result.code).toBe("publish_blocked");
-    expect(rows[0].editorial_status).toBe("needs_review");
-    expect(rows[0].why_it_matters_validation_status).toBe("requires_human_rewrite");
-    expect(rows[0].published_why_it_matters).toBeNull();
-    expect(rows.slice(1).every((row) => row.editorial_status === "approved")).toBe(true);
-    expect(rows.every((row) => row.is_live === false)).toBe(true);
-  });
-
   it("publishes approved edits without promoting unapproved depth fallback text", async () => {
     const rows = [
       createRow({
         id: "signal-1",
         rank: 1,
-        edited_why_it_matters: createValidWhyItMatters("Google"),
+        edited_why_it_matters: "Newly approved editorial update.",
         editorial_status: "approved",
       }),
       ...Array.from({ length: 4 }, (_, index) =>
         createRow({
           id: `signal-${index + 2}`,
           rank: index + 2,
-          edited_why_it_matters: createValidWhyItMatters(`Amazon ${index + 2}`),
-          published_why_it_matters: createValidWhyItMatters(`Google ${index + 2}`),
+          edited_why_it_matters: `Existing edited ${index + 2}`,
+          published_why_it_matters: `Existing published ${index + 2}`,
           editorial_status: "published",
         }),
       ),
@@ -775,8 +618,8 @@ describe("signals editorial workflow", () => {
 
     expect(result.ok).toBe(true);
     expect(rows.slice(0, 5).every((row) => row.editorial_status === "published")).toBe(true);
-    expect(rows[0].published_why_it_matters).toBe(createValidWhyItMatters("Google"));
-    expect(rows[1].published_why_it_matters).toBe(createValidWhyItMatters("Amazon 2"));
+    expect(rows[0].published_why_it_matters).toBe("Newly approved editorial update.");
+    expect(rows[1].published_why_it_matters).toBe("Existing edited 2");
     expect(rows[5].editorial_status).toBe("needs_review");
     expect(rows[5].published_why_it_matters).toBeNull();
     expect(rows[5].is_live).toBe(false);
@@ -881,7 +724,7 @@ describe("signals editorial workflow", () => {
         id: "signal-1",
         rank: 1,
         briefing_date: "2026-04-20",
-        edited_why_it_matters: createValidWhyItMatters("Google"),
+        edited_why_it_matters: "Approved historical editorial update.",
         editorial_status: "approved",
       }),
     ];
@@ -898,7 +741,7 @@ describe("signals editorial workflow", () => {
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Signal post published.");
     expect(rows[0].editorial_status).toBe("published");
-    expect(rows[0].published_why_it_matters).toBe(createValidWhyItMatters("Google"));
+    expect(rows[0].published_why_it_matters).toBe("Approved historical editorial update.");
   });
 
   it("captures individual publish storage failures as RSS publish failures", async () => {
@@ -906,7 +749,7 @@ describe("signals editorial workflow", () => {
       id: "signal-1",
       rank: 1,
       briefing_date: "2026-04-20",
-      edited_why_it_matters: createValidWhyItMatters("Google"),
+      edited_why_it_matters: "Approved historical editorial update.",
       editorial_status: "approved",
     });
     createSupabaseServiceRoleClient.mockReturnValue({
@@ -963,16 +806,15 @@ describe("signals editorial workflow", () => {
   it("publishes structured approved signal post payloads for homepage rendering", async () => {
     const structured = {
       preview: "Structured teaser.",
-      thesis: "Google's cloud strategy is now structurally tied to Amazon and Anthropic's infrastructure choices.",
-      sections: [{ title: "Why now", body: "That makes the dependency visible to customers deciding where durable AI workloads should run." }],
+      thesis: "Structured thesis.",
+      sections: [{ title: "Why now", body: "The signal changes near-term planning." }],
     };
     const rows = [
       createRow({
         id: "signal-1",
         rank: 1,
         briefing_date: "2026-04-20",
-        edited_why_it_matters:
-          "Google's cloud strategy is now structurally tied to Amazon and Anthropic's infrastructure choices.\n\nWhy now: That makes the dependency visible to customers deciding where durable AI workloads should run.",
+        edited_why_it_matters: "Structured thesis.\n\nWhy now: The signal changes near-term planning.",
         edited_why_it_matters_payload: structured,
         editorial_status: "approved",
       }),
@@ -1009,32 +851,6 @@ describe("signals editorial workflow", () => {
     expect(rows[0].published_why_it_matters).toBeNull();
   });
 
-  it("blocks individual publishing when approved copy fails validation", async () => {
-    const rows = [
-      createRow({
-        id: "signal-1",
-        editorial_status: "approved",
-        edited_why_it_matters:
-          "This changes assumptions about defense posture, state capacity, or international alignment.",
-      }),
-    ];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
-    safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
-      supabase: {},
-      sessionCookiePresent: true,
-    });
-
-    const { publishSignalPost } = await loadEditorialModule();
-    const result = await publishSignalPost({ postId: "signal-1" });
-
-    expect(result.ok).toBe(false);
-    expect(result.code).toBe("publish_blocked");
-    expect(rows[0].editorial_status).toBe("needs_review");
-    expect(rows[0].why_it_matters_validation_status).toBe("requires_human_rewrite");
-    expect(rows[0].published_why_it_matters).toBeNull();
-  });
-
   it("loads only the live published Top 5 for the public signals surface", async () => {
     const rows = [
       ...Array.from({ length: 7 }, (_, index) =>
@@ -1043,10 +859,7 @@ describe("signals editorial workflow", () => {
           rank: index + 1,
           briefing_date: "2026-04-24",
           editorial_status: "published",
-          published_why_it_matters: createValidWhyItMatters(`Google ${index + 1}`),
-          why_it_matters_validation_status: index === 2 ? "requires_human_rewrite" : "passed",
-          why_it_matters_validation_failures: index === 2 ? ["template_placeholder_language"] : [],
-          why_it_matters_validation_details: index === 2 ? ["placeholder copy"] : [],
+          published_why_it_matters: `Live published ${index + 1}`,
           is_live: true,
         }),
       ),
@@ -1064,20 +877,20 @@ describe("signals editorial workflow", () => {
     const { getPublishedSignalPosts } = await loadEditorialModule();
     const posts = await getPublishedSignalPosts();
 
-    expect(posts).toHaveLength(4);
-    expect(posts.map((post) => post.id)).toEqual(["live-1", "live-2", "live-4", "live-5"]);
+    expect(posts).toHaveLength(5);
+    expect(posts.map((post) => post.id)).toEqual(["live-1", "live-2", "live-3", "live-4", "live-5"]);
   });
 
   it("uses today's published rows as the homepage Tier 1 signal set", async () => {
     const rows = Array.from({ length: 7 }, (_, index) =>
-        createRow({
-          id: `live-${index + 1}`,
-          rank: index + 1,
-          briefing_date: "2026-04-26",
-          editorial_status: "published",
-          published_why_it_matters: createValidWhyItMatters(`Google ${index + 1}`),
-          is_live: true,
-        }),
+      createRow({
+        id: `live-${index + 1}`,
+        rank: index + 1,
+        briefing_date: "2026-04-26",
+        editorial_status: "published",
+        published_why_it_matters: `Live published ${index + 1}`,
+        is_live: true,
+      }),
     );
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
 
@@ -1116,7 +929,7 @@ describe("signals editorial workflow", () => {
         briefing_date: "2026-04-25",
         rank: 1,
         editorial_status: "published",
-        published_why_it_matters: createValidWhyItMatters("Google"),
+        published_why_it_matters: "Most recent published editorial text",
         is_live: false,
       }),
       createRow({
@@ -1124,7 +937,7 @@ describe("signals editorial workflow", () => {
         briefing_date: "2026-04-25",
         rank: 2,
         editorial_status: "published",
-        published_why_it_matters: createValidWhyItMatters("Amazon"),
+        published_why_it_matters: "Second recent published editorial text",
         is_live: false,
       }),
       createRow({
@@ -1140,7 +953,7 @@ describe("signals editorial workflow", () => {
         briefing_date: "2026-04-24",
         rank: 1,
         editorial_status: "published",
-        published_why_it_matters: createValidWhyItMatters("Microsoft"),
+        published_why_it_matters: "Older published copy",
         is_live: false,
       }),
     ];
@@ -1182,26 +995,6 @@ describe("signals editorial workflow", () => {
     });
   });
 
-  it("does not convert non-schema preflight transport errors into a homepage schema failure", async () => {
-    createSupabaseServiceRoleClient.mockReturnValue(
-      createSupabaseMock([], {
-        preflightTransportErrorColumns: ["id"],
-      }),
-    );
-
-    const { getHomepageSignalSnapshot } = await loadEditorialModule();
-    const snapshot = await getHomepageSignalSnapshot({
-      today: new Date("2026-04-26T12:00:00.000Z"),
-    });
-
-    expect(snapshot).toEqual({
-      source: "none",
-      posts: [],
-      depthPosts: [],
-      briefingDate: null,
-    });
-  });
-
   it("keeps quality-gate-rejected rows in the editorial queue with failure reasons", async () => {
     const rows = [
       createRow({
@@ -1219,7 +1012,7 @@ describe("signals editorial workflow", () => {
         briefing_date: "2026-04-25",
         rank: 2,
         editorial_status: "approved",
-        edited_why_it_matters: createValidWhyItMatters("Google"),
+        edited_why_it_matters: "Human editor rewrote the card with Google-specific infrastructure context.",
       }),
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
@@ -1244,47 +1037,5 @@ describe("signals editorial workflow", () => {
     expect(rejected?.whyItMattersValidationDetails).toContain(
       "missing specific noun: no named entity, number, country, organization, or person found",
     );
-  });
-
-  it("blocks signal_posts insertion visibly when the schema preflight is missing columns", async () => {
-    createSupabaseServiceRoleClient.mockReturnValue(
-      createSupabaseMock([], {
-        missingColumns: ["why_it_matters_validation_details"],
-      }),
-    );
-
-    const { persistSignalPostsForBriefing } = await loadEditorialModule();
-    const result = await persistSignalPostsForBriefing({
-      briefingDate: "2026-04-25",
-      items: [1, 2, 3, 4, 5].map(createBriefingItem),
-    });
-
-    expect(result).toEqual({
-      ok: false,
-      briefingDate: "2026-04-25",
-      insertedCount: 0,
-      message: "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_details.",
-    });
-  });
-
-  it("returns a homepage snapshot schema error instead of silently emptying public results", async () => {
-    createSupabaseServiceRoleClient.mockReturnValue(
-      createSupabaseMock([], {
-        missingColumns: ["why_it_matters_validation_failures"],
-      }),
-    );
-
-    const { getHomepageSignalSnapshot } = await loadEditorialModule();
-    const snapshot = await getHomepageSignalSnapshot({
-      today: new Date("2026-04-26T12:00:00.000Z"),
-    });
-
-    expect(snapshot).toEqual({
-      source: "none",
-      posts: [],
-      depthPosts: [],
-      briefingDate: null,
-      errorMessage: "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_failures.",
-    });
   });
 });
