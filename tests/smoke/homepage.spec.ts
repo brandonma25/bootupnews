@@ -1,12 +1,17 @@
 import { expect, test } from "../utils/audit-fixture";
 
 test.describe("homepage smoke", () => {
-  test("loads the public V1 homepage and opens the full briefing", async ({ page }) => {
+  test("loads the public V1 homepage and respects the current fallback state", async ({ page }) => {
     await page.goto("/");
 
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
 
     const detailLink = page.getByRole("link", { name: "Details" }).first();
+    if (!(await detailLink.isVisible())) {
+      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expect(page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail/i)).toHaveCount(0);
+      return;
+    }
 
     await expect(detailLink).toBeVisible();
     await detailLink.click();

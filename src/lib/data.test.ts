@@ -169,9 +169,9 @@ describe("homepage read model", () => {
     });
   });
 
-  it("prefers the latest stored signal snapshot over demo briefing copy", async () => {
+  it("uses the most recent published signal set as Tier 2 when today's set is unavailable", async () => {
     getHomepageSignalSnapshot.mockResolvedValue({
-      source: "latest_snapshot",
+      source: "recent_published",
       briefingDate: "2026-04-25",
       posts: [
         createHomepageSignalPost({
@@ -180,7 +180,8 @@ describe("homepage read model", () => {
           title: "Stored finance signal",
           tags: ["finance", "markets"],
           summary: "Stored finance summary",
-          editedWhyItMatters: "Stored finance editorial note",
+          editorialStatus: "published",
+          publishedWhyItMatters: "Stored finance editorial note",
         }),
         createHomepageSignalPost({
           id: "tech-1",
@@ -188,7 +189,8 @@ describe("homepage read model", () => {
           title: "Stored tech signal",
           tags: ["tech", "software"],
           summary: "Stored tech summary",
-          editedWhyItMatters: "Stored tech editorial note",
+          editorialStatus: "published",
+          publishedWhyItMatters: "Stored tech editorial note",
         }),
       ],
       depthPosts: [
@@ -198,7 +200,8 @@ describe("homepage read model", () => {
           title: "Stored finance signal",
           tags: ["finance", "markets"],
           summary: "Stored finance summary",
-          editedWhyItMatters: "Stored finance editorial note",
+          editorialStatus: "published",
+          publishedWhyItMatters: "Stored finance editorial note",
         }),
         createHomepageSignalPost({
           id: "tech-1",
@@ -206,7 +209,8 @@ describe("homepage read model", () => {
           title: "Stored tech signal",
           tags: ["tech", "software"],
           summary: "Stored tech summary",
-          editedWhyItMatters: "Stored tech editorial note",
+          editorialStatus: "published",
+          publishedWhyItMatters: "Stored tech editorial note",
         }),
         createHomepageSignalPost({
           id: "tech-depth-1",
@@ -214,7 +218,8 @@ describe("homepage read model", () => {
           title: "Stored tech depth signal",
           tags: ["tech", "software"],
           summary: "Stored tech depth summary",
-          editedWhyItMatters: "Stored tech depth editorial note",
+          editorialStatus: "published",
+          publishedWhyItMatters: "Stored tech depth editorial note",
         }),
       ],
     });
@@ -222,7 +227,14 @@ describe("homepage read model", () => {
     const { getHomepagePageState } = await loadDataModule();
     const state = await getHomepagePageState("/");
 
-    expect(state.data.briefing.intro).toMatch(/latest stored Top 5 snapshot/i);
+    expect(state.data.briefing.intro).toBe(
+      "Today's briefing is being prepared. Showing the most recently published signal set with its original date.",
+    );
+    expect(state.data.homepageFreshnessNotice).toEqual({
+      kind: "stale",
+      text: "Last updated Saturday, April 25 — Today's briefing is being prepared.",
+      briefingDate: "2026-04-25",
+    });
     expect(state.data.briefing.items.map((item) => item.title)).toEqual([
       "Stored finance signal",
       "Stored tech signal",
@@ -230,10 +242,15 @@ describe("homepage read model", () => {
     expect(
       state.data.briefing.items.some((item) => /static sample copy|public finance briefing now surfaces/i.test(item.title)),
     ).toBe(false);
+    expect(state.data.briefing.items.map((item) => item.whyItMatters)).toEqual([
+      "Stored finance editorial note",
+      "Stored tech editorial note",
+    ]);
+    expect(state.data.briefing.items.some((item) => item.whyItMatters === "Stored AI why it matters")).toBe(false);
     expect(state.data.publicRankedItems?.map((item) => item.title)).toContain("Stored tech depth signal");
   }, 10_000);
 
-  it("uses clearly labeled category-specific placeholders when no stored snapshot exists", async () => {
+  it("uses the Tier 3 honest empty state when no published signal set exists", async () => {
     getHomepageSignalSnapshot.mockResolvedValue({
       source: "none",
       briefingDate: null,
@@ -245,14 +262,20 @@ describe("homepage read model", () => {
     const { buildHomepageViewModel } = await import("@/lib/homepage-model");
     const state = await getHomepagePageState("/");
     const viewModel = buildHomepageViewModel(state.data);
+    const serializedOutput = JSON.stringify(state.data);
 
-    expect(state.data.briefing.intro).toMatch(/clearly labeled category placeholders/i);
-    expect(
-      state.data.briefing.items.some((item) => /static sample copy|live business feeds|live headlines/i.test(item.title)),
-    ).toBe(false);
-    expect(viewModel.debug.categoryCounts.tech).toBeGreaterThan(0);
-    expect(viewModel.debug.categoryCounts.finance).toBeGreaterThan(0);
-    expect(viewModel.debug.categoryCounts.politics).toBeGreaterThan(0);
+    expect(state.data.briefing.intro).toBe("Today's briefing is being prepared.");
+    expect(state.data.briefing.items).toEqual([]);
+    expect(state.data.publicRankedItems).toEqual([]);
+    expect(state.data.homepageFreshnessNotice).toEqual({
+      kind: "empty",
+      text: "Today's briefing is being prepared.",
+      briefingDate: null,
+    });
+    expect(viewModel.featured).toBeNull();
+    expect(viewModel.topRanked).toEqual([]);
+    expect(viewModel.debug.categoryCounts).toEqual({ tech: 0, finance: 0, politics: 0 });
+    expect(serializedOutput).not.toMatch(/placeholder|stored public signal snapshot|rail readable|sample slot/i);
   });
 });
 

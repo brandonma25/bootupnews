@@ -47,6 +47,7 @@ function createData(
   items: BriefingItem[],
   options: {
     publicRankedItems?: BriefingItem[] | null;
+    homepageFreshnessNotice?: DashboardData["homepageFreshnessNotice"];
   } = {},
 ): DashboardData {
   return {
@@ -61,6 +62,7 @@ function createData(
     },
     publicRankedItems:
       options.publicRankedItems === null ? undefined : (options.publicRankedItems ?? items),
+    homepageFreshnessNotice: options.homepageFreshnessNotice,
     topics: [
       { id: "tech", name: "Tech", description: "Tech coverage", color: "#294f86" },
       { id: "finance", name: "Finance", description: "Finance coverage", color: "#1f4f46" },
@@ -410,6 +412,87 @@ describe("LandingHomepage", () => {
 
     expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
     expect(screen.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
+  });
+
+  it("does not render a Why it matters section when no approved copy is available", () => {
+    const data = createData([
+      createItem({
+        id: "no-approved-why",
+        whyItMatters: "",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.queryByText("Why it matters")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("home-why-it-matters-text")).not.toBeInTheDocument();
+  });
+
+  it("renders the Tier 2 freshness notice as a distinct homepage indicator", () => {
+    const data = createData(
+      [
+        createItem({
+          id: "recent-published-card",
+          title: "Previously published signal",
+          whyItMatters: "Human-approved context from the prior published set.",
+          publishedWhyItMatters: "Human-approved context from the prior published set.",
+          editorialStatus: "published",
+        }),
+      ],
+      {
+        homepageFreshnessNotice: {
+          kind: "stale",
+          text: "Last updated Sunday, April 26 — Today's briefing is being prepared.",
+          briefingDate: "2026-04-26",
+        },
+      },
+    );
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Monday, April 27, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-freshness-notice")).toHaveTextContent(
+      "Last updated Sunday, April 26 — Today's briefing is being prepared.",
+    );
+    expect(screen.getByText("Previously published signal")).toBeInTheDocument();
+  });
+
+  it("renders the Tier 3 empty state without static placeholder copy", () => {
+    const data = createData([], {
+      homepageFreshnessNotice: {
+        kind: "empty",
+        text: "Today's briefing is being prepared.",
+        briefingDate: null,
+      },
+    });
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Monday, April 27, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-freshness-notice")).toHaveTextContent(
+      "Today's briefing is being prepared.",
+    );
+    expect(screen.getAllByText("Today's briefing is being prepared.").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/placeholder|stored public signal snapshot|rail readable|sample slot/i)).not.toBeInTheDocument();
   });
 
   it("renders keyPoints from BriefingItem.keyPoints without substituting internal fields", () => {

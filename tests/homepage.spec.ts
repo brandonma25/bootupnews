@@ -1,4 +1,12 @@
+import type { Page } from "@playwright/test";
+
 import { expect, test } from "./utils/audit-fixture";
+
+async function expectNoStaticHomepagePlaceholder(page: Page) {
+  await expect(
+    page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail|rail readable/i),
+  ).toHaveCount(0);
+}
 
 test.describe("homepage", () => {
   test("renders the public V1 briefing flow", async ({ page, diagnostics }) => {
@@ -6,7 +14,12 @@ test.describe("homepage", () => {
 
     await expect(page).toHaveTitle(/Daily Intelligence Briefing/i);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("link", { name: "Details" }).first()).toBeVisible();
+    if (await page.getByRole("link", { name: "Details" }).first().isVisible()) {
+      await expect(page.getByRole("link", { name: "Details" }).first()).toBeVisible();
+    } else {
+      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+    }
+    await expectNoStaticHomepagePlaceholder(page);
     await expect(page.getByText("Daily Intelligence Aggregator")).toHaveCount(0);
     expect(diagnostics.entries).toEqual([]);
   });
@@ -29,9 +42,17 @@ test.describe("homepage", () => {
 
     await expect(dateLabel).toBeVisible();
     await expect(topEventsTab).toHaveAttribute("aria-selected", "true");
-    await expect(topEventCards.first()).toBeVisible();
 
     const topEventCount = await topEventCards.count();
+    if (topEventCount === 0) {
+      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expect(page.getByRole("link", { name: "Details" })).toHaveCount(0);
+      await expectNoStaticHomepagePlaceholder(page);
+      expect(diagnostics.entries).toEqual([]);
+      return;
+    }
+
+    await expect(topEventCards.first()).toBeVisible();
     expect(topEventCount).toBeGreaterThanOrEqual(3);
     expect(topEventCount).toBeLessThanOrEqual(5);
 
@@ -105,12 +126,21 @@ test.describe("homepage", () => {
     expect(diagnostics.entries).toEqual([]);
   });
 
-  test("shows the signed-out category soft gate without duplicating Top Events", async ({ page, diagnostics }) => {
+  test("shows the signed-out category soft gate without duplicating Top Events when depth content exists", async ({ page, diagnostics }) => {
     await page.goto("/");
 
     const topEventCards = page.getByTestId("home-top-event-card");
     const gateCopy = "Create a free account to read Tech News, Economics, and Politics";
     const techNewsTab = page.getByRole("tab", { name: "Tech News" });
+    const topEventCount = await topEventCards.count();
+
+    if (topEventCount === 0) {
+      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expect(page.getByText(gateCopy)).toHaveCount(0);
+      await expectNoStaticHomepagePlaceholder(page);
+      expect(diagnostics.entries).toEqual([]);
+      return;
+    }
 
     await expect(topEventCards.first()).toBeVisible();
     await expect(page.getByText(gateCopy)).toHaveCount(0);

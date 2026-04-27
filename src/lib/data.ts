@@ -217,173 +217,6 @@ const PIPELINE_TOPIC_ALIASES: Record<"tech" | "finance" | "politics", string[]> 
 const BRIEFING_SELECT =
   "id, briefing_date, title, intro, reading_window, briefing_items(id, topic_id, topic_name, title, what_happened, key_points, why_it_matters, sources, estimated_minutes, priority, is_read)";
 
-function createStaticPublicHomepageFallbackItem(input: {
-  id: string;
-  topicId: string;
-  topicName: "Tech" | "Finance" | "Politics";
-  title: string;
-  whatHappened: string;
-  sourceTitle: string;
-  sourceUrl: string;
-  matchedKeywords: string[];
-  priority?: BriefingItem["priority"];
-  importanceScore: number;
-  importanceLabel: NonNullable<BriefingItem["importanceLabel"]>;
-}) {
-  const categoryLabel = input.topicName === "Tech" ? "technology" : input.topicName.toLowerCase();
-
-  return {
-    id: input.id,
-    topicId: input.topicId,
-    topicName: input.topicName,
-    title: input.title,
-    whatHappened: input.whatHappened,
-    keyPoints: [
-      `This is clearly labeled sample ${categoryLabel} fallback copy, not a live headline.`,
-      "Homepage SSR stayed on stored read models and did not fetch or parse feeds.",
-      "Publishing a live signal set or storing a fresh snapshot will replace this placeholder automatically.",
-    ],
-    whyItMatters: `It keeps the ${categoryLabel} rail readable without pretending the app has current live coverage when stored data is unavailable.`,
-    sources: [{ title: input.sourceTitle, url: input.sourceUrl }],
-    sourceCount: 1,
-    estimatedMinutes: 3,
-    read: false,
-    priority: input.priority ?? "normal",
-    matchedKeywords: input.matchedKeywords,
-    importanceScore: input.importanceScore,
-    importanceLabel: input.importanceLabel,
-    rankingSignals: [
-      "Stored homepage signal snapshot is unavailable.",
-      "Fallback stays category-specific and explicitly non-live.",
-    ],
-  } satisfies BriefingItem;
-}
-
-const STATIC_PUBLIC_HOME_FALLBACK_ITEMS: BriefingItem[] = [
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-tech-1",
-    topicId: "topic-tech",
-    topicName: "Tech",
-    title: "Technology placeholder: stored public signal snapshot unavailable",
-    whatHappened:
-      "The homepage is showing a technology placeholder because no stored public signal snapshot is available for this render.",
-    sourceTitle: "Product note",
-    sourceUrl: "https://example.com/fallback/technology",
-    matchedKeywords: ["technology", "placeholder", "stored snapshot"],
-    priority: "top",
-    importanceScore: 76,
-    importanceLabel: "High",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-finance-1",
-    topicId: "topic-finance",
-    topicName: "Finance",
-    title: "Finance placeholder: waiting for the next persisted Top 5 snapshot",
-    whatHappened:
-      "No stored finance signal is currently available for public SSR, so this card keeps the economics rail honest instead of implying live markets coverage.",
-    sourceTitle: "Product note",
-    sourceUrl: "https://example.com/fallback/finance",
-    matchedKeywords: ["finance", "economics", "placeholder"],
-    priority: "top",
-    importanceScore: 75,
-    importanceLabel: "High",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-politics-1",
-    topicId: "topic-politics",
-    topicName: "Politics",
-    title: "Politics placeholder: public SSR is waiting on persisted signal posts",
-    whatHappened:
-      "The politics rail is rendering safe placeholder copy because the current public signal set has not been persisted yet.",
-    sourceTitle: "Product note",
-    sourceUrl: "https://example.com/fallback/politics",
-    matchedKeywords: ["politics", "policy", "placeholder"],
-    priority: "top",
-    importanceScore: 74,
-    importanceLabel: "High",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-tech-2",
-    topicId: "topic-tech",
-    topicName: "Tech",
-    title: "Technology sample slot: publish a stored signal set to replace this card",
-    whatHappened:
-      "This placeholder preserves a category-specific technology slot without routing the homepage back through ingestion or feed parsing.",
-    sourceTitle: "Engineering note",
-    sourceUrl: "https://example.com/fallback/technology-slot",
-    matchedKeywords: ["technology", "sample", "ssr safe"],
-    priority: "top",
-    importanceScore: 72,
-    importanceLabel: "High",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-finance-2",
-    topicId: "topic-finance",
-    topicName: "Finance",
-    title: "Economics sample slot: no persisted business signal is available yet",
-    whatHappened:
-      "This finance placeholder keeps the homepage structure intact while making it clear that stored public business coverage is unavailable.",
-    sourceTitle: "Engineering note",
-    sourceUrl: "https://example.com/fallback/economics-slot",
-    matchedKeywords: ["economics", "business", "sample"],
-    priority: "top",
-    importanceScore: 71,
-    importanceLabel: "High",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-politics-2",
-    topicId: "topic-politics",
-    topicName: "Politics",
-    title: "Politics sample slot: homepage stayed online without claiming live policy coverage",
-    whatHappened:
-      "The placeholder is intentionally non-live copy so the politics tab remains distinct even when persisted public signal data is missing.",
-    sourceTitle: "Engineering note",
-    sourceUrl: "https://example.com/fallback/politics-slot",
-    matchedKeywords: ["politics", "policy", "sample"],
-    importanceScore: 68,
-    importanceLabel: "Watch",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-tech-3",
-    topicId: "topic-tech",
-    topicName: "Tech",
-    title: "Technology fallback rail stays sample-only until stored headlines exist",
-    whatHappened:
-      "This sample technology card is a last-resort placeholder and should disappear as soon as a stored signal snapshot is available.",
-    sourceTitle: "Fallback policy",
-    sourceUrl: "https://example.com/fallback/technology-policy",
-    matchedKeywords: ["technology", "fallback rail", "sample"],
-    importanceScore: 67,
-    importanceLabel: "Watch",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-finance-3",
-    topicId: "topic-finance",
-    topicName: "Finance",
-    title: "Finance fallback rail uses sample copy rather than pretending a market move",
-    whatHappened:
-      "This placeholder makes the absence of stored finance coverage explicit while preserving the homepage layout and category filtering.",
-    sourceTitle: "Fallback policy",
-    sourceUrl: "https://example.com/fallback/finance-policy",
-    matchedKeywords: ["finance", "market", "fallback rail"],
-    importanceScore: 66,
-    importanceLabel: "Watch",
-  }),
-  createStaticPublicHomepageFallbackItem({
-    id: "static-home-politics-3",
-    topicId: "topic-politics",
-    topicName: "Politics",
-    title: "Politics fallback rail stays category-specific while persisted coverage is missing",
-    whatHappened:
-      "This sample politics card exists only so the homepage can keep a distinct politics lane without reintroducing feed-parsing dependencies.",
-    sourceTitle: "Fallback policy",
-    sourceUrl: "https://example.com/fallback/politics-policy",
-    matchedKeywords: ["politics", "fallback rail", "stored data"],
-    importanceScore: 65,
-    importanceLabel: "Watch",
-  }),
-];
-
 type BriefingSummaryFields = Pick<
   BriefingItem,
   "title" | "whatHappened" | "keyPoints" | "whyItMatters" | "estimatedMinutes"
@@ -546,14 +379,12 @@ function selectHomepageSignalWhyItMatters(
   source: HomepageSignalSnapshotSource,
 ) {
   const preferredLiveText = post.publishedWhyItMatters?.trim();
-  const preferredSnapshotText = post.editedWhyItMatters?.trim();
-  const aiFallback = post.aiWhyItMatters?.trim();
 
   if (source === "published_live") {
-    return preferredLiveText || preferredSnapshotText || aiFallback || post.selectionReason || post.summary || "";
+    return preferredLiveText || "";
   }
 
-  return preferredSnapshotText || preferredLiveText || aiFallback || post.selectionReason || post.summary || "";
+  return preferredLiveText || "";
 }
 
 function buildHomepageSignalKeyPoints(
@@ -564,11 +395,11 @@ function buildHomepageSignalKeyPoints(
     ? `Lead coverage is anchored by ${post.sourceName}.`
     : source === "published_live"
       ? "Lead coverage is anchored by the published signal set."
-      : "Lead coverage is anchored by the stored signal snapshot.";
+      : "Lead coverage is anchored by the previously published signal set.";
   const rankPoint =
     source === "published_live"
       ? `Published as live signal #${post.rank} for the homepage briefing.`
-      : `Read from the latest stored signal snapshot at rank #${post.rank}.`;
+      : `Previously published at rank #${post.rank} for the homepage briefing.`;
   const summaryPoint = post.summary || post.selectionReason || selectHomepageSignalWhyItMatters(post, source);
 
   return [sourcePoint, rankPoint, summaryPoint];
@@ -581,7 +412,7 @@ function mapHomepageSignalPostToBriefingItem(
   const topicName = inferTopicName(post.tags);
   const whyItMatters = selectHomepageSignalWhyItMatters(post, source);
   const structuredWhyItMatters =
-    source === "published_live"
+    source === "published_live" || source === "recent_published"
       ? post.publishedWhyItMattersStructured
       : post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
 
@@ -597,12 +428,12 @@ function mapHomepageSignalPostToBriefingItem(
     editedWhyItMatters: post.editedWhyItMatters,
     publishedWhyItMatters: post.publishedWhyItMatters || "",
     editedWhyItMattersStructured:
-      source === "published_live" ? null : structuredWhyItMatters,
+      source === "published_live" || source === "recent_published" ? null : structuredWhyItMatters,
     editorialWhyItMatters:
-      source === "published_live" ? structuredWhyItMatters : null,
+      source === "published_live" || source === "recent_published" ? structuredWhyItMatters : null,
     publishedWhyItMattersStructured:
-      source === "published_live" ? structuredWhyItMatters : null,
-    editorialStatus: source === "published_live" ? "published" : post.editorialStatus,
+      source === "published_live" || source === "recent_published" ? structuredWhyItMatters : null,
+    editorialStatus: source === "published_live" || source === "recent_published" ? "published" : post.editorialStatus,
     sources: post.sourceUrl ? [{ title: post.sourceName || "Source", url: post.sourceUrl }] : [],
     sourceCount: post.sourceUrl ? 1 : 0,
     estimatedMinutes: 4,
@@ -633,31 +464,41 @@ function normalizeCalendarSafeBriefingDate(dateKey: string) {
   return `${dateKey}T12:00:00`;
 }
 
-function buildStaticPublicHomepageFallbackData(): DashboardData {
+function formatHomepageFreshnessDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function buildEmptyPublicHomepageData(): DashboardData {
   const sources = getSourcesForPublicSurface("public.home");
   const briefingDate = normalizeCalendarSafeBriefingDate(getBriefingDateKey(formatISO(new Date())));
-  const topItems = STATIC_PUBLIC_HOME_FALLBACK_ITEMS
-    .slice(0, 5)
-    .map((item, index) => ({
-      ...item,
-      priority: index < 5 ? ("top" as const) : item.priority,
-    }));
 
   return {
     mode: "public",
     briefing: {
-      id: `static-homepage-${getBriefingDateKey(briefingDate)}`,
+      id: `empty-homepage-${getBriefingDateKey(briefingDate)}`,
       briefingDate,
       title: "Daily Executive Briefing",
-      intro:
-        "Published public signal posts are unavailable, so the homepage is showing clearly labeled category placeholders instead of pretending those stories are live.",
-      readingWindow: `${topItems.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
-      items: topItems,
+      intro: "Today's briefing is being prepared.",
+      readingWindow: "0 minutes",
+      items: [],
     },
     topics: demoTopics,
     sources,
-    publicRankedItems: STATIC_PUBLIC_HOME_FALLBACK_ITEMS,
-    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, STATIC_PUBLIC_HOME_FALLBACK_ITEMS.length),
+    publicRankedItems: [],
+    homepageFreshnessNotice: {
+      kind: "empty",
+      text: "Today's briefing is being prepared.",
+      briefingDate: null,
+    },
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, 0),
   };
 }
 
@@ -666,7 +507,7 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const sources = getSourcesForPublicSurface("public.home");
 
   if (homepageSignalSnapshot.posts.length === 0) {
-    return buildStaticPublicHomepageFallbackData();
+    return buildEmptyPublicHomepageData();
   }
 
   const firstBriefingDate = homepageSignalSnapshot.briefingDate ?? homepageSignalSnapshot.posts[0]?.briefingDate;
@@ -684,8 +525,16 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   ).map((post) => mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source));
   const intro =
     homepageSignalSnapshot.source === "published_live"
-      ? "The homepage renders from the published live signal set instead of triggering feed ingestion during SSR."
-      : "Showing the latest stored Top 5 snapshot while published homepage signals are unavailable. This SSR path stays on persisted data only.";
+      ? "The homepage renders from today's published signal set instead of triggering feed ingestion during SSR."
+      : "Today's briefing is being prepared. Showing the most recently published signal set with its original date.";
+  const homepageFreshnessNotice =
+    homepageSignalSnapshot.source === "recent_published" && homepageSignalSnapshot.briefingDate
+      ? {
+          kind: "stale" as const,
+          text: `Last updated ${formatHomepageFreshnessDate(homepageSignalSnapshot.briefingDate)} — Today's briefing is being prepared.`,
+          briefingDate: homepageSignalSnapshot.briefingDate,
+        }
+      : undefined;
 
   return {
     mode: "public",
@@ -700,6 +549,7 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
     topics: demoTopics,
     sources,
     publicRankedItems: depthItems,
+    homepageFreshnessNotice,
     homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, depthItems.length),
   };
 }

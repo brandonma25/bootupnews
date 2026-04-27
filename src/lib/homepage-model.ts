@@ -738,7 +738,7 @@ function sanitizeWhyItMatters(
 ) {
   const trimmed = (options.preserveFullText ? value : summarize(value, 1)).replace(/\s+/g, " ").trim();
   if (!trimmed) {
-    return `This development is worth watching because it can change assumptions around ${title.toLowerCase()}.`;
+    return "";
   }
 
   return trimmed

@@ -178,6 +178,11 @@ export type DashboardData = {
   topics: Topic[];
   sources: Source[];
   publicRankedItems?: BriefingItem[];
+  homepageFreshnessNotice?: {
+    kind: "stale" | "empty";
+    text: string;
+    briefingDate?: string | null;
+  };
   homepageDiagnostics?: {
     totalArticlesFetched: number | null;
     totalCandidateEvents: number | null;

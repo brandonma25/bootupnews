@@ -366,7 +366,11 @@ function getFilterCount(
 }
 
 function isBulkApprovablePost(post: EditorialSignalPost) {
-  return post.persisted && ["draft", "needs_review"].includes(post.editorialStatus);
+  return (
+    post.persisted &&
+    ["draft", "needs_review"].includes(post.editorialStatus) &&
+    post.whyItMattersValidationStatus !== "requires_human_rewrite"
+  );
 }
 
 function StatusFilterLink({
@@ -507,6 +511,17 @@ function getApproveAllBlockedReason(
 
   if (posts.length === 0) {
     return "No signal posts are loaded for approval.";
+  }
+
+  const rewriteRequiredCount = posts.filter(
+    (post) =>
+      post.persisted &&
+      ["draft", "needs_review"].includes(post.editorialStatus) &&
+      post.whyItMattersValidationStatus === "requires_human_rewrite",
+  ).length;
+
+  if (rewriteRequiredCount > 0) {
+    return `${rewriteRequiredCount} signal posts require a human rewrite before bulk approval.`;
   }
 
   if (eligibleCount === 0) {

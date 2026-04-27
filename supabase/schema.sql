@@ -138,6 +138,11 @@ create table if not exists public.signal_posts (
   ai_why_it_matters text not null default '',
   edited_why_it_matters text,
   published_why_it_matters text,
+  why_it_matters_validation_status text not null default 'passed'
+    check (why_it_matters_validation_status in ('passed', 'requires_human_rewrite')),
+  why_it_matters_validation_failures text[] not null default '{}'::text[],
+  why_it_matters_validation_details text[] not null default '{}'::text[],
+  why_it_matters_validated_at timestamptz,
   editorial_status text not null default 'needs_review'
     check (editorial_status in ('draft', 'needs_review', 'approved', 'published')),
   edited_by text,

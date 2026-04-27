@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -53,8 +54,11 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
     post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
   const controlsDisabled = !storageReady || !post.persisted;
   const eligibleForApproveAll =
-    post.persisted && ["draft", "needs_review"].includes(post.editorialStatus);
+    post.persisted &&
+    ["draft", "needs_review"].includes(post.editorialStatus) &&
+    post.whyItMattersValidationStatus !== "requires_human_rewrite";
   const canPublishPost = post.editorialStatus === "approved";
+  const requiresHumanRewrite = post.whyItMattersValidationStatus === "requires_human_rewrite";
   const toggleLabel = isExpanded ? "Collapse" : "Expand";
   const panelId = `editorial-panel-${post.id}`;
 
@@ -71,6 +75,7 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
                 </span>
                 {post.briefingDate ? <Badge>{post.briefingDate}</Badge> : null}
                 <Badge>{formatStatus(post.editorialStatus)}</Badge>
+                {requiresHumanRewrite ? <Badge>Requires rewrite</Badge> : null}
                 {post.isLive ? <Badge>Live homepage set</Badge> : null}
                 {post.signalScore !== null ? <Badge>Score {Math.round(post.signalScore)}</Badge> : null}
                 {post.tags.map((tag) => (
@@ -118,6 +123,19 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
           <div className="space-y-3 rounded-card border border-[var(--border)] bg-[var(--bg)] p-4">
             <p className="section-label">AI-generated reference</p>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">{post.aiWhyItMatters}</p>
+            {requiresHumanRewrite ? (
+              <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
+                <p className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                  <AlertTriangle className="h-4 w-4" />
+                  Quality gate reasons
+                </p>
+                <ul className="mt-2 space-y-1 text-sm leading-6 text-[var(--text-secondary)]">
+                  {post.whyItMattersValidationDetails.map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </div>
 
