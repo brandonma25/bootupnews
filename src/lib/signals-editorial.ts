@@ -597,7 +597,17 @@ async function persistSignalPostCandidates(
   const briefingDate = normalizeDateValue(input.briefingDate) ?? new Date().toISOString().slice(0, 10);
   const mode = input.mode ?? "normal";
 
-  if (input.candidates.length < TOP_SIGNAL_SET_SIZE) {
+  if (input.candidates.length === 0) {
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      mode,
+      message: "The current signal pipeline returned no structurally eligible signal posts for editorial review.",
+    };
+  }
+
+  if (mode !== "draft_only" && input.candidates.length < TOP_SIGNAL_SET_SIZE) {
     return {
       ok: false,
       briefingDate,

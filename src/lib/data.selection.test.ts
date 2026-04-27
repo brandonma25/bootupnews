@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { selectPublicBriefingItems } from "@/lib/data";
-import type { BriefingItem, EventIntelligence } from "@/lib/types";
+import type {
+  BriefingItem,
+  EventIntelligence,
+  SignalSelectionEligibility,
+  SignalSelectionEligibilityTier,
+} from "@/lib/types";
 
 function createIntelligence(overrides: Partial<EventIntelligence> = {}): EventIntelligence {
   return {
@@ -54,6 +59,30 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
     importanceLabel: overrides.importanceLabel ?? "High",
     rankingSignals: overrides.rankingSignals ?? ["Strategic score from ranked Story Cluster evidence."],
     eventIntelligence: overrides.eventIntelligence ?? createIntelligence(),
+    selectionEligibility: overrides.selectionEligibility,
+  };
+}
+
+function createEligibility(
+  tier: SignalSelectionEligibilityTier,
+  overrides: Partial<SignalSelectionEligibility> = {},
+): SignalSelectionEligibility {
+  return {
+    tier,
+    reasons: overrides.reasons ?? [],
+    warnings: overrides.warnings ?? [],
+    filterDecision: overrides.filterDecision ?? (tier === "exclude_from_public_candidates" ? "reject" : "pass"),
+    filterSeverity: overrides.filterSeverity ?? (tier === "exclude_from_public_candidates" ? "reject" : "pass"),
+    filterReasons: overrides.filterReasons ?? [],
+    sourceTier: overrides.sourceTier ?? "tier1",
+    headlineQuality: overrides.headlineQuality ?? "strong",
+    eventType: overrides.eventType ?? "policy_regulation",
+    structuralImportanceScore: overrides.structuralImportanceScore ?? 72,
+    sourceQualityScore: overrides.sourceQualityScore ?? 84,
+    finalScore: overrides.finalScore ?? 72,
+    scoreComponents: overrides.scoreComponents,
+    rankingProvider: overrides.rankingProvider ?? "fns",
+    diversityProvider: overrides.diversityProvider ?? "fns",
   };
 }
 
@@ -197,5 +226,123 @@ describe("selectPublicBriefingItems", () => {
     expect(selected.map((item) => item.id)).toEqual(["tech-1", "tech-2", "finance-1"]);
     expect(selected.filter((item) => item.topicName === "Tech")).toHaveLength(2);
     expect(selected.map((item) => item.id)).not.toContain("non-signal-fresh");
+  });
+
+  it("does not promote a validator-passing weak consumer item into Core Signals", () => {
+    const structuralSignal = createItem({
+      id: "structural-signal",
+      topicName: "Politics",
+      title: "Regulators approve AI export-control review for advanced chips",
+      whyItMatters:
+        "Export-control reviews reshape who can buy advanced chips and how cloud platforms plan capacity. That makes this a market-structure signal, not a product update.",
+      importanceScore: 82,
+      selectionEligibility: createEligibility("core_signal_eligible"),
+    });
+    const validatorPassingWeakConsumerItem = createItem({
+      id: "validator-passing-weak-consumer-item",
+      topicName: "Tech",
+      title: "Streaming app announces a celebrity podcast partnership",
+      whyItMatters:
+        "The partnership could shift listener attention between platforms and change how advertisers evaluate creator bundles. That makes platform distribution strategy more visible.",
+      importanceScore: 96,
+      eventIntelligence: createIntelligence({
+        eventType: "partnership_major",
+        rankingScore: 98,
+      }),
+      selectionEligibility: createEligibility("exclude_from_public_candidates", {
+        reasons: ["weak_entertainment_or_podcast_content", "insufficient_structural_event_evidence"],
+        eventType: "partnership_major",
+        structuralImportanceScore: 44,
+        finalScore: 96,
+      }),
+    });
+
+    const selected = selectPublicBriefingItems([
+      validatorPassingWeakConsumerItem,
+      structuralSignal,
+    ]);
+
+    expect(selected.map((item) => item.id)).toEqual(["structural-signal"]);
+  });
+
+  it("fails closed instead of filling missing Core Signal slots with context, depth, or excluded candidates", () => {
+    const coreItems = [
+      createItem({
+        id: "core-1",
+        topicName: "Finance",
+        importanceScore: 90,
+        selectionEligibility: createEligibility("core_signal_eligible"),
+      }),
+      createItem({
+        id: "core-2",
+        topicName: "Politics",
+        importanceScore: 88,
+        selectionEligibility: createEligibility("core_signal_eligible"),
+      }),
+    ];
+    const nonCoreItems = [
+      createItem({
+        id: "context-1",
+        topicName: "Tech",
+        importanceScore: 95,
+        selectionEligibility: createEligibility("context_signal_eligible"),
+      }),
+      createItem({
+        id: "depth-1",
+        topicName: "World",
+        importanceScore: 94,
+        selectionEligibility: createEligibility("depth_only"),
+      }),
+      createItem({
+        id: "excluded-1",
+        topicName: "Business",
+        importanceScore: 99,
+        selectionEligibility: createEligibility("exclude_from_public_candidates", {
+          reasons: ["weak_gadget_or_review_content"],
+        }),
+      }),
+    ];
+
+    const selected = selectPublicBriefingItems([...nonCoreItems, ...coreItems], 5);
+
+    expect(selected.map((item) => item.id)).toEqual(["core-1", "core-2"]);
+  });
+
+  it("does not let category diversity promote weak fillers above stronger structural signals", () => {
+    const structuralSignals = [
+      createItem({
+        id: "policy-1",
+        topicName: "Politics",
+        importanceScore: 91,
+        selectionEligibility: createEligibility("core_signal_eligible"),
+      }),
+      createItem({
+        id: "markets-1",
+        topicName: "Finance",
+        importanceScore: 89,
+        selectionEligibility: createEligibility("core_signal_eligible"),
+      }),
+    ];
+    const weakCategoryFiller = createItem({
+      id: "weak-category-filler",
+      topicName: "Entertainment",
+      title: "Podcast network announces celebrity programming bundle",
+      importanceScore: 97,
+      eventIntelligence: createIntelligence({
+        eventType: "partnership_major",
+        rankingScore: 99,
+      }),
+      selectionEligibility: createEligibility("exclude_from_public_candidates", {
+        reasons: ["weak_entertainment_or_podcast_content"],
+        finalScore: 97,
+      }),
+    });
+
+    const selected = selectPublicBriefingItems([
+      weakCategoryFiller,
+      ...structuralSignals,
+    ], 3);
+
+    expect(selected.map((item) => item.id)).toEqual(["policy-1", "markets-1"]);
   });
 });

@@ -25,11 +25,16 @@ import type { FeedArticle } from "@/lib/rss";
 import { getSourcesForPublicSurface } from "@/lib/source-manifest";
 import {
   applySignalFiltering,
+  type ArticleFilterEvaluation,
   type EventType,
   type FilterDecision,
   type HeadlineQuality,
   type SourceTier,
 } from "@/lib/signal-filtering";
+import {
+  evaluateSignalSelectionEligibility,
+  isCoreSignalEligible,
+} from "@/lib/signal-selection-eligibility";
 import { summarizeCluster } from "@/lib/summarizer";
 import { withServerFallback } from "@/lib/server-safety";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
@@ -1189,6 +1194,21 @@ export async function generateDailyBriefing(
   };
   const { run, ranked_clusters } = await runClusterFirstPipelineSafely(pipelineOptions);
   const topicFallback = topics[0] ?? demoTopics[0];
+  const articleFilterDiagnostics = run.article_filter_evaluations ?? [];
+  const hasArticleFilterDiagnostics = "article_filter_evaluations" in run;
+  const articleFilterEvaluationById = new Map(
+    articleFilterDiagnostics.map((evaluation) => [
+      evaluation.article_id,
+      {
+        id: evaluation.article_id,
+        sourceTier: evaluation.source_tier,
+        headlineQuality: evaluation.headline_quality,
+        eventType: evaluation.event_type,
+        filterDecision: evaluation.filter_decision,
+        filterReasons: evaluation.filter_reasons,
+      } as ArticleFilterEvaluation,
+    ]),
+  );
 
   const candidateItems: BriefingItem[] = ranked_clusters.map(({ cluster, ranked }) => {
     const feedArticles = cluster.articles.map((article) => ({
@@ -1234,7 +1254,7 @@ export async function generateDailyBriefing(
     }));
     const corroborationWindow = getClusterCorroborationWindow(cluster.articles.map((article) => article.published_at));
 
-    return {
+    const item: BriefingItem = {
       id: `generated-${cluster.cluster_id}`,
       topicId: topic.id,
       topicName: topic.name,
@@ -1271,6 +1291,18 @@ export async function generateDailyBriefing(
       trustDebug,
       signalRole: packet.signal_role,
     };
+
+    return {
+      ...item,
+      selectionEligibility: hasArticleFilterDiagnostics
+        ? evaluateSignalSelectionEligibility({
+            item,
+            cluster,
+            ranked,
+            articleFilterEvaluation: articleFilterEvaluationById.get(cluster.representative_article.id),
+          })
+        : undefined,
+    };
   });
   const items = selectPublicBriefingItems(candidateItems).map((item, index) => ({
     ...item,
@@ -1287,7 +1319,7 @@ export async function generateDailyBriefing(
           readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
           items,
         }
-      : topics === demoTopics && areMvpDefaultPublicSources(sources)
+      : candidateItems.length === 0 && run.num_raw_items === 0 && topics === demoTopics && areMvpDefaultPublicSources(sources)
         ? demoDashboardData.briefing
         : createEmptyBriefing();
 
@@ -1354,6 +1386,11 @@ export function selectPublicBriefingItems(items: BriefingItem[], limit = 5) {
     const topicKey = item.topicName.toLowerCase();
     const topicCount = topicCounts.get(topicKey) ?? 0;
     const isNonSignal = item.eventIntelligence?.eventType === "non_signal";
+    const isEligible = isCoreSignalEligible(item);
+
+    if (!isEligible) {
+      continue;
+    }
 
     if (isNonSignal && selected.length < limit) {
       skippedForSecondPass.push(item);
