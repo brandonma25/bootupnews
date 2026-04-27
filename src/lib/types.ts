@@ -94,6 +94,38 @@ export type EventIntelligence = {
 
 export type EventDisplayState = "new" | "changed" | "escalated" | "unchanged";
 export type EditorialStatus = "draft" | "needs_review" | "approved" | "published";
+export type SignalSelectionEligibilityTier =
+  | "core_signal_eligible"
+  | "context_signal_eligible"
+  | "depth_only"
+  | "exclude_from_public_candidates";
+
+export type SignalSelectionEligibility = {
+  tier: SignalSelectionEligibilityTier;
+  reasons: string[];
+  warnings: string[];
+  filterDecision?: "pass" | "suppress" | "reject";
+  filterSeverity?: "pass" | "suppress" | "reject";
+  filterReasons?: string[];
+  sourceTier?: string;
+  headlineQuality?: string;
+  eventType?: string;
+  structuralImportanceScore?: number;
+  sourceQualityScore?: number;
+  finalScore?: number;
+  scoreComponents?: {
+    credibility?: number;
+    novelty?: number;
+    urgency?: number;
+    reinforcement?: number;
+    trust_timeliness?: number;
+    event_importance?: number;
+    support_and_novelty?: number;
+    importance_adjustment?: number;
+  };
+  rankingProvider?: string | null;
+  diversityProvider?: string | null;
+};
 
 /**
  * MVP compatibility/view-model payload used by briefing, editorial, and card
@@ -138,6 +170,7 @@ export type BriefingItem = {
   trustDebug?: TrustLayerDebug;
   homepageClassification?: HomepageCategoryClassification;
   signalRole?: SignalRole;
+  selectionEligibility?: SignalSelectionEligibility;
   displayState?: EventDisplayState;
   continuityKey?: string;
   continuityFingerprint?: string;

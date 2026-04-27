@@ -6,7 +6,7 @@ import {
   resolveControlledPipelineConfig,
   type ControlledPipelineConfig,
 } from "@/lib/pipeline/controlled-execution";
-import type { DailyBriefing } from "@/lib/types";
+import type { DailyBriefing, SignalSelectionEligibilityTier } from "@/lib/types";
 
 function buildConfig(overrides: Partial<ControlledPipelineConfig> = {}): ControlledPipelineConfig {
   return {
@@ -32,7 +32,7 @@ function buildBriefing(): DailyBriefing {
   };
 }
 
-function buildItem(index: number, whyItMatters: string) {
+function buildItem(index: number, whyItMatters: string, tier: SignalSelectionEligibilityTier = "core_signal_eligible") {
   return {
     id: `candidate-${index}`,
     topicId: "topic-tech",
@@ -50,6 +50,31 @@ function buildItem(index: number, whyItMatters: string) {
     matchedKeywords: ["tech"],
     importanceScore: 70 - index,
     rankingSignals: [`Ranking signal ${index}`],
+    selectionEligibility: {
+      tier,
+      reasons: tier === "exclude_from_public_candidates" ? ["weak_consumer_content"] : [],
+      warnings: [],
+      filterDecision: tier === "exclude_from_public_candidates" ? "reject" : "pass",
+      filterSeverity: tier === "exclude_from_public_candidates" ? "reject" : "pass",
+      filterReasons: tier === "exclude_from_public_candidates" ? ["rejected_low_signal"] : ["passed_allowed_event_type"],
+      sourceTier: "tier1",
+      headlineQuality: "strong",
+      eventType: "policy_regulation",
+      structuralImportanceScore: 78,
+      sourceQualityScore: 88,
+      finalScore: 70 - index,
+      scoreComponents: {
+        credibility: 88,
+        novelty: 70,
+        urgency: 70,
+        reinforcement: 70,
+        trust_timeliness: 82,
+        event_importance: 78,
+        support_and_novelty: 70,
+      },
+      rankingProvider: "fns",
+      diversityProvider: "fns",
+    },
   };
 }
 
@@ -139,7 +164,7 @@ describe("controlled pipeline report", () => {
       buildItem(3, valid),
       buildItem(4, valid),
       buildItem(5, valid),
-      buildItem(6, invalid),
+      buildItem(6, invalid, "depth_only"),
     ];
     const report = buildControlledPipelineReport({
       mode: "dry_run",
@@ -160,6 +185,14 @@ describe("controlled pipeline report", () => {
     expect(report.candidateCount).toBe(6);
     expect(report.proposedTopFive).toHaveLength(5);
     expect(report.proposedDepthRows).toHaveLength(1);
+    expect(report.candidate_pool_insufficient).toBe(false);
+    expect(report.selectionSummary.eligibleCoreCount).toBe(5);
+    expect(report.proposedTopFive[0]).toMatchObject({
+      eligibilityTier: "core_signal_eligible",
+      filterDecision: "pass",
+      structuralImportanceScore: 78,
+      rankingProvider: "fns",
+    });
     expect(report.proposedTopFive[0]).toMatchObject({
       validationStatus: "requires_human_rewrite",
       validationFailures: expect.arrayContaining(["incomplete_sentence", "template_placeholder_language"]),
@@ -170,5 +203,74 @@ describe("controlled pipeline report", () => {
       validationDetails: [],
     });
     expect(report.proposedDepthRows[0].validationStatus).toBe("requires_human_rewrite");
+  });
+
+  it("reports an insufficient candidate pool instead of filling weak Core slots", () => {
+    const valid =
+      "Anthropic's growth is now structurally tied to Google and Amazon's infrastructure, not independent of it. At scale, that's a dependency, not just a partnership.";
+    const publicRankedItems = [
+      buildItem(1, valid),
+      buildItem(2, valid),
+      buildItem(3, valid, "context_signal_eligible"),
+      buildItem(4, valid, "depth_only"),
+      buildItem(5, valid, "exclude_from_public_candidates"),
+    ];
+    const report = buildControlledPipelineReport({
+      mode: "dry_run",
+      testRunId: "insufficient-pool-test",
+      briefing: {
+        ...buildBriefing(),
+        items: publicRankedItems.slice(0, 2),
+      },
+      publicRankedItems,
+      pipelineRun: {
+        run_id: "pipeline-test",
+        num_clusters: 5,
+        active_sources: [
+          {
+            source_id: "source-1",
+            source: "Reuters World",
+            donor: "horizon",
+            source_class: "global_wire",
+            trust_tier: "tier_1",
+          },
+        ],
+        source_contributions: [
+          {
+            source_id: "source-1",
+            source: "Reuters World",
+            donor: "horizon",
+            source_class: "global_wire",
+            trust_tier: "tier_1",
+            item_count: 5,
+          },
+        ],
+        article_filter_evaluations: [
+          {
+            article_id: "article-1",
+            title: "Policy story",
+            source_name: "Reuters World",
+            source_url: "https://example.com/policy",
+            source_tier: "tier1",
+            headline_quality: "strong",
+            event_type: "policy_regulation",
+            filter_decision: "pass",
+            filter_severity: "pass",
+            filter_reasons: ["passed_allowed_event_type"],
+          },
+        ],
+      } as never,
+    });
+
+    expect(report.proposedTopFive).toHaveLength(2);
+    expect(report.proposedContextRows).toHaveLength(1);
+    expect(report.proposedDepthRows).toHaveLength(1);
+    expect(report.excludedCandidates).toHaveLength(1);
+    expect(report.candidate_pool_insufficient).toBe(true);
+    expect(report.selectionSummary.selectionQualityWarnings).toContain("eligible_core_count_2_below_required_5");
+    expect(report.articleCandidates[0]).toMatchObject({
+      filterDecision: "pass",
+      eventType: "policy_regulation",
+    });
   });
 });

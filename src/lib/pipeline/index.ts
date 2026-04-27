@@ -14,6 +14,10 @@ import { normalizeRawItems } from "@/lib/pipeline/normalization";
 import { rankStoryClusters } from "@/lib/pipeline/ranking";
 import { createEmptyPipelineRun, type PipelineRun } from "@/lib/observability/pipeline-run";
 import type { RankedStoryClusterResult } from "@/lib/scoring/scoring-engine";
+import {
+  applyArticleSelectionFiltering,
+  mapArticleFilterDiagnostic,
+} from "@/lib/signal-selection-eligibility";
 
 export type ClusterFirstPipelineResult = {
   digest: DigestOutput;
@@ -47,7 +51,9 @@ export async function runClusterFirstPipeline(options: {
   run.used_seed_fallback = ingestion.usedSeedFallback;
 
   const normalized = normalizeRawItems(ingestion.items);
-  const deduped = deduplicateArticles(normalized);
+  const articleFiltering = applyArticleSelectionFiltering(normalized);
+  const filterDiagnosticById = new Map(articleFiltering.evaluations.map((evaluation) => [evaluation.id, evaluation]));
+  const deduped = deduplicateArticles(articleFiltering.filteredArticles);
   const clusters = clusterNormalizedArticles(deduped);
   const rankedStoryClusters = rankStoryClusters(clusters);
 
@@ -74,6 +80,7 @@ export async function runClusterFirstPipeline(options: {
   );
 
   run.num_raw_items = ingestion.items.length;
+  run.num_after_filter = articleFiltering.filteredArticles.length;
   run.num_after_dedup = deduped.length;
   run.num_clusters = clusters.length;
   run.avg_cluster_size =
@@ -84,6 +91,27 @@ export async function runClusterFirstPipeline(options: {
   run.prevented_merge_count = preventedMergeCount;
   run.top_scores = rankedStoryClusters.slice(0, 5).map((entry) => entry.ranked.score);
   run.scoring_breakdown = rankedStoryClusters.map((entry) => entry.scoringLog);
+  run.article_filter_evaluations = normalized.map((article) => {
+    const evaluation = filterDiagnosticById.get(article.id);
+
+    if (!evaluation) {
+      return {
+        article_id: article.id,
+        title: article.title,
+        source_name: article.source,
+        source_url: article.url,
+        source_tier: "unknown",
+        headline_quality: "unknown",
+        event_type: "unknown",
+        filter_decision: "reject",
+        filter_severity: "reject",
+        filter_reasons: ["missing_prd13_filter_evaluation"],
+      };
+    }
+
+    return mapArticleFilterDiagnostic(article, evaluation);
+  });
+  run.article_filter_summary = articleFiltering.summary;
   run.ranking_provider = rankedStoryClusters[0]?.ranked.ranking_debug.provider ?? null;
   run.diversity_provider = rankedStoryClusters.find((entry) => entry.ranked.ranking_debug.diversity.action !== "none")
     ?.ranked.ranking_debug.provider ?? rankedStoryClusters[0]?.ranked.ranking_debug.provider ?? null;
@@ -110,6 +138,9 @@ export async function runClusterFirstPipeline(options: {
   logPipelineEvent("info", "Cluster quality summary", {
     run_id: run.run_id,
     candidate_articles: deduped.length,
+    raw_articles: normalized.length,
+    articles_after_prd13_filter: run.num_after_filter,
+    article_filter_summary: run.article_filter_summary,
     num_clusters: run.num_clusters,
     avg_cluster_size: run.avg_cluster_size,
     singleton_count: run.singleton_count,

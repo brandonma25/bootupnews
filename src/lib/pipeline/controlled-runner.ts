@@ -5,6 +5,7 @@ import {
   type ControlledPipelineConfig,
   type ControlledPipelineReport,
 } from "@/lib/pipeline/controlled-execution";
+import { isCoreSignalEligible } from "@/lib/signal-selection-eligibility";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 
 export async function runControlledPipeline(
@@ -26,10 +27,11 @@ export async function runControlledPipeline(
     },
   );
   const briefingDate = config.briefingDateOverride ?? briefing.briefingDate.slice(0, 10);
+  const structurallyEligibleItems = briefing.items.filter(isCoreSignalEligible);
   const persistence = config.mode === "draft_only"
     ? await persistSignalPostsForBriefing({
         briefingDate,
-        items: briefing.items,
+        items: structurallyEligibleItems,
         mode: "draft_only",
       })
     : null;
@@ -40,6 +42,7 @@ export async function runControlledPipeline(
     briefing: {
       ...briefing,
       briefingDate: `${briefingDate}T12:00:00.000Z`,
+      items: structurallyEligibleItems,
     },
     publicRankedItems,
     pipelineRun,

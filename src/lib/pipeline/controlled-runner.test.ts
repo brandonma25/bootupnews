@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ControlledPipelineConfig } from "@/lib/pipeline/controlled-execution";
+import type { SignalSelectionEligibilityTier } from "@/lib/types";
 
 const generateDailyBriefing = vi.fn();
 const persistSignalPostsForBriefing = vi.fn();
@@ -26,7 +27,7 @@ function buildConfig(overrides: Partial<ControlledPipelineConfig> = {}): Control
   };
 }
 
-function buildItem(index: number) {
+function buildItem(index: number, tier: SignalSelectionEligibilityTier = "core_signal_eligible") {
   const whyItMatters =
     index === 1
       ? "This changes how investors price rates, demand, or risk in rates and equities over"
@@ -49,13 +50,36 @@ function buildItem(index: number) {
     matchedKeywords: ["tech"],
     importanceScore: 80 - index,
     rankingSignals: [`Ranking signal ${index}`],
+    selectionEligibility: {
+      tier,
+      reasons: tier === "exclude_from_public_candidates" ? ["weak_entertainment_or_podcast_content"] : [],
+      warnings: [],
+      filterDecision: tier === "exclude_from_public_candidates" ? "reject" : "pass",
+      filterSeverity: tier === "exclude_from_public_candidates" ? "reject" : "pass",
+      filterReasons: tier === "exclude_from_public_candidates" ? ["rejected_low_signal"] : ["passed_allowed_event_type"],
+      sourceTier: "tier1",
+      headlineQuality: "strong",
+      eventType: tier === "exclude_from_public_candidates" ? "culture_filler" : "policy_regulation",
+      structuralImportanceScore: tier === "exclude_from_public_candidates" ? 30 : 78,
+      sourceQualityScore: 88,
+      finalScore: 80 - index,
+      rankingProvider: "fns",
+      diversityProvider: "fns",
+    },
   };
 }
 
 describe("runControlledPipeline", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    const items = Array.from({ length: 6 }, (_, index) => buildItem(index + 1));
+    const items = [
+      buildItem(1),
+      buildItem(2),
+      buildItem(3, "exclude_from_public_candidates"),
+      buildItem(4),
+      buildItem(5),
+      buildItem(6, "depth_only"),
+    ];
     generateDailyBriefing.mockResolvedValue({
       briefing: {
         id: "briefing-test",
@@ -71,14 +95,14 @@ describe("runControlledPipeline", () => {
         num_clusters: 6,
       },
     });
-    persistSignalPostsForBriefing.mockResolvedValue({
+    persistSignalPostsForBriefing.mockImplementation(async (input: { items: Array<{ id: string }> }) => ({
       ok: true,
       briefingDate: "2026-04-28",
-      insertedCount: 5,
-      insertedPostIds: ["row-1", "row-2", "row-3", "row-4", "row-5"],
+      insertedCount: input.items.length,
+      insertedPostIds: input.items.map((_, index) => `row-${index + 1}`),
       mode: "draft_only",
       message: "Persisted a new daily Top 5 snapshot for editorial review.",
-    });
+    }));
   });
 
   it("dry_run generates a validation report without writing signal_posts", async () => {
@@ -108,16 +132,26 @@ describe("runControlledPipeline", () => {
 
     expect(persistSignalPostsForBriefing).toHaveBeenCalledWith({
       briefingDate: "2026-04-28",
-      items: expect.arrayContaining([
+      items: [
         expect.objectContaining({ id: "item-1" }),
-      ]),
+        expect.objectContaining({ id: "item-2" }),
+        expect.objectContaining({ id: "item-4" }),
+        expect.objectContaining({ id: "item-5" }),
+      ],
       mode: "draft_only",
     });
+    expect(persistSignalPostsForBriefing).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ id: "item-3" }),
+        ]),
+      }),
+    );
     expect(report.generatedBriefingDate).toBe("2026-04-28");
     expect(report.persistence).toMatchObject({
       ok: true,
-      insertedCount: 5,
-      insertedPostIds: ["row-1", "row-2", "row-3", "row-4", "row-5"],
+      insertedCount: 4,
+      insertedPostIds: ["row-1", "row-2", "row-3", "row-4"],
       mode: "draft_only",
     });
   });
