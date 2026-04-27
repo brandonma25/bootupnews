@@ -16,6 +16,7 @@ import { captureRssFailure, type RssFailureType, type RssPhase } from "@/lib/obs
 import type { BriefingItem, EditorialStatus } from "@/lib/types";
 import {
   flagCardForRewrite,
+  validateWhyItMatters,
   type WhyItMattersReviewStatus,
   type WhyItMattersValidationResult,
 } from "@/lib/why-it-matters-quality-gate";
@@ -418,6 +419,22 @@ function getValidationStatus(validation: WhyItMattersValidationResult): WhyItMat
   return validation.passed ? "passed" : "requires_human_rewrite";
 }
 
+function buildWhyItMattersValidationFields(validation: WhyItMattersValidationResult, validatedAt: string) {
+  return {
+    why_it_matters_validation_status: getValidationStatus(validation),
+    why_it_matters_validation_failures: validation.failures,
+    why_it_matters_validation_details: validation.failureDetails,
+    why_it_matters_validated_at: validatedAt,
+  };
+}
+
+function getValidationFailureMessage(validation: WhyItMattersValidationResult) {
+  const details = validation.failureDetails.slice(0, 3).join("; ");
+  return details
+    ? `Why it matters requires a human rewrite before publishing: ${details}`
+    : "Why it matters requires a human rewrite before publishing.";
+}
+
 function buildSignalPostCandidates(items: BriefingItem[]) {
   return items.slice(0, PUBLIC_SIGNAL_DEPTH_LIMIT).map(mapBriefingItemToSignalPost);
 }
@@ -805,6 +822,10 @@ function selectPublishedEditorialWhyItMatters(post: EditorialSignalPost) {
     return "";
   }
 
+  if (post.whyItMattersValidationStatus === "requires_human_rewrite") {
+    return "";
+  }
+
   return normalizeEditorialText(post.publishedWhyItMatters);
 }
 
@@ -1112,6 +1133,24 @@ export async function saveSignalDraft(input: {
   const editorialText = normalizeEditorialText(
     buildEditorialWhyItMattersText(structuredContent, input.editedWhyItMatters),
   );
+  const validation = validateWhyItMatters(editorialText);
+
+  if (!validation.passed && currentStatus === "published") {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: getValidationFailureMessage(validation),
+    };
+  }
+
+  let nextEditorialStatus: EditorialStatus = "needs_review";
+  let successMessage = "Draft saved. Why it matters requires a human rewrite before approval.";
+
+  if (validation.passed) {
+    nextEditorialStatus = shouldPreserveStatus ? currentStatus : "draft";
+    successMessage = shouldPreserveStatus ? "Editorial changes saved." : "Draft saved.";
+  }
+
   const updateResult = await context.client
     .from("signal_posts")
     .update({
@@ -1123,7 +1162,8 @@ export async function saveSignalDraft(input: {
             published_why_it_matters_payload: structuredContent,
           }
         : {}),
-      editorial_status: shouldPreserveStatus ? currentStatus : "draft",
+      editorial_status: nextEditorialStatus,
+      ...buildWhyItMattersValidationFields(validation, now),
       edited_by: context.user.email ?? null,
       edited_at: now,
       updated_at: now,
@@ -1141,7 +1181,7 @@ export async function saveSignalDraft(input: {
   return {
     ok: true,
     code: "draft_saved",
-    message: shouldPreserveStatus ? "Editorial changes saved." : "Draft saved.",
+    message: successMessage,
   };
 }
 
@@ -1172,12 +1212,44 @@ async function approveSignalPostWithContext(
   }
 
   const now = new Date().toISOString();
+  const validation = validateWhyItMatters(editorialText);
+
+  if (!validation.passed) {
+    const flagResult = await context.client
+      .from("signal_posts")
+      .update({
+        edited_why_it_matters: editorialText,
+        edited_why_it_matters_payload: structuredContent,
+        editorial_status: "needs_review",
+        ...buildWhyItMattersValidationFields(validation, now),
+        edited_by: context.user.email ?? null,
+        edited_at: now,
+        updated_at: now,
+      })
+      .eq("id", input.postId);
+
+    if (flagResult.error) {
+      return {
+        ok: false,
+        code: "storage_error",
+        message: "The signal post could not be flagged for rewrite.",
+      };
+    }
+
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: getValidationFailureMessage(validation),
+    };
+  }
+
   const updateResult = await context.client
     .from("signal_posts")
     .update({
       edited_why_it_matters: editorialText,
       edited_why_it_matters_payload: structuredContent,
       editorial_status: "approved",
+      ...buildWhyItMattersValidationFields(validation, now),
       edited_by: context.user.email ?? null,
       edited_at: now,
       approved_by: context.user.email ?? null,
@@ -1294,9 +1366,13 @@ export async function approveSignalPosts(input: {
   const failedResults = results.filter((result) => !result.ok);
 
   if (failedResults.length > 0) {
+    const nonStorageFailure = failedResults.every((result) =>
+      result.code === "publish_blocked" || result.code === "empty_editorial_text",
+    );
+
     return {
       ok: false,
-      code: "storage_error",
+      code: nonStorageFailure ? "publish_blocked" : "storage_error",
       message:
         approvedCount > 0
           ? `Approved ${approvedCount} signal posts. ${failedResults.length} could not be approved.`
@@ -1346,12 +1422,14 @@ export async function resetSignalPostToAiDraft(input: {
     (lookup.data as Pick<StoredSignalPost, "ai_why_it_matters">).ai_why_it_matters,
   );
   const now = new Date().toISOString();
+  const validation = validateWhyItMatters(aiDraft);
   const updateResult = await context.client
     .from("signal_posts")
     .update({
       edited_why_it_matters: aiDraft,
       edited_why_it_matters_payload: null,
-      editorial_status: "draft",
+      editorial_status: validation.passed ? "draft" : "needs_review",
+      ...buildWhyItMattersValidationFields(validation, now),
       edited_by: context.user.email ?? null,
       edited_at: now,
       updated_at: now,
@@ -1441,6 +1519,57 @@ export async function publishApprovedSignals(input: {
   }
 
   const now = new Date().toISOString();
+  const topFivePublicationCandidates = topFivePosts.map((post) => {
+    const structuredContent =
+      post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
+    const text = normalizeEditorialText(
+      buildEditorialWhyItMattersText(
+        structuredContent,
+        post.editedWhyItMatters || post.publishedWhyItMatters || "",
+      ),
+    );
+
+    return {
+      post,
+      structuredContent,
+      text,
+      validation: validateWhyItMatters(text),
+    };
+  });
+  const invalidTopFive = topFivePublicationCandidates.filter((entry) => !entry.validation.passed);
+
+  if (invalidTopFive.length > 0) {
+    const flagResults = await Promise.all(
+      invalidTopFive.map(({ post, validation }) =>
+        context.client
+          .from("signal_posts")
+          .update({
+            editorial_status: "needs_review",
+            ...buildWhyItMattersValidationFields(validation, now),
+            updated_at: now,
+          })
+          .eq("id", post.id),
+      ),
+    );
+
+    if (flagResults.some((result) => result.error)) {
+      return {
+        ok: false,
+        code: "storage_error",
+        message: "The invalid signal posts could not be flagged for rewrite.",
+      };
+    }
+
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message:
+        invalidTopFive.length === 1
+          ? getValidationFailureMessage(invalidTopFive[0].validation)
+          : `${invalidTopFive.length} signal posts require human rewrite before publishing.`,
+    };
+  }
+
   const deactivateOldLiveSet = await context.client
     .from("signal_posts")
     .update({
@@ -1467,63 +1596,90 @@ export async function publishApprovedSignals(input: {
   }
 
   const updateResults = await Promise.all(
-    topFivePosts.map((post) => {
-      const structuredContent =
-        post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
-
-      return context.client
+    topFivePublicationCandidates.map(({ post, structuredContent, text, validation }) =>
+      context.client
         .from("signal_posts")
         .update({
-          published_why_it_matters: normalizeEditorialText(
-            buildEditorialWhyItMattersText(
-              structuredContent,
-              post.editedWhyItMatters || post.publishedWhyItMatters || "",
-            ),
-          ),
+          published_why_it_matters: text,
           published_why_it_matters_payload: structuredContent,
           editorial_status: "published",
+          ...buildWhyItMattersValidationFields(validation, now),
           is_live: true,
           published_at: now,
           updated_at: now,
         })
-        .eq("id", post.id);
-    }),
+        .eq("id", post.id),
+    ),
+  );
+
+  const depthPublicationCandidates = depthPosts
+    .map((post) => {
+      const structuredContent =
+        post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
+      const humanEditorialText = selectApprovedEditorialWhyItMatters(post);
+      const depthText = normalizeEditorialText(
+        humanEditorialText
+          ? buildEditorialWhyItMattersText(
+              structuredContent,
+              humanEditorialText,
+            )
+          : "",
+      );
+
+      return {
+        post,
+        structuredContent,
+        depthText,
+        validation: depthText ? validateWhyItMatters(depthText) : null,
+      };
+    })
+    .filter((entry) => entry.depthText);
+  const invalidDepthCandidates = depthPublicationCandidates.flatMap((entry) =>
+    entry.validation && !entry.validation.passed
+      ? [{ ...entry, validation: entry.validation }]
+      : [],
+  );
+  const validDepthCandidates = depthPublicationCandidates.flatMap((entry) =>
+    entry.validation?.passed
+      ? [{ ...entry, validation: entry.validation }]
+      : [],
+  );
+
+  const depthValidationResults = await Promise.all(
+    invalidDepthCandidates.map(({ post, validation }) =>
+      context.client
+        .from("signal_posts")
+        .update({
+          editorial_status: "needs_review",
+          ...buildWhyItMattersValidationFields(validation, now),
+          updated_at: now,
+        })
+        .eq("id", post.id),
+    ),
   );
 
   const depthUpdateResults = await Promise.all(
-    depthPosts
-      .map((post) => {
-        const structuredContent =
-          post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
-        const humanEditorialText = selectApprovedEditorialWhyItMatters(post);
-        const depthText = normalizeEditorialText(
-          humanEditorialText
-            ? buildEditorialWhyItMattersText(
-                structuredContent,
-                humanEditorialText,
-              )
-            : "",
-        );
-
-        return { post, structuredContent, depthText };
-      })
-      .filter((entry) => entry.depthText)
-      .map(({ post, structuredContent, depthText }) =>
-        context.client
-          .from("signal_posts")
-          .update({
-            published_why_it_matters: depthText,
-            published_why_it_matters_payload: structuredContent,
-            editorial_status: "published",
-            is_live: true,
-            published_at: now,
-            updated_at: now,
-          })
-          .eq("id", post.id),
-      ),
+    validDepthCandidates.map(({ post, structuredContent, depthText, validation }) =>
+      context.client
+        .from("signal_posts")
+        .update({
+          published_why_it_matters: depthText,
+          published_why_it_matters_payload: structuredContent,
+          editorial_status: "published",
+          ...buildWhyItMattersValidationFields(validation, now),
+          is_live: true,
+          published_at: now,
+          updated_at: now,
+        })
+        .eq("id", post.id),
+    ),
   );
 
-  if (updateResults.some((result) => result.error) || depthUpdateResults.some((result) => result.error)) {
+  if (
+    updateResults.some((result) => result.error) ||
+    depthUpdateResults.some((result) => result.error) ||
+    depthValidationResults.some((result) => result.error)
+  ) {
     captureRssEditorialStorageFailure({
       failureType: "rss_cache_write_failed",
       phase: "publish",
@@ -1617,12 +1773,40 @@ export async function publishSignalPost(input: {
   }
 
   const now = new Date().toISOString();
+  const validation = validateWhyItMatters(editorialText);
+
+  if (!validation.passed) {
+    const flagResult = await context.client
+      .from("signal_posts")
+      .update({
+        editorial_status: "needs_review",
+        ...buildWhyItMattersValidationFields(validation, now),
+        updated_at: now,
+      })
+      .eq("id", post.id);
+
+    if (flagResult.error) {
+      return {
+        ok: false,
+        code: "storage_error",
+        message: "The signal post could not be flagged for rewrite.",
+      };
+    }
+
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: getValidationFailureMessage(validation),
+    };
+  }
+
   const updateResult = await context.client
     .from("signal_posts")
     .update({
       published_why_it_matters: editorialText,
       published_why_it_matters_payload: structuredContent,
       editorial_status: "published",
+      ...buildWhyItMattersValidationFields(validation, now),
       published_at: now,
       updated_at: now,
     })
@@ -1684,7 +1868,7 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
 
   return ((result.data ?? []) as unknown as StoredSignalPost[])
     .map(mapStoredSignalPost)
-    .filter((post) => normalizeEditorialText(post.publishedWhyItMatters));
+    .filter((post) => selectPublishedEditorialWhyItMatters(post));
 }
 
 export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> {
