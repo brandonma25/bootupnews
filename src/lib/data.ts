@@ -68,6 +68,7 @@ async function fetchFeedArticlesSafely(
     timeoutMs?: number;
     retryCount?: number;
     headers?: HeadersInit;
+    feedId?: string;
   } = {},
 ): Promise<FeedArticle[]> {
   const { fetchFeedArticles } = await import("@/lib/rss");
@@ -2548,6 +2549,7 @@ async function fetchSourceArticlesWithFallback(source: Source): Promise<SourceFe
         await fetchFeedArticlesSafely(attempt.feedUrl, source.name, {
           timeoutMs: attempt.timeoutMs,
           retryCount: attempt.retryCount,
+          feedId: source.id,
         }),
         attempt,
       );

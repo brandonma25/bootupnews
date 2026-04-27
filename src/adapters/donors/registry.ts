@@ -85,6 +85,7 @@ function createRssIngestionAdapter(donor: DonorId): IngestionAdapter<DonorFeed> 
           const articles = await context.fetchFeed(source.fetch.feedUrl, source.source, {
             timeoutMs: source.fetch.timeoutMs ?? context.timeoutMs,
             retryCount: source.fetch.retryCount ?? context.retryCount,
+            feedId: source.id,
           });
 
           return articles.map((article) => ({

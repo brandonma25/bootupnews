@@ -9,11 +9,13 @@ import {
 import type { SourceDefinition } from "@/lib/integration/subsystem-contracts";
 import type { RawItem } from "@/lib/models/raw-item";
 import { logPipelineEvent } from "@/lib/observability/logger";
+import { captureRssFailure, classifyRssFailure } from "@/lib/observability/rss";
 import {
   buildRuntimeSourceResolutionSnapshot,
   type RuntimeSourceResolutionSnapshot,
 } from "@/lib/observability/pipeline-run";
 import { fetchFeedArticles } from "@/lib/rss";
+import { sanitizeUrl } from "@/lib/sentry-config";
 import { cleanText, stableId } from "@/lib/pipeline/shared/text";
 
 import { seedRawItems } from "./seed-items";
@@ -217,10 +219,21 @@ export async function ingestRawItems(options: {
       } catch (error) {
         const failure = {
           source: source.source,
-          feedUrl: source.fetch.feedUrl,
+          feedUrl: sanitizeUrl(source.fetch.feedUrl),
           error: error instanceof Error ? error.message : String(error),
         };
         failures.push(failure);
+        captureRssFailure(error, {
+          failureType: classifyRssFailure(error),
+          phase: "fetch",
+          feedUrl: source.fetch.feedUrl,
+          feedName: source.source,
+          feedId: source.sourceId,
+          retryCount: source.fetch.retryCount,
+          timeoutMs: source.fetch.timeoutMs,
+          level: "warning",
+          message: "RSS source ingestion failed; pipeline will continue when other sources succeed.",
+        });
         logPipelineEvent("warn", "Feed ingestion failed", failure);
         return [];
       }

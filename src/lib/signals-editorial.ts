@@ -12,6 +12,7 @@ import {
   createSupabaseServiceRoleClient,
   safeGetUser,
 } from "@/lib/supabase/server";
+import { captureRssFailure, type RssFailureType, type RssPhase } from "@/lib/observability/rss";
 import type { BriefingItem, EditorialStatus } from "@/lib/types";
 import {
   flagCardForRewrite,
@@ -209,6 +210,31 @@ function normalizeSearchQuery(value: string | null | undefined) {
 
 function normalizePageNumber(page?: number) {
   return Number.isFinite(page) && page && page > 0 ? Math.floor(page) : 1;
+}
+
+function captureRssEditorialStorageFailure(input: {
+  failureType: Extract<RssFailureType, "rss_cache_read_failed" | "rss_cache_write_failed">;
+  phase: Extract<RssPhase, "store" | "publish">;
+  operation: string;
+  message: string;
+  route?: string;
+  briefingDate?: string | null;
+  postId?: string;
+  postCount?: number;
+}) {
+  captureRssFailure(new Error(input.message), {
+    failureType: input.failureType,
+    phase: input.phase,
+    level: "error",
+    message: input.message,
+    extra: {
+      operation: input.operation,
+      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+      briefingDate: input.briefingDate ?? undefined,
+      postId: input.postId,
+      postCount: input.postCount,
+    },
+  });
 }
 
 function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
@@ -466,6 +492,14 @@ async function persistSignalPostCandidates(
     .eq("briefing_date", briefingDate);
 
   if (existingResult.error) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_read_failed",
+      phase: "store",
+      operation: "check_existing_signal_snapshot",
+      briefingDate,
+      message: "RSS signal snapshot storage could not be checked before persistence.",
+    });
+
     return {
       ok: false,
       briefingDate,
@@ -505,6 +539,14 @@ async function persistSignalPostCandidates(
       .eq("is_live", true);
 
     if (deactivateOldLiveSet.error) {
+      captureRssEditorialStorageFailure({
+        failureType: "rss_cache_write_failed",
+        phase: "store",
+        operation: "archive_previous_live_signal_set",
+        briefingDate,
+        message: "Previous live RSS signal set could not be archived before persistence.",
+      });
+
       return {
         ok: false,
         briefingDate,
@@ -541,6 +583,15 @@ async function persistSignalPostCandidates(
   );
 
   if (insertResult.error) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_write_failed",
+      phase: "store",
+      operation: "insert_signal_snapshot",
+      briefingDate,
+      postCount: flaggedCandidates.length,
+      message: "Current RSS Top 5 snapshot could not be persisted for editing.",
+    });
+
     return {
       ok: false,
       briefingDate,
@@ -1212,6 +1263,14 @@ export async function publishApprovedSignals(input: {
   );
 
   if (latest.errorMessage) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_read_failed",
+      phase: "publish",
+      operation: "load_latest_signal_snapshot_for_publish",
+      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+      message: "RSS signal set could not be loaded for publishing.",
+    });
+
     return {
       ok: false,
       code: "storage_error",
@@ -1261,6 +1320,15 @@ export async function publishApprovedSignals(input: {
     .eq("is_live", true);
 
   if (deactivateOldLiveSet.error) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_write_failed",
+      phase: "publish",
+      operation: "archive_previous_live_signal_set_for_publish",
+      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+      briefingDate: latest.latestBriefingDate,
+      message: "Previous live RSS signal set could not be archived before publishing.",
+    });
+
     return {
       ok: false,
       code: "storage_error",
@@ -1326,6 +1394,16 @@ export async function publishApprovedSignals(input: {
   );
 
   if (updateResults.some((result) => result.error) || depthUpdateResults.some((result) => result.error)) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_write_failed",
+      phase: "publish",
+      operation: "publish_signal_set",
+      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+      briefingDate: latest.latestBriefingDate,
+      postCount: topFivePosts.length + depthPosts.length,
+      message: "RSS signal set could not be published completely.",
+    });
+
     return {
       ok: false,
       code: "storage_error",
@@ -1360,7 +1438,24 @@ export async function publishSignalPost(input: {
     .eq("id", input.postId)
     .maybeSingle();
 
-  if (lookup.error || !lookup.data) {
+  if (lookup.error) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_read_failed",
+      phase: "publish",
+      operation: "load_signal_post_for_publish",
+      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+      postId: input.postId,
+      message: "RSS signal post could not be loaded for publishing.",
+    });
+
+    return {
+      ok: false,
+      code: "not_found",
+      message: "The signal post could not be found.",
+    };
+  }
+
+  if (!lookup.data) {
     return {
       ok: false,
       code: "not_found",
@@ -1404,6 +1499,16 @@ export async function publishSignalPost(input: {
     .eq("id", post.id);
 
   if (updateResult.error) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_write_failed",
+      phase: "publish",
+      operation: "publish_signal_post",
+      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+      briefingDate: post.briefingDate,
+      postId: post.id,
+      message: "RSS signal post could not be published.",
+    });
+
     return {
       ok: false,
       code: "storage_error",

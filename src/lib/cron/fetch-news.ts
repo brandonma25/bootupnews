@@ -1,5 +1,10 @@
 import { generateDailyBriefing } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
+import {
+  captureRssCronCheckIn,
+  captureRssFailure,
+  withRssSpan,
+} from "@/lib/observability/rss";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 
 export type DailyNewsCronRunSummary = {
@@ -40,6 +45,8 @@ function buildFailureResult(timestamp: string, message: string): DailyNewsCronRu
 
 export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
   const timestamp = new Date().toISOString();
+  const startedAtMs = Date.now();
+  const checkInId = captureRssCronCheckIn("in_progress");
 
   logServerEvent("info", "Daily news cron started", {
     route: "/api/cron/fetch-news",
@@ -47,7 +54,14 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
   });
 
   try {
-    const { briefing, publicRankedItems, pipelineRun } = await generateDailyBriefing();
+    const { briefing, publicRankedItems, pipelineRun } = await withRssSpan(
+      "rss.refresh",
+      "refresh",
+      {
+        route: "/api/cron/fetch-news",
+      },
+      () => generateDailyBriefing(),
+    );
     const briefingDate = briefing.briefingDate.slice(0, 10);
     const baseSummary = {
       briefingDate,
@@ -74,6 +88,20 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
         route: "/api/cron/fetch-news",
         ...result.summary,
       });
+      captureRssFailure(new Error(result.summary.message), {
+        failureType: "rss_refresh_job_failed",
+        phase: "refresh",
+        level: "error",
+        retryCount: pipelineRun.feed_failures.length,
+        message: result.summary.message,
+        extra: {
+          route: "/api/cron/fetch-news",
+          pipelineRunId: pipelineRun.run_id,
+          usedSeedFallback: true,
+          feedFailureCount: pipelineRun.feed_failures.length,
+        },
+      });
+      captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
 
       return result;
     }
@@ -93,6 +121,19 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
         ...result.summary,
         briefingItemCount: briefing.items.length,
       });
+      captureRssFailure(new Error(result.summary.message), {
+        failureType: "rss_refresh_job_failed",
+        phase: "refresh",
+        level: "error",
+        message: result.summary.message,
+        extra: {
+          route: "/api/cron/fetch-news",
+          pipelineRunId: pipelineRun.run_id,
+          briefingItemCount: briefing.items.length,
+          feedFailureCount: pipelineRun.feed_failures.length,
+        },
+      });
+      captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
 
       return result;
     }
@@ -116,6 +157,23 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       ...result.summary,
     });
 
+    if (!snapshot.ok) {
+      captureRssFailure(new Error("RSS signal post persistence failed during daily refresh."), {
+        failureType: "rss_cache_write_failed",
+        phase: "store",
+        level: "error",
+        message: "RSS signal post persistence failed during daily refresh.",
+        extra: {
+          route: "/api/cron/fetch-news",
+          pipelineRunId: pipelineRun.run_id,
+          briefingDate,
+          operation: "persist_signal_posts",
+        },
+      });
+    }
+
+    captureRssCronCheckIn(snapshot.ok ? "ok" : "error", checkInId, durationSeconds(startedAtMs));
+
     return result;
   } catch (error) {
     const result = buildFailureResult(timestamp, "Daily news cron failed before completion.");
@@ -125,7 +183,21 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       timestamp,
       ...errorContext(error),
     });
+    captureRssFailure(error, {
+      failureType: "rss_refresh_job_failed",
+      phase: "refresh",
+      level: "error",
+      message: result.summary.message,
+      extra: {
+        route: "/api/cron/fetch-news",
+      },
+    });
+    captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
 
     return result;
   }
+}
+
+function durationSeconds(startedAtMs: number) {
+  return Number(((Date.now() - startedAtMs) / 1000).toFixed(3));
 }
