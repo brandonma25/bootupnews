@@ -559,6 +559,14 @@ function getPublishBlockedReason(
     return "This Top 5 list is already published. Save and approve an edit to publish a new version.";
   }
 
+  const rewriteRequiredCount = posts.filter(
+    (post) => post.whyItMattersValidationStatus === "requires_human_rewrite",
+  ).length;
+
+  if (rewriteRequiredCount > 0) {
+    return `${rewriteRequiredCount} signal posts require a human rewrite before publishing.`;
+  }
+
   const blockedCount = posts.filter(
     (post) => !["approved", "published"].includes(post.editorialStatus),
   ).length;
