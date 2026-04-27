@@ -477,7 +477,7 @@ function formatHomepageFreshnessDate(dateKey: string) {
   }).format(date);
 }
 
-function buildEmptyPublicHomepageData(): DashboardData {
+function buildEmptyPublicHomepageData(message = "Today's briefing is being prepared."): DashboardData {
   const sources = getSourcesForPublicSurface("public.home");
   const briefingDate = normalizeCalendarSafeBriefingDate(getBriefingDateKey(formatISO(new Date())));
 
@@ -487,7 +487,7 @@ function buildEmptyPublicHomepageData(): DashboardData {
       id: `empty-homepage-${getBriefingDateKey(briefingDate)}`,
       briefingDate,
       title: "Daily Executive Briefing",
-      intro: "Today's briefing is being prepared.",
+      intro: message,
       readingWindow: "0 minutes",
       items: [],
     },
@@ -496,7 +496,7 @@ function buildEmptyPublicHomepageData(): DashboardData {
     publicRankedItems: [],
     homepageFreshnessNotice: {
       kind: "empty",
-      text: "Today's briefing is being prepared.",
+      text: message,
       briefingDate: null,
     },
     homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, 0),
@@ -508,7 +508,7 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const sources = getSourcesForPublicSurface("public.home");
 
   if (homepageSignalSnapshot.posts.length === 0) {
-    return buildEmptyPublicHomepageData();
+    return buildEmptyPublicHomepageData(homepageSignalSnapshot.errorMessage);
   }
 
   const firstBriefingDate = homepageSignalSnapshot.briefingDate ?? homepageSignalSnapshot.posts[0]?.briefingDate;

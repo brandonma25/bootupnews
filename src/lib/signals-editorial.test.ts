@@ -109,7 +109,12 @@ function createBriefingItem(rank: number) {
   };
 }
 
-function createSupabaseMock(rows: SignalPostRow[]) {
+function createSupabaseMock(
+  rows: SignalPostRow[],
+  options: { missingColumns?: string[] } = {},
+) {
+  const missingColumns = new Set(options.missingColumns ?? []);
+
   return {
     rows,
     from(tableName: string) {
@@ -117,6 +122,7 @@ function createSupabaseMock(rows: SignalPostRow[]) {
 
       let operation: "select" | "update" | null = null;
       let updateValues: Partial<SignalPostRow> = {};
+      let selectError: { message: string } | null = null;
       const filters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
       const inclusionFilters: Array<{ column: keyof SignalPostRow; values: unknown[] }> = [];
       const lessThanFilters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
@@ -137,6 +143,14 @@ function createSupabaseMock(rows: SignalPostRow[]) {
       }
 
       function selectResult(limit?: number) {
+        if (selectError) {
+          return Promise.resolve({
+            data: null,
+            error: selectError,
+            count: 0,
+          });
+        }
+
         let data = applyFilters();
 
         if (orderRules.length > 0) {
@@ -170,8 +184,20 @@ function createSupabaseMock(rows: SignalPostRow[]) {
       }
 
       const builder = {
-        select() {
+        select(columns?: string) {
           operation = "select";
+          const selectedColumns = String(columns ?? "")
+            .split(",")
+            .map((column) => column.trim().split(/\s+/)[0])
+            .filter(Boolean);
+          const missingSelectedColumns = selectedColumns.filter((column) => missingColumns.has(column));
+
+          if (missingSelectedColumns.length > 0) {
+            selectError = {
+              message: `column signal_posts.${missingSelectedColumns[0]} does not exist`,
+            };
+          }
+
           return builder;
         },
         order(column: keyof SignalPostRow, options?: { ascending?: boolean }) {
@@ -301,6 +327,30 @@ describe("signals editorial workflow", () => {
         "No stored Top 5 signal snapshot exists yet. This page stays read-only until signal posts have been persisted.",
     });
     expect(generateDailyBriefing).not.toHaveBeenCalled();
+  });
+
+  it("fails editorial review visibly when the signal_posts schema preflight is missing columns", async () => {
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock([], {
+        missingColumns: ["why_it_matters_validation_status"],
+      }),
+    );
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { getEditorialReviewState } = await loadEditorialModule();
+    const state = await getEditorialReviewState();
+
+    expect(state.kind).toBe("authorized");
+    if (state.kind !== "authorized") return;
+    expect(state.posts).toEqual([]);
+    expect(state.storageReady).toBe(false);
+    expect(state.warning).toBe(
+      "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_status.",
+    );
   });
 
   it("loads editorial history in stable reverse briefing-date order", async () => {
@@ -1037,5 +1087,47 @@ describe("signals editorial workflow", () => {
     expect(rejected?.whyItMattersValidationDetails).toContain(
       "missing specific noun: no named entity, number, country, organization, or person found",
     );
+  });
+
+  it("blocks signal_posts insertion visibly when the schema preflight is missing columns", async () => {
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock([], {
+        missingColumns: ["why_it_matters_validation_details"],
+      }),
+    );
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-04-25",
+      items: [1, 2, 3, 4, 5].map(createBriefingItem),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      briefingDate: "2026-04-25",
+      insertedCount: 0,
+      message: "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_details.",
+    });
+  });
+
+  it("returns a homepage snapshot schema error instead of silently emptying public results", async () => {
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock([], {
+        missingColumns: ["why_it_matters_validation_failures"],
+      }),
+    );
+
+    const { getHomepageSignalSnapshot } = await loadEditorialModule();
+    const snapshot = await getHomepageSignalSnapshot({
+      today: new Date("2026-04-26T12:00:00.000Z"),
+    });
+
+    expect(snapshot).toEqual({
+      source: "none",
+      posts: [],
+      depthPosts: [],
+      briefingDate: null,
+      errorMessage: "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_failures.",
+    });
   });
 });

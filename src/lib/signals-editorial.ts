@@ -23,7 +23,7 @@ import {
 export const SIGNALS_EDITORIAL_ROUTE = "/dashboard/signals/editorial-review";
 export const PUBLIC_SIGNALS_ROUTE = "/signals";
 
-const SIGNAL_POST_SELECT = [
+const SIGNAL_POST_REQUIRED_COLUMNS = [
   "id",
   "briefing_date",
   "rank",
@@ -52,7 +52,9 @@ const SIGNAL_POST_SELECT = [
   "is_live",
   "created_at",
   "updated_at",
-].join(", ");
+];
+
+const SIGNAL_POST_SELECT = SIGNAL_POST_REQUIRED_COLUMNS.join(", ");
 
 const EDITORIAL_PAGE_SIZE = 20;
 const PUBLIC_SIGNAL_DEPTH_LIMIT = 20;
@@ -193,7 +195,70 @@ export type HomepageSignalSnapshot = {
   posts: EditorialSignalPost[];
   depthPosts: EditorialSignalPost[];
   briefingDate: string | null;
+  errorMessage?: string;
 };
+
+type SignalPostsSchemaPreflightResult =
+  | {
+      ok: true;
+      missingColumns: [];
+      message: null;
+    }
+  | {
+      ok: false;
+      missingColumns: string[];
+      message: string;
+    };
+
+let signalPostsSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
+
+function buildSignalPostsSchemaPreflightFailure(missingColumns: string[]): SignalPostsSchemaPreflightResult {
+  return {
+    ok: false,
+    missingColumns,
+    message: `signal_posts schema preflight failed. Missing expected columns: ${missingColumns.join(", ")}.`,
+  };
+}
+
+async function runSignalPostsSchemaPreflight(
+  client: EditorialClient,
+): Promise<SignalPostsSchemaPreflightResult> {
+  const missingColumns: string[] = [];
+  const errorMessages: string[] = [];
+
+  for (const column of SIGNAL_POST_REQUIRED_COLUMNS) {
+    const result = await client.from("signal_posts").select(column).limit(0);
+
+    if (result.error) {
+      missingColumns.push(column);
+      errorMessages.push(`${column}: ${result.error.message}`);
+    }
+  }
+
+  if (missingColumns.length === 0) {
+    return {
+      ok: true,
+      missingColumns: [],
+      message: null,
+    };
+  }
+
+  const failure = buildSignalPostsSchemaPreflightFailure(missingColumns);
+
+  logServerEvent("error", "signal_posts schema preflight failed", {
+    missingColumns,
+    errorMessages,
+  });
+
+  return failure;
+}
+
+function getSignalPostsSchemaPreflight(
+  client: EditorialClient,
+): Promise<SignalPostsSchemaPreflightResult> {
+  signalPostsSchemaPreflightPromise ??= runSignalPostsSchemaPreflight(client);
+  return signalPostsSchemaPreflightPromise;
+}
 
 function normalizeEditorialText(value: string | null | undefined) {
   return value?.trim() ?? "";
@@ -616,13 +681,25 @@ export async function persistSignalPostsForBriefing(input: {
   items: BriefingItem[];
 }): Promise<SignalSnapshotPersistenceResult> {
   const client = createSupabaseServiceRoleClient();
+  const briefingDate = normalizeDateValue(input.briefingDate) ?? new Date().toISOString().slice(0, 10);
 
   if (!client) {
     return {
       ok: false,
-      briefingDate: normalizeDateValue(input.briefingDate) ?? new Date().toISOString().slice(0, 10),
+      briefingDate,
       insertedCount: 0,
       message: "Editorial storage is unavailable. Configure Supabase and SUPABASE_SERVICE_ROLE_KEY.",
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(client);
+
+  if (!schemaPreflight.ok) {
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      message: schemaPreflight.message,
     };
   }
 
@@ -850,6 +927,27 @@ export async function getEditorialReviewState(
       currentTopFive: [],
       storageReady: false,
       warning: context.message,
+      page: normalizedPage,
+      pageSize: EDITORIAL_PAGE_SIZE,
+      totalMatchingPosts: 0,
+      latestBriefingDate: null,
+      appliedScope: normalizedScope,
+      appliedStatus: normalizedStatus,
+      appliedQuery: normalizedQuery,
+      appliedDate: normalizedDate,
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(context.client);
+
+  if (!schemaPreflight.ok) {
+    return {
+      kind: "authorized",
+      adminEmail: context.user.email ?? "",
+      posts: [],
+      currentTopFive: [],
+      storageReady: false,
+      warning: schemaPreflight.message,
       page: normalizedPage,
       pageSize: EDITORIAL_PAGE_SIZE,
       totalMatchingPosts: 0,
@@ -1530,6 +1628,12 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
     return [];
   }
 
+  const schemaPreflight = await getSignalPostsSchemaPreflight(supabase);
+
+  if (!schemaPreflight.ok) {
+    return [];
+  }
+
   const result = await supabase
     .from("signal_posts")
     .select(SIGNAL_POST_SELECT)
@@ -1564,6 +1668,18 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
       posts: [],
       depthPosts: [],
       briefingDate: null,
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(supabase);
+
+  if (!schemaPreflight.ok) {
+    return {
+      source: "none",
+      posts: [],
+      depthPosts: [],
+      briefingDate: null,
+      errorMessage: schemaPreflight.message,
     };
   }
 
