@@ -35,6 +35,7 @@ const safeGetUser = vi.fn();
 const createSupabaseServiceRoleClient = vi.fn();
 const createSupabaseServerClient = vi.fn();
 const generateDailyBriefing = vi.fn();
+const captureRssFailure = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   safeGetUser,
@@ -44,6 +45,10 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/data", () => ({
   generateDailyBriefing,
+}));
+
+vi.mock("@/lib/observability/rss", () => ({
+  captureRssFailure,
 }));
 
 function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
@@ -255,6 +260,7 @@ describe("signals editorial workflow", () => {
     createSupabaseServiceRoleClient.mockReset();
     createSupabaseServerClient.mockReset();
     generateDailyBriefing.mockReset();
+    captureRssFailure.mockReset();
   });
 
   it("withholds editorial review state from non-admin users", async () => {
@@ -736,6 +742,65 @@ describe("signals editorial workflow", () => {
     expect(result.message).toBe("Signal post published.");
     expect(rows[0].editorial_status).toBe("published");
     expect(rows[0].published_why_it_matters).toBe("Approved historical editorial update.");
+  });
+
+  it("captures individual publish storage failures as RSS publish failures", async () => {
+    const row = createRow({
+      id: "signal-1",
+      rank: 1,
+      briefing_date: "2026-04-20",
+      edited_why_it_matters: "Approved historical editorial update.",
+      editorial_status: "approved",
+    });
+    createSupabaseServiceRoleClient.mockReturnValue({
+      from() {
+        let operation: "select" | "update" | null = null;
+        const builder = {
+          select() {
+            operation = "select";
+            return builder;
+          },
+          update() {
+            operation = "update";
+            return builder;
+          },
+          eq() {
+            if (operation === "update") {
+              return Promise.resolve({ error: { message: "write failed" } });
+            }
+
+            return builder;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: row, error: null });
+          },
+        };
+
+        return builder;
+      },
+    });
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishSignalPost } = await loadEditorialModule();
+    const result = await publishSignalPost({ postId: "signal-1" });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("storage_error");
+    expect(captureRssFailure).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        failureType: "rss_cache_write_failed",
+        phase: "publish",
+        extra: expect.objectContaining({
+          operation: "publish_signal_post",
+          postId: "signal-1",
+        }),
+      }),
+    );
   });
 
   it("publishes structured approved signal post payloads for homepage rendering", async () => {

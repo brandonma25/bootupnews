@@ -73,6 +73,7 @@ export interface IngestionFetchContext {
       timeoutMs?: number;
       retryCount?: number;
       headers?: HeadersInit;
+      feedId?: string;
     },
   ): Promise<FeedArticle[]>;
   timeoutMs: number;

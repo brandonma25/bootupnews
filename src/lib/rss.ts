@@ -1,6 +1,16 @@
 import Parser from "rss-parser";
 
 import { env } from "@/lib/env";
+import {
+  captureRssFailure,
+  classifyRssFailure,
+  createRssError,
+  recordRssFetchSuccess,
+  withRssSpan,
+  type RssFailureType,
+  type RssPhase,
+} from "@/lib/observability/rss";
+import { getUrlHost } from "@/lib/sentry-config";
 import { fetchTldrFeed, isTldrFeedUrl, type TldrDiscoveryMetadata } from "@/lib/tldr";
 import { stripHtml } from "@/lib/utils";
 
@@ -23,9 +33,58 @@ type FeedRequestOptions = {
   timeoutMs?: number;
   retryCount?: number;
   headers?: HeadersInit;
+  feedId?: string;
 };
 
 export async function fetchFeedArticles(
+  feedUrl: string,
+  sourceName: string,
+  requestOptions: FeedRequestOptions = {},
+) {
+  return withRssSpan(
+    "rss.fetch",
+    "fetch",
+    {
+      "rss.feed_host": getUrlHost(feedUrl),
+      "rss.feed_name": sourceName,
+    },
+    async () => {
+      try {
+        const articles = await fetchFeedArticlesUnchecked(feedUrl, sourceName, requestOptions);
+
+        if (articles.length === 0) {
+          throw createRssError(`Feed returned zero articles for ${sourceName}`, {
+            failureType: "rss_parse_empty_feed",
+            phase: "parse",
+            feedUrl,
+            feedName: sourceName,
+            feedId: requestOptions.feedId,
+            parser: "rss-parser",
+          });
+        }
+
+        recordRssFetchSuccess({ feedUrl, feedName: sourceName, feedId: requestOptions.feedId });
+        return articles;
+      } catch (error) {
+        captureRssFailure(error, {
+          failureType: classifyRssFailure(error),
+          phase: error instanceof Error && error.name === "RssError" && "phase" in error
+            ? error.phase as RssPhase
+            : "fetch",
+          feedUrl,
+          feedName: sourceName,
+          feedId: requestOptions.feedId,
+          retryCount: requestOptions.retryCount,
+          timeoutMs: requestOptions.timeoutMs,
+          parser: "rss-parser",
+        });
+        throw error;
+      }
+    },
+  );
+}
+
+async function fetchFeedArticlesUnchecked(
   feedUrl: string,
   sourceName: string,
   requestOptions: FeedRequestOptions = {},
@@ -50,18 +109,84 @@ export async function fetchFeedArticles(
     },
   }, sourceName);
 
+  assertRssContentType(response, feedUrl, sourceName);
+
   const xml = await response.text();
+
+  if (!xml.trim()) {
+    throw createRssError(`Feed returned an empty response for ${sourceName}`, {
+      failureType: "rss_fetch_empty_response",
+      phase: "fetch",
+      feedUrl,
+      feedName: sourceName,
+      feedId: requestOptions.feedId,
+    });
+  }
+
   let feed;
 
   try {
-    feed = await parser.parseString(xml);
+    feed = await withRssSpan(
+      "rss.parse",
+      "parse",
+      {
+        "rss.feed_host": getUrlHost(feedUrl),
+        "rss.feed_name": sourceName,
+      },
+      () => parser.parseString(xml),
+    );
   } catch (error) {
-    throw new Error(
+    throw createRssError(
       `Feed parsing failed for ${sourceName}: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        failureType: "rss_parse_invalid_xml",
+        phase: "parse",
+        feedUrl,
+        feedName: sourceName,
+        feedId: requestOptions.feedId,
+        parser: "rss-parser",
+      },
     );
   }
 
-  return (feed.items ?? []).slice(0, 15).map<FeedArticle>((item, index) => ({
+  const items = feed.items ?? [];
+
+  if (!Array.isArray(items)) {
+    throw createRssError(`Feed parsing failed for ${sourceName}: invalid feed item structure`, {
+      failureType: "rss_parse_invalid_feed",
+      phase: "parse",
+      feedUrl,
+      feedName: sourceName,
+      feedId: requestOptions.feedId,
+      parser: "rss-parser",
+    });
+  }
+
+  if (items.length === 0) {
+    throw createRssError(`Feed parsing failed for ${sourceName}: empty feed`, {
+      failureType: "rss_parse_empty_feed",
+      phase: "parse",
+      feedUrl,
+      feedName: sourceName,
+      feedId: requestOptions.feedId,
+      parser: "rss-parser",
+    });
+  }
+
+  const selectedItems = items.slice(0, 15);
+
+  if (selectedItems.every((item) => !item.title?.trim() && !item.link?.trim())) {
+    throw createRssError(`Feed parsing failed for ${sourceName}: missing required item fields`, {
+      failureType: "rss_parse_missing_required_fields",
+      phase: "parse",
+      feedUrl,
+      feedName: sourceName,
+      feedId: requestOptions.feedId,
+      parser: "rss-parser",
+    });
+  }
+
+  return selectedItems.map<FeedArticle>((item, index) => ({
     title: item.title?.trim() || `Untitled article ${index + 1}`,
     url: item.link?.trim() || feedUrl,
     summaryText: stripHtml(
@@ -244,8 +369,18 @@ export async function fetchWithRetry(
       const response = await fetchWithTimeout(url, init, options.timeoutMs);
 
       if (!response.ok) {
-        const error = new Error(
+        const error = createRssError(
           `Feed request failed for ${options.sourceName} with status ${response.status}`,
+          {
+            failureType: classifyHttpStatus(response.status),
+            phase: "fetch",
+            feedUrl: url,
+            feedName: options.sourceName,
+            statusCode: response.status,
+            retryAttempt: attempt,
+            retryCount: options.retryCount,
+            timeoutMs: options.timeoutMs,
+          },
         );
 
         if (attempt < options.retryCount && isRetryableStatus(response.status)) {
@@ -253,23 +388,36 @@ export async function fetchWithRetry(
           continue;
         }
 
-        throw error;
+        throw attempt > 0 && isRetryableStatus(response.status)
+          ? createRetryExhaustedError(url, options, error)
+          : error;
       }
 
       return response;
     } catch (error) {
-      const normalized = normalizeFeedRequestError(error, options.sourceName, options.timeoutMs);
+      const normalized = normalizeFeedRequestError(error, url, options.sourceName, options.timeoutMs);
       lastError = normalized;
 
       if (attempt < options.retryCount && isRetryableFetchError(error)) {
         continue;
       }
 
-      throw normalized;
+      throw attempt > 0 && isRetryableFetchError(error)
+        ? createRetryExhaustedError(url, options, normalized)
+        : normalized;
     }
   }
 
-  throw lastError ?? new Error(`Feed request failed for ${options.sourceName}`);
+  throw lastError
+    ? createRetryExhaustedError(url, options, lastError)
+    : createRssError(`Feed request failed for ${options.sourceName}`, {
+      failureType: "rss_unknown_error",
+      phase: "fetch",
+      feedUrl: url,
+      feedName: options.sourceName,
+      retryCount: options.retryCount,
+      timeoutMs: options.timeoutMs,
+    });
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
@@ -298,14 +446,86 @@ function isRetryableFetchError(error: unknown) {
   return false;
 }
 
-function normalizeFeedRequestError(error: unknown, sourceName: string, timeoutMs: number) {
+function normalizeFeedRequestError(error: unknown, feedUrl: string, sourceName: string, timeoutMs: number) {
   if (error instanceof Error && error.name === "AbortError") {
-    return new Error(`Feed request timed out for ${sourceName} after ${timeoutMs}ms`);
+    return createRssError(`Feed request timed out for ${sourceName} after ${timeoutMs}ms`, {
+      failureType: "rss_fetch_timeout",
+      phase: "fetch",
+      feedUrl,
+      feedName: sourceName,
+      timeoutMs,
+    });
   }
 
-  if (error instanceof Error) {
+  if (error instanceof Error && error.name === "RssError") {
     return error;
   }
 
-  return new Error(`Feed request failed for ${sourceName}: ${String(error)}`);
+  if (error instanceof Error) {
+    return createRssError(error.message, {
+      failureType: classifyRssFailure(error, "rss_fetch_network_error"),
+      phase: "fetch",
+      feedUrl,
+      feedName: sourceName,
+      timeoutMs,
+    });
+  }
+
+  return createRssError(`Feed request failed for ${sourceName}: ${String(error)}`, {
+    failureType: "rss_unknown_error",
+    phase: "fetch",
+    feedUrl,
+    feedName: sourceName,
+    timeoutMs,
+  });
+}
+
+function classifyHttpStatus(status: number): RssFailureType {
+  if (status === 429) {
+    return "rss_fetch_rate_limited";
+  }
+
+  if (status >= 400) {
+    return "rss_fetch_http_error";
+  }
+
+  return "rss_fetch_unexpected_status";
+}
+
+function createRetryExhaustedError(
+  feedUrl: string,
+  options: {
+    timeoutMs: number;
+    retryCount: number;
+    sourceName: string;
+  },
+  lastError: Error,
+) {
+  return createRssError(
+    `Feed request retry exhausted for ${options.sourceName}: ${lastError.message}`,
+    {
+      failureType: "rss_retry_exhausted",
+      phase: "fetch",
+      feedUrl,
+      feedName: options.sourceName,
+      retryCount: options.retryCount,
+      timeoutMs: options.timeoutMs,
+    },
+  );
+}
+
+function assertRssContentType(response: Response, feedUrl: string, sourceName: string) {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+
+  if (
+    contentType &&
+    !/(xml|rss|atom|text\/plain|text\/html|application\/xhtml)/i.test(contentType)
+  ) {
+    throw createRssError(`Feed response for ${sourceName} had invalid content type ${contentType}`, {
+      failureType: "rss_fetch_invalid_content_type",
+      phase: "fetch",
+      feedUrl,
+      feedName: sourceName,
+    });
+  }
 }
