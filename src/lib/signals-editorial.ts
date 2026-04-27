@@ -220,19 +220,51 @@ function buildSignalPostsSchemaPreflightFailure(missingColumns: string[]): Signa
   };
 }
 
+function isMissingColumnError(error: unknown, column: string) {
+  const maybeError = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  const normalizedColumn = column.toLowerCase();
+  const haystack = [
+    maybeError.code,
+    maybeError.message,
+    maybeError.details,
+    maybeError.hint,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    haystack.includes("42703") ||
+    (haystack.includes("does not exist") &&
+      (haystack.includes(normalizedColumn) || haystack.includes(`signal_posts.${normalizedColumn}`))) ||
+    (haystack.includes("could not find") &&
+      haystack.includes(normalizedColumn) &&
+      haystack.includes("column"))
+  );
+}
+
 async function runSignalPostsSchemaPreflight(
   client: EditorialClient,
 ): Promise<SignalPostsSchemaPreflightResult> {
   const missingColumns: string[] = [];
   const errorMessages: string[] = [];
+  const nonSchemaErrorMessages: string[] = [];
 
   for (const column of SIGNAL_POST_REQUIRED_COLUMNS) {
     const result = await client.from("signal_posts").select(column).limit(0);
 
-    if (result.error) {
+    if (result.error && isMissingColumnError(result.error, column)) {
       missingColumns.push(column);
       errorMessages.push(`${column}: ${result.error.message}`);
+    } else if (result.error) {
+      nonSchemaErrorMessages.push(`${column}: ${result.error.message}`);
     }
+  }
+
+  if (nonSchemaErrorMessages.length > 0 && missingColumns.length === 0) {
+    logServerEvent("warn", "signal_posts schema preflight could not verify columns", {
+      errorMessages: nonSchemaErrorMessages,
+    });
   }
 
   if (missingColumns.length === 0) {

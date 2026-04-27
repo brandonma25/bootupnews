@@ -111,9 +111,10 @@ function createBriefingItem(rank: number) {
 
 function createSupabaseMock(
   rows: SignalPostRow[],
-  options: { missingColumns?: string[] } = {},
+  options: { missingColumns?: string[]; preflightTransportErrorColumns?: string[] } = {},
 ) {
   const missingColumns = new Set(options.missingColumns ?? []);
+  const preflightTransportErrorColumns = new Set(options.preflightTransportErrorColumns ?? []);
 
   return {
     rows,
@@ -123,6 +124,7 @@ function createSupabaseMock(
       let operation: "select" | "update" | null = null;
       let updateValues: Partial<SignalPostRow> = {};
       let selectError: { message: string } | null = null;
+      let selectedColumns: string[] = [];
       const filters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
       const inclusionFilters: Array<{ column: keyof SignalPostRow; values: unknown[] }> = [];
       const lessThanFilters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
@@ -186,7 +188,7 @@ function createSupabaseMock(
       const builder = {
         select(columns?: string) {
           operation = "select";
-          const selectedColumns = String(columns ?? "")
+          selectedColumns = String(columns ?? "")
             .split(",")
             .map((column) => column.trim().split(/\s+/)[0])
             .filter(Boolean);
@@ -205,6 +207,17 @@ function createSupabaseMock(
           return builder;
         },
         limit(count: number) {
+          const shouldReturnPreflightTransportError =
+            count === 0 && selectedColumns.some((column) => preflightTransportErrorColumns.has(column));
+
+          if (shouldReturnPreflightTransportError) {
+            return Promise.resolve({
+              data: null,
+              error: { message: "TypeError: fetch failed" },
+              count: 0,
+            });
+          }
+
           return selectResult(count);
         },
         range(from: number, to: number) {
@@ -1036,6 +1049,26 @@ describe("signals editorial workflow", () => {
 
     const { getHomepageSignalSnapshot } = await loadEditorialModule();
     const snapshot = await getHomepageSignalSnapshot({ today: new Date("2026-04-26T12:00:00.000Z") });
+
+    expect(snapshot).toEqual({
+      source: "none",
+      posts: [],
+      depthPosts: [],
+      briefingDate: null,
+    });
+  });
+
+  it("does not convert non-schema preflight transport errors into a homepage schema failure", async () => {
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock([], {
+        preflightTransportErrorColumns: ["id"],
+      }),
+    );
+
+    const { getHomepageSignalSnapshot } = await loadEditorialModule();
+    const snapshot = await getHomepageSignalSnapshot({
+      today: new Date("2026-04-26T12:00:00.000Z"),
+    });
 
     expect(snapshot).toEqual({
       source: "none",
