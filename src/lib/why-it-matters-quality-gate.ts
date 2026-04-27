@@ -23,6 +23,34 @@ export type FlaggedWhyItMattersCard<T> = T & {
 
 const TERMINAL_PUNCTUATION_PATTERN = /[.!?]$/;
 const SIGNAL_SUFFIX_PATTERN = /\s*\(Signal:\s*[^)]+\)\s*$/i;
+const UNRESOLVED_VARIABLE_PATTERN =
+  /(?:\{\{\s*[^{}]+\s*\}\}|\{[a-z][a-z0-9_\s-]*\}|\[[a-z][a-z0-9_\s-]*\]|\$[a-z][a-z0-9_]*)/gi;
+const DANGLING_ENDING_PATTERNS = [
+  {
+    label: "rather than",
+    pattern: /\b(?:rather|instead)\s+than$/i,
+    detail: "dangling comparison phrase",
+  },
+  {
+    label: "more/less than",
+    pattern: /\b(?:more|less|fewer|higher|lower)\s+than$/i,
+    detail: "dangling comparison phrase",
+  },
+  {
+    label: "clause connector",
+    pattern: /\b(?:because|while|although|though|when|where|if|unless|until|which|whose|rather)$/i,
+    detail: "incomplete clause ending",
+  },
+  {
+    label: "dangling preposition",
+    pattern: /\b(?:as|from|for|with|without|into|across|around|over|under|between|against|toward|through|via|by|of|to)$/i,
+    detail: "dangling preposition or connector",
+  },
+];
+const MALFORMED_SUBJECT_START_PATTERN =
+  /^(?:can|how|why|the|an|a)\s+(?:matters|gives|changes|resets|opens|raises|shifts|is\s+not|could\s+(?:change|move|raise|shift))\b/i;
+const POSSESSIVE_MANGLE_START_PATTERN =
+  /^([A-Z][a-z]{2,}s)\s+(?:matters|gives|changes|resets|opens|raises|shifts|could\s+(?:change|move|raise|shift))\b/;
 
 const TRUNCATION_PATTERNS = [
   "so it could raise",
@@ -180,6 +208,8 @@ const GENERIC_SENTENCE_STARTERS = new Set([
   "A",
   "An",
   "At",
+  "Can",
+  "How",
   "In",
   "It",
   "Its",
@@ -188,6 +218,7 @@ const GENERIC_SENTENCE_STARTERS = new Set([
   "Their",
   "This",
   "Those",
+  "Why",
 ]);
 
 const GENERIC_PROPER_NOUN_TERMS = new Set([
@@ -269,7 +300,7 @@ function hasSpecificNoun(value: string) {
       return false;
     }
 
-    if (/^(Signal|Why|This|The|A|An|It|At)$/i.test(match)) {
+    if (/^(Signal|Why|How|Can|This|The|A|An|It|At)$/i.test(match)) {
       return false;
     }
 
@@ -299,6 +330,16 @@ function detectIncompleteSentence(value: string, failures: Map<WhyItMattersFailu
       addFailure(failures, "incomplete_sentence", `Ends with truncation pattern: "${pattern}"`);
     }
   }
+
+  for (const ending of DANGLING_ENDING_PATTERNS) {
+    if (ending.pattern.test(terminal)) {
+      addFailure(
+        failures,
+        "incomplete_sentence",
+        `Ends with ${ending.detail}: "${ending.label}"`,
+      );
+    }
+  }
 }
 
 function detectTemplatePlaceholderLanguage(
@@ -312,6 +353,39 @@ function detectTemplatePlaceholderLanguage(
         failures,
         "template_placeholder_language",
         `Contains template placeholder phrase: "${phrase}"`,
+      );
+    }
+  }
+
+  const unresolvedVariables = value.match(UNRESOLVED_VARIABLE_PATTERN) ?? [];
+  for (const variable of unresolvedVariables) {
+    addFailure(
+      failures,
+      "template_placeholder_language",
+      `Contains unresolved template variable: "${variable}"`,
+    );
+  }
+
+  const malformedSubjectMatch = value.match(MALFORMED_SUBJECT_START_PATTERN);
+  if (malformedSubjectMatch) {
+    addFailure(
+      failures,
+      "template_placeholder_language",
+      `Contains malformed generated subject/verb sequence: "${malformedSubjectMatch[0]}"`,
+    );
+  }
+
+  const possessiveMangleMatch = value.match(POSSESSIVE_MANGLE_START_PATTERN);
+  if (possessiveMangleMatch) {
+    const subject = possessiveMangleMatch[1];
+    const isKnownSpecificEntity = SPECIFIC_ENTITY_TERMS.some(
+      (term) => term.toLowerCase() === subject.toLowerCase(),
+    );
+    if (!isKnownSpecificEntity) {
+      addFailure(
+        failures,
+        "template_placeholder_language",
+        `Contains title/subject mangling before template verb: "${possessiveMangleMatch[0]}"`,
       );
     }
   }

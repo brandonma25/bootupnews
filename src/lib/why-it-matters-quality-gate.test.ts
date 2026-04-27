@@ -38,6 +38,53 @@ describe("why-it-matters quality gate", () => {
     );
   });
 
+  it("flags unresolved template variables as placeholder language", () => {
+    const result = validateWhyItMatters(
+      "Google changes the [category] baseline because {actor} can move {{market_structure}} expectations.",
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("template_placeholder_language");
+    expect(result.failureDetails).toEqual(
+      expect.arrayContaining([
+        'template_placeholder_language: Contains unresolved template variable: "[category]"',
+        'template_placeholder_language: Contains unresolved template variable: "{actor}"',
+        'template_placeholder_language: Contains unresolved template variable: "{{market_structure}}"',
+      ]),
+    );
+  });
+
+  it("flags dangling comparison endings as incomplete generated copy", () => {
+    const result = validateWhyItMatters(
+      "How is not a market-moving development because it shifts expectations rather than.",
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("incomplete_sentence");
+    expect(result.failureDetails).toContain(
+      'incomplete_sentence: Ends with dangling comparison phrase: "rather than"',
+    );
+  });
+
+  it("flags malformed title/subject starts from generated copy", () => {
+    const results = [
+      validateWhyItMatters(
+        "Chinas matters for chip supply because Taiwan risk now shapes trade planning.",
+      ),
+      validateWhyItMatters(
+        "Can gives OpenAI a procurement signal because Microsoft and Google now shape the buying cycle.",
+      ),
+      validateWhyItMatters(
+        "How is not a market-moving development because Amazon and Google already set the infrastructure baseline.",
+      ),
+    ];
+
+    for (const result of results) {
+      expect(result.passed).toBe(false);
+      expect(result.failures).toContain("template_placeholder_language");
+    }
+  });
+
   it("flags abstract variable lists from homepage audit card #2", () => {
     const result = validateWhyItMatters(AUDIT_CARD_2);
 
