@@ -1,5 +1,6 @@
 import type { ClusterFirstPipelineResult } from "@/lib/pipeline";
 import type { PublicSourcePlan } from "@/lib/source-manifest";
+import type { CandidatePoolInsufficientReason, ContentAccessibility, SourceRole } from "@/lib/source-accessibility-types";
 import type { SignalSnapshotPersistenceResult } from "@/lib/signals-editorial";
 import type { BriefingItem, DailyBriefing, SignalSelectionEligibilityTier } from "@/lib/types";
 import { validateWhyItMatters } from "@/lib/why-it-matters-quality-gate";
@@ -26,6 +27,12 @@ export type ControlledPipelineSignalReport = {
   sourceUrl: string | null;
   sourceCount: number | null;
   sourceTier: string | null;
+  sourceRole: SourceRole | null;
+  contentAccessibility: ContentAccessibility | null;
+  accessibleTextLength: number | null;
+  extractionMethod: string | null;
+  fetchStatus: string | null;
+  parseStatus: string | null;
   articleId: string | null;
   clusterId: string | null;
   articleCount: number | null;
@@ -52,6 +59,8 @@ export type ControlledPipelineSignalReport = {
   validationDetails: string[];
   selectionQualityWarnings: string[];
   selectionEligibilityReasons: string[];
+  sourceAccessibilityWarnings: string[];
+  coreBlockingReasons: string[];
 };
 
 export type ControlledPipelineArticleCandidateReport = {
@@ -62,6 +71,17 @@ export type ControlledPipelineArticleCandidateReport = {
   sourceName: string;
   sourceUrl: string;
   sourceTier: string;
+  sourceRole: string | null;
+  contentAccessibility: string | null;
+  accessibleTextLength: number | null;
+  summaryLength: number | null;
+  contentLength: number | null;
+  extractionMethod: string | null;
+  fetchStatus: string | null;
+  parseStatus: string | null;
+  failureReason: string | null;
+  suppliedByManifest: boolean | null;
+  publicEligible: boolean | null;
   eventType: string;
   filterDecision: string;
   filterSeverity: string;
@@ -82,7 +102,18 @@ export type ControlledPipelineSelectionSummary = {
   depthOnlyCount: number;
   excludedWeakCandidateCount: number;
   candidate_pool_insufficient: boolean;
+  candidate_pool_insufficient_reason: CandidatePoolInsufficientReason | null;
   sourceScarcityLikely: boolean;
+  sourceAccessibilityLikely: boolean;
+  functionalSourceCoverageByCategory: Record<string, {
+    active_sources: number;
+    contributing_sources: number;
+    core_capable_sources: number;
+    context_capable_sources: number;
+    depth_capable_sources: number;
+    failed_sources: number;
+  }>;
+  sourceAccessibilityWarnings: string[];
   selectionQualityWarnings: string[];
 };
 
@@ -110,6 +141,7 @@ export type ControlledPipelineReport = {
   articleCandidates: ControlledPipelineArticleCandidateReport[];
   selectionSummary: ControlledPipelineSelectionSummary;
   candidate_pool_insufficient: boolean;
+  candidate_pool_insufficient_reason: CandidatePoolInsufficientReason | null;
   proposedTopFive: ControlledPipelineSignalReport[];
   proposedContextRows: ControlledPipelineSignalReport[];
   proposedDepthRows: ControlledPipelineSignalReport[];
@@ -252,6 +284,12 @@ function mapSignalReport(item: BriefingItem, rank: number): ControlledPipelineSi
     sourceUrl: source?.url ?? null,
     sourceCount: item.sourceCount ?? item.sources.length,
     sourceTier: eligibility?.sourceTier ?? null,
+    sourceRole: eligibility?.sourceRole ?? null,
+    contentAccessibility: eligibility?.contentAccessibility ?? null,
+    accessibleTextLength: eligibility?.accessibleTextLength ?? null,
+    extractionMethod: eligibility?.extractionMethod ?? null,
+    fetchStatus: eligibility?.fetchStatus ?? null,
+    parseStatus: eligibility?.parseStatus ?? null,
     articleId: item.relatedArticles?.[0]?.url ?? source?.url ?? null,
     clusterId: getClusterId(item),
     articleCount: item.eventIntelligence?.signals.articleCount ?? item.relatedArticles?.length ?? null,
@@ -292,6 +330,8 @@ function mapSignalReport(item: BriefingItem, rank: number): ControlledPipelineSi
     validationDetails: validation.failureDetails,
     selectionQualityWarnings: eligibility?.warnings ?? [],
     selectionEligibilityReasons: eligibility?.reasons ?? [],
+    sourceAccessibilityWarnings: eligibility?.sourceAccessibilityWarnings ?? [],
+    coreBlockingReasons: eligibility?.coreBlockingReasons ?? [],
   };
 }
 
@@ -308,6 +348,17 @@ function mapArticleCandidateReport(
     sourceName: entry.source_name,
     sourceUrl: entry.source_url,
     sourceTier: entry.source_tier,
+    sourceRole: entry.source_role ?? null,
+    contentAccessibility: entry.content_accessibility ?? null,
+    accessibleTextLength: entry.accessible_text_length ?? null,
+    summaryLength: entry.summary_length ?? null,
+    contentLength: entry.content_length ?? null,
+    extractionMethod: entry.extraction_method ?? null,
+    fetchStatus: entry.fetch_status ?? null,
+    parseStatus: entry.parse_status ?? null,
+    failureReason: entry.failure_reason ?? null,
+    suppliedByManifest: entry.supplied_by_manifest ?? null,
+    publicEligible: entry.public_eligible ?? null,
     eventType: entry.event_type,
     filterDecision: entry.filter_decision,
     filterSeverity: entry.filter_severity,
@@ -333,6 +384,82 @@ function buildFallbackSourcePlan(activeSources: ClusterFirstPipelineResult["run"
     sources: [] as [],
     warnings: ["source_plan_metadata_unavailable"],
   };
+}
+
+function summarizeFunctionalSourceCoverage(
+  sourceContributions: NonNullable<ClusterFirstPipelineResult["run"]["source_contributions"]>,
+) {
+  return sourceContributions.reduce<ControlledPipelineSelectionSummary["functionalSourceCoverageByCategory"]>(
+    (summary, entry) => {
+      const category = entry.topic ?? "Unknown";
+      const current = summary[category] ?? {
+        active_sources: 0,
+        contributing_sources: 0,
+        core_capable_sources: 0,
+        context_capable_sources: 0,
+        depth_capable_sources: 0,
+        failed_sources: 0,
+      };
+
+      current.active_sources += 1;
+      if (entry.item_count > 0) current.contributing_sources += 1;
+      if (entry.functional_for_core) current.core_capable_sources += 1;
+      if (entry.functional_for_context) current.context_capable_sources += 1;
+      if (entry.functional_for_depth) current.depth_capable_sources += 1;
+      if (entry.fetch_status === "failed" || entry.fetch_status === "rss_retry_exhausted") {
+        current.failed_sources += 1;
+      }
+
+      summary[category] = current;
+      return summary;
+    },
+    {},
+  );
+}
+
+function hasSourceAccessibilityBlockingSignal(input: {
+  sourceContributions: NonNullable<ClusterFirstPipelineResult["run"]["source_contributions"]>;
+  excludedCandidates: ControlledPipelineSignalReport[];
+  articleCandidates: ControlledPipelineArticleCandidateReport[];
+}) {
+  return (
+    input.sourceContributions.some((entry) => entry.item_count > 0 && entry.functional_for_core === false) ||
+    input.sourceContributions.some((entry) => entry.fetch_status === "failed" || entry.fetch_status === "rss_retry_exhausted") ||
+    input.excludedCandidates.some((entry) =>
+      entry.coreBlockingReasons.some((reason) =>
+        /source_accessibility|source_fetch_failed|metadata_only|abstract_only|paywall_limited|rss_retry_exhausted/.test(reason),
+      ),
+    ) ||
+    input.articleCandidates.some((entry) =>
+      entry.contentAccessibility === "metadata_only" ||
+      entry.contentAccessibility === "fetch_failed" ||
+      entry.contentAccessibility === "rss_retry_exhausted" ||
+      entry.contentAccessibility === "paywall_limited",
+    )
+  );
+}
+
+function resolveCandidatePoolInsufficientReason(input: {
+  candidatePoolInsufficient: boolean;
+  sourceScarcityLikely: boolean;
+  sourceAccessibilityLikely: boolean;
+  selectionQualityLikely: boolean;
+}): CandidatePoolInsufficientReason | null {
+  if (!input.candidatePoolInsufficient) {
+    return null;
+  }
+
+  const reasons = [
+    input.sourceScarcityLikely ? "source_scarcity" : null,
+    input.sourceAccessibilityLikely ? "source_accessibility" : null,
+    input.selectionQualityLikely ? "selection_quality" : null,
+  ].filter((value): value is Exclude<CandidatePoolInsufficientReason, "mixed"> => Boolean(value));
+
+  if (reasons.length > 1) {
+    return "mixed";
+  }
+
+  return reasons[0] ?? "selection_quality";
 }
 
 export function buildControlledPipelineReport(input: {
@@ -376,6 +503,7 @@ export function buildControlledPipelineReport(input: {
     articleFilterEvaluations.map((entry) => ({ source_name: entry.source_name })),
   );
   const categoryDistribution = summarizeCategoryDistribution(candidateReports);
+  const functionalSourceCoverageByCategory = summarizeFunctionalSourceCoverage(sourceContributions);
   const categoriesRepresented = [
     ...new Set(candidateReports.map((item) => item.category ?? item.topic).filter((value): value is string => Boolean(value))),
   ];
@@ -392,9 +520,32 @@ export function buildControlledPipelineReport(input: {
     activeContributingSourceCount < 4 ||
     categoriesRepresented.length < 3;
   const candidatePoolInsufficient = proposedTopFive.length < 5;
+  const sourceAccessibilityLikely = hasSourceAccessibilityBlockingSignal({
+    sourceContributions,
+    excludedCandidates,
+    articleCandidates,
+  });
+  const selectionQualityLikely =
+    excludedCandidates.length > 0 ||
+    articleCandidates.some((entry) => entry.filterDecision !== "pass");
+  const candidatePoolInsufficientReason = resolveCandidatePoolInsufficientReason({
+    candidatePoolInsufficient,
+    sourceScarcityLikely,
+    sourceAccessibilityLikely,
+    selectionQualityLikely,
+  });
+  const sourceAccessibilityWarnings = [
+    ...new Set([
+      ...sourceContributions.flatMap((entry) => entry.accessibility_warnings ?? []),
+      ...candidateReports.flatMap((entry) => entry.sourceAccessibilityWarnings),
+      sourceAccessibilityLikely ? "source_accessibility_constrained_selection" : null,
+    ].filter((value): value is string => Boolean(value))),
+  ];
   const selectionQualityWarnings = [
     candidatePoolInsufficient ? `eligible_core_count_${proposedTopFive.length}_below_required_5` : null,
     sourceScarcityLikely && activeSourceCount > 0 ? "source_pool_likely_constrained_selection" : null,
+    sourceAccessibilityLikely ? "source_accessibility_likely_constrained_selection" : null,
+    candidatePoolInsufficientReason ? `candidate_pool_insufficient_reason_${candidatePoolInsufficientReason}` : null,
   ].filter((value): value is string => Boolean(value));
   const selectionSummary: ControlledPipelineSelectionSummary = {
     activeSourceCount,
@@ -410,7 +561,11 @@ export function buildControlledPipelineReport(input: {
     depthOnlyCount: proposedDepthRows.length,
     excludedWeakCandidateCount: excludedCandidates.length + articleCandidates.filter((entry) => entry.filterDecision !== "pass").length,
     candidate_pool_insufficient: candidatePoolInsufficient,
+    candidate_pool_insufficient_reason: candidatePoolInsufficientReason,
     sourceScarcityLikely,
+    sourceAccessibilityLikely,
+    functionalSourceCoverageByCategory,
+    sourceAccessibilityWarnings,
     selectionQualityWarnings,
   };
 
@@ -430,6 +585,7 @@ export function buildControlledPipelineReport(input: {
     articleCandidates,
     selectionSummary,
     candidate_pool_insufficient: candidatePoolInsufficient,
+    candidate_pool_insufficient_reason: candidatePoolInsufficientReason,
     proposedTopFive,
     proposedContextRows,
     proposedDepthRows,

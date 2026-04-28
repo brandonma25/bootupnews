@@ -3,6 +3,7 @@ import { applySignalFiltering } from "@/lib/signal-filtering";
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
 import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { RankedStoryClusterResult } from "@/lib/scoring/scoring-engine";
+import { evaluateSourceAccessibilitySupport } from "@/lib/source-accessibility";
 import type {
   BriefingItem,
   SignalSelectionEligibility,
@@ -134,6 +135,17 @@ export function mapArticleFilterDiagnostic(article: NormalizedArticle, evaluatio
     source_name: article.source,
     source_url: article.url,
     source_tier: evaluation.sourceTier,
+    source_role: article.source_accessibility?.source_role,
+    content_accessibility: article.source_accessibility?.content_accessibility,
+    accessible_text_length: article.source_accessibility?.accessible_text_length,
+    summary_length: article.source_accessibility?.summary_length,
+    content_length: article.source_accessibility?.content_length,
+    extraction_method: article.source_accessibility?.extraction_method,
+    fetch_status: article.source_accessibility?.fetch_status,
+    parse_status: article.source_accessibility?.parse_status,
+    failure_reason: article.source_accessibility?.failure_reason,
+    supplied_by_manifest: article.source_accessibility?.supplied_by_manifest,
+    public_eligible: article.source_accessibility?.public_eligible,
     headline_quality: evaluation.headlineQuality,
     event_type: evaluation.eventType,
     filter_decision: evaluation.filterDecision,
@@ -174,6 +186,7 @@ export function evaluateSignalSelectionEligibility(input: {
   const fallbackPromoted = filterReasons.includes("passed_fallback_low_pass_volume");
   const sourceQualityScore = Number(((features.source_credibility * 0.55) + (features.trust_tier * 0.45)).toFixed(2));
   const structuralImportanceScore = groupedScores.event_importance;
+  const sourceAccessibility = evaluateSourceAccessibilitySupport(cluster.articles);
   const sourceQualityAdequate =
     sourceTier === "tier1" ||
     sourceTier === "tier2" ||
@@ -197,6 +210,8 @@ export function evaluateSignalSelectionEligibility(input: {
   if (filterDecision !== "pass") reasons.push(`prd13_filter_${filterDecision}`);
   if (fallbackPromoted) warnings.push("filter_passed_only_by_low_volume_fallback");
   if (!sourceQualityAdequate) reasons.push("source_quality_below_public_threshold");
+  if (!sourceAccessibility.coreSupported) reasons.push(...sourceAccessibility.coreBlockingReasons);
+  warnings.push(...sourceAccessibility.warnings);
   if (!specific) reasons.push("missing_specific_actor_or_number");
   if (LOW_SIGNAL_EVENT_TYPES.has(eventType as EventType)) reasons.push(`low_signal_event_type_${eventType}`);
   if (weakContent) reasons.push(...weakContentReasons);
@@ -211,6 +226,7 @@ export function evaluateSignalSelectionEligibility(input: {
     filterDecision === "pass" &&
     !fallbackPromoted &&
     sourceQualityAdequate &&
+    sourceAccessibility.coreSupported &&
     specific &&
     !weakContent &&
     (structuralEventType || strongStructuralOverride) &&
@@ -221,6 +237,7 @@ export function evaluateSignalSelectionEligibility(input: {
     !coreEligible &&
     filterDecision === "pass" &&
     sourceQualityAdequate &&
+    sourceAccessibility.contextSupported &&
     specific &&
     !weakContent &&
     (contextEventType || strongStructuralOverride) &&
@@ -232,6 +249,7 @@ export function evaluateSignalSelectionEligibility(input: {
     !contextEligible &&
     filterDecision !== "reject" &&
     sourceQualityAdequate &&
+    sourceAccessibility.depthSupported &&
     specific &&
     !weakContent &&
     !LOW_SIGNAL_EVENT_TYPES.has(eventType as EventType) &&
@@ -257,6 +275,14 @@ export function evaluateSignalSelectionEligibility(input: {
     filterSeverity: filterDecision,
     filterReasons,
     sourceTier,
+    sourceRole: sourceAccessibility.representative.source_role,
+    contentAccessibility: sourceAccessibility.representative.content_accessibility,
+    accessibleTextLength: sourceAccessibility.accessibleTextLength,
+    extractionMethod: sourceAccessibility.representative.extraction_method,
+    fetchStatus: sourceAccessibility.representative.fetch_status,
+    parseStatus: sourceAccessibility.representative.parse_status,
+    sourceAccessibilityWarnings: sourceAccessibility.warnings,
+    coreBlockingReasons: sourceAccessibility.coreBlockingReasons,
     headlineQuality: articleFilterEvaluation?.headlineQuality,
     eventType,
     structuralImportanceScore,

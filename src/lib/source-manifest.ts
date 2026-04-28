@@ -1,5 +1,6 @@
 import { demoSources } from "@/lib/demo-data";
 import { classifySourcePreference } from "@/lib/source-policy";
+import type { SourceRole } from "@/lib/source-accessibility-types";
 import type { Source } from "@/lib/types";
 
 export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
@@ -19,13 +20,7 @@ export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
 } as const;
 
 export type PublicSurfaceKey = keyof typeof PUBLIC_SURFACE_SOURCE_MANIFEST;
-export type PublicSourceRole =
-  | "primary_authoritative"
-  | "secondary_authoritative"
-  | "aggregator_summary"
-  | "corroboration_only"
-  | "reference_only"
-  | "exclude_from_public_candidates";
+export type PublicSourceRole = SourceRole;
 
 export type PublicSourcePlanEntry = {
   id: string;
@@ -96,6 +91,14 @@ const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; p
     publicEligible: true,
   },
 };
+
+function normalizeSourceId(sourceId: string) {
+  return sourceId.startsWith("custom-") ? sourceId.slice("custom-".length) : sourceId;
+}
+
+export function getPublicSourceGovernance(sourceId: string) {
+  return PUBLIC_SOURCE_GOVERNANCE[normalizeSourceId(sourceId)] ?? null;
+}
 
 export function getSourcesForPublicSurface(surface: PublicSurfaceKey): Source[] {
   const sourceIds = PUBLIC_SURFACE_SOURCE_MANIFEST[surface];

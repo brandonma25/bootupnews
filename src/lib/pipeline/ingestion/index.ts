@@ -16,15 +16,27 @@ import {
 } from "@/lib/observability/pipeline-run";
 import { fetchFeedArticles } from "@/lib/rss";
 import { sanitizeUrl } from "@/lib/sentry-config";
+import {
+  buildArticleSourceAccessibility,
+  buildFailedSourceAccessibility,
+  inferSourceRole,
+  normalizeSourceTier,
+  summarizeSourceAccessibility,
+} from "@/lib/source-accessibility";
+import type { SourceAccessibilityDiagnostics } from "@/lib/source-accessibility-types";
+import { getPublicSourceGovernance } from "@/lib/source-manifest";
 import { classifySourcePreference } from "@/lib/source-policy";
 import { cleanText, stableId } from "@/lib/pipeline/shared/text";
 
 import { seedRawItems } from "./seed-items";
 
 type IngestionFailure = {
+  source_id: string;
   source: string;
   feedUrl: string;
+  failure_type: string;
   error: string;
+  source_accessibility: SourceAccessibilityDiagnostics;
 };
 
 type IngestionResult = {
@@ -37,8 +49,23 @@ type IngestionResult = {
     source_id: string;
     source: string;
     donor: string;
+    topic: string;
     source_class: string;
     trust_tier: string;
+    source_tier: string;
+    source_role: string;
+    public_eligible: boolean;
+    content_accessibility: string;
+    accessible_text_length_max: number;
+    extraction_method: string;
+    fetch_status: string;
+    parse_status: string;
+    failure_reason: string | null;
+    functional_for_core: boolean;
+    functional_for_context: boolean;
+    functional_for_depth: boolean;
+    accessibility_warnings: string[];
+    core_blocking_reasons: string[];
     item_count: number;
   }>;
 };
@@ -78,13 +105,14 @@ function classifyCustomSourceTopic(topicName?: string) {
   };
 }
 
-function buildCustomSourceDefinition(source: Source): SourceDefinition {
+function buildCustomSourceDefinition(source: Source, options: { suppliedByManifest?: boolean } = {}): SourceDefinition {
   const metadata = classifyCustomSourceTopic(source.topicName);
   const sourcePolicyTier = classifySourcePreference({
     sourceName: source.name,
     sourceFeedUrl: source.feedUrl,
     sourceHomepageUrl: source.homepageUrl,
   });
+  const governance = getPublicSourceGovernance(source.id);
   const trustTier = sourcePolicyTier === "tier1"
     ? "tier_1"
     : sourcePolicyTier === "tier2"
@@ -92,6 +120,13 @@ function buildCustomSourceDefinition(source: Source): SourceDefinition {
       : sourcePolicyTier === "tier3"
         ? "tier_3"
         : metadata.trustTier;
+  const publicEligible = governance?.publicEligible ?? true;
+  const sourceRole = governance?.sourceRole ?? inferSourceRole({
+    sourceClass: metadata.sourceClass,
+    trustTier,
+    provenance: metadata.provenance,
+    publicEligible,
+  });
 
   return {
     sourceId: `custom-${source.id}`,
@@ -106,6 +141,9 @@ function buildCustomSourceDefinition(source: Source): SourceDefinition {
     provenance: metadata.provenance,
     status: source.status === "active" ? "active" : "inactive",
     availability: "custom",
+    sourceRole,
+    publicEligible,
+    suppliedByManifest: Boolean(options.suppliedByManifest),
     fetch: {
       feedUrl: source.feedUrl,
       timeoutMs: 4500,
@@ -157,7 +195,7 @@ function resolveIngestionSources(options: {
    */
   const cappedSources = suppliedByManifest ? activeSources : activeSources.slice(0, 5);
 
-  return cappedSources.map(buildCustomSourceDefinition);
+  return cappedSources.map((source) => buildCustomSourceDefinition(source, { suppliedByManifest }));
 }
 
 export function resolveNoArgumentRuntimeSourceResolutionSnapshot(): RuntimeSourceResolutionSnapshot {
@@ -182,13 +220,16 @@ async function fetchSourceWithAdapter(source: SourceDefinition) {
     topic: source.topic,
     credibility: source.credibility,
     reliability: source.reliability,
-    sourceClass: source.sourceClass,
-    trustTier: source.trustTier,
-    provenance: source.provenance,
-    status: source.status,
-    availability: source.availability,
-    fetch: source.fetch,
-  }], {
+        sourceClass: source.sourceClass,
+        trustTier: source.trustTier,
+        provenance: source.provenance,
+        status: source.status,
+        availability: source.availability,
+        sourceRole: source.sourceRole,
+        publicEligible: source.publicEligible,
+        suppliedByManifest: source.suppliedByManifest,
+        fetch: source.fetch,
+      }], {
     fetchFeed: fetchFeedArticles,
     timeoutMs: source.fetch.timeoutMs ?? 4_500,
     retryCount: source.fetch.retryCount ?? 1,
@@ -198,6 +239,8 @@ async function fetchSourceWithAdapter(source: SourceDefinition) {
 }
 
 function toRawItem(entry: Awaited<ReturnType<typeof fetchSourceWithAdapter>>[number]): RawItem {
+  const sourceAccessibility = buildArticleSourceAccessibility(entry.article, entry.sourceDefinition);
+
   return {
     id: entry.article.stableId ?? stableId(entry.sourceDefinition.source, entry.article.url, entry.article.publishedAt),
     source: entry.article.sourceName || entry.sourceDefinition.source,
@@ -206,6 +249,7 @@ function toRawItem(entry: Awaited<ReturnType<typeof fetchSourceWithAdapter>>[num
     published_at: entry.article.publishedAt,
     raw_content: cleanText(entry.article.contentText ?? entry.article.summaryText),
     source_metadata: entry.sourceMetadata,
+    source_accessibility: sourceAccessibility,
     discovery_metadata: entry.article.discoveryMetadata,
   };
 }
@@ -230,14 +274,24 @@ export async function ingestRawItems(options: {
         const maxItems = source.fetch.maxItems ?? 6;
         return items.slice(0, maxItems).map(toRawItem);
       } catch (error) {
+        const failureType = classifyRssFailure(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const failedAccessibility = buildFailedSourceAccessibility({
+          source,
+          failureType,
+          error: errorMessage,
+        });
         const failure = {
+          source_id: source.sourceId,
           source: source.source,
           feedUrl: sanitizeUrl(source.fetch.feedUrl),
-          error: error instanceof Error ? error.message : String(error),
+          failure_type: failureType,
+          error: errorMessage,
+          source_accessibility: failedAccessibility,
         };
         failures.push(failure);
         captureRssFailure(error, {
-          failureType: classifyRssFailure(error),
+          failureType,
           phase: "fetch",
           feedUrl: source.fetch.feedUrl,
           feedName: source.source,
@@ -254,13 +308,26 @@ export async function ingestRawItems(options: {
   );
 
   const items = batches.flat();
+  const failureBySourceId = new Map(failures.map((failure) => [failure.source_id, failure.source_accessibility]));
   const sourceContributions = sources.map((source) => ({
     source_id: source.sourceId,
     source: source.source,
     donor: source.donor,
+    topic: source.topic,
     source_class: source.sourceClass,
     trust_tier: source.trustTier,
     item_count: items.filter((item) => item.source_metadata?.sourceId === source.sourceId).length,
+    ...summarizeSourceAccessibility({
+      source,
+      diagnostics: items
+        .filter((item) => item.source_metadata?.sourceId === source.sourceId)
+        .map((item) => item.source_accessibility)
+        .filter((value): value is SourceAccessibilityDiagnostics => Boolean(value)),
+      failure: failureBySourceId.get(source.sourceId) ?? null,
+    }),
+  })).map((entry) => ({
+    ...entry,
+    source_tier: normalizeSourceTier(entry.trust_tier),
   }));
 
   logPipelineEvent("info", "Ingestion source contribution summary", {

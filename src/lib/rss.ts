@@ -11,6 +11,7 @@ import {
   type RssPhase,
 } from "@/lib/observability/rss";
 import { getUrlHost } from "@/lib/sentry-config";
+import type { SourceExtractionMethod } from "@/lib/source-accessibility-types";
 import { fetchTldrFeed, isTldrFeedUrl, type TldrDiscoveryMetadata } from "@/lib/tldr";
 import { stripHtml } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ export type FeedArticle = {
   publishedAt: string;
   stableId?: string;
   discoveryMetadata?: TldrDiscoveryMetadata;
+  extractionMethod?: SourceExtractionMethod;
 };
 
 const parser = new Parser();
@@ -186,16 +188,31 @@ async function fetchFeedArticlesUnchecked(
     });
   }
 
-  return selectedItems.map<FeedArticle>((item, index) => ({
-    title: item.title?.trim() || `Untitled article ${index + 1}`,
-    url: item.link?.trim() || feedUrl,
-    summaryText: stripHtml(
-      item.contentSnippet ?? item.content ?? item.summary ?? item.title ?? "",
-    ),
-    contentText: stripHtml(item.content ?? item["content:encoded"] ?? ""),
-    sourceName,
-    publishedAt: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
-  }));
+  return selectedItems.map<FeedArticle>((item, index) => {
+    const encodedContent = typeof item["content:encoded"] === "string" ? item["content:encoded"] : "";
+    const itemContent = typeof item.content === "string" ? item.content : "";
+    const itemSummary = typeof item.summary === "string" ? item.summary : "";
+    const itemSnippet = typeof item.contentSnippet === "string" ? item.contentSnippet : "";
+    const extractionMethod: SourceExtractionMethod = encodedContent
+      ? "rss_content_encoded"
+      : itemContent
+        ? "rss_content"
+        : itemSnippet || itemSummary
+          ? "rss_summary"
+          : "metadata";
+
+    return {
+      title: item.title?.trim() || `Untitled article ${index + 1}`,
+      url: item.link?.trim() || feedUrl,
+      summaryText: stripHtml(
+        itemSnippet || itemContent || itemSummary || item.title || "",
+      ),
+      contentText: stripHtml(encodedContent || itemContent || ""),
+      sourceName,
+      publishedAt: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
+      extractionMethod,
+    };
+  });
 }
 
 export async function fetchApiArticles(
@@ -240,6 +257,7 @@ export async function fetchApiArticles(
       contentText: stripHtml(article.snippet ?? article.description ?? ""),
       sourceName: article.source?.trim() || sourceName,
       publishedAt: article.published_at ?? new Date().toISOString(),
+      extractionMethod: article.snippet ? "api_snippet" : article.description ? "api_description" : "metadata",
     }));
 }
 
@@ -283,6 +301,7 @@ async function fetchLegacyNewsApiArticles(
       contentText: stripHtml(article.content ?? article.description ?? ""),
       sourceName,
       publishedAt: article.publishedAt ?? new Date().toISOString(),
+      extractionMethod: article.content ? "api_snippet" : article.description ? "api_description" : "metadata",
     }));
 }
 
