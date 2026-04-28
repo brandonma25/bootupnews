@@ -16,6 +16,8 @@ function buildConfig(overrides: Partial<ControlledPipelineConfig> = {}): Control
     targetEnvironment: "local",
     allowProductionPipelineTest: false,
     cronDisabledConfirmed: false,
+    draftTierAllowlist: null,
+    draftMaxRows: null,
     artifactDir: ".pipeline-runs",
     ...overrides,
   };
@@ -88,7 +90,62 @@ describe("controlled pipeline execution config", () => {
 
     expect(config.mode).toBe("dry_run");
     expect(config.targetEnvironment).toBe("local");
+    expect(config.draftTierAllowlist).toBeNull();
+    expect(config.draftMaxRows).toBeNull();
     expect(() => assertControlledPipelineCanExecute(config)).not.toThrow();
+  });
+
+  it("resolves explicit Core and Context draft selection controls for controlled runs", () => {
+    const config = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "dry_run",
+      PIPELINE_DRAFT_TIER_ALLOWLIST: "core,context",
+      PIPELINE_DRAFT_MAX_ROWS: "3",
+    } as NodeJS.ProcessEnv);
+
+    expect(config.draftTierAllowlist).toEqual(["core_signal_eligible", "context_signal_eligible"]);
+    expect(config.draftMaxRows).toBe(3);
+    expect(() => assertControlledPipelineCanExecute(config)).not.toThrow();
+  });
+
+  it("fails closed for unsupported draft tiers", () => {
+    expect(() =>
+      resolveControlledPipelineConfig({
+        PIPELINE_RUN_MODE: "dry_run",
+        PIPELINE_DRAFT_TIER_ALLOWLIST: "core,depth",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/PIPELINE_DRAFT_TIER_ALLOWLIST/);
+  });
+
+  it("fails closed for invalid draft max rows", () => {
+    expect(() =>
+      resolveControlledPipelineConfig({
+        PIPELINE_RUN_MODE: "dry_run",
+        PIPELINE_DRAFT_MAX_ROWS: "0",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/PIPELINE_DRAFT_MAX_ROWS/);
+
+    expect(() =>
+      resolveControlledPipelineConfig({
+        PIPELINE_RUN_MODE: "dry_run",
+        PIPELINE_DRAFT_MAX_ROWS: "3.5",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/PIPELINE_DRAFT_MAX_ROWS/);
+
+    expect(() =>
+      resolveControlledPipelineConfig({
+        PIPELINE_RUN_MODE: "dry_run",
+        PIPELINE_DRAFT_MAX_ROWS: "4",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/PIPELINE_DRAFT_MAX_ROWS/);
+  });
+
+  it("requires an explicit max-row cap when a draft tier allowlist is set", () => {
+    const config = buildConfig({
+      mode: "dry_run",
+      draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+    });
+
+    expect(() => assertControlledPipelineCanExecute(config)).toThrow(/PIPELINE_DRAFT_MAX_ROWS/);
   });
 
   it("refuses production draft_only runs without explicit safety guards", () => {
@@ -152,6 +209,16 @@ describe("controlled pipeline execution config", () => {
     });
 
     expect(() => assertControlledPipelineCanExecute(config)).toThrow(/BRIEFING_DATE_OVERRIDE/);
+  });
+
+  it("does not allow normal mode to accept draft selection controls", () => {
+    const config = buildConfig({
+      mode: "normal",
+      draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+      draftMaxRows: 3,
+    });
+
+    expect(() => assertControlledPipelineCanExecute(config)).toThrow(/PIPELINE_DRAFT_\*/);
   });
 });
 

@@ -9,6 +9,31 @@ import {
 import { isCoreSignalEligible } from "@/lib/signal-selection-eligibility";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 import { getPublicSourcePlanForSurface, getRequiredSourcesForPublicSurface } from "@/lib/source-manifest";
+import type { BriefingItem } from "@/lib/types";
+
+function selectDraftOnlyItems(input: {
+  briefingItems: BriefingItem[];
+  publicRankedItems: BriefingItem[];
+  config: ControlledPipelineConfig;
+}) {
+  const { briefingItems, config, publicRankedItems } = input;
+
+  if (!config.draftTierAllowlist && config.draftMaxRows === null) {
+    return briefingItems.filter(isCoreSignalEligible);
+  }
+
+  const allowedTiers = new Set(config.draftTierAllowlist ?? ["core_signal_eligible"]);
+  const candidates = publicRankedItems.length > 0 ? publicRankedItems : briefingItems;
+  const selected = candidates.filter((item) => {
+    const tier = item.selectionEligibility?.tier;
+
+    return tier === "core_signal_eligible" || tier === "context_signal_eligible"
+      ? allowedTiers.has(tier)
+      : false;
+  });
+
+  return config.draftMaxRows === null ? selected : selected.slice(0, config.draftMaxRows);
+}
 
 export async function runControlledPipeline(
   config: ControlledPipelineConfig,
@@ -32,7 +57,11 @@ export async function runControlledPipeline(
     },
   );
   const briefingDate = config.briefingDateOverride ?? briefing.briefingDate.slice(0, 10);
-  const structurallyEligibleItems = briefing.items.filter(isCoreSignalEligible);
+  const structurallyEligibleItems = selectDraftOnlyItems({
+    briefingItems: briefing.items,
+    publicRankedItems,
+    config,
+  });
   const persistence = config.mode === "draft_only"
     ? await persistSignalPostsForBriefing({
         briefingDate,

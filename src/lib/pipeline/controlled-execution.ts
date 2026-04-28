@@ -8,6 +8,7 @@ import { summarizeSourceDistribution } from "@/lib/signal-selection-eligibility"
 
 export type PipelineRunMode = "normal" | "dry_run" | "draft_only";
 export type PipelineTargetEnvironment = "local" | "preview" | "staging" | "production";
+export type ControlledPipelineDraftTier = "core_signal_eligible" | "context_signal_eligible";
 
 export type ControlledPipelineConfig = {
   mode: PipelineRunMode;
@@ -16,6 +17,8 @@ export type ControlledPipelineConfig = {
   targetEnvironment: PipelineTargetEnvironment;
   allowProductionPipelineTest: boolean;
   cronDisabledConfirmed: boolean;
+  draftTierAllowlist: ControlledPipelineDraftTier[] | null;
+  draftMaxRows: number | null;
   artifactDir: string;
 };
 
@@ -209,6 +212,58 @@ function parseBriefingDateOverride(value: string | undefined) {
   return normalized;
 }
 
+function parseDraftTierAllowlist(value: string | undefined): ControlledPipelineDraftTier[] | null {
+  const normalized = normalizeEnv(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = normalized
+    .split(",")
+    .map((tier) => tier.trim().toLowerCase())
+    .filter(Boolean)
+    .map((tier) => {
+      if (tier === "core" || tier === "core_signal_eligible") {
+        return "core_signal_eligible";
+      }
+
+      if (tier === "context" || tier === "context_signal_eligible") {
+        return "context_signal_eligible";
+      }
+
+      throw new Error(
+        `Invalid PIPELINE_DRAFT_TIER_ALLOWLIST tier "${tier}". Expected only core,context for the controlled Phase B draft path.`,
+      );
+    });
+
+  if (parsed.length === 0) {
+    throw new Error("PIPELINE_DRAFT_TIER_ALLOWLIST must include core, context, or both.");
+  }
+
+  return [...new Set(parsed)];
+}
+
+function parseDraftMaxRows(value: string | undefined) {
+  const normalized = normalizeEnv(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d+$/.test(normalized)) {
+    throw new Error("PIPELINE_DRAFT_MAX_ROWS must be a positive integer.");
+  }
+
+  const maxRows = Number(normalized);
+
+  if (!Number.isSafeInteger(maxRows) || maxRows < 1 || maxRows > 3) {
+    throw new Error("PIPELINE_DRAFT_MAX_ROWS must be an integer from 1 through 3.");
+  }
+
+  return maxRows;
+}
+
 export function resolveControlledPipelineConfig(env: NodeJS.ProcessEnv = process.env): ControlledPipelineConfig {
   return {
     mode: parseRunMode(env.PIPELINE_RUN_MODE),
@@ -217,6 +272,8 @@ export function resolveControlledPipelineConfig(env: NodeJS.ProcessEnv = process
     targetEnvironment: parseTargetEnvironment(env),
     allowProductionPipelineTest: parseBooleanEnv(env.ALLOW_PRODUCTION_PIPELINE_TEST),
     cronDisabledConfirmed: parseBooleanEnv(env.PIPELINE_CRON_DISABLED_CONFIRMED),
+    draftTierAllowlist: parseDraftTierAllowlist(env.PIPELINE_DRAFT_TIER_ALLOWLIST),
+    draftMaxRows: parseDraftMaxRows(env.PIPELINE_DRAFT_MAX_ROWS),
     artifactDir: normalizeEnv(env.PIPELINE_RUN_ARTIFACT_DIR) || ".pipeline-runs",
   };
 }
@@ -228,6 +285,14 @@ export function assertControlledPipelineCanExecute(config: ControlledPipelineCon
 
   if (config.mode === "normal" && config.testRunId) {
     throw new Error("PIPELINE_TEST_RUN_ID is not allowed for normal pipeline runs.");
+  }
+
+  if (config.mode === "normal" && (config.draftTierAllowlist || config.draftMaxRows !== null)) {
+    throw new Error("PIPELINE_DRAFT_* controls are allowed only for controlled dry_run or draft_only runs.");
+  }
+
+  if (config.draftTierAllowlist && config.draftMaxRows === null) {
+    throw new Error("PIPELINE_DRAFT_TIER_ALLOWLIST requires PIPELINE_DRAFT_MAX_ROWS=1, 2, or 3.");
   }
 
   if (config.mode !== "draft_only") {

@@ -23,6 +23,8 @@ function buildConfig(overrides: Partial<ControlledPipelineConfig> = {}): Control
     targetEnvironment: "local",
     allowProductionPipelineTest: false,
     cronDisabledConfirmed: false,
+    draftTierAllowlist: null,
+    draftMaxRows: null,
     artifactDir: ".pipeline-runs",
     ...overrides,
   };
@@ -70,6 +72,12 @@ function buildItem(index: number, tier: SignalSelectionEligibilityTier = "core_s
   };
 }
 
+function getPersistedItemIds() {
+  const input = persistSignalPostsForBriefing.mock.calls[0]?.[0] as { items: Array<{ id: string }> } | undefined;
+
+  return input?.items.map((item) => item.id) ?? [];
+}
+
 describe("runControlledPipeline", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -79,7 +87,8 @@ describe("runControlledPipeline", () => {
       buildItem(3, "exclude_from_public_candidates"),
       buildItem(4),
       buildItem(5),
-      buildItem(6, "depth_only"),
+      buildItem(6, "context_signal_eligible"),
+      buildItem(7, "depth_only"),
     ];
     generateDailyBriefing.mockResolvedValue({
       briefing: {
@@ -93,7 +102,7 @@ describe("runControlledPipeline", () => {
       publicRankedItems: items,
       pipelineRun: {
         run_id: "pipeline-test",
-        num_clusters: 6,
+        num_clusters: 7,
       },
     });
     persistSignalPostsForBriefing.mockImplementation(async (input: { items: Array<{ id: string }> }) => ({
@@ -133,7 +142,7 @@ describe("runControlledPipeline", () => {
     });
   });
 
-  it("draft_only writes only review candidates for the override briefing date", async () => {
+  it("draft_only keeps the default Core-only selection for the override briefing date", async () => {
     const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
     const report = await runControlledPipeline(buildConfig({
       mode: "draft_only",
@@ -151,13 +160,12 @@ describe("runControlledPipeline", () => {
       ],
       mode: "draft_only",
     });
-    expect(persistSignalPostsForBriefing).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        items: expect.arrayContaining([
-          expect.objectContaining({ id: "item-3" }),
-        ]),
-      }),
-    );
+    expect(getPersistedItemIds()).toEqual([
+      "item-1",
+      "item-2",
+      "item-4",
+      "item-5",
+    ]);
     expect(report.generatedBriefingDate).toBe("2026-04-28");
     expect(report.persistence).toMatchObject({
       ok: true,
@@ -165,6 +173,100 @@ describe("runControlledPipeline", () => {
       insertedPostIds: ["row-1", "row-2", "row-3", "row-4"],
       mode: "draft_only",
     });
+  });
+
+  it("draft_only can explicitly select Core and Context rows with a max-row cap", async () => {
+    const items = [
+      buildItem(1),
+      buildItem(2, "context_signal_eligible"),
+      buildItem(3, "context_signal_eligible"),
+      buildItem(4, "depth_only"),
+      buildItem(5, "exclude_from_public_candidates"),
+    ];
+    generateDailyBriefing.mockResolvedValueOnce({
+      briefing: {
+        id: "briefing-phase-b",
+        briefingDate: "2026-04-27T12:00:00.000Z",
+        title: "Daily Executive Briefing",
+        intro: "Controlled test briefing.",
+        readingWindow: "20 minutes",
+        items: [items[0]],
+      },
+      publicRankedItems: items,
+      pipelineRun: {
+        run_id: "pipeline-phase-b",
+        num_clusters: 5,
+      },
+    });
+
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await runControlledPipeline(buildConfig({
+      mode: "draft_only",
+      briefingDateOverride: "2026-04-28",
+      testRunId: "phase-b-draft-test",
+      draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+      draftMaxRows: 3,
+    }));
+
+    expect(persistSignalPostsForBriefing).toHaveBeenCalledWith({
+      briefingDate: "2026-04-28",
+      items: [
+        expect.objectContaining({ id: "item-1" }),
+        expect.objectContaining({ id: "item-2" }),
+        expect.objectContaining({ id: "item-3" }),
+      ],
+      mode: "draft_only",
+    });
+    expect(getPersistedItemIds()).toEqual([
+      "item-1",
+      "item-2",
+      "item-3",
+    ]);
+  });
+
+  it("draft_only max rows cap limits the explicit Core and Context selection", async () => {
+    const items = [
+      buildItem(1),
+      buildItem(2, "context_signal_eligible"),
+      buildItem(3, "context_signal_eligible"),
+    ];
+    generateDailyBriefing.mockResolvedValueOnce({
+      briefing: {
+        id: "briefing-capped",
+        briefingDate: "2026-04-27T12:00:00.000Z",
+        title: "Daily Executive Briefing",
+        intro: "Controlled test briefing.",
+        readingWindow: "20 minutes",
+        items: [items[0]],
+      },
+      publicRankedItems: items,
+      pipelineRun: {
+        run_id: "pipeline-capped",
+        num_clusters: 3,
+      },
+    });
+
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await runControlledPipeline(buildConfig({
+      mode: "draft_only",
+      briefingDateOverride: "2026-04-28",
+      testRunId: "phase-b-cap-test",
+      draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+      draftMaxRows: 2,
+    }));
+
+    expect(persistSignalPostsForBriefing).toHaveBeenCalledWith({
+      briefingDate: "2026-04-28",
+      items: [
+        expect.objectContaining({ id: "item-1" }),
+        expect.objectContaining({ id: "item-2" }),
+      ],
+      mode: "draft_only",
+    });
+    expect(getPersistedItemIds()).toEqual([
+      "item-1",
+      "item-2",
+    ]);
   });
 
   it("refuses normal mode from the controlled test runner", async () => {
