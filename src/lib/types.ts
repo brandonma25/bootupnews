@@ -123,6 +123,8 @@ export type SignalSelectionEligibility = {
   parseStatus?: SourceParseStatus;
   sourceAccessibilityWarnings?: string[];
   coreBlockingReasons?: string[];
+  calibratedReasonLabels?: string[];
+  exclusionCause?: string | null;
   headlineQuality?: string;
   eventType?: string;
   structuralImportanceScore?: number;

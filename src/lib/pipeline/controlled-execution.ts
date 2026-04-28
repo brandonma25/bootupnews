@@ -59,6 +59,8 @@ export type ControlledPipelineSignalReport = {
   validationDetails: string[];
   selectionQualityWarnings: string[];
   selectionEligibilityReasons: string[];
+  calibratedReasonLabels: string[];
+  exclusionCause: string | null;
   sourceAccessibilityWarnings: string[];
   coreBlockingReasons: string[];
 };
@@ -330,6 +332,8 @@ function mapSignalReport(item: BriefingItem, rank: number): ControlledPipelineSi
     validationDetails: validation.failureDetails,
     selectionQualityWarnings: eligibility?.warnings ?? [],
     selectionEligibilityReasons: eligibility?.reasons ?? [],
+    calibratedReasonLabels: eligibility?.calibratedReasonLabels ?? [],
+    exclusionCause: eligibility?.exclusionCause ?? null,
     sourceAccessibilityWarnings: eligibility?.sourceAccessibilityWarnings ?? [],
     coreBlockingReasons: eligibility?.coreBlockingReasons ?? [],
   };

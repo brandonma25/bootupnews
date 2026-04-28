@@ -1354,6 +1354,10 @@ function normalizeIntelligence(intelligence: EventIntelligence): NormalizedIntel
 function mapReasoningCategory(eventType: string): NormalizedReasoningCategory {
   switch (eventType) {
     case "policy_regulation":
+    case "government_capacity":
+    case "platform_regulation":
+    case "ai_infrastructure_policy":
+    case "institutional_governance":
     case "regulation":
       return "policy_regulation";
     case "corporate":
@@ -1382,8 +1386,12 @@ function mapReasoningCategory(eventType: string): NormalizedReasoningCategory {
     case "geopolitics":
       return "defense_geopolitical";
     case "legal_investigation":
+    case "public_interest_legal_accountability":
+    case "cybersecurity_enforcement":
       return "legal_investigation";
     case "macro_market_move":
+    case "macro_data_release":
+    case "central_bank_policy":
     case "macro":
       return "macro_market_move";
     case "non_signal":

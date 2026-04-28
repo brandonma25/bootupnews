@@ -39,7 +39,7 @@ describe("buildEventIntelligence", () => {
 
     expect(intelligence.summary.length).toBeGreaterThan(20);
     expect(intelligence.entities.length).toBeGreaterThan(0);
-    expect(intelligence.eventType).toBe("macro_market_move");
+    expect(intelligence.eventType).toBe("central_bank_policy");
     expect(intelligence.primaryImpact.length).toBeGreaterThan(20);
     expect(intelligence.affectedMarkets).toContain("rates");
     expect(intelligence.timeHorizon).toBe("medium");
