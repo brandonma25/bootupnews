@@ -131,6 +131,34 @@ describe("why-it-matters quality gate", () => {
     });
   });
 
+  it("flags generic not-market-moving fallback copy as non-publishable", () => {
+    const examples = [
+      "ProPublica's Purdue settlement story is not a market-moving development, but it may still matter for individual readers.",
+      "AI data centers are not market-moving for individual decision-making, while market-wide pricing is unchanged.",
+      "Bessent's dollar swap comments are mainly useful for individual readers rather than a structural market signal.",
+    ];
+
+    for (const example of examples) {
+      const result = validateWhyItMatters(example);
+      expect(result.passed).toBe(false);
+      expect(result.failures).toContain("template_placeholder_language");
+      expect(result.recommendedAction).toBe("requires_human_rewrite");
+    }
+  });
+
+  it("flags source-review and editorial-review fallback copy as rewrite-required", () => {
+    const examples = [
+      "Source review needed for BLS: only metadata is available, so the pipeline cannot support a public structural explanation yet.",
+      "Editorial review needed for MarketWatch advice: the item does not yet show a structural change beyond the immediate update.",
+    ];
+
+    for (const example of examples) {
+      const result = validateWhyItMatters(example);
+      expect(result.passed).toBe(false);
+      expect(result.failures).toContain("template_placeholder_language");
+    }
+  });
+
   it("flags multiple homepage audit failure modes simultaneously from card #4", () => {
     const result = validateWhyItMatters(AUDIT_CARD_4);
 

@@ -67,10 +67,23 @@ const TRUNCATION_PATTERNS = [
 ];
 
 const TEMPLATE_PLACEHOLDER_PHRASES = [
+  "not a market-moving development",
+  "not market-moving",
+  "individual decision-making",
+  "individual readers",
+  "mainly useful for individual readers",
+  "market-wide pricing",
+  "editorial review needed",
+  "source review needed",
+  "does not yet show a structural change",
+  "not suitable for public signal copy",
+  "cannot support a public structural explanation yet",
   "changes assumptions about",
   "so it could raise",
+  "so it could move expectations",
   "or market structure in",
   "so it could move market expectations",
+  "could move expectations",
   "changes how investors price rates, demand, or risk",
   "this changes capital availability",
   "changes the macro baseline because this changes",
