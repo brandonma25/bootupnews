@@ -20,6 +20,8 @@ export type ControlledPipelineConfig = {
   draftTierAllowlist: ControlledPipelineDraftTier[] | null;
   draftMaxRows: number | null;
   artifactDir: string;
+  replayArtifactPath: string | null;
+  replayExpectedRunId: string | null;
 };
 
 export type ControlledPipelineSignalReport = {
@@ -275,6 +277,8 @@ export function resolveControlledPipelineConfig(env: NodeJS.ProcessEnv = process
     draftTierAllowlist: parseDraftTierAllowlist(env.PIPELINE_DRAFT_TIER_ALLOWLIST),
     draftMaxRows: parseDraftMaxRows(env.PIPELINE_DRAFT_MAX_ROWS),
     artifactDir: normalizeEnv(env.PIPELINE_RUN_ARTIFACT_DIR) || ".pipeline-runs",
+    replayArtifactPath: normalizeEnv(env.PIPELINE_REPLAY_ARTIFACT_PATH) || null,
+    replayExpectedRunId: normalizeEnv(env.PIPELINE_REPLAY_EXPECTED_RUN_ID) || null,
   };
 }
 
@@ -289,6 +293,14 @@ export function assertControlledPipelineCanExecute(config: ControlledPipelineCon
 
   if (config.mode === "normal" && (config.draftTierAllowlist || config.draftMaxRows !== null)) {
     throw new Error("PIPELINE_DRAFT_* controls are allowed only for controlled dry_run or draft_only runs.");
+  }
+
+  if (config.mode === "normal" && (config.replayArtifactPath || config.replayExpectedRunId)) {
+    throw new Error("PIPELINE_REPLAY_* controls are allowed only for controlled dry_run or draft_only runs.");
+  }
+
+  if (config.replayExpectedRunId && !config.replayArtifactPath) {
+    throw new Error("PIPELINE_REPLAY_EXPECTED_RUN_ID requires PIPELINE_REPLAY_ARTIFACT_PATH.");
   }
 
   if (config.draftTierAllowlist && config.draftMaxRows === null) {
