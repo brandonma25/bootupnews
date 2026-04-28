@@ -1,6 +1,7 @@
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
 import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { FeedArticle } from "@/lib/rss";
+import type { SourceRole } from "@/lib/source-accessibility-types";
 
 export type CanonicalTopic = "Tech" | "Finance" | "World";
 
@@ -43,6 +44,9 @@ export interface CanonicalSourceMetadata {
   provenance: SourceProvenance;
   status: SourceStatus;
   availability: SourceAvailability;
+  sourceRole?: SourceRole;
+  publicEligible?: boolean;
+  suppliedByManifest?: boolean;
 }
 
 export interface SourceFetchConfig {

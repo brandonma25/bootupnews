@@ -46,6 +46,9 @@ export async function runClusterFirstPipeline(options: {
     donor: source.donor,
     source_class: source.sourceClass,
     trust_tier: source.trustTier,
+    source_role: source.sourceRole,
+    public_eligible: source.publicEligible,
+    supplied_by_manifest: source.suppliedByManifest,
   }));
   run.source_contributions = ingestion.source_contributions;
   run.used_seed_fallback = ingestion.usedSeedFallback;
@@ -101,6 +104,17 @@ export async function runClusterFirstPipeline(options: {
         source_name: article.source,
         source_url: article.url,
         source_tier: "unknown",
+        source_role: article.source_accessibility?.source_role,
+        content_accessibility: article.source_accessibility?.content_accessibility,
+        accessible_text_length: article.source_accessibility?.accessible_text_length,
+        summary_length: article.source_accessibility?.summary_length,
+        content_length: article.source_accessibility?.content_length,
+        extraction_method: article.source_accessibility?.extraction_method,
+        fetch_status: article.source_accessibility?.fetch_status,
+        parse_status: article.source_accessibility?.parse_status,
+        failure_reason: article.source_accessibility?.failure_reason,
+        supplied_by_manifest: article.source_accessibility?.supplied_by_manifest,
+        public_eligible: article.source_accessibility?.public_eligible,
         headline_quality: "unknown",
         event_type: "unknown",
         filter_decision: "reject",

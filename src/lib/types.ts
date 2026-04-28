@@ -5,6 +5,13 @@ import type {
 import type { HomepageCategoryClassification } from "@/lib/homepage-taxonomy";
 import type { SignalRole } from "@/lib/output-sanity";
 import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
+import type {
+  ContentAccessibility,
+  SourceExtractionMethod,
+  SourceFetchStatus,
+  SourceParseStatus,
+  SourceRole,
+} from "@/lib/source-accessibility-types";
 
 export type Topic = {
   id: string;
@@ -108,6 +115,14 @@ export type SignalSelectionEligibility = {
   filterSeverity?: "pass" | "suppress" | "reject";
   filterReasons?: string[];
   sourceTier?: string;
+  sourceRole?: SourceRole;
+  contentAccessibility?: ContentAccessibility;
+  accessibleTextLength?: number;
+  extractionMethod?: SourceExtractionMethod;
+  fetchStatus?: SourceFetchStatus;
+  parseStatus?: SourceParseStatus;
+  sourceAccessibilityWarnings?: string[];
+  coreBlockingReasons?: string[];
   headlineQuality?: string;
   eventType?: string;
   structuralImportanceScore?: number;

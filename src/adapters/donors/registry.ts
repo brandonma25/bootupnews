@@ -52,6 +52,9 @@ function normalizeFeedMetadata(feed: DonorFeed): CanonicalSourceMetadata {
     provenance: feed.provenance,
     status: feed.status,
     availability: feed.availability,
+    sourceRole: feed.sourceRole,
+    publicEligible: feed.publicEligible,
+    suppliedByManifest: feed.suppliedByManifest,
   };
 }
 
