@@ -1,4 +1,5 @@
 import type { ClusterFirstPipelineResult } from "@/lib/pipeline";
+import type { PublicSourcePlan } from "@/lib/source-manifest";
 import type { SignalSnapshotPersistenceResult } from "@/lib/signals-editorial";
 import type { BriefingItem, DailyBriefing, SignalSelectionEligibilityTier } from "@/lib/types";
 import { validateWhyItMatters } from "@/lib/why-it-matters-quality-gate";
@@ -72,6 +73,9 @@ export type ControlledPipelineSelectionSummary = {
   activeSourceList: ClusterFirstPipelineResult["run"]["active_sources"];
   sourceDistributionOfIngestedCandidates: Record<string, number>;
   sourceDistributionOfProposedTopFive: Record<string, number>;
+  categoryDistributionOfCandidates: Record<string, number>;
+  sourcePlanWarnings: string[];
+  manifestCoverageWarnings: string[];
   categoriesRepresented: string[];
   eligibleCoreCount: number;
   contextEligibleCount: number;
@@ -90,9 +94,19 @@ export type ControlledPipelineReport = {
   candidateCount: number;
   clusterCount: number;
   signalCount: number;
+  sourcePlan: PublicSourcePlan | {
+    plan: "fallback";
+    surface: null;
+    suppliedByManifest: false;
+    sourceCount: number;
+    sourceIds: string[];
+    sources: [];
+    warnings: string[];
+  };
   activeSourceCount: number;
   activeSources: ClusterFirstPipelineResult["run"]["active_sources"];
   sourceDistribution: Record<string, number>;
+  categoryDistribution: Record<string, number>;
   articleCandidates: ControlledPipelineArticleCandidateReport[];
   selectionSummary: ControlledPipelineSelectionSummary;
   candidate_pool_insufficient: boolean;
@@ -301,12 +315,33 @@ function mapArticleCandidateReport(
   };
 }
 
+function summarizeCategoryDistribution(items: ControlledPipelineSignalReport[]) {
+  return items.reduce<Record<string, number>>((counts, item) => {
+    const key = item.category ?? item.topic ?? "uncategorized";
+    counts[key] = (counts[key] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function buildFallbackSourcePlan(activeSources: ClusterFirstPipelineResult["run"]["active_sources"]) {
+  return {
+    plan: "fallback" as const,
+    surface: null,
+    suppliedByManifest: false as const,
+    sourceCount: activeSources.length,
+    sourceIds: activeSources.map((source) => source.source_id),
+    sources: [] as [],
+    warnings: ["source_plan_metadata_unavailable"],
+  };
+}
+
 export function buildControlledPipelineReport(input: {
   mode: PipelineRunMode;
   testRunId?: string | null;
   briefing: DailyBriefing;
   publicRankedItems: BriefingItem[];
   pipelineRun: ClusterFirstPipelineResult["run"];
+  sourcePlan?: PublicSourcePlan;
   persistence?: SignalSnapshotPersistenceResult | null;
 }): ControlledPipelineReport {
   const candidates = input.publicRankedItems.length > 0
@@ -335,13 +370,23 @@ export function buildControlledPipelineReport(input: {
     mapArticleCandidateReport(input.pipelineRun.run_id, generatedBriefingDate, entry),
   );
   const activeSourceCount = activeSources.length;
+  const sourcePlan = input.sourcePlan ?? buildFallbackSourcePlan(activeSources);
   const activeContributingSourceCount = sourceContributions.filter((entry) => entry.item_count > 0).length;
   const sourceDistribution = summarizeSourceDistribution(
     articleFilterEvaluations.map((entry) => ({ source_name: entry.source_name })),
   );
+  const categoryDistribution = summarizeCategoryDistribution(candidateReports);
   const categoriesRepresented = [
     ...new Set(candidateReports.map((item) => item.category ?? item.topic).filter((value): value is string => Boolean(value))),
   ];
+  const manifestCoverageWarnings = [
+    sourcePlan.plan === "public_manifest" && activeSourceCount < sourcePlan.sourceCount
+      ? `active_source_count_${activeSourceCount}_below_manifest_source_count_${sourcePlan.sourceCount}`
+      : null,
+    sourcePlan.plan === "public_manifest" && activeContributingSourceCount < Math.min(4, sourcePlan.sourceCount)
+      ? `contributing_source_count_${activeContributingSourceCount}_below_expected_minimum`
+      : null,
+  ].filter((value): value is string => Boolean(value));
   const sourceScarcityLikely =
     activeSourceCount < 5 ||
     activeContributingSourceCount < 4 ||
@@ -356,6 +401,9 @@ export function buildControlledPipelineReport(input: {
     activeSourceList: activeSources,
     sourceDistributionOfIngestedCandidates: sourceDistribution,
     sourceDistributionOfProposedTopFive: summarizeSourceDistribution(proposedTopFive),
+    categoryDistributionOfCandidates: categoryDistribution,
+    sourcePlanWarnings: sourcePlan.warnings,
+    manifestCoverageWarnings,
     categoriesRepresented,
     eligibleCoreCount: proposedTopFive.length,
     contextEligibleCount: proposedContextRows.length,
@@ -374,9 +422,11 @@ export function buildControlledPipelineReport(input: {
     candidateCount: candidates.length,
     clusterCount: input.pipelineRun.num_clusters,
     signalCount: input.briefing.items.length,
+    sourcePlan,
     activeSourceCount,
     activeSources,
     sourceDistribution,
+    categoryDistribution,
     articleCandidates,
     selectionSummary,
     candidate_pool_insufficient: candidatePoolInsufficient,

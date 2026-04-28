@@ -109,13 +109,33 @@ describe("runControlledPipeline", () => {
     const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
     const report = await runControlledPipeline(buildConfig({ mode: "dry_run" }));
 
-    expect(generateDailyBriefing).toHaveBeenCalledWith(
-      undefined,
-      undefined,
-      { persistPipelineCandidates: false },
-    );
+    expect(generateDailyBriefing).toHaveBeenCalledTimes(1);
+    const [, sources, options] = generateDailyBriefing.mock.calls[0]!;
+
+    expect(sources.map((source: { id: string }) => source.id)).toEqual([
+      "source-verge",
+      "source-ars",
+      "source-mit-tech-review",
+      "source-techcrunch",
+      "source-ft",
+      "source-reuters-business",
+      "source-bbc-world",
+      "source-foreign-affairs",
+      "source-politico-politics",
+      "source-politico-congress",
+      "source-politico-defense",
+    ]);
+    expect(options).toEqual({
+      suppliedByManifest: true,
+      persistPipelineCandidates: false,
+    });
     expect(persistSignalPostsForBriefing).not.toHaveBeenCalled();
     expect(report.persistence).toBeNull();
+    expect(report.sourcePlan).toMatchObject({
+      plan: "public_manifest",
+      suppliedByManifest: true,
+      sourceCount: 11,
+    });
     expect(report.proposedTopFive[0]).toMatchObject({
       validationStatus: "requires_human_rewrite",
       validationFailures: expect.arrayContaining(["template_placeholder_language"]),

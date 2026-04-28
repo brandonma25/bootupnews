@@ -1,4 +1,5 @@
 import { generateDailyBriefing } from "@/lib/data";
+import { demoTopics } from "@/lib/demo-data";
 import { errorContext, logServerEvent } from "@/lib/observability";
 import {
   captureRssCronCheckIn,
@@ -6,6 +7,7 @@ import {
   withRssSpan,
 } from "@/lib/observability/rss";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
+import { getPublicSourcePlanForSurface, getRequiredSourcesForPublicSurface } from "@/lib/source-manifest";
 
 export type DailyNewsCronRunSummary = {
   briefingDate: string | null;
@@ -54,13 +56,15 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
   });
 
   try {
+    const sourcePlan = getPublicSourcePlanForSurface("public.home");
+    const sources = getRequiredSourcesForPublicSurface("public.home");
     const { briefing, publicRankedItems, pipelineRun } = await withRssSpan(
       "rss.refresh",
       "refresh",
       {
         route: "/api/cron/fetch-news",
       },
-      () => generateDailyBriefing(),
+      () => generateDailyBriefing(demoTopics, sources, { suppliedByManifest: sourcePlan.suppliedByManifest }),
     );
     const briefingDate = briefing.briefingDate.slice(0, 10);
     const baseSummary = {

@@ -113,6 +113,21 @@ describe("/api/cron/fetch-news", () => {
       },
     });
     expect(generateDailyBriefing).toHaveBeenCalledTimes(1);
+    const [, sources, options] = generateDailyBriefing.mock.calls[0]!;
+    expect(sources.map((source: { id: string }) => source.id)).toEqual(
+      expect.arrayContaining([
+        "source-mit-tech-review",
+        "source-reuters-business",
+        "source-bbc-world",
+        "source-foreign-affairs",
+        "source-politico-politics",
+        "source-politico-congress",
+        "source-politico-defense",
+      ]),
+    );
+    expect(options).toMatchObject({
+      suppliedByManifest: true,
+    });
     expect(persistSignalPostsForBriefing).toHaveBeenCalledWith({
       briefingDate: "2026-04-27",
       items: expect.any(Array),

@@ -1,4 +1,5 @@
 import { demoSources } from "@/lib/demo-data";
+import { classifySourcePreference } from "@/lib/source-policy";
 import type { Source } from "@/lib/types";
 
 export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
@@ -11,12 +12,90 @@ export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
     "source-reuters-business",
     "source-bbc-world",
     "source-foreign-affairs",
+    "source-politico-politics",
+    "source-politico-congress",
+    "source-politico-defense",
   ],
 } as const;
 
 export type PublicSurfaceKey = keyof typeof PUBLIC_SURFACE_SOURCE_MANIFEST;
+export type PublicSourceRole =
+  | "primary_authoritative"
+  | "secondary_authoritative"
+  | "aggregator_summary"
+  | "corroboration_only"
+  | "reference_only"
+  | "exclude_from_public_candidates";
+
+export type PublicSourcePlanEntry = {
+  id: string;
+  displayName: string;
+  category: string | null;
+  feedUrl: string;
+  homepageUrl: string | null;
+  status: Source["status"];
+  sourceRole: PublicSourceRole;
+  sourceTier: ReturnType<typeof classifySourcePreference>;
+  publicEligible: boolean;
+};
+
+export type PublicSourcePlan = {
+  plan: "public_manifest";
+  surface: PublicSurfaceKey;
+  suppliedByManifest: true;
+  sourceCount: number;
+  sourceIds: string[];
+  sources: PublicSourcePlanEntry[];
+  warnings: string[];
+};
 
 const MANIFEST_SOURCE_IDS: ReadonlySet<string> = new Set(Object.values(PUBLIC_SURFACE_SOURCE_MANIFEST).flat());
+const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; publicEligible: boolean }> = {
+  "source-verge": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-ars": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-mit-tech-review": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-techcrunch": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-ft": {
+    sourceRole: "primary_authoritative",
+    publicEligible: true,
+  },
+  "source-reuters-business": {
+    sourceRole: "primary_authoritative",
+    publicEligible: true,
+  },
+  "source-bbc-world": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-foreign-affairs": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-politico-politics": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-politico-congress": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-politico-defense": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+};
 
 export function getSourcesForPublicSurface(surface: PublicSurfaceKey): Source[] {
   const sourceIds = PUBLIC_SURFACE_SOURCE_MANIFEST[surface];
@@ -31,6 +110,60 @@ export function getSourcesForPublicSurface(surface: PublicSurfaceKey): Source[] 
 
     return source;
   });
+}
+
+export function getRequiredSourcesForPublicSurface(surface: PublicSurfaceKey): Source[] {
+  const sources = getSourcesForPublicSurface(surface);
+
+  if (sources.length === 0) {
+    throw new Error(`source_pool_unavailable: Public source manifest for ${surface} resolved zero sources.`);
+  }
+
+  return sources;
+}
+
+function buildPublicSourcePlanEntry(source: Source): PublicSourcePlanEntry {
+  const governance = PUBLIC_SOURCE_GOVERNANCE[source.id];
+
+  if (!governance) {
+    throw new Error(`Public source manifest source ${source.id} is missing public source governance metadata`);
+  }
+
+  return {
+    id: source.id,
+    displayName: source.name,
+    category: source.topicName ?? null,
+    feedUrl: source.feedUrl,
+    homepageUrl: source.homepageUrl ?? null,
+    status: source.status,
+    sourceRole: governance.sourceRole,
+    sourceTier: classifySourcePreference({
+      sourceName: source.name,
+      sourceFeedUrl: source.feedUrl,
+      sourceHomepageUrl: source.homepageUrl,
+    }),
+    publicEligible: governance.publicEligible,
+  };
+}
+
+export function getPublicSourcePlanForSurface(surface: PublicSurfaceKey): PublicSourcePlan {
+  const sources = getRequiredSourcesForPublicSurface(surface);
+  const entries = sources.map(buildPublicSourcePlanEntry);
+  const warnings = [
+    entries.some((entry) => !entry.publicEligible) ? "manifest_contains_non_public_source" : null,
+    entries.some((entry) => entry.sourceTier === "unknown") ? "manifest_contains_unknown_source_tier" : null,
+    entries.some((entry) => entry.status !== "active") ? "manifest_contains_inactive_source" : null,
+  ].filter((value): value is string => Boolean(value));
+
+  return {
+    plan: "public_manifest",
+    surface,
+    suppliedByManifest: true,
+    sourceCount: entries.length,
+    sourceIds: entries.map((source) => source.id),
+    sources: entries,
+    warnings,
+  };
 }
 
 export function isManifestSourceList(sources: Source[]): boolean {

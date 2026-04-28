@@ -57,6 +57,11 @@ export const SOURCE_PREFERENCE_RULES: SourcePreferenceRule[] = [
       "tldr.tech",
       "marketwatch.com",
       "nikkei.com",
+      "technologyreview.com",
+      "bbc.com",
+      "bbc.co.uk",
+      "foreignaffairs.com",
+      "politico.com",
     ],
     names: [
       "techcrunch",
@@ -68,6 +73,11 @@ export const SOURCE_PREFERENCE_RULES: SourcePreferenceRule[] = [
       "tldr",
       "marketwatch",
       "nikkei",
+      "mit technology review",
+      "bbc world news",
+      "bbc",
+      "foreign affairs",
+      "politico",
     ],
   },
   {

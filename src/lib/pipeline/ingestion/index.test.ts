@@ -159,6 +159,18 @@ describe("ingestRawItems", () => {
     );
   });
 
+  it("uses source-policy tier metadata for supplied manifest sources", async () => {
+    const sources = getSourcesForPublicSurface("public.home");
+    const result = await ingestRawItems({ sources, suppliedByManifest: true });
+    const sourceById = new Map(result.sources.map((source) => [source.sourceId, source]));
+
+    expect(sourceById.get("custom-source-ft")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-reuters-business")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-bbc-world")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-foreign-affairs")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-politico-congress")?.trustTier).toBe("tier_2");
+  });
+
   it("preserves the five-source cap for six non-manifest supplied sources", async () => {
     const result = await ingestRawItems({ sources: createUserSuppliedSources(6) });
 

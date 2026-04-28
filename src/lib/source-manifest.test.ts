@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   getSourcesForPublicSurface,
+  getPublicSourcePlanForSurface,
   PUBLIC_SURFACE_SOURCE_MANIFEST,
 } from "@/lib/source-manifest";
 
@@ -21,7 +22,7 @@ describe("public source manifest", () => {
     const sources = getSourcesForPublicSurface("public.home");
     const sourceIds = sources.map((source) => source.id);
 
-    expect(sources).toHaveLength(8);
+    expect(sources).toHaveLength(11);
     expect(sourceIds[2]).toBe("source-mit-tech-review");
     expect(sources.find((source) => source.id === "source-mit-tech-review")).toMatchObject({
       name: "MIT Technology Review",
@@ -55,6 +56,11 @@ describe("public source manifest", () => {
       topicName: "World",
       status: "active",
     });
+    expect(sourceIds.slice(8)).toEqual([
+      "source-politico-politics",
+      "source-politico-congress",
+      "source-politico-defense",
+    ]);
   });
 
   it("preserves manifest ordering", () => {
@@ -75,6 +81,9 @@ describe("public source manifest", () => {
       "source-reuters-business",
       "source-bbc-world",
       "source-foreign-affairs",
+      "source-politico-politics",
+      "source-politico-congress",
+      "source-politico-defense",
     ]);
     expect(sources.map((source) => source.topicName)).toEqual([
       "Tech",
@@ -85,7 +94,47 @@ describe("public source manifest", () => {
       "Finance",
       "World",
       "World",
+      "Politics",
+      "Politics",
+      "Politics",
     ]);
+  });
+
+  it("serializes public source roles, tiering, and eligibility for the controlled source plan", () => {
+    const sourcePlan = getPublicSourcePlanForSurface("public.home");
+
+    expect(sourcePlan).toMatchObject({
+      plan: "public_manifest",
+      surface: "public.home",
+      suppliedByManifest: true,
+      sourceCount: 11,
+      warnings: [],
+    });
+    expect(sourcePlan.sources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "source-reuters-business",
+          sourceRole: "primary_authoritative",
+          sourceTier: "tier1",
+          publicEligible: true,
+        }),
+        expect.objectContaining({
+          id: "source-politico-congress",
+          sourceRole: "secondary_authoritative",
+          sourceTier: "tier2",
+          publicEligible: true,
+        }),
+      ]),
+    );
+  });
+
+  it("keeps TLDR, AP Politics, and Congress.gov outside the public manifest", () => {
+    const manifestIds = new Set(PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]);
+
+    expect([...manifestIds].some((sourceId) => sourceId.includes("tldr"))).toBe(false);
+    expect(manifestIds.has("source-ap-top-news")).toBe(false);
+    expect(manifestIds.has("source-ap-politics")).toBe(false);
+    expect(manifestIds.has("congress-gov-api")).toBe(false);
   });
 
   it("throws a descriptive error when a declared source is missing from demoSources", async () => {

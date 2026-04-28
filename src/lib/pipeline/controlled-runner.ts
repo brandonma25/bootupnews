@@ -1,4 +1,5 @@
 import { generateDailyBriefing } from "@/lib/data";
+import { demoTopics } from "@/lib/demo-data";
 import {
   assertControlledPipelineCanExecute,
   buildControlledPipelineReport,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/pipeline/controlled-execution";
 import { isCoreSignalEligible } from "@/lib/signal-selection-eligibility";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
+import { getPublicSourcePlanForSurface, getRequiredSourcesForPublicSurface } from "@/lib/source-manifest";
 
 export async function runControlledPipeline(
   config: ControlledPipelineConfig,
@@ -19,10 +21,13 @@ export async function runControlledPipeline(
     );
   }
 
+  const sourcePlan = getPublicSourcePlanForSurface("public.home");
+  const sources = getRequiredSourcesForPublicSurface("public.home");
   const { briefing, publicRankedItems, pipelineRun } = await generateDailyBriefing(
-    undefined,
-    undefined,
+    demoTopics,
+    sources,
     {
+      suppliedByManifest: sourcePlan.suppliedByManifest,
       persistPipelineCandidates: false,
     },
   );
@@ -46,6 +51,7 @@ export async function runControlledPipeline(
     },
     publicRankedItems,
     pipelineRun,
+    sourcePlan,
     persistence,
   });
 }

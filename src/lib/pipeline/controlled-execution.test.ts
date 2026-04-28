@@ -268,9 +268,161 @@ describe("controlled pipeline report", () => {
     expect(report.excludedCandidates).toHaveLength(1);
     expect(report.candidate_pool_insufficient).toBe(true);
     expect(report.selectionSummary.selectionQualityWarnings).toContain("eligible_core_count_2_below_required_5");
+    expect(report.selectionSummary.selectionQualityWarnings).toContain("source_pool_likely_constrained_selection");
+    expect(report.selectionSummary.sourceScarcityLikely).toBe(true);
+    expect(report.sourceDistribution).toEqual({
+      "Reuters World": 1,
+    });
+    expect(report.categoryDistribution).toEqual({
+      Tech: 5,
+    });
     expect(report.articleCandidates[0]).toMatchObject({
       filterDecision: "pass",
       eventType: "policy_regulation",
+    });
+  });
+
+  it("serializes manifest source-plan diagnostics and coverage warnings", () => {
+    const valid =
+      "Anthropic's growth is now structurally tied to Google and Amazon's infrastructure, not independent of it. At scale, that's a dependency, not just a partnership.";
+    const publicRankedItems = [
+      buildItem(1, valid),
+      buildItem(2, valid, "context_signal_eligible"),
+      buildItem(3, valid, "depth_only"),
+    ];
+    const report = buildControlledPipelineReport({
+      mode: "dry_run",
+      testRunId: "manifest-plan-test",
+      briefing: {
+        ...buildBriefing(),
+        items: publicRankedItems,
+      },
+      publicRankedItems,
+      sourcePlan: {
+        plan: "public_manifest",
+        surface: "public.home",
+        suppliedByManifest: true,
+        sourceCount: 3,
+        sourceIds: ["source-ft", "source-bbc-world", "source-politico-congress"],
+        warnings: [],
+        sources: [
+          {
+            id: "source-ft",
+            displayName: "Financial Times",
+            category: "Finance",
+            feedUrl: "https://www.ft.com/rss/home",
+            homepageUrl: "https://www.ft.com",
+            status: "active",
+            sourceRole: "primary_authoritative",
+            sourceTier: "tier1",
+            publicEligible: true,
+          },
+          {
+            id: "source-bbc-world",
+            displayName: "BBC World News",
+            category: "World",
+            feedUrl: "https://feeds.bbci.co.uk/news/world/rss.xml",
+            homepageUrl: "https://www.bbc.com/news/world",
+            status: "active",
+            sourceRole: "secondary_authoritative",
+            sourceTier: "tier2",
+            publicEligible: true,
+          },
+          {
+            id: "source-politico-congress",
+            displayName: "Politico Congress",
+            category: "Politics",
+            feedUrl: "https://rss.politico.com/congress.xml",
+            homepageUrl: "https://www.politico.com/congress",
+            status: "active",
+            sourceRole: "secondary_authoritative",
+            sourceTier: "tier2",
+            publicEligible: true,
+          },
+        ],
+      },
+      pipelineRun: {
+        run_id: "pipeline-test",
+        num_clusters: 3,
+        active_sources: [
+          {
+            source_id: "custom-source-ft",
+            source: "Financial Times",
+            donor: "openclaw",
+            source_class: "business_press",
+            trust_tier: "tier_2",
+          },
+          {
+            source_id: "custom-source-bbc-world",
+            source: "BBC World News",
+            donor: "openclaw",
+            source_class: "general_newswire",
+            trust_tier: "tier_2",
+          },
+        ],
+        source_contributions: [
+          {
+            source_id: "custom-source-ft",
+            source: "Financial Times",
+            donor: "openclaw",
+            source_class: "business_press",
+            trust_tier: "tier_2",
+            item_count: 2,
+          },
+          {
+            source_id: "custom-source-bbc-world",
+            source: "BBC World News",
+            donor: "openclaw",
+            source_class: "general_newswire",
+            trust_tier: "tier_2",
+            item_count: 0,
+          },
+        ],
+        article_filter_evaluations: [
+          {
+            article_id: "article-1",
+            title: "Rates story",
+            source_name: "Financial Times",
+            source_url: "https://example.com/rates",
+            source_tier: "tier1",
+            headline_quality: "strong",
+            event_type: "macro_market_move",
+            filter_decision: "pass",
+            filter_severity: "pass",
+            filter_reasons: ["passed_allowed_event_type"],
+          },
+          {
+            article_id: "article-2",
+            title: "World story",
+            source_name: "BBC World News",
+            source_url: "https://example.com/world",
+            source_tier: "tier2",
+            headline_quality: "medium",
+            event_type: "geopolitics",
+            filter_decision: "suppress",
+            filter_severity: "suppress",
+            filter_reasons: ["suppressed_low_specificity"],
+          },
+        ],
+      } as never,
+    });
+
+    expect(report.sourcePlan).toMatchObject({
+      plan: "public_manifest",
+      suppliedByManifest: true,
+      sourceCount: 3,
+      sourceIds: ["source-ft", "source-bbc-world", "source-politico-congress"],
+    });
+    expect(report.selectionSummary.manifestCoverageWarnings).toEqual([
+      "active_source_count_2_below_manifest_source_count_3",
+      "contributing_source_count_1_below_expected_minimum",
+    ]);
+    expect(report.sourceDistribution).toEqual({
+      "Financial Times": 1,
+      "BBC World News": 1,
+    });
+    expect(report.selectionSummary.categoryDistributionOfCandidates).toEqual({
+      Tech: 3,
     });
   });
 });

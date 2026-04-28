@@ -16,6 +16,7 @@ import {
 } from "@/lib/observability/pipeline-run";
 import { fetchFeedArticles } from "@/lib/rss";
 import { sanitizeUrl } from "@/lib/sentry-config";
+import { classifySourcePreference } from "@/lib/source-policy";
 import { cleanText, stableId } from "@/lib/pipeline/shared/text";
 
 import { seedRawItems } from "./seed-items";
@@ -79,6 +80,18 @@ function classifyCustomSourceTopic(topicName?: string) {
 
 function buildCustomSourceDefinition(source: Source): SourceDefinition {
   const metadata = classifyCustomSourceTopic(source.topicName);
+  const sourcePolicyTier = classifySourcePreference({
+    sourceName: source.name,
+    sourceFeedUrl: source.feedUrl,
+    sourceHomepageUrl: source.homepageUrl,
+  });
+  const trustTier = sourcePolicyTier === "tier1"
+    ? "tier_1"
+    : sourcePolicyTier === "tier2"
+      ? "tier_2"
+      : sourcePolicyTier === "tier3"
+        ? "tier_3"
+        : metadata.trustTier;
 
   return {
     sourceId: `custom-${source.id}`,
@@ -89,7 +102,7 @@ function buildCustomSourceDefinition(source: Source): SourceDefinition {
     credibility: metadata.credibility,
     reliability: metadata.reliability,
     sourceClass: metadata.sourceClass,
-    trustTier: metadata.trustTier,
+    trustTier,
     provenance: metadata.provenance,
     status: source.status === "active" ? "active" : "inactive",
     availability: "custom",
