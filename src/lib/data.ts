@@ -23,6 +23,7 @@ import {
 import type { ClusterFirstPipelineResult } from "@/lib/pipeline";
 import type { FeedArticle } from "@/lib/rss";
 import { getSourcesForPublicSurface } from "@/lib/source-manifest";
+import { evaluateSourceAccessibilitySupport } from "@/lib/source-accessibility";
 import {
   applySignalFiltering,
   type ArticleFilterEvaluation,
@@ -1228,11 +1229,17 @@ export async function generateDailyBriefing(
     const topic = resolvePipelineTopic(topics, cluster, topicFallback, intelligence);
     const sourceCount = new Set(cluster.articles.map((article) => article.source)).size;
     const rankingSignals = [intelligence.rankingReason];
+    const sourceAccessibility = evaluateSourceAccessibilitySupport(cluster.articles);
+    const representativeFilterEvaluation = articleFilterEvaluationById.get(cluster.representative_article.id);
     const trustLayer = buildTrustLayerPresentation(intelligence, {
       title: intelligence.title,
       topicName: topic.name,
       sourceCount,
       rankingSignals,
+      eventTypeOverride: representativeFilterEvaluation?.eventType,
+      contentAccessibility: sourceAccessibility.representative.content_accessibility,
+      accessibleTextLength: sourceAccessibility.accessibleTextLength,
+      sourceAccessibilityWarnings: sourceAccessibility.warnings,
     });
     const { packet, trustDebug } = assembleExplanationPacket({
       title: intelligence.title,
@@ -1299,7 +1306,7 @@ export async function generateDailyBriefing(
             item,
             cluster,
             ranked,
-            articleFilterEvaluation: articleFilterEvaluationById.get(cluster.representative_article.id),
+            articleFilterEvaluation: representativeFilterEvaluation,
           })
         : undefined,
     };

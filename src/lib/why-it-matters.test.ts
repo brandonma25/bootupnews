@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   __testing__,
+  buildTrustLayerPresentation,
   generateWhyThisMatters,
   generateWhyThisMattersHeuristically,
   isUsableWhyItMattersText,
@@ -283,10 +284,9 @@ describe("why-it-matters", () => {
       }),
     );
 
-    expect(text.toLowerCase()).toContain("product signal");
-    expect(text).toContain("4 articles from 3 sources");
-    expect(text).toContain("Google and Chrome");
-    expect(text.toLowerCase()).toContain("ranking favored it because broad coverage centered on chrome's ai-assisted browsing changes");
+    expect(text.toLowerCase()).toContain("evidence:");
+    expect(text).toContain("4 articles/3 sources");
+    expect(text).toContain("Google/Chrome");
   });
 
   it("rejects malformed why-it-matters text that just repeats the summary", () => {
@@ -438,8 +438,175 @@ describe("why-it-matters", () => {
       }),
     );
 
-    expect(text.toLowerCase()).toContain("not a market-moving development");
+    expect(text.toLowerCase()).toContain("editorial review needed");
+    expect(text.toLowerCase()).toContain("does not yet show a structural change");
+    expect(text.toLowerCase()).not.toContain("not a market-moving development");
     expect(text.toLowerCase()).not.toMatch(/policy risk|valuation|equities/);
+  });
+
+  it("generates legal-accountability WITM from the actual actor and event", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "Politico: prediction-market operators face violations tied to election contracts",
+        summary: "Regulators alleged prediction-market operators mishandled election-contract compliance.",
+        primaryChange: "Prediction-market operators faced regulatory violations tied to election contracts",
+        entities: ["Politico", "prediction-market operators"],
+        keyEntities: ["prediction-market operators"],
+        eventType: "public_interest_legal_accountability",
+        affectedMarkets: ["prediction markets", "election contracts"],
+        topics: ["finance", "politics"],
+        signalStrength: "moderate",
+        confidenceScore: 62,
+      }),
+    );
+
+    expect(text).toContain("Prediction-market violations are stacking up");
+    expect(text.toLowerCase()).toContain("accountability");
+    expect(text.toLowerCase()).not.toMatch(/paris matters|defense and international relations|not market-moving/);
+  });
+
+  it("keeps government-capacity WITM out of generic regulation-list language", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "TSA officers quit amid shutdown pressure",
+        summary: "Staffing attrition raised questions about airport screening capacity.",
+        primaryChange: "TSA officers quit amid shutdown pressure",
+        entities: ["TSA"],
+        keyEntities: ["TSA"],
+        eventType: "government_capacity",
+        affectedMarkets: ["airport screening", "federal services"],
+        topics: ["politics"],
+        signalStrength: "moderate",
+        confidenceScore: 58,
+      }),
+    );
+
+    expect(text).toContain("TSA attrition is rising during the shutdown");
+    expect(text.toLowerCase()).toContain("public institutions");
+    expect(text.toLowerCase()).not.toMatch(/regulation, compliance|market-access assumptions/);
+  });
+
+  it("keeps generated card WITM under the explanation packet clipping limit", () => {
+    const body = buildTrustLayerPresentation(
+      createIntelligence({
+        title: "Over 1,000 TSA officers have quit amid shutdown",
+        summary: "Staffing attrition raised questions about airport screening capacity.",
+        primaryChange: "Over 1,000 TSA officers have quit amid shutdown",
+        entities: ["TSA"],
+        keyEntities: ["TSA"],
+        eventType: "government_capacity",
+        affectedMarkets: ["airport screening", "federal services"],
+        topics: ["politics"],
+        signalStrength: "moderate",
+        confidenceScore: 58,
+        signals: {
+          articleCount: 1,
+          sourceDiversity: 1,
+          recencyScore: 86,
+          velocityScore: 20,
+        },
+      }),
+      {
+        title: "Over 1,000 TSA officers have quit amid shutdown",
+        topicName: "Politics",
+        eventTypeOverride: "government_capacity",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 1552,
+      },
+    ).body;
+
+    expect(body.length).toBeLessThanOrEqual(220);
+    expect(body).not.toContain("...");
+  });
+
+  it("preserves numeric thousands separators when composing WITM copy", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "Over 1,000 TSA officers have quit amid shutdown",
+        summary: "Staffing attrition raised questions about airport screening capacity.",
+        primaryChange: "Over 1,000 TSA officers have quit amid shutdown",
+        entities: ["TSA"],
+        keyEntities: ["TSA"],
+        eventType: "government_capacity",
+        affectedMarkets: ["airport screening", "federal services"],
+        topics: ["politics"],
+        signalStrength: "moderate",
+        confidenceScore: 58,
+      }),
+    );
+
+    expect(text).not.toContain("1, 000");
+  });
+
+  it("frames EU Google Android AI intervention as platform regulation, not defense", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "EU intervenes in Google Android AI distribution rules",
+        summary: "European regulators scrutinized how Google distributes AI features through Android.",
+        primaryChange: "EU intervened in Google Android AI distribution rules",
+        entities: ["EU", "Google", "Android"],
+        keyEntities: ["EU", "Google"],
+        eventType: "platform_regulation",
+        affectedMarkets: ["Android distribution", "AI market access"],
+        topics: ["tech", "policy"],
+        signalStrength: "strong",
+        confidenceScore: 69,
+      }),
+    );
+
+    expect(text).toMatch(/EU|Google/);
+    expect(text.toLowerCase()).toContain("distribution");
+    expect(text.toLowerCase()).toContain("market access");
+    expect(text.toLowerCase()).not.toMatch(/defense|international relations/);
+  });
+
+  it("uses PRD-13 event-type override when eligibility classification is more precise than event intelligence", () => {
+    const trustLayer = buildTrustLayerPresentation(
+      createIntelligence({
+        title: "EU tells Google to open up AI on Android",
+        summary: "The story was initially inferred as geopolitical because it mentioned international regulators.",
+        primaryChange: "EU told Google to open up AI on Android",
+        entities: ["EU", "Google", "Android"],
+        keyEntities: ["EU", "Google"],
+        eventType: "defense",
+        affectedMarkets: ["Android distribution", "AI market access"],
+        topics: ["tech", "policy"],
+      }),
+      {
+        title: "EU tells Google to open up AI on Android",
+        topicName: "Tech",
+        eventTypeOverride: "platform_regulation",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 1400,
+      },
+    );
+
+    expect(trustLayer.body.toLowerCase()).toContain("distribution");
+    expect(trustLayer.body.toLowerCase()).toContain("market access");
+    expect(trustLayer.body.toLowerCase()).not.toMatch(/defense|national-security|alliance/);
+  });
+
+  it("does not overclaim when source accessibility is metadata-only", async () => {
+    const text = await generateWhyThisMatters(
+      createIntelligence({
+        title: "BLS releases routine labor productivity table",
+        summary: "A metadata-only feed item named the release but did not expose body text.",
+        primaryChange: "BLS released a routine labor productivity table",
+        entities: ["BLS"],
+        keyEntities: ["BLS"],
+        eventType: "macro_data_release",
+        affectedMarkets: ["labor productivity"],
+        topics: ["finance"],
+      }),
+      {
+        contentAccessibility: "metadata_only",
+        accessibleTextLength: 0,
+      },
+    );
+
+    expect(text.toLowerCase()).toContain("source review needed");
+    expect(text.toLowerCase()).toContain("only metadata is available");
+    expect(text.toLowerCase()).not.toContain("fresh read on labor");
   });
 
   it("keeps non-fallback outputs subject-first without hedge prefixes", async () => {
@@ -626,6 +793,8 @@ describe("why-it-matters", () => {
     );
 
     const normalized = text.toLowerCase();
-    expect(normalized.indexOf("because")).toBeLessThan(normalized.indexOf("so it could"));
+    expect(normalized).toContain("because");
+    expect(normalized).not.toContain("so it could");
+    expect(normalized.indexOf("adobe")).toBeLessThan(normalized.indexOf("because"));
   });
 });

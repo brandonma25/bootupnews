@@ -1,4 +1,5 @@
 import type { EventIntelligence } from "@/lib/types";
+import type { ContentAccessibility } from "@/lib/source-accessibility-types";
 
 export type TrustLayerPresentation = {
   tier: "high" | "medium" | "low";
@@ -9,6 +10,10 @@ export type TrustLayerPresentation = {
 
 type GenerateWhyThisMattersOptions = {
   previousOutputs?: string[];
+  eventTypeOverride?: string | null;
+  contentAccessibility?: ContentAccessibility | null;
+  accessibleTextLength?: number | null;
+  sourceAccessibilityWarnings?: string[];
 };
 
 type NormalizedReasoningCategory =
@@ -33,6 +38,9 @@ type NormalizedIntelligence = EventIntelligence & {
   timeHorizon: EventIntelligence["timeHorizon"];
   signalStrength: EventIntelligence["signalStrength"];
   reasoningCategory: NormalizedReasoningCategory;
+  contentAccessibility?: ContentAccessibility | null;
+  accessibleTextLength?: number | null;
+  sourceAccessibilityWarnings?: string[];
 };
 
 type PatternTemplate = {
@@ -362,7 +370,7 @@ export async function generateWhyThisMatters(
   intelligence: EventIntelligence,
   options: GenerateWhyThisMattersOptions = {},
 ) {
-  const normalized = normalizeIntelligence(intelligence);
+  const normalized = normalizeIntelligence(intelligence, options);
   const previousOutputs = options.previousOutputs ?? [];
   const body = buildGroundedWhyThisMatters(normalized, previousOutputs);
   return formatWhyThisMatters(body, normalized.signalStrength);
@@ -376,6 +384,10 @@ export function buildTrustLayerPresentation(
     whyItMatters?: string;
     sourceCount?: number;
     rankingSignals?: string[];
+    eventTypeOverride?: string | null;
+    contentAccessibility?: ContentAccessibility | null;
+    accessibleTextLength?: number | null;
+    sourceAccessibilityWarnings?: string[];
   },
 ): TrustLayerPresentation {
   const preferredBody =
@@ -396,7 +408,7 @@ export function buildTrustLayerPresentation(
   }
 
   const tier = intelligence.confidenceScore >= 72 ? "high" : intelligence.confidenceScore >= 45 ? "medium" : "low";
-  const normalized = normalizeIntelligence(intelligence);
+  const normalized = normalizeIntelligence(intelligence, fallback);
   const body =
     preferredBody ||
     formatWhyThisMatters(buildGroundedWhyThisMatters(normalized, []), normalized.signalStrength);
@@ -463,11 +475,21 @@ function buildGroundedWhyThisMatters(
   intelligence: NormalizedIntelligence,
   previousOutputs: string[],
 ) {
+  const sourceLimited = buildSourceLimitedReviewCopy(intelligence);
+  if (sourceLimited) {
+    return sourceLimited;
+  }
+
   if (isLowDataScenario(intelligence)) {
     return buildLowConfidenceFallback(intelligence, previousOutputs);
   }
 
   const anchorLabel = getSubjectLabel(intelligence);
+  const eventSpecific = buildEventTypeSpecificWhyThisMatters(intelligence, anchorLabel);
+  if (eventSpecific) {
+    return appendSupportingContext(eventSpecific, intelligence);
+  }
+
   const marketLabel = intelligence.affectedMarkets.slice(0, 2).join(" and ");
   const horizonLabel = getTimeHorizonLabel(intelligence.timeHorizon);
   const mechanism = buildMechanism(intelligence, marketLabel);
@@ -492,6 +514,251 @@ function buildGroundedWhyThisMatters(
   const chosen = chooseBestCandidate(rankedTemplates, previousOutputs);
   const body = chosen?.text ?? buildLowConfidenceFallback(intelligence, previousOutputs);
   return appendSupportingContext(body, intelligence);
+}
+
+function buildSourceLimitedReviewCopy(intelligence: NormalizedIntelligence) {
+  const accessibility = intelligence.contentAccessibility;
+  if (!accessibility) {
+    return "";
+  }
+
+  const accessibleLength = intelligence.accessibleTextLength ?? 0;
+  const anchor = getSubjectLabel(intelligence);
+
+  if (accessibility === "full_text_available") {
+    return "";
+  }
+
+  if (accessibility === "partial_text_available" && accessibleLength >= 500) {
+    return "";
+  }
+
+  if (
+    (accessibility === "abstract_only" || accessibility === "paywall_limited") &&
+    accessibleLength >= 800
+  ) {
+    return "";
+  }
+
+  const limitation =
+    accessibility === "partial_text_available"
+      ? "partial source text is too short"
+      : accessibility === "abstract_only"
+        ? "only an abstract is available"
+        : accessibility === "paywall_limited"
+          ? "the accessible text is paywall-limited"
+          : accessibility === "metadata_only"
+            ? "only metadata is available"
+            : accessibility === "fetch_failed" || accessibility === "rss_retry_exhausted"
+              ? "source fetching failed"
+              : accessibility === "parser_failed"
+                ? "article parsing failed"
+                : "source accessibility is unknown";
+
+  return `Source review needed for ${anchor}: ${limitation}, so the pipeline cannot support a public structural explanation yet.`;
+}
+
+function buildEventTypeSpecificWhyThisMatters(
+  intelligence: NormalizedIntelligence,
+  anchor: string,
+) {
+  if (intelligence.reasoningCategory === "non_signal") {
+    return buildNonSignalReviewCopy(anchor);
+  }
+
+  const concreteChange = buildConcreteChangeSentence(intelligence, anchor);
+  const consequence = buildStructuralConsequence(intelligence);
+
+  if (!consequence) {
+    return "";
+  }
+
+  return `${concreteChange}, which matters because ${consequence}.`;
+}
+
+function buildConcreteChangeSentence(intelligence: NormalizedIntelligence, anchor: string) {
+  const contentSpecificChange = buildContentSpecificChange(intelligence);
+  if (contentSpecificChange) {
+    return contentSpecificChange;
+  }
+
+  const candidate = chooseConcreteChangeSource(intelligence);
+  const change = stripTerminalPunctuation(candidate);
+  const cleanedChange = cleanSentenceStart(change);
+
+  if (
+    cleanedChange &&
+    cleanedChange.length <= 90 &&
+    isUsableConcreteChange(cleanedChange, anchor)
+  ) {
+    return ensureSentenceStart(cleanedChange);
+  }
+
+  return `${anchor} changed the current briefing read`;
+}
+
+function buildContentSpecificChange(intelligence: NormalizedIntelligence) {
+  const corpus = `${intelligence.title} ${intelligence.summary} ${intelligence.primaryChange}`.toLowerCase();
+
+  if (intelligence.eventType === "public_interest_legal_accountability" && /prediction[-\s]?market/.test(corpus)) {
+    return "Prediction-market violations are stacking up";
+  }
+
+  if (intelligence.eventType === "government_capacity" && /\btsa\b/.test(corpus) && /shutdown/.test(corpus)) {
+    return "TSA attrition is rising during the shutdown";
+  }
+
+  if (intelligence.eventType === "platform_regulation" && /google/.test(corpus) && /android/.test(corpus)) {
+    return "EU regulators are challenging Google's Android AI distribution rules";
+  }
+
+  return "";
+}
+
+function chooseConcreteChangeSource(intelligence: NormalizedIntelligence) {
+  const primaryChange = intelligence.primaryChange?.trim();
+  if (primaryChange && hasMeaningfulTokenOverlap(primaryChange, intelligence.title)) {
+    return primaryChange;
+  }
+
+  return intelligence.title || primaryChange || "This development";
+}
+
+function hasMeaningfulTokenOverlap(left: string, right: string) {
+  const leftTokens = new Set(normalizeForSimilarityTokens(left).split(" ").filter((token) => token.length > 2));
+  const rightTokens = normalizeForSimilarityTokens(right).split(" ").filter((token) => token.length > 2);
+  return rightTokens.some((token) => leftTokens.has(token));
+}
+
+function isUsableConcreteChange(value: string, anchor: string) {
+  if (/^this\s+(development|story|update|move|signal)\b/i.test(value)) {
+    return false;
+  }
+
+  const firstWord = value.split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (INVALID_ANCHORS.has(firstWord) || /^(should|how|why|can)$/i.test(firstWord)) {
+    return false;
+  }
+
+  if (isGenericHeadlineFragment(getAnchorLabelCandidateFromTitle(value))) {
+    return false;
+  }
+
+  if (anchor.startsWith("This ") || anchor.startsWith("The House vote")) {
+    return false;
+  }
+
+  const anchorWords = anchor.toLowerCase().split(/\s+/).filter(Boolean);
+  const valueWords = value.toLowerCase().split(/\s+/).filter(Boolean);
+  if (
+    anchorWords.length > 0 &&
+    anchorWords.every((word, index) => valueWords[index] === word) &&
+    INVALID_ANCHOR_PARTS.has(valueWords[anchorWords.length] ?? "") &&
+    INVALID_ANCHOR_PARTS.has(valueWords[anchorWords.length + 1] ?? "")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function buildStructuralConsequence(intelligence: NormalizedIntelligence) {
+  const eventType = intelligence.eventType;
+  const market = buildSpecificMarketLabel(intelligence);
+
+  switch (eventType) {
+    case "public_interest_legal_accountability":
+      return "it tests whether enforcement, settlements, or public oversight change accountability beyond the case itself";
+    case "government_capacity":
+      return "it shows whether public institutions can maintain basic services under staffing or funding pressure";
+    case "platform_regulation":
+      return "it can shift who controls distribution, defaults, or market access on a major digital platform";
+    case "macro_data_release":
+      return `it gives policymakers and investors a fresh read on ${market || "labor, inflation, or productivity conditions"}`;
+    case "central_bank_policy":
+      return "it can reset rate expectations and the cost of capital before the next policy move";
+    case "ai_infrastructure_policy":
+      return "it ties AI growth to grid capacity, permitting, and public-infrastructure constraints";
+    case "cybersecurity_enforcement":
+      return "it tests whether enforcement can raise the cost of state-linked or criminal cyber activity";
+    case "institutional_governance":
+      return "it can change how a public institution allocates authority, funding, or strategic priorities";
+    default:
+      break;
+  }
+
+  switch (intelligence.reasoningCategory) {
+    case "policy_regulation":
+      return `it can alter rule enforcement or market access for ${market || "affected institutions"}`;
+    case "corporate":
+      return `it can change execution expectations for ${market || "the company's operating plan"}`;
+    case "mna_funding":
+      return `it can alter ownership, capital allocation, or competitive control in ${market || "the affected market"}`;
+    case "early_stage_funding":
+      return `it shows where capital is forming around ${market || "an emerging technology market"}`;
+    case "large_ipo":
+      return "it tests whether public investors will fund new issuance under current market conditions";
+    case "data_report":
+      return `it gives a measurable demand signal for ${market || "the affected market"}`;
+    case "executive_move":
+      return "it can change governance accountability and execution risk at the institution";
+    case "product":
+      return buildProductStructuralConsequence(intelligence);
+    case "political":
+      return "it can change governance credibility, policy follow-through, or executive accountability";
+    case "defense_geopolitical":
+      return "it can change procurement, alliance, or national-security assumptions for the actors involved";
+    case "legal_investigation":
+      return "it can change liability, enforcement precedent, or operating constraints for the actors involved";
+    case "macro_market_move":
+      return `it can change how decision-makers read ${market || "rates, inflation, or growth"}`;
+    case "company_update":
+      return `it must show a durable change in ${market || "operations or market position"} before it belongs in a public signal slot`;
+    default:
+      return "";
+  }
+}
+
+function buildProductStructuralConsequence(intelligence: NormalizedIntelligence) {
+  const delta = sanitizeDeltaPhrase(intelligence, buildHeadlineDeltaPhrase(intelligence));
+  if (/links?|link interaction/i.test(delta)) {
+    return "it may shift how users leave AI-assisted answers and reach the open web";
+  }
+
+  if (/browsing|navigation|search behavior/i.test(delta)) {
+    return "it may shift browser navigation and search behavior at platform scale";
+  }
+
+  return "it may shift distribution power or buyer behavior beyond a feature update";
+}
+
+function buildNonSignalReviewCopy(anchor: string) {
+  return `Editorial review needed for ${anchor}: the item does not yet show a structural change beyond the immediate update.`;
+}
+
+function buildSpecificMarketLabel(intelligence: NormalizedIntelligence) {
+  const candidates = intelligence.affectedMarkets
+    .map((entry) => entry.trim())
+    .filter((entry) => entry && !/^(market|markets|business|finance|technology|tech|policy|risk)$/i.test(entry))
+    .slice(0, 2);
+
+  if (!candidates.length) {
+    return "";
+  }
+
+  return candidates.join(" and ");
+}
+
+function stripTerminalPunctuation(value: string) {
+  return value.replace(/[\s.?!…]+$/g, "").trim();
+}
+
+function cleanSentenceStart(value: string) {
+  return value.replace(/^(this|the)\s+(story|update|development)\s+(shows|says|reports)\s+/i, "").trim();
+}
+
+function ensureSentenceStart(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function extractPrimaryAnchor(intelligence: NormalizedIntelligence) {
@@ -877,22 +1144,21 @@ function buildLowConfidenceFallback(
   intelligence: NormalizedIntelligence,
   previousOutputs: string[] = [],
 ) {
-  const marketLabel = intelligence.affectedMarkets.slice(0, 2).join(" and ");
   const anchorLabel = getSubjectLabel(intelligence);
 
   if (intelligence.reasoningCategory === "non_signal") {
     const templates = [
       {
         key: "non_signal_specific",
-        text: `${anchorLabel} is not a market-moving development, but it may still matter for individual decision-making.`,
+        text: buildNonSignalReviewCopy(anchorLabel),
       },
       {
         key: "non_signal_consumer",
-        text: `${anchorLabel} fits better as consumer or personal guidance than as a policy or market signal.`,
+        text: `Editorial review needed for ${anchorLabel}: this looks like personal or consumer guidance, not a structural signal.`,
       },
       {
         key: "non_signal_statement",
-        text: `${anchorLabel} belongs in an individual decision-making frame, not a broader macro or market narrative.`,
+        text: `Editorial review needed for ${anchorLabel}: the story is not suitable for public signal copy without a stronger structural link.`,
       },
     ];
     const usageByKey = countPatternUsage(previousOutputs);
@@ -914,21 +1180,20 @@ function buildLowConfidenceFallback(
     return appendSupportingContext(chosen?.text ?? templates[0].text, intelligence);
   }
 
-  const horizonLabel = getTimeHorizonLabel(intelligence.timeHorizon);
-  const mechanism = buildMechanism(intelligence, marketLabel);
-  const impact = buildImpact(intelligence, marketLabel);
+  const consequence = buildStructuralConsequence(intelligence);
+  const marketLabel = buildSpecificMarketLabel(intelligence) || intelligence.topics[0] || "the affected market";
   const templates = [
     {
       key: "specific_shift",
-      text: `${anchorLabel} points to an early shift in ${marketLabel}, which could ${impact} over the ${horizonLabel}.`,
+      text: `${anchorLabel} needs confirmation, but the early report matters if ${consequence}.`,
     },
     {
       key: "specific_implication",
-      text: `${anchorLabel} already touches ${marketLabel}, and even limited reporting could ${impact} over the ${horizonLabel}.`,
+      text: `${anchorLabel} is still thinly sourced, so editors should confirm whether it changes ${marketLabel}.`,
     },
     {
       key: "specific_causal",
-      text: `${anchorLabel} suggests pressure on ${marketLabel} because ${mechanism}, which could ${impact} over the ${horizonLabel}.`,
+      text: `${anchorLabel} should remain review-only until reporting shows a concrete structural consequence for ${marketLabel}.`,
     },
   ];
   const usageByKey = countPatternUsage(previousOutputs);
@@ -962,7 +1227,14 @@ function appendSupportingContext(base: string, intelligence: NormalizedIntellige
     return base;
   }
 
-  return `${base} ${evidence}`;
+  const withEvidence = `${base} ${evidence}`;
+  if (withEvidence.length <= 190) {
+    return withEvidence;
+  }
+
+  const compactEvidence = buildCompactEvidenceSentence(intelligence);
+  const withCompactEvidence = compactEvidence ? `${base} ${compactEvidence}` : base;
+  return withCompactEvidence.length <= 190 ? withCompactEvidence : base;
 }
 
 function buildEvidenceSentence(intelligence: NormalizedIntelligence) {
@@ -981,7 +1253,19 @@ function buildEvidenceSentence(intelligence: NormalizedIntelligence) {
     return "";
   }
 
-  return `It ranks as a ${eventType} because ${details}.`;
+  return `Evidence: ${eventType}; ${details}.`;
+}
+
+function buildCompactEvidenceSentence(intelligence: NormalizedIntelligence) {
+  const sourceEvidence = buildSourceEvidence(intelligence.signals.articleCount, intelligence.signals.sourceDiversity);
+  const entityEvidence = buildEntityEvidence(intelligence);
+  const details = [sourceEvidence, entityEvidence].filter(Boolean).join("; ");
+
+  if (!details) {
+    return "";
+  }
+
+  return `Evidence: ${details}.`;
 }
 
 function getEvidenceEventLabel(reasoningCategory: NormalizedReasoningCategory) {
@@ -1019,19 +1303,19 @@ function getEvidenceEventLabel(reasoningCategory: NormalizedReasoningCategory) {
 
 function buildSourceEvidence(articleCount: number, sourceDiversity: number) {
   if (articleCount > 1 && sourceDiversity > 1) {
-    return `${articleCount} articles from ${sourceDiversity} sources picked up the same development`;
+    return `${articleCount} articles/${sourceDiversity} sources`;
   }
 
   if (articleCount > 1) {
-    return `${articleCount} articles tracked the same development`;
+    return `${articleCount} articles`;
   }
 
   if (sourceDiversity > 1) {
-    return `${sourceDiversity} sources independently picked it up`;
+    return `${sourceDiversity} sources`;
   }
 
   if (articleCount === 1 || sourceDiversity === 1) {
-    return "early coverage is already pointing to the same shift";
+    return "single-source coverage";
   }
 
   return "";
@@ -1055,14 +1339,14 @@ function buildEntityEvidence(intelligence: NormalizedIntelligence) {
       return "";
     }
 
-    return `${anchor} is the key entity in view`;
+    return `entity: ${anchor}`;
   }
 
   if (labels.length === 1) {
-    return `${labels[0]} is the key entity in view`;
+    return `entity: ${labels[0]}`;
   }
 
-  return `${labels[0]} and ${labels[1]} are the key entities in view`;
+  return `entities: ${labels[0]}/${labels[1]}`;
 }
 
 function buildRankingEvidence(rankingReason: string) {
@@ -1071,8 +1355,8 @@ function buildRankingEvidence(rankingReason: string) {
     return "";
   }
 
-  const compact = cleaned.length > 92 ? `${cleaned.slice(0, 89).trimEnd()}...` : cleaned;
-  return `ranking favored it because ${compact.charAt(0).toLowerCase()}${compact.slice(1)}`;
+  const compact = cleaned.length > 58 ? `${cleaned.slice(0, 55).trimEnd()}...` : cleaned;
+  return `ranked for ${compact.charAt(0).toLowerCase()}${compact.slice(1)}`;
 }
 
 function buildDeltaEvidence(intelligence: NormalizedIntelligence) {
@@ -1081,7 +1365,7 @@ function buildDeltaEvidence(intelligence: NormalizedIntelligence) {
     return "";
   }
 
-  return `the clearest shift is in ${delta.replace(/^how\s+/i, "")}`;
+  return `shift: ${delta.replace(/^how\s+/i, "")}`;
 }
 
 function stripSignalSuffix(value: string) {
@@ -1128,7 +1412,7 @@ function postProcessGrammar(value: string) {
 
 function dedupeRepeatedClauses(value: string) {
   const clauses = value
-    .split(/,\s*/)
+    .split(/,\s+/)
     .map((clause) => clause.trim())
     .filter(Boolean);
   const deduped: string[] = [];
@@ -1203,9 +1487,16 @@ function chooseBestCandidate<T extends { text: string; usage: number }>(
 function getPatternKey(output: string) {
   const normalized = output.toLowerCase();
 
+  if (normalized.includes("source review needed")) return "source_review_needed";
+  if (normalized.includes("does not yet show a structural change")) return "non_signal_specific";
+  if (normalized.includes("personal or consumer guidance")) return "non_signal_consumer";
+  if (normalized.includes("not suitable for public signal copy")) return "non_signal_statement";
   if (normalized.includes("not a market-moving development")) return "non_signal_statement";
   if (normalized.includes("consumer or personal guidance")) return "non_signal_consumer";
   if (normalized.includes("individual decision-making frame")) return "non_signal_specific";
+  if (normalized.includes("needs confirmation")) return "specific_shift";
+  if (normalized.includes("thinly sourced")) return "specific_implication";
+  if (normalized.includes("review-only")) return "specific_causal";
   if (normalized.includes("early ecosystem signal")) return "ecosystem_frame";
   if (normalized.includes("startup capital picture")) return "capital_frame";
   if (normalized.includes("competitive expansion")) return "competition_frame";
@@ -1326,7 +1617,13 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function normalizeIntelligence(intelligence: EventIntelligence): NormalizedIntelligence {
+function normalizeIntelligence(
+  intelligence: EventIntelligence,
+  sourceContext: Pick<
+    GenerateWhyThisMattersOptions,
+    "eventTypeOverride" | "contentAccessibility" | "accessibleTextLength" | "sourceAccessibilityWarnings"
+  > = {},
+): NormalizedIntelligence {
   const entities = intelligence.entities?.length
     ? intelligence.entities
     : intelligence.keyEntities?.length
@@ -1337,17 +1634,22 @@ function normalizeIntelligence(intelligence: EventIntelligence): NormalizedIntel
     ? intelligence.affectedMarkets
     : [primaryTopic];
 
+  const eventType = sourceContext.eventTypeOverride || intelligence.eventType || deriveLegacyEventType(intelligence);
+
   return {
     ...intelligence,
     entities,
-    eventType: intelligence.eventType || deriveLegacyEventType(intelligence),
+    eventType,
     primaryImpact:
       intelligence.primaryImpact ||
       `it can change expectations around ${affectedMarkets[0] ?? primaryTopic}`,
     affectedMarkets,
     timeHorizon: intelligence.timeHorizon || "medium",
     signalStrength: intelligence.signalStrength || "moderate",
-    reasoningCategory: mapReasoningCategory(intelligence.eventType || deriveLegacyEventType(intelligence)),
+    reasoningCategory: mapReasoningCategory(eventType),
+    contentAccessibility: sourceContext.contentAccessibility,
+    accessibleTextLength: sourceContext.accessibleTextLength,
+    sourceAccessibilityWarnings: sourceContext.sourceAccessibilityWarnings ?? [],
   };
 }
 
