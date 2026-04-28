@@ -169,6 +169,15 @@ describe("ingestRawItems", () => {
     expect(sourceById.get("custom-source-bbc-world")?.trustTier).toBe("tier_2");
     expect(sourceById.get("custom-source-foreign-affairs")?.trustTier).toBe("tier_2");
     expect(sourceById.get("custom-source-politico-congress")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-npr-economy")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-cnbc-finance")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-propublica-main")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-fed-press-all")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-bls-cpi")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-fed-press-all")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-bls-employment-situation")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-marketwatch")?.sourceRole).toBe("corroboration_only");
+    expect(sourceById.get("custom-source-cnbc-finance")?.sourceRole).toBe("secondary_authoritative");
   });
 
   it("preserves the five-source cap for six non-manifest supplied sources", async () => {

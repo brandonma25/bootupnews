@@ -8,7 +8,21 @@ describe("source catalog governance", () => {
     "mit-technology-review",
     "foreign-affairs",
     "the-diplomat",
+    "npr-business",
+    "npr-economy",
+    "federal-reserve-press-all",
+    "federal-reserve-monetary-policy",
+    "bls-principal-federal-economic-indicators",
+    "bls-consumer-price-index",
+    "bls-employment-situation",
+    "cnbc-business",
+    "cnbc-economy",
+    "cnbc-finance",
+    "marketwatch-top-stories",
     "npr-world",
+    "npr-politics",
+    "propublica-main",
+    "cnbc-politics",
     "foreign-policy",
     "guardian-world",
     "hacker-news-best",
@@ -28,11 +42,17 @@ describe("source catalog governance", () => {
     "tldr-marketing",
   ];
 
-  it("keeps BBC and CNBC out of the onboarding catalog", () => {
+  it("keeps blocked broad or unofficial source classes out of the onboarding catalog", () => {
     const serialized = JSON.stringify(recommendedSources).toLowerCase();
+    const sourceIds = new Set(recommendedSources.map((source) => source.id));
 
-    expect(serialized).not.toContain("bbc");
-    expect(serialized).not.toContain("cnbc");
+    expect(serialized).not.toContain("ap direct rss");
+    expect(serialized).not.toContain("reuters direct rss");
+    expect(serialized).not.toContain("third-party feed");
+    expect(serialized).not.toContain("unofficial scraper");
+    expect(sourceIds.has("new-york-times")).toBe(false);
+    expect(sourceIds.has("bloomberg")).toBe(false);
+    expect(sourceIds.has("the-information")).toBe(false);
   });
 
   it("keeps catalog entries separate from default ingestion", () => {
@@ -130,6 +150,61 @@ describe("source catalog governance", () => {
     });
   });
 
+  it("catalogs Batch 1 accessible source additions as validated optional sources", () => {
+    const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
+
+    expect(sourcesById.get("npr-business")).toMatchObject({
+      sourceFormat: "rss",
+      importStatus: "ready",
+      lifecycleStatus: "active_optional",
+      validationStatus: "validated",
+      topicLabel: "Markets",
+    });
+    expect(sourcesById.get("npr-economy")).toMatchObject({
+      sourceFormat: "rss",
+      importStatus: "ready",
+      lifecycleStatus: "active_optional",
+      validationStatus: "validated",
+      topicLabel: "Economics",
+    });
+    expect(sourcesById.get("propublica-main")).toMatchObject({
+      sourceFormat: "rss",
+      importStatus: "ready",
+      lifecycleStatus: "active_optional",
+      validationStatus: "validated",
+      topicLabel: "Politics",
+    });
+    expect(sourcesById.get("marketwatch-top-stories")).toMatchObject({
+      feedUrl: "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+      lifecycleStatus: "active_optional",
+      validationStatus: "validated",
+    });
+  });
+
+  it("catalogs institutional Batch 1 sources without treating them as normal publisher defaults", () => {
+    const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
+
+    for (const sourceId of [
+      "federal-reserve-press-all",
+      "federal-reserve-monetary-policy",
+      "bls-principal-federal-economic-indicators",
+      "bls-consumer-price-index",
+      "bls-employment-situation",
+    ]) {
+      const source = sourcesById.get(sourceId);
+
+      expect(source).toMatchObject({
+        sourceFormat: "rss",
+        importStatus: "ready",
+        lifecycleStatus: "active_optional",
+        validationStatus: "validated",
+        topicLabel: "Economics",
+        mvpDefaultAllowed: false,
+      });
+      expect(source?.note).toMatch(/institutional|Primary institutional|BLS|Federal/i);
+    }
+  });
+
   it("keeps Congress.gov cataloged without runtime ingestion support", () => {
     const source = recommendedSources.find((entry) => entry.id === "congress-gov-api");
 
@@ -150,9 +225,10 @@ describe("source catalog governance", () => {
     expect(duplicateFeedUrls).toEqual([]);
     expect(recommendedSources.filter((source) => source.id === "ars-technica")).toHaveLength(1);
     expect(recommendedSources.some((source) => source.feedUrl === "https://www.theverge.com/rss/index.xml")).toBe(false);
-    expect(recommendedSources.some((source) => source.id === "npr-economy")).toBe(false);
     expect(recommendedSources.some((source) => source.id === "brookings-research")).toBe(false);
     expect(recommendedSources.some((source) => source.id === "csis-analysis")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "treasury-press-releases")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "marketwatch-market-pulse")).toBe(false);
     expect(recommendedSources.some((source) => source.feedUrl === "https://feeds.content.dowjones.io/public/rss/mktw_wsjonline")).toBe(false);
   });
 });

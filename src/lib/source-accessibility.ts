@@ -325,6 +325,10 @@ function hasContextSupport(diagnostics: SourceAccessibilityDiagnostics) {
     return false;
   }
 
+  if (diagnostics.content_accessibility === "full_text_available") {
+    return true;
+  }
+
   if (hasFullTextCoreSupport(diagnostics) || hasSubstantialPartialCoreSupport(diagnostics)) {
     return true;
   }

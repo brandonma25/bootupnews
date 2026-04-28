@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ControlledPipelineConfig } from "@/lib/pipeline/controlled-execution";
+import { PUBLIC_SURFACE_SOURCE_MANIFEST } from "@/lib/source-manifest";
 import type { SignalSelectionEligibilityTier } from "@/lib/types";
 
 const generateDailyBriefing = vi.fn();
@@ -113,17 +114,7 @@ describe("runControlledPipeline", () => {
     const [, sources, options] = generateDailyBriefing.mock.calls[0]!;
 
     expect(sources.map((source: { id: string }) => source.id)).toEqual([
-      "source-verge",
-      "source-ars",
-      "source-mit-tech-review",
-      "source-techcrunch",
-      "source-ft",
-      "source-reuters-business",
-      "source-bbc-world",
-      "source-foreign-affairs",
-      "source-politico-politics",
-      "source-politico-congress",
-      "source-politico-defense",
+      ...PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"],
     ]);
     expect(options).toEqual({
       suppliedByManifest: true,
@@ -134,7 +125,7 @@ describe("runControlledPipeline", () => {
     expect(report.sourcePlan).toMatchObject({
       plan: "public_manifest",
       suppliedByManifest: true,
-      sourceCount: 11,
+      sourceCount: PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"].length,
     });
     expect(report.proposedTopFive[0]).toMatchObject({
       validationStatus: "requires_human_rewrite",

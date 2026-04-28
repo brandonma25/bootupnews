@@ -29,8 +29,19 @@ describe("source preference policy", () => {
       .toBe("tier2");
   });
 
-  it("does not reintroduce CNBC preference after the MVP cleanup", () => {
-    expect(classifySourcePreference({ sourceName: "CNBC", url: "https://www.cnbc.com/markets" })).toBe("unknown");
+  it("classifies Batch 1 accessible source additions without making support sources tier1 by brand", () => {
+    expect(classifySourcePreference({ sourceName: "NPR Economy", url: "https://www.npr.org/sections/economy/" }))
+      .toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "CNBC Finance", url: "https://www.cnbc.com/finance/" }))
+      .toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "MarketWatch", url: "https://feeds.content.dowjones.io/public/rss/mw_topstories" }))
+      .toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "ProPublica", url: "https://www.propublica.org/story" }))
+      .toBe("tier1");
+    expect(classifySourcePreference({ sourceName: "BLS Consumer Price Index", url: "https://www.bls.gov/cpi/" }))
+      .toBe("tier1");
+    expect(classifySourcePreference({ sourceName: "Federal Reserve Monetary Policy", url: "https://www.federalreserve.gov/monetarypolicy.htm" }))
+      .toBe("tier1");
   });
 
   it("keeps Ars Technica at tier2 in source-policy despite donor metadata differences", () => {

@@ -11,8 +11,23 @@ export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
     "source-techcrunch",
     "source-ft",
     "source-reuters-business",
+    "source-npr-business",
+    "source-npr-economy",
+    "source-fed-press-all",
+    "source-fed-monetary-policy",
+    "source-bls-latest",
+    "source-bls-cpi",
+    "source-bls-employment-situation",
+    "source-cnbc-business",
+    "source-cnbc-economy",
+    "source-cnbc-finance",
+    "source-marketwatch",
     "source-bbc-world",
     "source-foreign-affairs",
+    "source-npr-world",
+    "source-npr-politics",
+    "source-propublica-main",
+    "source-cnbc-politics",
     "source-politico-politics",
     "source-politico-congress",
     "source-politico-defense",
@@ -70,11 +85,71 @@ const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; p
     sourceRole: "primary_authoritative",
     publicEligible: true,
   },
+  "source-npr-business": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-npr-economy": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-fed-press-all": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-fed-monetary-policy": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-bls-latest": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-bls-cpi": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-bls-employment-situation": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-cnbc-business": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-cnbc-economy": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-cnbc-finance": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-marketwatch": {
+    sourceRole: "corroboration_only",
+    publicEligible: true,
+  },
   "source-bbc-world": {
     sourceRole: "secondary_authoritative",
     publicEligible: true,
   },
   "source-foreign-affairs": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-npr-world": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-npr-politics": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-propublica-main": {
+    sourceRole: "primary_authoritative",
+    publicEligible: true,
+  },
+  "source-cnbc-politics": {
     sourceRole: "secondary_authoritative",
     publicEligible: true,
   },

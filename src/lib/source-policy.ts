@@ -24,10 +24,12 @@ export const SOURCE_PREFERENCE_RULES: SourcePreferenceRule[] = [
       "oecd.org",
       "sec.gov",
       "federalreserve.gov",
+      "bls.gov",
       "europa.eu",
       "ec.europa.eu",
       "whitehouse.gov",
       "treasury.gov",
+      "propublica.org",
     ],
     names: [
       "reuters",
@@ -42,7 +44,10 @@ export const SOURCE_PREFERENCE_RULES: SourcePreferenceRule[] = [
       "international monetary fund",
       "world bank",
       "federal reserve",
+      "bureau of labor statistics",
+      "bls",
       "u.s. securities and exchange commission",
+      "propublica",
     ],
   },
   {
@@ -62,6 +67,8 @@ export const SOURCE_PREFERENCE_RULES: SourcePreferenceRule[] = [
       "bbc.co.uk",
       "foreignaffairs.com",
       "politico.com",
+      "npr.org",
+      "cnbc.com",
     ],
     names: [
       "techcrunch",
@@ -78,6 +85,8 @@ export const SOURCE_PREFERENCE_RULES: SourcePreferenceRule[] = [
       "bbc",
       "foreign affairs",
       "politico",
+      "npr",
+      "cnbc",
     ],
   },
   {

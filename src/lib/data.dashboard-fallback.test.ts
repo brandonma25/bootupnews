@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateDailyBriefing, getDashboardData } from "@/lib/data";
 import { logServerEvent } from "@/lib/observability";
 import { runClusterFirstPipeline } from "@/lib/pipeline";
+import { PUBLIC_SURFACE_SOURCE_MANIFEST } from "@/lib/source-manifest";
 
 vi.mock("@/lib/pipeline", () => ({
   runClusterFirstPipeline: vi.fn(),
@@ -379,19 +380,7 @@ describe("getDashboardData fallback behavior", () => {
     expect(data.briefing.items).toHaveLength(1);
     expect(data.topics.length).toBeGreaterThan(0);
     expect(data.sources.length).toBeGreaterThan(0);
-    expect(data.sources.map((source) => source.id)).toEqual([
-      "source-verge",
-      "source-ars",
-      "source-mit-tech-review",
-      "source-techcrunch",
-      "source-ft",
-      "source-reuters-business",
-      "source-bbc-world",
-      "source-foreign-affairs",
-      "source-politico-politics",
-      "source-politico-congress",
-      "source-politico-defense",
-    ]);
+    expect(data.sources.map((source) => source.id)).toEqual([...PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]]);
     expect(runClusterFirstPipeline).toHaveBeenCalledTimes(1);
     expect(logServerEvent).toHaveBeenCalledWith(
       "info",

@@ -184,6 +184,48 @@ describe("source accessibility predicates", () => {
     expect(support.depthSupported).toBe(true);
   });
 
+  it("keeps abstract-only CNBC support out of Core by brand alone", () => {
+    const support = evaluateSourceAccessibilitySupport([
+      article(source({
+        sourceId: "source-cnbc-finance",
+        source: "CNBC Finance",
+        homepageUrl: "https://www.cnbc.com/finance/",
+        sourceRole: "secondary_authoritative",
+        trustTier: "tier_2",
+        fetch: {
+          feedUrl: "https://www.cnbc.com/id/10000664/device/rss/rss.html",
+        },
+      }), {
+        summaryText: "Markets moved after a policy signal but the RSS item only exposes a short abstract.",
+        contentText: "",
+        extractionMethod: "rss_summary",
+      }),
+    ]);
+
+    expect(support.coreSupported).toBe(false);
+    expect(support.depthSupported).toBe(false);
+    expect(support.coreBlockingReasons).toContain("abstract_only_uncorroborated");
+  });
+
+  it("keeps MarketWatch as corroboration support instead of sole Core authority", () => {
+    const support = evaluateSourceAccessibilitySupport([
+      article(source({
+        sourceId: "source-marketwatch",
+        source: "MarketWatch",
+        homepageUrl: "https://www.marketwatch.com",
+        sourceRole: "corroboration_only",
+        trustTier: "tier_2",
+        fetch: {
+          feedUrl: "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+        },
+      })),
+    ]);
+
+    expect(support.coreSupported).toBe(false);
+    expect(support.contextSupported).toBe(true);
+    expect(support.coreBlockingReasons).toContain("source_accessibility_insufficient");
+  });
+
   it("allows substantial partial authoritative sources to support Context and Core", () => {
     const support = evaluateSourceAccessibilitySupport([
       article(source(), {
