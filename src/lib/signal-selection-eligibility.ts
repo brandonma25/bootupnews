@@ -12,6 +12,14 @@ import type {
 
 const CORE_EVENT_TYPES = new Set<EventType>([
   "policy_regulation",
+  "government_capacity",
+  "public_interest_legal_accountability",
+  "platform_regulation",
+  "macro_data_release",
+  "central_bank_policy",
+  "ai_infrastructure_policy",
+  "cybersecurity_enforcement",
+  "institutional_governance",
   "earnings_financials",
   "mna_funding",
   "geopolitics",
@@ -37,13 +45,27 @@ const LOW_SIGNAL_EVENT_TYPES = new Set<EventType>([
   "repetitive_followup_no_new_info",
 ]);
 
-const WEAK_PUBLIC_CONTENT_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
+const WEAK_PUBLIC_CONTENT_PATTERNS: Array<{ pattern: RegExp; reason: string; requiresConsumerContext?: boolean }> = [
   { pattern: /\b(podcast|trailer|teaser|tv|movie|celebrity|entertainment)\b/i, reason: "weak_entertainment_or_podcast_content" },
-  { pattern: /\b(gadget|device deal|discount|gift guide|hands-on|review|gaming mouse|touchscreen mouse)\b/i, reason: "weak_gadget_or_review_content" },
+  { pattern: /\b(gadget|device deal|discount|gift guide|gaming mouse|touchscreen mouse)\b/i, reason: "weak_gadget_or_review_content" },
+  { pattern: /\b(hands-on|review)\b/i, reason: "weak_gadget_or_review_content", requiresConsumerContext: true },
   { pattern: /\b(workout|fitness|lifestyle|fashion)\b/i, reason: "weak_lifestyle_content" },
   { pattern: /\b(partnering with|partners with|partnership)\b/i, reason: "weak_consumer_partnership_without_system_impact" },
   { pattern: /\b(upcoming|leak|dummy|drops full|new colors|spring colors)\b/i, reason: "weak_product_update_or_promo_content" },
 ];
+
+const PUBLIC_INTEREST_EVENT_TYPES = new Set<EventType>([
+  "government_capacity",
+  "public_interest_legal_accountability",
+  "platform_regulation",
+  "macro_data_release",
+  "central_bank_policy",
+  "ai_infrastructure_policy",
+  "cybersecurity_enforcement",
+  "institutional_governance",
+  "legal_investigation",
+  "policy_regulation",
+]);
 
 function normalizeTrustTier(value: string | null | undefined) {
   if (value === "tier_1") return "tier1";
@@ -86,12 +108,105 @@ function hasSpecificity(item: BriefingItem, cluster: StoryCluster) {
   return hasNumber || hasEntity || hasProperNoun;
 }
 
-function getWeakContentReasons(item: BriefingItem, cluster: StoryCluster) {
+function getCalibrationLabels(corpus: string, eventType: string) {
+  const labels: string[] = [];
+
+  if (eventType === "government_capacity" || /\b(shutdown|federal workers?|tsa officers?|agency capacity|workforce attrition|quit amid shutdown)\b/i.test(corpus)) {
+    labels.push("institutional_capacity_signal");
+  }
+  if (eventType === "public_interest_legal_accountability" || /\b(purdue settlement|opioid settlement|settlement money|victims?|low-income residents?|ignoring new law|legal accountability)\b/i.test(corpus)) {
+    labels.push("public_interest_legal_accountability");
+  }
+  if (eventType === "platform_regulation" || (/\b(android|app store|platform|ai distribution|market access)\b/i.test(corpus) && /\b(antitrust|regulation|rules?|open up|intervention|probe)\b/i.test(corpus))) {
+    labels.push("platform_regulation_signal");
+  }
+  if (eventType === "macro_data_release" || /\b(payroll employment|consumer price index|cpi|unemployment rate|jobs report|employment situation|major economic indicators)\b/i.test(corpus)) {
+    labels.push("macro_data_release");
+  }
+  if (eventType === "central_bank_policy" || /\b(fomc|federal reserve|fed chair|central bank|monetary policy|discount rate)\b/i.test(corpus)) {
+    labels.push("central_bank_policy_signal");
+  }
+  if (eventType === "ai_infrastructure_policy" || /\b(ai data centers?|data centers?|grid|permitting|power demand|energy capacity|ai infrastructure)\b/i.test(corpus)) {
+    labels.push("ai_infrastructure_policy");
+  }
+  if (eventType === "cybersecurity_enforcement" || /\b(cyberattacks?|hacker|extradited|indicted|state-linked|state linked|cyber enforcement)\b/i.test(corpus)) {
+    labels.push("cybersecurity_enforcement_signal");
+  }
+  if (eventType === "institutional_governance" || /\b(national science board|national science foundation|science governance|institutional governance)\b/i.test(corpus)) {
+    labels.push("institutional_governance_signal");
+  }
+  if (/\b(king charles|queen camilla|state visit|ceremonial|address to congress|ballroom|white house renovation|presidential library|commemorative|state dinner)\b/i.test(corpus)) {
+    labels.push("ceremonial_or_low_policy_change");
+  }
+  if (/\b(says|said|opinion|commentary|outlook)\b/i.test(corpus) && /\b(market|stocks?|rates?|inflation|fed)\b/i.test(corpus)) {
+    labels.push("market_commentary_source_thin");
+  }
+  if (/\b(local|connecticut|tiny texas town|towing companies)\b/i.test(corpus) && labels.includes("public_interest_legal_accountability")) {
+    labels.push("local_public_interest_depth");
+  }
+
+  return uniqueStrings(labels);
+}
+
+function isConsumerProductContext(corpus: string) {
+  return /\b(gadget|device|phone|laptop|headphones?|keyboard|mouse|gaming|console|tv|app|product|consumer|fitness|workout|peloton|spotify)\b/i.test(corpus);
+}
+
+function getWeakContentReasons(item: BriefingItem, cluster: StoryCluster, eventType: string, calibratedReasonLabels: string[]) {
   const corpus = getContentCorpus({ item, cluster });
+  const publicInterestProtected =
+    PUBLIC_INTEREST_EVENT_TYPES.has(eventType as EventType) ||
+    calibratedReasonLabels.some((label) =>
+      [
+        "public_interest_legal_accountability",
+        "institutional_capacity_signal",
+        "platform_regulation_signal",
+        "macro_data_release",
+        "central_bank_policy_signal",
+        "ai_infrastructure_policy",
+        "cybersecurity_enforcement_signal",
+        "institutional_governance_signal",
+      ].includes(label),
+    );
 
   return WEAK_PUBLIC_CONTENT_PATTERNS
-    .filter((entry) => entry.pattern.test(corpus))
+    .filter((entry) => {
+      if (!entry.pattern.test(corpus)) return false;
+      if (entry.requiresConsumerContext && !isConsumerProductContext(corpus)) return false;
+      if (publicInterestProtected && !isConsumerProductContext(corpus)) return false;
+      return true;
+    })
     .map((entry) => entry.reason);
+}
+
+function isRoutineOrStaleRelease(corpus: string, labels: string[]) {
+  return (
+    labels.includes("macro_data_release") &&
+    /\b(major economic indicators latest numbers|latest numbers|minutes of|approval of application|application by)\b/i.test(corpus)
+  );
+}
+
+function isCeremonialOrLowPolicyChange(labels: string[]) {
+  return labels.includes("ceremonial_or_low_policy_change");
+}
+
+function getExclusionCause(input: {
+  tier: SignalSelectionEligibilityTier;
+  weakContent: boolean;
+  sourceAccessibility: ReturnType<typeof evaluateSourceAccessibilitySupport>;
+  routineOrStaleRelease: boolean;
+  ceremonialOrLowPolicyChange: boolean;
+  filterDecision: string;
+  structuralImportanceScore: number;
+}) {
+  if (input.tier !== "exclude_from_public_candidates") return null;
+  if (input.weakContent) return "product/noise";
+  if (input.sourceAccessibility.coreBlockingReasons.length > 0) return "source_accessibility";
+  if (input.routineOrStaleRelease) return "stale/routine_release";
+  if (input.ceremonialOrLowPolicyChange) return "ceremonial_or_low_policy_change";
+  if (input.filterDecision !== "pass") return "product/noise";
+  if (input.structuralImportanceScore < 52) return "below_structural_threshold";
+  return "lack_of_corroboration";
 }
 
 export function buildArticleFilterCandidate(article: NormalizedArticle): ArticleFilterCandidate {
@@ -181,7 +296,9 @@ export function evaluateSignalSelectionEligibility(input: {
     articleFilterEvaluation?.sourceTier ??
     normalizeTrustTier(cluster.representative_article.source_metadata?.trustTier);
   const sourceDiversity = new Set(cluster.articles.map((article) => article.source)).size;
-  const weakContentReasons = getWeakContentReasons(item, cluster);
+  const corpus = getContentCorpus({ item, cluster });
+  const calibratedReasonLabels = getCalibrationLabels(corpus, eventType);
+  const weakContentReasons = getWeakContentReasons(item, cluster, eventType, calibratedReasonLabels);
   const specific = hasSpecificity(item, cluster);
   const fallbackPromoted = filterReasons.includes("passed_fallback_low_pass_volume");
   const sourceQualityScore = Number(((features.source_credibility * 0.55) + (features.trust_tier * 0.45)).toFixed(2));
@@ -204,6 +321,8 @@ export function evaluateSignalSelectionEligibility(input: {
     (sourceTier === "tier1" || sourceDiversity >= 2) &&
     !LOW_SIGNAL_EVENT_TYPES.has(eventType as EventType);
   const weakContent = weakContentReasons.length > 0 && !weakContentHasOverride;
+  const routineOrStaleRelease = isRoutineOrStaleRelease(corpus, calibratedReasonLabels);
+  const ceremonialOrLowPolicyChange = isCeremonialOrLowPolicyChange(calibratedReasonLabels);
   const reasons: string[] = [];
   const warnings: string[] = [];
 
@@ -215,6 +334,8 @@ export function evaluateSignalSelectionEligibility(input: {
   if (!specific) reasons.push("missing_specific_actor_or_number");
   if (LOW_SIGNAL_EVENT_TYPES.has(eventType as EventType)) reasons.push(`low_signal_event_type_${eventType}`);
   if (weakContent) reasons.push(...weakContentReasons);
+  if (routineOrStaleRelease) reasons.push("stale_routine_release");
+  if (ceremonialOrLowPolicyChange) reasons.push("ceremonial_or_low_policy_change");
   if (!structuralEventType && !strongStructuralOverride) {
     reasons.push("insufficient_structural_event_evidence");
   }
@@ -229,6 +350,8 @@ export function evaluateSignalSelectionEligibility(input: {
     sourceAccessibility.coreSupported &&
     specific &&
     !weakContent &&
+    !routineOrStaleRelease &&
+    !ceremonialOrLowPolicyChange &&
     (structuralEventType || strongStructuralOverride) &&
     structuralImportanceScore >= 52 &&
     ranked.score >= 58;
@@ -240,6 +363,8 @@ export function evaluateSignalSelectionEligibility(input: {
     sourceAccessibility.contextSupported &&
     specific &&
     !weakContent &&
+    !routineOrStaleRelease &&
+    !ceremonialOrLowPolicyChange &&
     (contextEventType || strongStructuralOverride) &&
     structuralImportanceScore >= 46 &&
     ranked.score >= 52;
@@ -271,6 +396,16 @@ export function evaluateSignalSelectionEligibility(input: {
     tier,
     reasons: uniqueStrings(reasons),
     warnings: uniqueStrings(warnings),
+    calibratedReasonLabels,
+    exclusionCause: getExclusionCause({
+      tier,
+      weakContent,
+      sourceAccessibility,
+      routineOrStaleRelease,
+      ceremonialOrLowPolicyChange,
+      filterDecision,
+      structuralImportanceScore,
+    }),
     filterDecision,
     filterSeverity: filterDecision,
     filterReasons,

@@ -115,6 +115,52 @@ describe("donor registry", () => {
     expect(getCanonicalSourceMetadata().map((entry) => entry.source)).toContain("Reuters World");
   });
 
+  it("boosts structural features for institutional and public-interest signal patterns", () => {
+    const provider = getRankingFeatureProviders().find((entry) => entry.donor === "fns")?.provider;
+    const baselineCluster: StoryCluster = {
+      cluster_id: "cluster-baseline",
+      articles: [createArticle()],
+      representative_article: createArticle(),
+      topic_keywords: ["policy", "market", "impact"],
+      cluster_size: 1,
+      cluster_debug: {
+        provider: "after_market_agent",
+        clustering_capabilities: ["title_overlap"],
+        candidate_snapshots: [],
+        merge_decisions: [],
+        prevented_merge_count: 0,
+        representative_selection_reason: "only article",
+        representative_scores: [{ article_id: "article-1", score: 1, reasons: ["only article"] }],
+        diversity_support_available: true,
+      },
+    };
+    const publicInterestCluster: StoryCluster = {
+      ...baselineCluster,
+      cluster_id: "cluster-public-interest",
+      representative_article: createArticle({
+        title: "Purdue settlement victims face accountability deadline",
+        content: "The Purdue settlement leaves opioid victims facing legal accountability and restitution questions.",
+        keywords: ["purdue", "settlement", "victims", "accountability"],
+      }),
+      articles: [
+        createArticle({
+          title: "Purdue settlement victims face accountability deadline",
+          content: "The Purdue settlement leaves opioid victims facing legal accountability and restitution questions.",
+          keywords: ["purdue", "settlement", "victims", "accountability"],
+        }),
+      ],
+      topic_keywords: ["purdue settlement", "opioid victims", "legal accountability"],
+    };
+
+    expect(provider).toBeDefined();
+    const baselineFeatures = provider!.mapClusterToRankingFeatures(baselineCluster, [baselineCluster]);
+    const calibratedFeatures = provider!.mapClusterToRankingFeatures(publicInterestCluster, [publicInterestCluster]);
+
+    expect(calibratedFeatures.structural_impact).toBeGreaterThan(baselineFeatures.structural_impact ?? 0);
+    expect(calibratedFeatures.downstream_consequence).toBeGreaterThan(baselineFeatures.downstream_consequence ?? 0);
+    expect(calibratedFeatures.persistence_or_endurance).toBeGreaterThan(baselineFeatures.persistence_or_endurance ?? 0);
+  });
+
   it("exposes a source registry with donor ownership, trust tier, and active status", () => {
     const sourceRegistry = getSourceRegistrySnapshot();
     const activeSources = getActiveSourceRegistry();

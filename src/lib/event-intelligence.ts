@@ -367,6 +367,14 @@ function inferEventType(
 
   const rules: Array<[string, string[]]> = [
     ["defense", ["department of defense", "classified", "government", "military", "pentagon", "defense department"]],
+    ["government_capacity", ["shutdown", "federal workers", "tsa officers", "agency staff", "agency capacity", "workforce attrition", "quit amid shutdown"]],
+    ["public_interest_legal_accountability", ["purdue settlement", "opioid settlement", "settlement money", "victims", "low-income residents", "ignoring new law", "enforcement", "legal accountability"]],
+    ["platform_regulation", ["android", "app store", "platform regulation", "ai distribution", "open up ai", "market access", "antitrust rules"]],
+    ["macro_data_release", ["payroll employment", "consumer price index", "cpi", "unemployment rate", "jobs report", "employment situation", "productivity", "major economic indicators"]],
+    ["central_bank_policy", ["fomc", "federal reserve", "fed chair", "central bank", "monetary policy", "discount rate", "interest rates"]],
+    ["ai_infrastructure_policy", ["ai data centers", "data centers", "grid", "permitting", "power demand", "energy capacity", "ai infrastructure"]],
+    ["cybersecurity_enforcement", ["cyberattack", "cyberattacks", "hacker", "extradited", "indicted", "state-linked", "cyber enforcement"]],
+    ["institutional_governance", ["national science board", "national science foundation", "science governance", "institutional governance"]],
     ["political", ["election", "minister", "foreign office", "foreign minister", "cabinet", "parliament", "vetting", "ambassador", "appointment", "surveillance powers", "oversight", "executive authority"]],
     ["large_ipo", ["ipo", "initial public offering", "listing", "public offering", "files for ipo"]],
     ["early_stage_funding", ["raises", "raised", "series a", "series b", "seed round", "backed", "funding round"]],
@@ -473,6 +481,22 @@ function inferPrimaryImpact(input: {
       return `${entityLabel} may change defense posture, state capacity, or international risk assumptions tied to ${marketLabel}.`;
     case "policy_regulation":
       return `${entityLabel} could alter operating rules, compliance costs, or market access across ${marketLabel}.`;
+    case "government_capacity":
+      return `${entityLabel} shows whether public institutions can sustain basic execution under political or budget stress.`;
+    case "public_interest_legal_accountability":
+      return `${entityLabel} can change legal accountability, restitution, or enforcement expectations beyond the immediate case.`;
+    case "platform_regulation":
+      return `${entityLabel} could alter platform distribution power, market access, and compliance costs across ${marketLabel}.`;
+    case "macro_data_release":
+      return `${entityLabel} provides a primary data signal that can reset assumptions about labor, inflation, or demand.`;
+    case "central_bank_policy":
+      return `${entityLabel} can change rate expectations, liquidity conditions, and the policy backdrop for ${marketLabel}.`;
+    case "ai_infrastructure_policy":
+      return `${entityLabel} links AI growth to physical capacity constraints such as grid, permitting, and public investment.`;
+    case "cybersecurity_enforcement":
+      return `${entityLabel} can change security expectations, enforcement risk, and state-linked technology exposure.`;
+    case "institutional_governance":
+      return `${entityLabel} can reshape the institutions that fund, regulate, or coordinate long-term strategic work.`;
     case "macro_market_move":
       return `${entityLabel} changes the rate, demand, or liquidity backdrop feeding into ${marketLabel}.`;
     case "mna_funding":
@@ -508,9 +532,40 @@ function inferAffectedMarkets(
     return [...affected];
   }
 
-  if (eventType === "macro_market_move") {
+  if (eventType === "macro_market_move" || eventType === "macro_data_release" || eventType === "central_bank_policy") {
     affected.add("rates");
     affected.add("equities");
+  }
+
+  if (eventType === "government_capacity") {
+    affected.add("state capacity");
+    affected.add("public services");
+  }
+
+  if (eventType === "public_interest_legal_accountability") {
+    affected.add("legal accountability");
+    affected.add("public institutions");
+  }
+
+  if (eventType === "platform_regulation") {
+    affected.add("platform access");
+    affected.add("competition");
+  }
+
+  if (eventType === "ai_infrastructure_policy") {
+    affected.add("energy");
+    affected.add("infrastructure");
+    affected.add("AI capacity");
+  }
+
+  if (eventType === "cybersecurity_enforcement") {
+    affected.add("security");
+    affected.add("enforcement risk");
+  }
+
+  if (eventType === "institutional_governance") {
+    affected.add("institutional capacity");
+    affected.add("research priorities");
   }
 
   if (eventType === "early_stage_funding") {
@@ -606,6 +661,11 @@ function inferTimeHorizon(eventType: string, articles: FeedArticle[]): EventTime
 
   if (
     eventType === "policy_regulation" ||
+    eventType === "government_capacity" ||
+    eventType === "public_interest_legal_accountability" ||
+    eventType === "platform_regulation" ||
+    eventType === "ai_infrastructure_policy" ||
+    eventType === "institutional_governance" ||
     eventType === "defense" ||
     eventType === "geopolitical" ||
     corpus.includes("multi-year") ||
@@ -620,6 +680,8 @@ function inferTimeHorizon(eventType: string, articles: FeedArticle[]): EventTime
     eventType === "large_ipo" ||
     eventType === "executive_move" ||
     eventType === "macro_market_move" ||
+    eventType === "macro_data_release" ||
+    eventType === "central_bank_policy" ||
     eventType === "mna_funding" ||
     eventType === "early_stage_funding" ||
     eventType === "data_report" ||
@@ -751,6 +813,14 @@ function getEventTypeSignalWeight(eventType: string) {
     case "geopolitical":
     case "political":
     case "policy_regulation":
+    case "government_capacity":
+    case "public_interest_legal_accountability":
+    case "platform_regulation":
+    case "macro_data_release":
+    case "central_bank_policy":
+    case "ai_infrastructure_policy":
+    case "cybersecurity_enforcement":
+    case "institutional_governance":
     case "macro_market_move":
       return 2;
     case "large_ipo":
@@ -776,6 +846,14 @@ function isHighImpactEventType(eventType: string) {
     "geopolitical",
     "political",
     "policy_regulation",
+    "government_capacity",
+    "public_interest_legal_accountability",
+    "platform_regulation",
+    "macro_data_release",
+    "central_bank_policy",
+    "ai_infrastructure_policy",
+    "cybersecurity_enforcement",
+    "institutional_governance",
     "macro_market_move",
     "large_ipo",
     "legal_investigation",

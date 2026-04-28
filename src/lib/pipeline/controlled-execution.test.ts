@@ -54,6 +54,8 @@ function buildItem(index: number, whyItMatters: string, tier: SignalSelectionEli
       tier,
       reasons: tier === "exclude_from_public_candidates" ? ["weak_consumer_content"] : [],
       warnings: [],
+      calibratedReasonLabels: tier === "exclude_from_public_candidates" ? ["product/noise"] : ["platform_regulation_signal"],
+      exclusionCause: tier === "exclude_from_public_candidates" ? "product/noise" : null,
       filterDecision: tier === "exclude_from_public_candidates" ? "reject" : "pass",
       filterSeverity: tier === "exclude_from_public_candidates" ? "reject" : "pass",
       filterReasons: tier === "exclude_from_public_candidates" ? ["rejected_low_signal"] : ["passed_allowed_event_type"],
@@ -279,6 +281,14 @@ describe("controlled pipeline report", () => {
     expect(report.articleCandidates[0]).toMatchObject({
       filterDecision: "pass",
       eventType: "policy_regulation",
+    });
+    expect(report.proposedTopFive[0]).toMatchObject({
+      calibratedReasonLabels: ["platform_regulation_signal"],
+      exclusionCause: null,
+    });
+    expect(report.excludedCandidates[0]).toMatchObject({
+      calibratedReasonLabels: ["product/noise"],
+      exclusionCause: "product/noise",
     });
   });
 

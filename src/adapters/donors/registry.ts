@@ -642,7 +642,7 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
       const actorHits = actors.filter((actor) =>
         /(federal reserve|ecb|bank of japan|china|u\.s\.|united states|european union|apple|microsoft|google|amazon|openai|nvidia|tesla|congress|white house|sec|doj|opec|taiwan)/.test(actor),
       ).length;
-      const structuralImpact = scoreKeywordPresence(
+      let structuralImpact = scoreKeywordPresence(
         corpus,
         [
           "policy",
@@ -663,31 +663,81 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
         18,
         12,
       );
-      const downstreamConsequence = scoreKeywordPresence(
+      let downstreamConsequence = scoreKeywordPresence(
         corpus,
         ["pricing", "repric", "guidance", "outlook", "forecast", "supply chain", "capital", "procurement", "compliance", "rollout", "export", "trade", "chip", "semiconductor"],
         16,
         11,
       );
-      const actorSignificance = Math.min(100, 24 + actorHits * 16 + (matches.some((entry) => entry.trustTier === "tier_1") ? 10 : 0));
-      const crossDomainRelevance = scoreKeywordPresence(
+      let actorSignificance = Math.min(100, 24 + actorHits * 16 + (matches.some((entry) => entry.trustTier === "tier_1") ? 10 : 0));
+      let crossDomainRelevance = scoreKeywordPresence(
         corpus,
         ["market", "policy", "enterprise", "consumer", "developer", "government", "bank", "cloud", "trade", "security", "chip", "supply chain"],
         18,
         9,
       );
-      const actionability = scoreKeywordPresence(
+      let actionability = scoreKeywordPresence(
         corpus,
         ["review", "restrict", "control", "raise", "cut", "delay", "approve", "launch", "guidance", "forecast", "hearing", "tariff", "export"],
         24,
         8,
       );
-      const persistence = scoreKeywordPresence(
+      let persistence = scoreKeywordPresence(
         corpus,
         ["roadmap", "policy", "regulation", "supply chain", "infrastructure", "guidance", "investment", "capacity", "platform", "trade", "export", "security"],
         20,
         10,
       );
+      const addCalibrationBoost = (boost: {
+        structural?: number;
+        downstream?: number;
+        actor?: number;
+        crossDomain?: number;
+        actionability?: number;
+        persistence?: number;
+      }) => {
+        structuralImpact = Math.min(100, structuralImpact + (boost.structural ?? 0));
+        downstreamConsequence = Math.min(100, downstreamConsequence + (boost.downstream ?? 0));
+        actorSignificance = Math.min(100, actorSignificance + (boost.actor ?? 0));
+        crossDomainRelevance = Math.min(100, crossDomainRelevance + (boost.crossDomain ?? 0));
+        actionability = Math.min(100, actionability + (boost.actionability ?? 0));
+        persistence = Math.min(100, persistence + (boost.persistence ?? 0));
+      };
+
+      if (includesAny(corpus, ["shutdown", "federal workers", "tsa officers", "agency capacity", "workforce attrition", "quit amid shutdown"])) {
+        addCalibrationBoost({ structural: 22, downstream: 16, actor: 8, crossDomain: 12, actionability: 10, persistence: 10 });
+      }
+
+      if (includesAny(corpus, ["purdue settlement", "opioid settlement", "settlement money", "victims", "low-income residents", "ignoring new law", "legal accountability"])) {
+        addCalibrationBoost({ structural: 22, downstream: 14, actor: 8, crossDomain: 10, actionability: 12, persistence: 12 });
+      }
+
+      if (
+        includesAny(corpus, ["android", "app store", "platform", "ai distribution", "market access"]) &&
+        includesAny(corpus, ["antitrust", "regulation", "rules", "open up", "intervention", "probe"])
+      ) {
+        addCalibrationBoost({ structural: 26, downstream: 18, actor: 8, crossDomain: 16, actionability: 14, persistence: 12 });
+      }
+
+      if (includesAny(corpus, ["payroll employment", "consumer price index", "cpi", "unemployment rate", "jobs report", "employment situation", "productivity"])) {
+        addCalibrationBoost({ structural: 20, downstream: 16, actor: 10, crossDomain: 10, actionability: 8, persistence: 8 });
+      }
+
+      if (includesAny(corpus, ["fomc", "federal reserve", "fed chair", "central bank", "monetary policy", "discount rate"])) {
+        addCalibrationBoost({ structural: 18, downstream: 16, actor: 12, crossDomain: 10, actionability: 10, persistence: 8 });
+      }
+
+      if (includesAny(corpus, ["ai data centers", "data centers", "grid", "permitting", "power demand", "energy capacity", "ai infrastructure"])) {
+        addCalibrationBoost({ structural: 24, downstream: 18, actor: 8, crossDomain: 16, actionability: 12, persistence: 14 });
+      }
+
+      if (includesAny(corpus, ["cyberattack", "cyberattacks", "hacker", "extradited", "indicted", "state-linked", "cyber enforcement"])) {
+        addCalibrationBoost({ structural: 18, downstream: 10, actor: 8, crossDomain: 10, actionability: 10, persistence: 8 });
+      }
+
+      if (includesAny(corpus, ["national science board", "national science foundation", "science governance", "institutional governance"])) {
+        addCalibrationBoost({ structural: 22, downstream: 12, actor: 10, crossDomain: 12, actionability: 8, persistence: 12 });
+      }
 
       return {
         source_credibility: matches.length

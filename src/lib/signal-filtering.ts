@@ -5,6 +5,14 @@ export type HeadlineQuality = "strong" | "medium" | "weak";
 export type FilterDecision = "pass" | "suppress" | "reject";
 export type EventType =
   | "policy_regulation"
+  | "government_capacity"
+  | "public_interest_legal_accountability"
+  | "platform_regulation"
+  | "macro_data_release"
+  | "central_bank_policy"
+  | "ai_infrastructure_policy"
+  | "cybersecurity_enforcement"
+  | "institutional_governance"
   | "earnings_financials"
   | "mna_funding"
   | "product_launch_major"
@@ -67,6 +75,13 @@ const ARTICLE_FILTER_CONFIG = {
 
 const STRONG_HEADLINE_PATTERNS: Array<{ pattern: RegExp; score: number; reason: string }> = [
   { pattern: /\b(approves?|bans?|orders?|mandates?|sanctions?|tariffs?|restrictions?|export controls?|regulat(?:es|ion)|policy|rules?)\b/i, score: 3, reason: "strong_policy_action" },
+  { pattern: /\b(shutdown|federal workers?|agency|officers?|staff|capacity|attrition|quit|resignations?)\b/i, score: 3, reason: "strong_institutional_capacity" },
+  { pattern: /\b(settlement|enforcement|legal accountability|victims?|low-income|violations?|violated|ignoring new law)\b/i, score: 3, reason: "strong_public_interest_accountability" },
+  { pattern: /\b(android|app store|platform|distribution|search|ai distribution|market access)\b.*\b(antitrust|regulation|rules?|open up|intervention|probe)\b/i, score: 3, reason: "strong_platform_regulation" },
+  { pattern: /\b(payroll employment|consumer price index|cpi|unemployment rate|jobs report|employment situation|productivity|ppi|producer price)\b/i, score: 3, reason: "strong_macro_data_release" },
+  { pattern: /\b(fomc|federal reserve|fed chair|central bank|monetary policy|discount rate)\b/i, score: 3, reason: "strong_central_bank_policy" },
+  { pattern: /\b(data centers?|grid|permitting|power demand|energy capacity|ai infrastructure)\b/i, score: 3, reason: "strong_ai_infrastructure_policy" },
+  { pattern: /\b(cyberattacks?|hacker|extradited|indicted|state-linked|state linked|cyber enforcement)\b/i, score: 3, reason: "strong_cybersecurity_enforcement" },
   { pattern: /\b(earnings|revenue|profit|guidance|quarter|q[1-4]|results?)\b/i, score: 3, reason: "strong_financial_result" },
   { pattern: /\b(acquires?|acquisition|merger|buyout|raises? \$|\bfunding\b|series [abcde]|ipo)\b/i, score: 3, reason: "strong_mna_funding" },
   { pattern: /\b(sues?|lawsuit|probe|investigation|antitrust|charges?|settlement)\b/i, score: 3, reason: "strong_legal_action" },
@@ -88,6 +103,14 @@ const WEAK_HEADLINE_PATTERNS: Array<{ pattern: RegExp; score: number; reason: st
 
 const ALLOWED_EVENT_TYPES = new Set<EventType>([
   "policy_regulation",
+  "government_capacity",
+  "public_interest_legal_accountability",
+  "platform_regulation",
+  "macro_data_release",
+  "central_bank_policy",
+  "ai_infrastructure_policy",
+  "cybersecurity_enforcement",
+  "institutional_governance",
   "earnings_financials",
   "mna_funding",
   "product_launch_major",
@@ -114,6 +137,14 @@ const SOFT_BLOCK_EVENT_TYPES = new Set<EventType>([
 
 const HIGH_PRIORITY_EVENT_TYPES = new Set<EventType>([
   "policy_regulation",
+  "government_capacity",
+  "public_interest_legal_accountability",
+  "platform_regulation",
+  "macro_data_release",
+  "central_bank_policy",
+  "ai_infrastructure_policy",
+  "cybersecurity_enforcement",
+  "institutional_governance",
   "earnings_financials",
   "mna_funding",
   "geopolitics",
@@ -342,6 +373,14 @@ export function classifyEventType(
   if (/\b(human interest|viral|heartwarming|lifestyle)\b/.test(text)) return "human_interest_low_relevance";
   if (/\b(live updates?|what we know|what to know|recap|roundup|timeline)\b/.test(text)) return "repetitive_followup_no_new_info";
   if (/\b(minor update|small update|feature update|beta feature|ui tweak|bug fix)\b/.test(text)) return "minor_feature_update";
+  if (/\b(shutdown|federal workers?|tsa officers?|agency staff|agency capacity|workforce attrition|quit amid shutdown|resignations?)\b/.test(text)) return "government_capacity";
+  if (/\b(purdue settlement|opioid settlement|settlement money|victims?|low-income residents?|towing companies|ignoring new law|enforcement|legal accountability)\b/.test(text)) return "public_interest_legal_accountability";
+  if (/\b(android|app store|platform|distribution|search|ai distribution|market access)\b.*\b(antitrust|regulation|rules?|open up|intervention|probe)\b/.test(text)) return "platform_regulation";
+  if (/\b(payroll employment|consumer price index|cpi|unemployment rate|jobs report|employment situation|productivity|ppi|producer price|bureau of labor statistics|major economic indicators)\b/.test(text)) return "macro_data_release";
+  if (/\b(fomc|federal reserve|fed chair|central bank|monetary policy|discount rate|interest rates?)\b/.test(text)) return "central_bank_policy";
+  if (/\b(ai data centers?|data centers?|grid|permitting|power demand|energy capacity|ai infrastructure)\b/.test(text)) return "ai_infrastructure_policy";
+  if (/\b(cyberattacks?|hacker|extradited|indicted|state-linked|state linked|cyber enforcement)\b/.test(text)) return "cybersecurity_enforcement";
+  if (/\b(national science board|national science foundation|science governance|board fired|institutional governance)\b/.test(text)) return "institutional_governance";
   if (/\b(approves?|bans?|tariffs?|sanctions?|restrictions?|export controls?|regulation|regulatory|policy|rules?|executive order|antitrust rules)\b/.test(text)) return "policy_regulation";
   if (/\b(earnings|revenue|profit|guidance|quarterly|results?|forecast)\b/.test(text)) return "earnings_financials";
   if (/\b(acquires?|acquisition|merger|buyout|funding|raises? \$|series [abcde]|venture round|ipo)\b/.test(text)) return "mna_funding";
