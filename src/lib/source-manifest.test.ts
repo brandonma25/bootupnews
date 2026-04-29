@@ -16,6 +16,13 @@ const batch2ASourceIds = [
   "source-sec-press-releases",
   "source-france24",
 ];
+const batch2BFinanceSourceIds = [
+  "source-liberty-street-economics",
+  "source-fred-blog",
+  "source-fed-feds-notes",
+  "source-sf-fed-research-insights",
+  "source-stlouisfed-on-the-economy",
+];
 
 describe("public source manifest", () => {
   afterEach(() => {
@@ -29,13 +36,14 @@ describe("public source manifest", () => {
     expect(sources).toHaveLength(PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"].length);
   });
 
-  it("includes governed Batch 1 and Batch 2A sources in the public.home source plan", () => {
+  it("includes governed Batch 1, Batch 2A, and Batch 2B sources in the public.home source plan", () => {
     const sources = getSourcesForPublicSurface("public.home");
     const sourceIds = sources.map((source) => source.id);
 
-    expect(sources).toHaveLength(34);
+    expect(sources).toHaveLength(39);
     expect(sourceIds).toEqual([...PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]]);
     expect(batch2ASourceIds.every((sourceId) => sourceIds.includes(sourceId))).toBe(true);
+    expect(batch2BFinanceSourceIds.every((sourceId) => sourceIds.includes(sourceId))).toBe(true);
     expect(sources.find((source) => source.id === "source-mit-tech-review")).toMatchObject({
       name: "MIT Technology Review",
       feedUrl: "https://www.technologyreview.com/feed/",
@@ -59,6 +67,36 @@ describe("public source manifest", () => {
     expect(sources.find((source) => source.id === "source-heatmap")).toMatchObject({
       name: "Heatmap",
       feedUrl: "https://heatmap.news/feeds/feed.rss",
+      topicName: "Finance",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-liberty-street-economics")).toMatchObject({
+      name: "Liberty Street Economics",
+      feedUrl: "https://libertystreeteconomics.newyorkfed.org/feed/",
+      topicName: "Finance",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-fred-blog")).toMatchObject({
+      name: "FRED Blog",
+      feedUrl: "https://fredblog.stlouisfed.org/feed/",
+      topicName: "Finance",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-fed-feds-notes")).toMatchObject({
+      name: "Federal Reserve FEDS Notes",
+      feedUrl: "https://www.federalreserve.gov/feeds/feds_notes.xml",
+      topicName: "Finance",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-sf-fed-research-insights")).toMatchObject({
+      name: "SF Fed Research and Insights",
+      feedUrl: "https://www.frbsf.org/feed/",
+      topicName: "Finance",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-stlouisfed-on-the-economy")).toMatchObject({
+      name: "St. Louis Fed On the Economy",
+      feedUrl: "https://www.stlouisfed.org/rss/page%20resources/publications/blog-entries",
       topicName: "Finance",
       status: "active",
     });
@@ -124,6 +162,11 @@ describe("public source manifest", () => {
       "source-cnbc-finance",
       "source-marketwatch",
       "source-heatmap",
+      "source-liberty-street-economics",
+      "source-fred-blog",
+      "source-fed-feds-notes",
+      "source-sf-fed-research-insights",
+      "source-stlouisfed-on-the-economy",
       "source-bbc-world",
       "source-guardian-world",
       "source-foreign-affairs",
@@ -145,6 +188,11 @@ describe("public source manifest", () => {
       "Tech",
       "Tech",
       "Tech",
+      "Finance",
+      "Finance",
+      "Finance",
+      "Finance",
+      "Finance",
       "Finance",
       "Finance",
       "Finance",
@@ -184,7 +232,7 @@ describe("public source manifest", () => {
       plan: "public_manifest",
       surface: "public.home",
       suppliedByManifest: true,
-      sourceCount: 34,
+      sourceCount: 39,
       warnings: [],
     });
     expect(sourcePlan.sources).toEqual(
@@ -229,11 +277,19 @@ describe("public source manifest", () => {
               publicEligible: true,
             }),
           ),
+        ...batch2BFinanceSourceIds.map((sourceId) =>
+          expect.objectContaining({
+            id: sourceId,
+            sourceRole: "primary_institutional",
+            sourceTier: "tier1",
+            publicEligible: true,
+          }),
+        ),
       ]),
     );
   });
 
-  it("keeps TLDR, AP Politics, Congress.gov, and deferred Batch 2B/2C sources outside the public manifest", () => {
+  it("keeps TLDR, AP Politics, Congress.gov, and excluded Batch 2B/2C sources outside the public manifest", () => {
     const manifestIds = new Set(PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]);
 
     expect([...manifestIds].some((sourceId) => sourceId.includes("tldr"))).toBe(false);
@@ -244,6 +300,9 @@ describe("public source manifest", () => {
     expect(manifestIds.has("source-cnbc-technology")).toBe(false);
     expect(manifestIds.has("source-marketwatch-market-pulse")).toBe(false);
     expect(manifestIds.has("source-treasury-press-releases")).toBe(false);
+    expect(manifestIds.has("source-imf-blog")).toBe(false);
+    expect(manifestIds.has("source-calculated-risk")).toBe(false);
+    expect(manifestIds.has("source-marketplace")).toBe(false);
     expect(manifestIds.has("source-nyt")).toBe(false);
     expect(manifestIds.has("source-wsj")).toBe(false);
     expect(manifestIds.has("source-bloomberg")).toBe(false);

@@ -49,6 +49,13 @@ describe("MVP default source governance", () => {
     "sec-press-releases",
     "france24",
   ];
+  const guardedBatchTwoBFinanceSourceIds = [
+    "liberty-street-economics",
+    "fred-blog",
+    "fed-feds-notes",
+    "sf-fed-research-insights",
+    "stlouisfed-on-the-economy",
+  ];
   const pausedTldrSourceIds = [
     "source-tldr-tech",
     "source-tldr-ai",
@@ -88,6 +95,11 @@ describe("MVP default source governance", () => {
     expect(defaultSourceIds.has("source-axios")).toBe(false);
     expect(defaultSourceIds.has("source-404-media")).toBe(false);
     expect(defaultSourceIds.has("source-sec-press-releases")).toBe(false);
+    expect(defaultSourceIds.has("source-liberty-street-economics")).toBe(false);
+    expect(defaultSourceIds.has("source-fred-blog")).toBe(false);
+    expect(defaultSourceIds.has("source-fed-feds-notes")).toBe(false);
+    expect(defaultSourceIds.has("source-sf-fed-research-insights")).toBe(false);
+    expect(defaultSourceIds.has("source-stlouisfed-on-the-economy")).toBe(false);
     expect(areMvpDefaultPublicSources(demoSources)).toBe(false);
     expect(recommendedSources.some((source) => source.lifecycleStatus === "active_default")).toBe(false);
 
@@ -174,6 +186,9 @@ describe("MVP default source governance", () => {
       expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
     }
     for (const sourceId of guardedBatchTwoASourceIds) {
+      expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
+    }
+    for (const sourceId of guardedBatchTwoBFinanceSourceIds) {
       expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
     }
     expect(probationaryRuntimeSourceIds.has("bbc")).toBe(false);

@@ -51,6 +51,13 @@ describe("source catalog governance", () => {
     "sec-press-releases",
     "france24",
   ];
+  const batchTwoBFinanceSourceIds = [
+    "liberty-street-economics",
+    "fred-blog",
+    "fed-feds-notes",
+    "sf-fed-research-insights",
+    "stlouisfed-on-the-economy",
+  ];
 
   it("keeps blocked broad or unofficial source classes out of the onboarding catalog", () => {
     const serialized = JSON.stringify(recommendedSources).toLowerCase();
@@ -68,6 +75,9 @@ describe("source catalog governance", () => {
     expect(sourceIds.has("wired")).toBe(false);
     expect(sourceIds.has("al-jazeera")).toBe(false);
     expect(sourceIds.has("dw")).toBe(false);
+    expect(sourceIds.has("imf-blog")).toBe(false);
+    expect(sourceIds.has("calculated-risk")).toBe(false);
+    expect(sourceIds.has("marketplace")).toBe(false);
   });
 
   it("keeps catalog entries separate from default ingestion", () => {
@@ -225,6 +235,35 @@ describe("source catalog governance", () => {
     expect(sourcesById.get("france24")?.note).toMatch(/short abstracts|Context/i);
   });
 
+  it("catalogs Batch 2B finance source additions as validated optional non-default sources", () => {
+    const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
+
+    for (const sourceId of batchTwoBFinanceSourceIds) {
+      const source = sourcesById.get(sourceId);
+
+      expect(source).toBeDefined();
+      expect(source).toMatchObject({
+        sourceFormat: "rss",
+        importStatus: "ready",
+        lifecycleStatus: "active_optional",
+        validationStatus: "validated",
+        topicLabel: "Economics",
+        mvpDefaultAllowed: false,
+        editorialPreference: "none",
+      });
+      expect(source?.note).toMatch(/2026-04-29|Batch 2B/);
+    }
+    expect(sourcesById.get("liberty-street-economics")).toMatchObject({
+      feedUrl: "https://libertystreeteconomics.newyorkfed.org/feed/",
+    });
+    expect(sourcesById.get("fred-blog")).toMatchObject({
+      feedUrl: "https://fredblog.stlouisfed.org/feed/",
+    });
+    expect(sourcesById.get("fed-feds-notes")?.note).toMatch(/excerpt-length|substantial/i);
+    expect(sourcesById.get("sf-fed-research-insights")?.note).toMatch(/broad|category-aware/i);
+    expect(sourcesById.get("stlouisfed-on-the-economy")?.note).toMatch(/thin abstracts|not a Core fix/i);
+  });
+
   it("catalogs institutional Batch 1 sources without treating them as normal publisher defaults", () => {
     const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
 
@@ -274,5 +313,8 @@ describe("source catalog governance", () => {
     expect(recommendedSources.some((source) => source.id === "treasury-press-releases")).toBe(false);
     expect(recommendedSources.some((source) => source.id === "marketwatch-market-pulse")).toBe(false);
     expect(recommendedSources.some((source) => source.feedUrl === "https://feeds.content.dowjones.io/public/rss/mktw_wsjonline")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "imf-blog")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "calculated-risk")).toBe(false);
+    expect(recommendedSources.some((source) => source.id === "marketplace")).toBe(false);
   });
 });

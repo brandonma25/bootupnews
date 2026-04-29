@@ -249,6 +249,64 @@ describe("source accessibility predicates", () => {
     expect(support.coreBlockingReasons).toContain("abstract_only_uncorroborated");
   });
 
+  it("keeps Batch 2B finance Core support conditional on accessible text depth", () => {
+    const fullTextOfficial = evaluateSourceAccessibilitySupport([
+      article(source({
+        sourceId: "source-liberty-street-economics",
+        source: "Liberty Street Economics",
+        homepageUrl: "https://libertystreeteconomics.newyorkfed.org",
+        sourceRole: "primary_institutional",
+        trustTier: "tier_1",
+        fetch: {
+          feedUrl: "https://libertystreeteconomics.newyorkfed.org/feed/",
+        },
+      })),
+    ]);
+    const excerptOnlyOfficial = evaluateSourceAccessibilitySupport([
+      article(source({
+        sourceId: "source-fed-feds-notes",
+        source: "Federal Reserve FEDS Notes",
+        homepageUrl: "https://www.federalreserve.gov/econres/notes/feds-notes/default.htm",
+        sourceRole: "primary_institutional",
+        trustTier: "tier_1",
+        fetch: {
+          feedUrl: "https://www.federalreserve.gov/feeds/feds_notes.xml",
+        },
+      }), {
+        summaryText: "Federal Reserve researchers explain labor market and inflation expectations.",
+        contentText: "Federal Reserve researchers explain labor market and inflation expectations. ".repeat(6),
+        extractionMethod: "rss_content",
+      }),
+    ]);
+    const thinOfficial = evaluateSourceAccessibilitySupport([
+      article(source({
+        sourceId: "source-stlouisfed-on-the-economy",
+        source: "St. Louis Fed On the Economy",
+        homepageUrl: "https://www.stlouisfed.org/on-the-economy/",
+        sourceRole: "primary_institutional",
+        trustTier: "tier_1",
+        fetch: {
+          feedUrl: "https://www.stlouisfed.org/rss/page%20resources/publications/blog-entries",
+        },
+      }), {
+        summaryText: "Short official abstract notes a finance development.",
+        contentText: [
+          "Consumer credit conditions weakened in affected areas while the RSS item only exposed a short official",
+          "abstract. It cannot carry structural Core evidence alone.",
+        ].join(" "),
+        extractionMethod: "rss_content",
+      }),
+    ]);
+
+    expect(fullTextOfficial.coreSupported).toBe(true);
+    expect(excerptOnlyOfficial.coreSupported).toBe(false);
+    expect(excerptOnlyOfficial.contextSupported).toBe(true);
+    expect(thinOfficial.coreSupported).toBe(false);
+    expect(thinOfficial.contextSupported).toBe(false);
+    expect(thinOfficial.depthSupported).toBe(true);
+    expect(thinOfficial.coreBlockingReasons).toContain("source_accessibility_insufficient");
+  });
+
   it("allows substantial partial authoritative sources to support Context and Core", () => {
     const support = evaluateSourceAccessibilitySupport([
       article(source(), {

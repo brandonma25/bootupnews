@@ -59,6 +59,29 @@ describe("source preference policy", () => {
       .toBe("tier2");
   });
 
+  it("classifies Batch 2B official finance sources as tier1 institutional sources", () => {
+    expect(classifySourcePreference({
+      sourceName: "Liberty Street Economics",
+      url: "https://libertystreeteconomics.newyorkfed.org/story",
+    })).toBe("tier1");
+    expect(classifySourcePreference({
+      sourceName: "FRED Blog",
+      url: "https://fredblog.stlouisfed.org/story",
+    })).toBe("tier1");
+    expect(classifySourcePreference({
+      sourceName: "Federal Reserve FEDS Notes",
+      url: "https://www.federalreserve.gov/econres/notes/feds-notes/story.htm",
+    })).toBe("tier1");
+    expect(classifySourcePreference({
+      sourceName: "SF Fed Research and Insights",
+      url: "https://www.frbsf.org/research-and-insights/story/",
+    })).toBe("tier1");
+    expect(classifySourcePreference({
+      sourceName: "St. Louis Fed On the Economy",
+      url: "https://www.stlouisfed.org/on-the-economy/story",
+    })).toBe("tier1");
+  });
+
   it("keeps Ars Technica at tier2 in source-policy despite donor metadata differences", () => {
     const serializedRules = JSON.stringify(SOURCE_PREFERENCE_RULES);
 
