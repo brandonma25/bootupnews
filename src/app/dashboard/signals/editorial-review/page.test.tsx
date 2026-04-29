@@ -316,7 +316,7 @@ describe("signals editorial review page", () => {
     expect(screen.getByRole("button", { name: "Publish Top 5 Signals" })).toBeEnabled();
   });
 
-  it("shows a per-card Publish action for approved posts waiting to go live", async () => {
+  it("keeps approved rows waiting for the full Top 5 publish gate", async () => {
     getEditorialReviewState.mockResolvedValue({
       ...createAuthorizedState([approvedPost]),
     });
@@ -325,8 +325,8 @@ describe("signals editorial review page", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     fireEvent.click(screen.getByRole("button", { name: "Expand" }));
-    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
-    expect(screen.getByText(/Approved and waiting to publish/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Approved and waiting for the full Top 5 publish gate/i)).toBeInTheDocument();
   });
 
   it("explains that draft rows still block publishing even when other rows are already published", async () => {
@@ -347,6 +347,74 @@ describe("signals editorial review page", () => {
 
     expect(screen.getByRole("button", { name: "Publish Top 5 Signals" })).toBeDisabled();
     expect(screen.getByText(/Already published posts remain publish-ready/i)).toBeInTheDocument();
+  });
+
+  it("blocks publishing with an exactly-five message for a three-row current set", async () => {
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState([
+        reviewPost,
+        {
+          ...reviewPost,
+          id: "signal-2",
+          rank: 2,
+          title: "Signal 2",
+        },
+        {
+          ...reviewPost,
+          id: "signal-3",
+          rank: 3,
+          title: "Signal 3",
+        },
+      ]),
+      latestBriefingDate: "2026-04-28",
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Current set 2026-04-28")).toBeInTheDocument();
+    expect(screen.getByText("3 current cards")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish Top 5 Signals" })).toBeDisabled();
+    expect(
+      screen.getByText("Publishing requires exactly five ranked signal posts. Current count: 3."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows WITM rewrite-required status and failure reasons from a local fixture", async () => {
+    const rewritePost = {
+      ...reviewPost,
+      whyItMattersValidationStatus: "requires_human_rewrite" as const,
+      whyItMattersValidationFailures: ["minimum_specificity"],
+      whyItMattersValidationDetails: ["missing specific noun: no named entity, number, country, organization, or person found"],
+    };
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState([
+        rewritePost,
+        ...Array.from({ length: 4 }, (_, index) => ({
+          ...approvedPost,
+          id: `approved-${index + 2}`,
+          rank: index + 2,
+          title: `Approved ${index + 2}`,
+        })),
+      ]),
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("WITM rewrite required")).toBeInTheDocument();
+    expect(screen.getByText("Quality gate reasons")).toBeInTheDocument();
+    expect(
+      screen.getByText("missing specific noun: no named entity, number, country, organization, or person found"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve All" })).toBeDisabled();
+    expect(
+      screen.getByText("1 signal posts require a human rewrite before bulk approval."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish Top 5 Signals" })).toBeDisabled();
+    expect(
+      screen.getByText("1 signal posts require a human rewrite before publishing."),
+    ).toBeInTheDocument();
   });
 
   it("shows a clear historical review empty state when older dates have nothing waiting for review", async () => {

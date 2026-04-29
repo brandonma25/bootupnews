@@ -846,7 +846,9 @@ async function loadPublishedHomepageSnapshotForDate(
     .from("signal_posts")
     .select(SIGNAL_POST_SELECT)
     .eq("briefing_date", briefingDate)
+    .eq("is_live", true)
     .eq("editorial_status", "published")
+    .not("published_at", "is", null)
     .order("rank", { ascending: true })
     .limit(limit);
 
@@ -866,7 +868,9 @@ async function loadMostRecentPublishedHomepageSnapshot(
   const result = await client
     .from("signal_posts")
     .select(SIGNAL_POST_SELECT)
+    .eq("is_live", true)
     .eq("editorial_status", "published")
+    .not("published_at", "is", null)
     .order("briefing_date", { ascending: false })
     .order("rank", { ascending: true })
     .limit(100);
@@ -1714,122 +1718,10 @@ export async function publishSignalPost(input: {
     };
   }
 
-  const lookup = await context.client
-    .from("signal_posts")
-    .select(SIGNAL_POST_SELECT)
-    .eq("id", input.postId)
-    .maybeSingle();
-
-  if (lookup.error) {
-    captureRssEditorialStorageFailure({
-      failureType: "rss_cache_read_failed",
-      phase: "publish",
-      operation: "load_signal_post_for_publish",
-      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
-      postId: input.postId,
-      message: "RSS signal post could not be loaded for publishing.",
-    });
-
-    return {
-      ok: false,
-      code: "not_found",
-      message: "The signal post could not be found.",
-    };
-  }
-
-  if (!lookup.data) {
-    return {
-      ok: false,
-      code: "not_found",
-      message: "The signal post could not be found.",
-    };
-  }
-
-  const post = mapStoredSignalPost(lookup.data as unknown as StoredSignalPost);
-
-  if (post.editorialStatus !== "approved") {
-    return {
-      ok: false,
-      code: "publish_blocked",
-      message: "Approve this signal post before publishing it.",
-    };
-  }
-
-  const structuredContent = post.editedWhyItMattersStructured;
-  const editorialText = normalizeEditorialText(
-    buildEditorialWhyItMattersText(structuredContent, post.editedWhyItMatters || ""),
-  );
-
-  if (!editorialText) {
-    return {
-      ok: false,
-      code: "publish_blocked",
-      message: "Add editorial Why it matters text before publishing this signal post.",
-    };
-  }
-
-  const now = new Date().toISOString();
-  const validation = validateWhyItMatters(editorialText);
-
-  if (!validation.passed) {
-    const flagResult = await context.client
-      .from("signal_posts")
-      .update({
-        editorial_status: "needs_review",
-        ...buildWhyItMattersValidationFields(validation, now),
-        updated_at: now,
-      })
-      .eq("id", post.id);
-
-    if (flagResult.error) {
-      return {
-        ok: false,
-        code: "storage_error",
-        message: "The signal post could not be flagged for rewrite.",
-      };
-    }
-
-    return {
-      ok: false,
-      code: "publish_blocked",
-      message: getValidationFailureMessage(validation),
-    };
-  }
-
-  const updateResult = await context.client
-    .from("signal_posts")
-    .update({
-      published_why_it_matters: editorialText,
-      published_why_it_matters_payload: structuredContent,
-      editorial_status: "published",
-      ...buildWhyItMattersValidationFields(validation, now),
-      published_at: now,
-      updated_at: now,
-    })
-    .eq("id", post.id);
-
-  if (updateResult.error) {
-    captureRssEditorialStorageFailure({
-      failureType: "rss_cache_write_failed",
-      phase: "publish",
-      operation: "publish_signal_post",
-      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
-      briefingDate: post.briefingDate,
-      postId: post.id,
-      message: "RSS signal post could not be published.",
-    });
-
-    return {
-      ok: false,
-      code: "storage_error",
-      message: "The signal post could not be published.",
-    };
-  }
-
   return {
-    ok: true,
-    code: "published",
-    message: "Signal post published.",
+    ok: false,
+    code: "publish_blocked",
+    message: "Individual signal publishing is disabled. Use Publish Top 5 Signals after exactly five ranked posts are approved.",
   };
 }
 
@@ -1851,6 +1743,7 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
     .select(SIGNAL_POST_SELECT)
     .eq("is_live", true)
     .eq("editorial_status", "published")
+    .not("published_at", "is", null)
     .order("rank", { ascending: true })
     .limit(limit);
 

@@ -11,6 +11,7 @@ type PublishedSignalPostRow = {
   published_why_it_matters: string | null;
   published_why_it_matters_payload: unknown | null;
   editorial_status: string | null;
+  published_at: string | null;
 };
 
 export type PublishedHomepageEditorialOverride = {
@@ -109,9 +110,10 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
 
   const result = await client
     .from("signal_posts")
-    .select("title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status")
+    .select("title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status, published_at")
     .eq("is_live", true)
     .eq("editorial_status", "published")
+    .not("published_at", "is", null)
     .order("rank", { ascending: true })
     .limit(5);
 
