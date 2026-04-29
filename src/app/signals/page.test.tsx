@@ -9,7 +9,29 @@ vi.mock("@/lib/signals-editorial", () => {
   };
 });
 
-function createPublishedPost(index: number) {
+type PublishedPostFixture = {
+  id: string;
+  rank: number;
+  title: string;
+  sourceName: string;
+  sourceUrl: string;
+  summary: string;
+  tags: string[];
+  signalScore: number;
+  selectionReason: string;
+  aiWhyItMatters: string;
+  editedWhyItMatters: string;
+  publishedWhyItMatters: string;
+  editorialStatus: string;
+  editedBy: string;
+  editedAt: string;
+  approvedBy: string;
+  approvedAt: string;
+  publishedAt: string;
+  persisted: boolean;
+};
+
+function createPublishedPost(index: number, overrides: Partial<PublishedPostFixture> = {}) {
   return {
     id: `signal-${index}`,
     rank: index,
@@ -30,6 +52,7 @@ function createPublishedPost(index: number) {
     approvedAt: "2026-04-23T00:00:00.000Z",
     publishedAt: "2026-04-23T00:00:00.000Z",
     persisted: true,
+    ...overrides,
   };
 }
 
@@ -48,5 +71,33 @@ describe("public signals page", () => {
 
     expect(screen.getByText("Human final version 1")).toBeInTheDocument();
     expect(screen.queryByText("Raw AI draft should not be public")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("renders Core and Context sections for the published seven-signal slate", async () => {
+    getPublishedSignalPosts.mockResolvedValue([
+      ...Array.from({ length: 5 }, (_, index) => createPublishedPost(index + 1)),
+      createPublishedPost(6, {
+        id: "context-1",
+        rank: 6,
+        title: "Published context signal 1",
+        publishedWhyItMatters: "Human final context version 1",
+      }),
+      createPublishedPost(7, {
+        id: "context-2",
+        rank: 7,
+        title: "Published context signal 2",
+        publishedWhyItMatters: "Human final context version 2",
+      }),
+    ]);
+
+    const Page = (await import("@/app/signals/page")).default;
+    render(await Page());
+
+    expect(screen.getByRole("heading", { name: "Top 5 Core Signals" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Next 2 Context Signals" })).toBeInTheDocument();
+    expect(screen.getByText("Published context signal 1")).toBeInTheDocument();
+    expect(screen.getByText("Published context signal 2")).toBeInTheDocument();
+    expect(screen.getByText("Human final context version 1")).toBeInTheDocument();
+    expect(screen.getByText("Human final context version 2")).toBeInTheDocument();
   }, 10000);
 });

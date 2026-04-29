@@ -143,7 +143,12 @@ function createSupabaseMock(
         return rows.filter((row) =>
           filters.every((filter) => row[filter.column] === filter.value) &&
           inclusionFilters.every((filter) => filter.values.includes(row[filter.column])) &&
-          lessThanFilters.every((filter) => String(row[filter.column]) < String(filter.value)) &&
+          lessThanFilters.every((filter) => {
+            const rowValue = row[filter.column];
+            return typeof rowValue === "number" && typeof filter.value === "number"
+              ? rowValue < filter.value
+              : String(rowValue) < String(filter.value);
+          }) &&
           notNullFilters.every((filter) => row[filter.column] !== null) &&
           (orSearch
             ? row.title.toLowerCase().includes(orSearch) || row.source_name.toLowerCase().includes(orSearch)
@@ -1136,7 +1141,7 @@ describe("signals editorial workflow", () => {
     expect(rows[0].published_why_it_matters).toBeNull();
   });
 
-  it("loads only the live published Top 5 for the public signals surface", async () => {
+  it("loads published Core and Context rows while excluding parked and non-public rows", async () => {
     const rows = [
       ...Array.from({ length: 7 }, (_, index) =>
         createRow({
@@ -1145,13 +1150,49 @@ describe("signals editorial workflow", () => {
           briefing_date: "2026-04-24",
           editorial_status: "published",
           published_why_it_matters: createValidWhyItMatters(`Google ${index + 1}`),
-          why_it_matters_validation_status: index === 2 ? "requires_human_rewrite" : "passed",
-          why_it_matters_validation_failures: index === 2 ? ["template_placeholder_language"] : [],
-          why_it_matters_validation_details: index === 2 ? ["placeholder copy"] : [],
+          why_it_matters_validation_status: "passed",
+          why_it_matters_validation_failures: [],
+          why_it_matters_validation_details: [],
           is_live: true,
           published_at: `2026-04-24T08:0${index}:00.000Z`,
         }),
       ),
+      createRow({
+        id: "parked-rank-8",
+        rank: 8,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: createValidWhyItMatters("Depth"),
+        is_live: true,
+        published_at: "2026-04-24T08:08:00.000Z",
+      }),
+      createRow({
+        id: "depth-rank-10",
+        rank: 10,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: createValidWhyItMatters("Depth 10"),
+        is_live: true,
+        published_at: "2026-04-24T08:10:00.000Z",
+      }),
+      createRow({
+        id: "unpublished-context",
+        rank: 6,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: createValidWhyItMatters("Unpublished context"),
+        is_live: true,
+        published_at: null,
+      }),
+      createRow({
+        id: "non-live-context",
+        rank: 7,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: createValidWhyItMatters("Non-live context"),
+        is_live: false,
+        published_at: "2026-04-24T08:07:00.000Z",
+      }),
       createRow({
         id: "archived-1",
         rank: 1,
@@ -1167,8 +1208,17 @@ describe("signals editorial workflow", () => {
     const { getPublishedSignalPosts } = await loadEditorialModule();
     const posts = await getPublishedSignalPosts();
 
-    expect(posts).toHaveLength(4);
-    expect(posts.map((post) => post.id)).toEqual(["live-1", "live-2", "live-4", "live-5"]);
+    expect(posts).toHaveLength(7);
+    expect(posts.map((post) => post.id)).toEqual([
+      "live-1",
+      "live-2",
+      "live-3",
+      "live-4",
+      "live-5",
+      "live-6",
+      "live-7",
+    ]);
+    expect(posts.map((post) => post.rank)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
   it("keeps approved but unpublished rows out of public signal and homepage reads", async () => {
@@ -1201,7 +1251,8 @@ describe("signals editorial workflow", () => {
   });
 
   it("uses today's published rows as the homepage Tier 1 signal set", async () => {
-    const rows = Array.from({ length: 7 }, (_, index) =>
+    const rows = [
+      ...Array.from({ length: 7 }, (_, index) =>
         createRow({
           id: `live-${index + 1}`,
           rank: index + 1,
@@ -1211,7 +1262,17 @@ describe("signals editorial workflow", () => {
           is_live: true,
           published_at: `2026-04-26T08:0${index}:00.000Z`,
         }),
-    );
+      ),
+      createRow({
+        id: "parked-rank-8",
+        rank: 8,
+        briefing_date: "2026-04-26",
+        editorial_status: "published",
+        published_why_it_matters: createValidWhyItMatters("Parked"),
+        is_live: true,
+        published_at: "2026-04-26T08:08:00.000Z",
+      }),
+    ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
 
     const { getHomepageSignalSnapshot } = await loadEditorialModule();

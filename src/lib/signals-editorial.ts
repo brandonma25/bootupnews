@@ -57,8 +57,10 @@ const SIGNAL_POST_REQUIRED_COLUMNS = [
 const SIGNAL_POST_SELECT = SIGNAL_POST_REQUIRED_COLUMNS.join(", ");
 
 const EDITORIAL_PAGE_SIZE = 20;
-const PUBLIC_SIGNAL_DEPTH_LIMIT = 20;
+const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
 const TOP_SIGNAL_SET_SIZE = 5;
+const CONTEXT_SIGNAL_SET_SIZE = 2;
+const PUBLIC_SIGNAL_SET_SIZE = TOP_SIGNAL_SET_SIZE + CONTEXT_SIGNAL_SET_SIZE;
 
 type EditorialClient = NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
 
@@ -439,7 +441,7 @@ function getValidationFailureMessage(validation: WhyItMattersValidationResult) {
 }
 
 function buildSignalPostCandidates(items: BriefingItem[]) {
-  return items.slice(0, PUBLIC_SIGNAL_DEPTH_LIMIT).map(mapBriefingItemToSignalPost);
+  return items.slice(0, SIGNAL_POST_CANDIDATE_DEPTH_LIMIT).map(mapBriefingItemToSignalPost);
 }
 
 function parseEditorialSortTime(value: string | null | undefined) {
@@ -800,7 +802,7 @@ async function loadCurrentSignalDepth(client: EditorialClient, briefingDate: str
     .select(SIGNAL_POST_SELECT)
     .eq("briefing_date", briefingDate)
     .order("rank", { ascending: true })
-    .limit(PUBLIC_SIGNAL_DEPTH_LIMIT);
+    .limit(SIGNAL_POST_CANDIDATE_DEPTH_LIMIT);
 
   if (result.error) {
     return [];
@@ -845,6 +847,7 @@ async function loadPublishedHomepageSnapshotForDate(
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
+    .lt("rank", PUBLIC_SIGNAL_SET_SIZE + 1)
     .order("rank", { ascending: true })
     .limit(limit);
 
@@ -867,6 +870,7 @@ async function loadMostRecentPublishedHomepageSnapshot(
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
+    .lt("rank", PUBLIC_SIGNAL_SET_SIZE + 1)
     .order("briefing_date", { ascending: false })
     .order("rank", { ascending: true })
     .limit(100);
@@ -1740,6 +1744,7 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
+    .lt("rank", PUBLIC_SIGNAL_SET_SIZE + 1)
     .order("rank", { ascending: true })
     .limit(limit);
 
@@ -1757,7 +1762,7 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
 }
 
 export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> {
-  return (await loadPublishedSignalPosts(5)).slice(0, 5);
+  return (await loadPublishedSignalPosts(PUBLIC_SIGNAL_SET_SIZE)).slice(0, PUBLIC_SIGNAL_SET_SIZE);
 }
 
 export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): Promise<HomepageSignalSnapshot> {
@@ -1788,9 +1793,9 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
   const todayDepthPosts = await loadPublishedHomepageSnapshotForDate(
     supabase,
     todayKey,
-    PUBLIC_SIGNAL_DEPTH_LIMIT,
+    PUBLIC_SIGNAL_SET_SIZE,
   );
-  const todayPosts = todayDepthPosts.slice(0, 5);
+  const todayPosts = todayDepthPosts.slice(0, TOP_SIGNAL_SET_SIZE);
 
   if (todayPosts.length > 0) {
     return {
@@ -1803,9 +1808,9 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
 
   const recentSnapshot = await loadMostRecentPublishedHomepageSnapshot(
     supabase,
-    PUBLIC_SIGNAL_DEPTH_LIMIT,
+    PUBLIC_SIGNAL_SET_SIZE,
   );
-  const recentPosts = recentSnapshot.posts.slice(0, 5);
+  const recentPosts = recentSnapshot.posts.slice(0, TOP_SIGNAL_SET_SIZE);
 
   if (recentPosts.length === 0) {
     return {
