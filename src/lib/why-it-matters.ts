@@ -674,7 +674,7 @@ function buildStructuralConsequence(intelligence: NormalizedIntelligence) {
     case "platform_regulation":
       return "it can shift who controls distribution, defaults, or market access on a major digital platform";
     case "macro_data_release":
-      return `it gives policymakers and investors a fresh read on ${market || "labor, inflation, or productivity conditions"}`;
+      return buildMacroStructuralConsequence(intelligence, market);
     case "central_bank_policy":
       return "it can reset rate expectations and the cost of capital before the next policy move";
     case "ai_infrastructure_policy":
@@ -732,14 +732,49 @@ function buildProductStructuralConsequence(intelligence: NormalizedIntelligence)
   return "it may shift distribution power or buyer behavior beyond a feature update";
 }
 
+function buildMacroStructuralConsequence(intelligence: NormalizedIntelligence, market: string) {
+  const corpus = buildEventCorpus(intelligence);
+
+  if (/\br\*|neutral[-\s]?rate|labor share/.test(corpus)) {
+    return "it changes how Federal Reserve policymakers estimate the neutral rate and judge whether current policy is restrictive";
+  }
+
+  if (/slow.*labor market|no growth labor market|labor-market|employment|unemployment|wage/.test(corpus)) {
+    return "it reframes how labor-market slack constrains the Federal Reserve rate path";
+  }
+
+  if (/inflation|cpi|prices?/.test(corpus)) {
+    return "it can shift inflation expectations and the timing of future rate moves";
+  }
+
+  if (/productivity|output|labor productivity/.test(corpus)) {
+    return "it changes how policymakers read productivity, growth capacity, and inflation pressure";
+  }
+
+  if (/insurance|homeowner|risk sharing/.test(corpus)) {
+    return "it shows how household risk transfer can affect financial resilience when shocks hit";
+  }
+
+  if (/most[-\s]?read|countdown|top topics|roundup/.test(corpus)) {
+    return "it shows which inflation, labor, and growth questions dominated institutional attention";
+  }
+
+  return `it can change how policymakers and investors read ${market || "labor, inflation, or productivity conditions"}`;
+}
+
 function buildNonSignalReviewCopy(anchor: string) {
   return `Editorial review needed for ${anchor}: the item does not yet show a structural change beyond the immediate update.`;
 }
 
 function buildSpecificMarketLabel(intelligence: NormalizedIntelligence) {
+  const contextual = buildContextualMarketLabel(intelligence);
+  if (contextual) {
+    return contextual;
+  }
+
   const candidates = intelligence.affectedMarkets
     .map((entry) => entry.trim())
-    .filter((entry) => entry && !/^(market|markets|business|finance|technology|tech|policy|risk)$/i.test(entry))
+    .filter(isUsableMarketLabel)
     .slice(0, 2);
 
   if (!candidates.length) {
@@ -747,6 +782,57 @@ function buildSpecificMarketLabel(intelligence: NormalizedIntelligence) {
   }
 
   return candidates.join(" and ");
+}
+
+function buildContextualMarketLabel(intelligence: NormalizedIntelligence) {
+  const corpus = buildEventCorpus(intelligence);
+
+  if (intelligence.eventType === "mna_funding" && /wind|offshore|energy|clean-energy/.test(corpus)) {
+    return "offshore wind investment and clean-energy permitting";
+  }
+
+  if (intelligence.eventType === "macro_data_release" || intelligence.eventType === "central_bank_policy") {
+    if (/\br\*|neutral[-\s]?rate|labor share/.test(corpus)) {
+      return "neutral-rate estimates and labor income";
+    }
+
+    if (/slow.*labor market|no growth labor market|labor-market|employment|unemployment|wage/.test(corpus)) {
+      return "labor-market slack and Fed policy";
+    }
+
+    if (/inflation|cpi|prices?/.test(corpus)) {
+      return "inflation expectations and rate policy";
+    }
+
+    if (/insurance|homeowner|risk sharing/.test(corpus)) {
+      return "household risk transfer and insurance-market resilience";
+    }
+
+    if (/most[-\s]?read|countdown|top topics|roundup/.test(corpus)) {
+      return "institutional attention around inflation, labor, and growth";
+    }
+  }
+
+  return "";
+}
+
+function isUsableMarketLabel(value: string) {
+  return Boolean(value) && !/^(market|markets|business|finance|technology|tech|policy|risk|individual decision-making|individual readers|personal finance|consumer guidance)$/i.test(value);
+}
+
+function buildEventCorpus(intelligence: NormalizedIntelligence) {
+  return [
+    intelligence.title,
+    intelligence.summary,
+    intelligence.primaryChange,
+    intelligence.primaryImpact,
+    intelligence.affectedMarkets.join(" "),
+    intelligence.topics.join(" "),
+    intelligence.entities.join(" "),
+    intelligence.keyEntities.join(" "),
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 function stripTerminalPunctuation(value: string) {
@@ -1228,13 +1314,30 @@ function appendSupportingContext(base: string, intelligence: NormalizedIntellige
   }
 
   const withEvidence = `${base} ${evidence}`;
-  if (withEvidence.length <= 190) {
+  if (withEvidence.length <= 190 && isStandaloneEvidenceSentenceSafe(evidence)) {
     return withEvidence;
   }
 
   const compactEvidence = buildCompactEvidenceSentence(intelligence);
   const withCompactEvidence = compactEvidence ? `${base} ${compactEvidence}` : base;
-  return withCompactEvidence.length <= 190 ? withCompactEvidence : base;
+  return withCompactEvidence.length <= 190 && isStandaloneEvidenceSentenceSafe(compactEvidence)
+    ? withCompactEvidence
+    : base;
+}
+
+function isStandaloneEvidenceSentenceSafe(value: string) {
+  if (!value) {
+    return false;
+  }
+
+  const wordCount = value
+    .split(/\s+/)
+    .filter((word) => /[A-Za-z0-9]/.test(word)).length;
+  if (wordCount >= 8) {
+    return true;
+  }
+
+  return /\b\d+\s+articles\/(?:[2-9]|\d{2,})\s+sources\b/i.test(value) && /\bentities:\s*\S+/i.test(value);
 }
 
 function buildEvidenceSentence(intelligence: NormalizedIntelligence) {

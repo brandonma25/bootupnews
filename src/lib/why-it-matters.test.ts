@@ -7,6 +7,7 @@ import {
   generateWhyThisMattersHeuristically,
   isUsableWhyItMattersText,
 } from "@/lib/why-it-matters";
+import { validateWhyItMatters } from "@/lib/why-it-matters-quality-gate";
 import type { EventIntelligence } from "@/lib/types";
 
 function createIntelligence(overrides: Partial<EventIntelligence> = {}): EventIntelligence {
@@ -607,6 +608,118 @@ describe("why-it-matters", () => {
     expect(text.toLowerCase()).toContain("source review needed");
     expect(text.toLowerCase()).toContain("only metadata is available");
     expect(text.toLowerCase()).not.toContain("fresh read on labor");
+  });
+
+  it("generates Context-safe WITM for offshore wind deal stories without clipped market labels", () => {
+    const trustLayer = buildTrustLayerPresentation(
+      createIntelligence({
+        title: "Trumps Shady Wind Deals Arent Over Yet",
+        summary: "The article describes policy pressure and deal terms around offshore wind projects.",
+        primaryChange: "Offshore wind deal terms are still being reshaped by federal policy pressure",
+        entities: ["Trump", "offshore wind"],
+        keyEntities: ["Trump"],
+        eventType: "geopolitical",
+        affectedMarkets: ["policy risk", "defense posture"],
+        topics: ["finance", "energy"],
+        signalStrength: "weak",
+        confidenceScore: 52,
+      }),
+      {
+        title: "Trumps Shady Wind Deals Arent Over Yet",
+        topicName: "Finance",
+        eventTypeOverride: "mna_funding",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 7932,
+      },
+    );
+    const validation = validateWhyItMatters(trustLayer.body, {
+      title: "Trumps Shady Wind Deals Arent Over Yet",
+      eligibilityTier: "context_signal_eligible",
+      contentAccessibility: "full_text_available",
+      accessibleTextLength: 7932,
+      eventType: "mna_funding",
+    });
+
+    expect(trustLayer.body.toLowerCase()).toMatch(/offshore wind|clean-energy|permitting/);
+    expect(trustLayer.body).not.toContain("policy risk and defense posture");
+    expect(validation.passed).toBe(true);
+  });
+
+  it("replaces generic macro placeholder markets with labor-policy mechanisms for Context rows", () => {
+    const trustLayer = buildTrustLayerPresentation(
+      createIntelligence({
+        title: "Monetary Policy in a Slow (to No) Growth Labor Market",
+        summary: "The research note links slower labor-market growth to monetary policy choices.",
+        primaryChange: "Labor-market growth slowed as monetary policy remained restrictive",
+        entities: ["Federal Reserve", "labor market"],
+        keyEntities: ["Federal Reserve"],
+        eventType: "non_signal",
+        affectedMarkets: ["individual decision-making"],
+        topics: ["finance"],
+        signalStrength: "weak",
+        confidenceScore: 56,
+      }),
+      {
+        title: "Monetary Policy in a Slow (to No) Growth Labor Market",
+        topicName: "Finance",
+        eventTypeOverride: "macro_data_release",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 8429,
+      },
+    );
+    const validation = validateWhyItMatters(trustLayer.body, {
+      title: "Monetary Policy in a Slow (to No) Growth Labor Market",
+      eligibilityTier: "context_signal_eligible",
+      contentAccessibility: "full_text_available",
+      accessibleTextLength: 8429,
+      eventType: "macro_data_release",
+    });
+
+    expect(trustLayer.body.toLowerCase()).toMatch(/labor-market|fed|rate/);
+    expect(trustLayer.body.toLowerCase()).not.toContain("individual decision-making");
+    expect(validation.passed).toBe(true);
+  });
+
+  it("generates Core-safe neutral-rate WITM without short standalone evidence sentences", () => {
+    const trustLayer = buildTrustLayerPresentation(
+      createIntelligence({
+        title: "The R*-Labor Share Nexus",
+        summary: "The analysis links the labor share to R* and the neutral-rate estimate.",
+        primaryChange: "The labor-share relationship changed how economists read R*",
+        entities: ["Williams", "Holston"],
+        keyEntities: ["Williams", "Holston"],
+        eventType: "non_signal",
+        affectedMarkets: ["individual decision-making"],
+        topics: ["finance"],
+        signalStrength: "weak",
+        confidenceScore: 60,
+        signals: {
+          articleCount: 1,
+          sourceDiversity: 1,
+          recencyScore: 82,
+          velocityScore: 20,
+        },
+      }),
+      {
+        title: "The R*-Labor Share Nexus",
+        topicName: "Finance",
+        eventTypeOverride: "macro_data_release",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 31843,
+      },
+    );
+    const validation = validateWhyItMatters(trustLayer.body, {
+      title: "The R*-Labor Share Nexus",
+      eligibilityTier: "core_signal_eligible",
+      contentAccessibility: "full_text_available",
+      accessibleTextLength: 31843,
+      eventType: "macro_data_release",
+    });
+
+    expect(trustLayer.body.toLowerCase()).toMatch(/neutral rate|restrictive|policy/);
+    expect(trustLayer.body.toLowerCase()).not.toContain("individual decision-making");
+    expect(trustLayer.body).not.toMatch(/Evidence: [^.]{1,45}\./);
+    expect(validation.passed).toBe(true);
   });
 
   it("keeps non-fallback outputs subject-first without hedge prefixes", async () => {

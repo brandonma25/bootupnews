@@ -1,10 +1,29 @@
+import type { ContentAccessibility } from "@/lib/source-accessibility-types";
+
 export type WhyItMattersFailureMode =
   | "incomplete_sentence"
   | "template_placeholder_language"
   | "abstract_variable_list"
-  | "minimum_specificity";
+  | "minimum_specificity"
+  | "summary_only_wording"
+  | "unsupported_structural_claim"
+  | "evidence_accessibility_mismatch";
 
 export type WhyItMattersRecommendedAction = "approve" | "requires_human_rewrite";
+
+export type WhyItMattersValidationTier =
+  | "core_signal_eligible"
+  | "context_signal_eligible"
+  | "depth_only"
+  | "exclude_from_public_candidates";
+
+export type WhyItMattersValidationContext = {
+  title?: string | null;
+  eligibilityTier?: WhyItMattersValidationTier | null;
+  contentAccessibility?: ContentAccessibility | null;
+  accessibleTextLength?: number | null;
+  eventType?: string | null;
+};
 
 export type WhyItMattersValidationResult = {
   passed: boolean;
@@ -118,7 +137,50 @@ const TEMPLATE_PLACEHOLDER_PHRASES = [
   "how governance credibility and diplomatic scrutiny evolve",
   "how borrowing conditions feed into housing demand",
   "how demand signals feed into revenue expectations",
+  "could have implications",
+  "matters because it is important",
+  "markets are watching",
+  "the economy may be affected",
 ];
+
+const SUMMARY_ONLY_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "because",
+  "but",
+  "by",
+  "for",
+  "from",
+  "in",
+  "is",
+  "it",
+  "its",
+  "matter",
+  "matters",
+  "of",
+  "on",
+  "or",
+  "over",
+  "that",
+  "the",
+  "this",
+  "to",
+  "which",
+  "with",
+]);
+
+const STRUCTURAL_MECHANISM_PATTERN =
+  /\b(?:allocation|assumptions?|capacity|capital|competition|cost|credit|demand|employment|enforcement|fed|federal reserve|financing|funding|governance|growth|inflation|infrastructure|institution|investment|labor|liquidity|market|monetary|neutral rate|permitting|policy|pricing|productivity|rate|rates|risk|supply|wage)\b/i;
+
+const STRONG_STRUCTURAL_CLAIM_PATTERN =
+  /\b(?:alter(?:s|ed|ing)?|chang(?:e|es|ed|ing)|constrain(?:s|ed|ing)?|feed(?:s|ing)? into|mov(?:e|es|ed|ing)|narrow(?:s|ed|ing)?|rais(?:e|es|ed|ing)|refram(?:e|es|ed|ing)|reset(?:s|ting)?|reshap(?:e|es|ed|ing)|shift(?:s|ed|ing)?|test(?:s|ed|ing)?)\b/i;
+
+const RETROSPECTIVE_META_TITLE_PATTERN =
+  /\b(?:countdown|most[-\s]?read|roundup|year in review|look back|top topics|most popular)\b/i;
 
 const ABSTRACT_TERMS = new Set([
   "adoption expectations",
@@ -455,7 +517,163 @@ function detectMinimumSpecificity(value: string, failures: Map<WhyItMattersFailu
   }
 }
 
-export function validateWhyItMatters(text: string): WhyItMattersValidationResult {
+function isCoreOrContextTier(context: WhyItMattersValidationContext | undefined) {
+  return (
+    context?.eligibilityTier === "core_signal_eligible" ||
+    context?.eligibilityTier === "context_signal_eligible"
+  );
+}
+
+function normalizeForSummaryCheck(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getSignificantTokens(value: string) {
+  return normalizeForSummaryCheck(value)
+    .split(" ")
+    .filter((token) => token.length > 2 && !SUMMARY_ONLY_STOPWORDS.has(token));
+}
+
+function tokenOverlapScore(left: string, right: string) {
+  const leftTokens = new Set(getSignificantTokens(left));
+  const rightTokens = new Set(getSignificantTokens(right));
+  if (!leftTokens.size || !rightTokens.size) {
+    return 0;
+  }
+
+  const overlap = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  return overlap / leftTokens.size;
+}
+
+function removeTitleTokens(value: string, title: string) {
+  const titleTokens = new Set(getSignificantTokens(title));
+  return getSignificantTokens(value)
+    .filter((token) => !titleTokens.has(token))
+    .join(" ");
+}
+
+function extractBecauseClause(value: string) {
+  const match = value.match(/\b(?:because|which matters because)\b(.+)$/i);
+  return match?.[1]?.trim() ?? value;
+}
+
+function detectSummaryOnlyWording(
+  value: string,
+  context: WhyItMattersValidationContext | undefined,
+  failures: Map<WhyItMattersFailureMode, string[]>,
+) {
+  if (!isCoreOrContextTier(context) || !context?.title) {
+    return;
+  }
+
+  const title = normalizeForSummaryCheck(context.title);
+  const becauseClause = normalizeForSummaryCheck(extractBecauseClause(value));
+  if (!title || !becauseClause) {
+    return;
+  }
+
+  const overlap = tokenOverlapScore(context.title, becauseClause);
+  const repeatsTitle = becauseClause.includes(title);
+  const mechanismRemainder = removeTitleTokens(becauseClause, context.title);
+  if ((repeatsTitle || overlap >= 0.72) && !STRUCTURAL_MECHANISM_PATTERN.test(mechanismRemainder)) {
+    addFailure(
+      failures,
+      "summary_only_wording",
+      "Core/Context WITM repeats the headline or summary without a structural mechanism.",
+    );
+  }
+}
+
+function hasSufficientCoreContextEvidence(context: WhyItMattersValidationContext | undefined) {
+  const accessibility = context?.contentAccessibility;
+  const accessibleLength = context?.accessibleTextLength ?? 0;
+
+  if (!accessibility) {
+    return true;
+  }
+
+  if (accessibility === "full_text_available") {
+    return accessibleLength >= 800;
+  }
+
+  if (accessibility === "partial_text_available") {
+    return accessibleLength >= 800;
+  }
+
+  if (accessibility === "abstract_only") {
+    return accessibleLength >= 1000;
+  }
+
+  return false;
+}
+
+function detectEvidenceAccessibilityMismatch(
+  value: string,
+  context: WhyItMattersValidationContext | undefined,
+  failures: Map<WhyItMattersFailureMode, string[]>,
+) {
+  if (!isCoreOrContextTier(context) || hasSufficientCoreContextEvidence(context)) {
+    return;
+  }
+
+  if (STRONG_STRUCTURAL_CLAIM_PATTERN.test(value)) {
+    addFailure(
+      failures,
+      "evidence_accessibility_mismatch",
+      "Core/Context WITM makes a structural claim without enough accessible source evidence.",
+    );
+  }
+}
+
+function detectUnsupportedStructuralClaim(
+  value: string,
+  context: WhyItMattersValidationContext | undefined,
+  failures: Map<WhyItMattersFailureMode, string[]>,
+) {
+  if (!isCoreOrContextTier(context)) {
+    return;
+  }
+
+  const title = context?.title ?? "";
+  if (context?.eligibilityTier === "core_signal_eligible" && RETROSPECTIVE_META_TITLE_PATTERN.test(title)) {
+    addFailure(
+      failures,
+      "unsupported_structural_claim",
+      "Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+    );
+  }
+
+  const normalized = value.toLowerCase();
+  if (
+    /fresh read on (?:rates and equities|the economy|markets|market conditions)\b/i.test(normalized) ||
+    /gives policymakers and investors a fresh read\b/i.test(normalized)
+  ) {
+    addFailure(
+      failures,
+      "unsupported_structural_claim",
+      "Core/Context WITM uses generic macro fresh-read language without a specific structural mechanism.",
+    );
+  }
+}
+
+function detectContextualCoreContextFailures(
+  value: string,
+  context: WhyItMattersValidationContext | undefined,
+  failures: Map<WhyItMattersFailureMode, string[]>,
+) {
+  detectSummaryOnlyWording(value, context, failures);
+  detectEvidenceAccessibilityMismatch(value, context, failures);
+  detectUnsupportedStructuralClaim(value, context, failures);
+}
+
+export function validateWhyItMatters(
+  text: string,
+  context: WhyItMattersValidationContext = {},
+): WhyItMattersValidationResult {
   const normalized = stripSignalSuffix(normalizeText(text));
   const failuresByMode = new Map<WhyItMattersFailureMode, string[]>();
 
@@ -471,6 +689,7 @@ export function validateWhyItMatters(text: string): WhyItMattersValidationResult
     detectTemplatePlaceholderLanguage(normalized, failuresByMode);
     detectAbstractVariableList(normalized, failuresByMode);
     detectMinimumSpecificity(normalized, failuresByMode);
+    detectContextualCoreContextFailures(normalized, context, failuresByMode);
   }
 
   const failures = Array.from(failuresByMode.keys());
