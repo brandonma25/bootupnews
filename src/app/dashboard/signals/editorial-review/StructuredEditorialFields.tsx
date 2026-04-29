@@ -10,12 +10,10 @@ import {
   ExternalLink,
   RotateCcw,
   Save,
-  Send,
 } from "lucide-react";
 
 import {
   approveSignalPostAction,
-  publishSignalPostAction,
   resetSignalPostToAiDraftAction,
   saveSignalDraftAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
@@ -58,7 +56,6 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
     ["draft", "needs_review"].includes(post.editorialStatus) &&
     post.whyItMattersValidationStatus !== "requires_human_rewrite";
   const requiresHumanRewrite = post.whyItMattersValidationStatus === "requires_human_rewrite";
-  const canPublishPost = post.editorialStatus === "approved" && !requiresHumanRewrite;
   const toggleLabel = isExpanded ? "Collapse" : "Expand";
   const panelId = `editorial-panel-${post.id}`;
 
@@ -75,7 +72,7 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
                 </span>
                 {post.briefingDate ? <Badge>{post.briefingDate}</Badge> : null}
                 <Badge>{formatStatus(post.editorialStatus)}</Badge>
-                {requiresHumanRewrite ? <Badge>Requires rewrite</Badge> : null}
+                <Badge>{requiresHumanRewrite ? "WITM rewrite required" : "WITM passed"}</Badge>
                 {post.isLive ? <Badge>Live homepage set</Badge> : null}
                 {post.signalScore !== null ? <Badge>Score {Math.round(post.signalScore)}</Badge> : null}
                 {post.tags.map((tag) => (
@@ -168,17 +165,6 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
               <CheckCircle2 className="h-4 w-4" />
               Approve
             </Button>
-            {canPublishPost ? (
-              <Button
-                type="submit"
-                formAction={publishSignalPostAction}
-                disabled={controlsDisabled}
-                className="gap-2"
-              >
-                <Send className="h-4 w-4" />
-                Publish
-              </Button>
-            ) : null}
             <Button
               type="submit"
               formAction={resetSignalPostToAiDraftAction}
@@ -425,7 +411,7 @@ function getPostStateHint(post: EditorialSignalPost) {
   }
 
   if (post.editorialStatus === "approved") {
-    return "Approved and waiting to publish. Publish this card or use Publish Top 5 Signals when the full Top 5 is ready.";
+    return "Approved and waiting for the full Top 5 publish gate.";
   }
 
   if (post.editorialStatus === "published") {
