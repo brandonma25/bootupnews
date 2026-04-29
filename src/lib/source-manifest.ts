@@ -25,6 +25,11 @@ export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
     "source-cnbc-finance",
     "source-marketwatch",
     "source-heatmap",
+    "source-liberty-street-economics",
+    "source-fred-blog",
+    "source-fed-feds-notes",
+    "source-sf-fed-research-insights",
+    "source-stlouisfed-on-the-economy",
     "source-bbc-world",
     "source-guardian-world",
     "source-foreign-affairs",
@@ -147,6 +152,26 @@ const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; p
   },
   "source-heatmap": {
     sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-liberty-street-economics": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-fred-blog": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-fed-feds-notes": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-sf-fed-research-insights": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-stlouisfed-on-the-economy": {
+    sourceRole: "primary_institutional",
     publicEligible: true,
   },
   "source-bbc-world": {
