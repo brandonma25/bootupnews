@@ -409,6 +409,117 @@ describe("runControlledPipeline", () => {
     ]);
   });
 
+  it("draft_only product-target cap selects five Core and two Context rows without Depth", async () => {
+    const items = [
+      buildItem(1),
+      buildItem(2),
+      buildItem(3),
+      buildItem(4),
+      buildItem(5),
+      buildItem(6, "context_signal_eligible"),
+      buildItem(7, "context_signal_eligible"),
+      buildItem(8, "depth_only"),
+      buildItem(9, "exclude_from_public_candidates"),
+    ];
+    generateDailyBriefing.mockResolvedValueOnce({
+      briefing: {
+        id: "briefing-product-target",
+        briefingDate: "2026-04-27T12:00:00.000Z",
+        title: "Daily Executive Briefing",
+        intro: "Controlled test briefing.",
+        readingWindow: "20 minutes",
+        items: items.slice(0, 5),
+      },
+      publicRankedItems: items,
+      pipelineRun: {
+        run_id: "pipeline-product-target",
+        num_clusters: 9,
+      },
+    });
+
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await runControlledPipeline(buildConfig({
+      mode: "draft_only",
+      briefingDateOverride: "2026-04-29",
+      testRunId: "core-context-product-target",
+      draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+      draftMaxRows: 7,
+    }));
+
+    expect(persistSignalPostsForBriefing).toHaveBeenCalledWith({
+      briefingDate: "2026-04-29",
+      items: [
+        expect.objectContaining({ id: "item-1" }),
+        expect.objectContaining({ id: "item-2" }),
+        expect.objectContaining({ id: "item-3" }),
+        expect.objectContaining({ id: "item-4" }),
+        expect.objectContaining({ id: "item-5" }),
+        expect.objectContaining({ id: "item-6" }),
+        expect.objectContaining({ id: "item-7" }),
+      ],
+      mode: "draft_only",
+    });
+    expect(getPersistedItemIds()).toEqual([
+      "item-1",
+      "item-2",
+      "item-3",
+      "item-4",
+      "item-5",
+      "item-6",
+      "item-7",
+    ]);
+    expect(getPersistedItemIds()).not.toContain("item-8");
+    expect(getPersistedItemIds()).not.toContain("item-9");
+  });
+
+  it("draft_only product-target cap never selects more than seven Core and Context rows", async () => {
+    const items = [
+      buildItem(1),
+      buildItem(2),
+      buildItem(3),
+      buildItem(4),
+      buildItem(5),
+      buildItem(6, "context_signal_eligible"),
+      buildItem(7, "context_signal_eligible"),
+      buildItem(8, "context_signal_eligible"),
+    ];
+    generateDailyBriefing.mockResolvedValueOnce({
+      briefing: {
+        id: "briefing-product-target-capped",
+        briefingDate: "2026-04-27T12:00:00.000Z",
+        title: "Daily Executive Briefing",
+        intro: "Controlled test briefing.",
+        readingWindow: "20 minutes",
+        items: items.slice(0, 5),
+      },
+      publicRankedItems: items,
+      pipelineRun: {
+        run_id: "pipeline-product-target-capped",
+        num_clusters: 8,
+      },
+    });
+
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await runControlledPipeline(buildConfig({
+      mode: "draft_only",
+      briefingDateOverride: "2026-04-29",
+      testRunId: "core-context-product-target-capped",
+      draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+      draftMaxRows: 7,
+    }));
+
+    expect(getPersistedItemIds()).toEqual([
+      "item-1",
+      "item-2",
+      "item-3",
+      "item-4",
+      "item-5",
+      "item-6",
+      "item-7",
+    ]);
+    expect(getPersistedItemIds()).not.toContain("item-8");
+  });
+
   it("replays dry_run from a valid controlled artifact without live ingestion or writes", async () => {
     const { artifactPath, cleanup } = await writeReplayArtifact(buildReplayArtifact());
 
@@ -489,6 +600,48 @@ describe("runControlledPipeline", () => {
         "replay-replay-1",
         "replay-replay-2",
       ]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("replay draft_only follows the seven-row Core/Context product-target cap without Depth", async () => {
+    const { artifactPath, cleanup } = await writeReplayArtifact(buildReplayArtifact({
+      proposedTopFive: [
+        buildReplaySignal(1),
+        buildReplaySignal(2),
+        buildReplaySignal(3),
+        buildReplaySignal(4),
+        buildReplaySignal(5),
+      ],
+      proposedContextRows: [
+        buildReplaySignal(6, "context_signal_eligible"),
+        buildReplaySignal(7, "context_signal_eligible"),
+      ],
+      proposedDepthRows: [buildReplaySignal(8, "depth_only")],
+    }));
+
+    try {
+      const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+      await runControlledPipeline(buildConfig({
+        mode: "draft_only",
+        briefingDateOverride: "2026-04-29",
+        testRunId: "replay-product-target-draft-only",
+        draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+        draftMaxRows: 7,
+        replayArtifactPath: artifactPath,
+      }));
+
+      expect(getPersistedItemIds()).toEqual([
+        "replay-replay-1",
+        "replay-replay-2",
+        "replay-replay-3",
+        "replay-replay-4",
+        "replay-replay-5",
+        "replay-replay-6",
+        "replay-replay-7",
+      ]);
+      expect(getPersistedItemIds()).not.toContain("replay-replay-8");
     } finally {
       await cleanup();
     }

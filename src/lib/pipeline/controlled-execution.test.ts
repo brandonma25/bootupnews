@@ -115,6 +115,20 @@ describe("controlled pipeline execution config", () => {
     expect(() => assertControlledPipelineCanExecute(config)).not.toThrow();
   });
 
+  it("allows the product-target cap only for Core and Context draft_only", () => {
+    const config = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "draft_only",
+      BRIEFING_DATE_OVERRIDE: "2026-04-29",
+      PIPELINE_TEST_RUN_ID: "controlled-core-context-seven",
+      PIPELINE_DRAFT_TIER_ALLOWLIST: "core,context",
+      PIPELINE_DRAFT_MAX_ROWS: "7",
+    } as NodeJS.ProcessEnv);
+
+    expect(config.draftTierAllowlist).toEqual(["core_signal_eligible", "context_signal_eligible"]);
+    expect(config.draftMaxRows).toBe(7);
+    expect(() => assertControlledPipelineCanExecute(config)).not.toThrow();
+  });
+
   it("resolves explicit replay artifact controls for controlled runs", () => {
     const config = resolveControlledPipelineConfig({
       PIPELINE_RUN_MODE: "dry_run",
@@ -151,12 +165,77 @@ describe("controlled pipeline execution config", () => {
       } as NodeJS.ProcessEnv),
     ).toThrow(/PIPELINE_DRAFT_MAX_ROWS/);
 
+    for (const maxRows of ["4", "5", "6", "8"]) {
+      expect(() =>
+        resolveControlledPipelineConfig({
+          PIPELINE_RUN_MODE: "draft_only",
+          BRIEFING_DATE_OVERRIDE: "2026-04-29",
+          PIPELINE_TEST_RUN_ID: "controlled-test",
+          PIPELINE_DRAFT_TIER_ALLOWLIST: "core,context",
+          PIPELINE_DRAFT_MAX_ROWS: maxRows,
+        } as NodeJS.ProcessEnv),
+      ).toThrow(/PIPELINE_DRAFT_MAX_ROWS/);
+    }
+  });
+
+  it("rejects product-target cap without the exact Core and Context draft_only allowlist", () => {
+    const noAllowlist = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "draft_only",
+      BRIEFING_DATE_OVERRIDE: "2026-04-29",
+      PIPELINE_TEST_RUN_ID: "controlled-no-allowlist",
+      PIPELINE_DRAFT_MAX_ROWS: "7",
+    } as NodeJS.ProcessEnv);
+    const coreOnly = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "draft_only",
+      BRIEFING_DATE_OVERRIDE: "2026-04-29",
+      PIPELINE_TEST_RUN_ID: "controlled-core-only",
+      PIPELINE_DRAFT_TIER_ALLOWLIST: "core",
+      PIPELINE_DRAFT_MAX_ROWS: "7",
+    } as NodeJS.ProcessEnv);
+    const contextOnly = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "draft_only",
+      BRIEFING_DATE_OVERRIDE: "2026-04-29",
+      PIPELINE_TEST_RUN_ID: "controlled-context-only",
+      PIPELINE_DRAFT_TIER_ALLOWLIST: "context",
+      PIPELINE_DRAFT_MAX_ROWS: "7",
+    } as NodeJS.ProcessEnv);
+    const dryRun = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "dry_run",
+      PIPELINE_DRAFT_TIER_ALLOWLIST: "core,context",
+      PIPELINE_DRAFT_MAX_ROWS: "7",
+    } as NodeJS.ProcessEnv);
+
+    expect(() => assertControlledPipelineCanExecute(noAllowlist)).toThrow(/PIPELINE_DRAFT_MAX_ROWS=7/);
+    expect(() => assertControlledPipelineCanExecute(coreOnly)).toThrow(/PIPELINE_DRAFT_MAX_ROWS=7/);
+    expect(() => assertControlledPipelineCanExecute(contextOnly)).toThrow(/PIPELINE_DRAFT_MAX_ROWS=7/);
+    expect(() => assertControlledPipelineCanExecute(dryRun)).toThrow(/PIPELINE_DRAFT_MAX_ROWS=7/);
     expect(() =>
       resolveControlledPipelineConfig({
-        PIPELINE_RUN_MODE: "dry_run",
-        PIPELINE_DRAFT_MAX_ROWS: "4",
+        PIPELINE_RUN_MODE: "draft_only",
+        BRIEFING_DATE_OVERRIDE: "2026-04-29",
+        PIPELINE_TEST_RUN_ID: "controlled-depth",
+        PIPELINE_DRAFT_TIER_ALLOWLIST: "core,context,depth",
+        PIPELINE_DRAFT_MAX_ROWS: "7",
       } as NodeJS.ProcessEnv),
-    ).toThrow(/PIPELINE_DRAFT_MAX_ROWS/);
+    ).toThrow(/PIPELINE_DRAFT_TIER_ALLOWLIST/);
+  });
+
+  it("rejects publish or normal mode from using the product-target cap", () => {
+    expect(() =>
+      resolveControlledPipelineConfig({
+        PIPELINE_RUN_MODE: "publish",
+        PIPELINE_DRAFT_TIER_ALLOWLIST: "core,context",
+        PIPELINE_DRAFT_MAX_ROWS: "7",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/Invalid PIPELINE_RUN_MODE/);
+
+    const normalMode = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "normal",
+      PIPELINE_DRAFT_TIER_ALLOWLIST: "core,context",
+      PIPELINE_DRAFT_MAX_ROWS: "7",
+    } as NodeJS.ProcessEnv);
+
+    expect(() => assertControlledPipelineCanExecute(normalMode)).toThrow(/PIPELINE_DRAFT_\*/);
   });
 
   it("requires an explicit max-row cap when a draft tier allowlist is set", () => {
