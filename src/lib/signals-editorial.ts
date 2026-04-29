@@ -15,7 +15,6 @@ import {
 import { captureRssFailure, type RssFailureType, type RssPhase } from "@/lib/observability/rss";
 import type { BriefingItem, EditorialStatus } from "@/lib/types";
 import {
-  flagCardForRewrite,
   validateWhyItMatters,
   type WhyItMattersReviewStatus,
   type WhyItMattersValidationResult,
@@ -384,7 +383,7 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
     item.importanceLabel,
   ].filter((value): value is string => Boolean(value));
   const aiWhyItMatters = normalizeEditorialText(item.aiWhyItMatters ?? item.whyItMatters);
-  const validation = flagCardForRewrite({ aiWhyItMatters }).whyItMattersValidation;
+  const validation = item.whyItMattersValidation ?? validateWhyItMatters(aiWhyItMatters);
 
   return {
     id: `candidate-${index + 1}`,
@@ -659,9 +658,8 @@ async function persistSignalPostCandidates(
 
   const now = new Date().toISOString();
 
-  const flaggedCandidates = missingCandidates.map(flagCardForRewrite);
   const insertResult = await client.from("signal_posts").insert(
-    flaggedCandidates.map((post) => ({
+    missingCandidates.map((post) => ({
       briefing_date: briefingDate,
       rank: post.rank,
       title: post.title,
@@ -672,11 +670,9 @@ async function persistSignalPostCandidates(
       signal_score: post.signalScore,
       selection_reason: post.selectionReason,
       ai_why_it_matters: post.aiWhyItMatters,
-      why_it_matters_validation_status: post.reviewStatus === "requires_human_rewrite"
-        ? "requires_human_rewrite"
-        : "passed",
-      why_it_matters_validation_failures: post.whyItMattersValidation.failures,
-      why_it_matters_validation_details: post.whyItMattersValidation.failureDetails,
+      why_it_matters_validation_status: post.whyItMattersValidationStatus,
+      why_it_matters_validation_failures: post.whyItMattersValidationFailures,
+      why_it_matters_validation_details: post.whyItMattersValidationDetails,
       why_it_matters_validated_at: now,
       editorial_status: "needs_review",
       published_at: null,
@@ -692,7 +688,7 @@ async function persistSignalPostCandidates(
       phase: "store",
       operation: "insert_signal_snapshot",
       briefingDate,
-      postCount: flaggedCandidates.length,
+      postCount: missingCandidates.length,
       message: "Current RSS Top 5 snapshot could not be persisted for editing.",
     });
 

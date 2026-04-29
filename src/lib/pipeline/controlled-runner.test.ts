@@ -84,7 +84,11 @@ function getPersistedItemIds() {
   return input?.items.map((item) => item.id) ?? [];
 }
 
-function buildReplaySignal(index: number, tier: SignalSelectionEligibilityTier = "core_signal_eligible") {
+function buildReplaySignal(
+  index: number,
+  tier: SignalSelectionEligibilityTier = "core_signal_eligible",
+  overrides: Record<string, unknown> = {},
+) {
   const whyItMatters =
     tier === "context_signal_eligible"
       ? "TSA attrition is rising during the shutdown, which matters because it shows whether public institutions can maintain basic services under staffing or funding pressure."
@@ -144,6 +148,7 @@ function buildReplaySignal(index: number, tier: SignalSelectionEligibilityTier =
     exclusionCause: null,
     sourceAccessibilityWarnings: [],
     coreBlockingReasons: [],
+    ...overrides,
   };
 }
 
@@ -642,6 +647,72 @@ describe("runControlledPipeline", () => {
         "replay-replay-7",
       ]);
       expect(getPersistedItemIds()).not.toContain("replay-replay-8");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("replay draft_only preserves WITM validation metadata from the source artifact", async () => {
+    const { artifactPath, cleanup } = await writeReplayArtifact(buildReplayArtifact({
+      proposedTopFive: [
+        buildReplaySignal(1, "core_signal_eligible", {
+          title: "Economic Letter Countdown: Most Read Topics from 2025",
+          whyItMatters:
+            "Economic Letter Countdown: Most Read Topics from 2025, which matters because it shows which inflation, labor, and growth questions dominated institutional attention.",
+          validationStatus: "requires_human_rewrite",
+          validationFailures: ["unsupported_structural_claim"],
+          validationDetails: [
+            "unsupported_structural_claim: Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+          ],
+        }),
+      ],
+      proposedContextRows: [buildReplaySignal(2, "context_signal_eligible")],
+      proposedDepthRows: [buildReplaySignal(3, "depth_only")],
+    }));
+
+    try {
+      const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+      const report = await runControlledPipeline(buildConfig({
+        mode: "draft_only",
+        briefingDateOverride: "2026-04-29",
+        testRunId: "replay-metadata-draft-only",
+        draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+        draftMaxRows: 2,
+        replayArtifactPath: artifactPath,
+      }));
+
+      expect(persistSignalPostsForBriefing).toHaveBeenCalledWith({
+        briefingDate: "2026-04-29",
+        items: [
+          expect.objectContaining({
+            id: "replay-replay-1",
+            whyItMattersValidation: {
+              passed: false,
+              failures: ["unsupported_structural_claim"],
+              failureDetails: [
+                "unsupported_structural_claim: Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+              ],
+              recommendedAction: "requires_human_rewrite",
+            },
+          }),
+          expect.objectContaining({
+            id: "replay-replay-2",
+            whyItMattersValidation: {
+              passed: true,
+              failures: [],
+              failureDetails: [],
+              recommendedAction: "approve",
+            },
+          }),
+        ],
+        mode: "draft_only",
+      });
+      expect(report.proposedTopFive[0].validationStatus).toBe("requires_human_rewrite");
+      expect(report.proposedTopFive[0].validationFailures).toEqual(["unsupported_structural_claim"]);
+      expect(report.proposedTopFive[0].validationDetails).toEqual([
+        "unsupported_structural_claim: Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+      ]);
+      expect(report.proposedDepthRows).toHaveLength(0);
     } finally {
       await cleanup();
     }

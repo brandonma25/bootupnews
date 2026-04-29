@@ -69,6 +69,18 @@ function validateReplaySignalRows(rows: unknown, label: string, expectedTier: Si
       throw new Error(`PIPELINE_REPLAY_ARTIFACT_PATH is malformed: ${label}[${index}] must include whyItMatters.`);
     }
 
+    if (row.validationStatus !== "passed" && row.validationStatus !== "requires_human_rewrite") {
+      throw new Error(`PIPELINE_REPLAY_ARTIFACT_PATH is malformed: ${label}[${index}] must include validationStatus.`);
+    }
+
+    if (!Array.isArray(row.validationFailures)) {
+      throw new Error(`PIPELINE_REPLAY_ARTIFACT_PATH is malformed: ${label}[${index}] must include validationFailures.`);
+    }
+
+    if (!Array.isArray(row.validationDetails)) {
+      throw new Error(`PIPELINE_REPLAY_ARTIFACT_PATH is malformed: ${label}[${index}] must include validationDetails.`);
+    }
+
     return row as unknown as ControlledPipelineSignalReport;
   });
 }
@@ -170,6 +182,12 @@ function replaySignalToBriefingItem(row: ControlledPipelineSignalReport, index: 
     ],
     whyItMatters: row.whyItMatters,
     aiWhyItMatters: row.whyItMatters,
+    whyItMattersValidation: {
+      passed: row.validationStatus === "passed",
+      failures: row.validationFailures,
+      failureDetails: row.validationDetails,
+      recommendedAction: row.validationStatus === "passed" ? "approve" : "requires_human_rewrite",
+    },
     sources: [{ title: sourceTitle, url: sourceUrl }],
     sourceCount: row.sourceCount ?? 1,
     estimatedMinutes: 4,

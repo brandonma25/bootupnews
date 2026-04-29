@@ -965,6 +965,85 @@ describe("signals editorial workflow", () => {
     expect(rows[1].why_it_matters_validation_status).toBe("passed");
   });
 
+  it("draft_only mode preserves supplied WITM validation metadata instead of recomputing it", async () => {
+    const rows: SignalPostRow[] = [];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-04-29",
+      mode: "draft_only",
+      items: [
+        {
+          ...createBriefingItem(1),
+          title: "Economic Letter Countdown: Most Read Topics from 2025",
+          aiWhyItMatters:
+            "Economic Letter Countdown: Most Read Topics from 2025, which matters because it shows which inflation, labor, and growth questions dominated institutional attention.",
+          whyItMattersValidation: {
+            passed: false,
+            failures: ["unsupported_structural_claim"],
+            failureDetails: [
+              "unsupported_structural_claim: Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+            ],
+            recommendedAction: "requires_human_rewrite",
+          },
+        },
+        {
+          ...createBriefingItem(2),
+          aiWhyItMatters: createValidWhyItMatters("Google"),
+          whyItMattersValidation: {
+            passed: true,
+            failures: [],
+            failureDetails: [],
+            recommendedAction: "approve",
+          },
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.insertedCount).toBe(2);
+    expect(rows.every((row) => row.editorial_status === "needs_review")).toBe(true);
+    expect(rows.every((row) => row.is_live === false)).toBe(true);
+    expect(rows.every((row) => row.published_at === null)).toBe(true);
+    expect(rows[0].why_it_matters_validation_status).toBe("requires_human_rewrite");
+    expect(rows[0].why_it_matters_validation_failures).toEqual(["unsupported_structural_claim"]);
+    expect(rows[0].why_it_matters_validation_details).toEqual([
+      "unsupported_structural_claim: Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+    ]);
+    expect(rows[1].why_it_matters_validation_status).toBe("passed");
+    expect(rows[1].why_it_matters_validation_failures).toEqual([]);
+    expect(rows[1].why_it_matters_validation_details).toEqual([]);
+  });
+
+  it("draft_only mode preserves rewrite status even when a supplied failure array is empty", async () => {
+    const rows: SignalPostRow[] = [];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-04-29",
+      mode: "draft_only",
+      items: [
+        {
+          ...createBriefingItem(1),
+          aiWhyItMatters: createValidWhyItMatters("Google"),
+          whyItMattersValidation: {
+            passed: false,
+            failures: [],
+            failureDetails: [],
+            recommendedAction: "requires_human_rewrite",
+          },
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].why_it_matters_validation_status).toBe("requires_human_rewrite");
+    expect(rows[0].why_it_matters_validation_failures).toEqual([]);
+    expect(rows[0].why_it_matters_validation_details).toEqual([]);
+  });
+
   it("flags malformed why-it-matters drafts without blocking signal snapshot persistence", async () => {
     const rows: SignalPostRow[] = [];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
