@@ -41,6 +41,16 @@ describe("source catalog governance", () => {
     "tldr-crypto",
     "tldr-marketing",
   ];
+  const batchTwoASourceIds = [
+    "semafor",
+    "axios",
+    "404-media",
+    "heatmap",
+    "guardian-world",
+    "pbs-newshour",
+    "sec-press-releases",
+    "france24",
+  ];
 
   it("keeps blocked broad or unofficial source classes out of the onboarding catalog", () => {
     const serialized = JSON.stringify(recommendedSources).toLowerCase();
@@ -53,6 +63,11 @@ describe("source catalog governance", () => {
     expect(sourceIds.has("new-york-times")).toBe(false);
     expect(sourceIds.has("bloomberg")).toBe(false);
     expect(sourceIds.has("the-information")).toBe(false);
+    expect(sourceIds.has("wall-street-journal")).toBe(false);
+    expect(sourceIds.has("the-economist")).toBe(false);
+    expect(sourceIds.has("wired")).toBe(false);
+    expect(sourceIds.has("al-jazeera")).toBe(false);
+    expect(sourceIds.has("dw")).toBe(false);
   });
 
   it("keeps catalog entries separate from default ingestion", () => {
@@ -179,6 +194,35 @@ describe("source catalog governance", () => {
       lifecycleStatus: "active_optional",
       validationStatus: "validated",
     });
+  });
+
+  it("catalogs Batch 2A accessible source additions as validated optional non-default sources", () => {
+    const sourcesById = new Map(recommendedSources.map((source) => [source.id, source]));
+
+    for (const sourceId of batchTwoASourceIds) {
+      const source = sourcesById.get(sourceId);
+
+      expect(source).toBeDefined();
+      expect(source).toMatchObject({
+        sourceFormat: "rss",
+        importStatus: "ready",
+        lifecycleStatus: "active_optional",
+        validationStatus: "validated",
+        mvpDefaultAllowed: false,
+        editorialPreference: "none",
+      });
+      expect(source?.note).toMatch(/2026-04-29|Batch 2A/);
+    }
+    expect(sourcesById.get("404-media")).toMatchObject({
+      feedUrl: "https://www.404media.co/rss/",
+      topicLabel: "Technology",
+    });
+    expect(sourcesById.get("sec-press-releases")).toMatchObject({
+      feedUrl: "https://www.sec.gov/news/pressreleases.rss",
+      topicLabel: "Markets",
+    });
+    expect(sourcesById.get("pbs-newshour")?.note).toMatch(/short abstracts|Context/i);
+    expect(sourcesById.get("france24")?.note).toMatch(/short abstracts|Context/i);
   });
 
   it("catalogs institutional Batch 1 sources without treating them as normal publisher defaults", () => {

@@ -9,12 +9,14 @@ export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
     "source-ars",
     "source-mit-tech-review",
     "source-techcrunch",
+    "source-404-media",
     "source-ft",
     "source-reuters-business",
     "source-npr-business",
     "source-npr-economy",
     "source-fed-press-all",
     "source-fed-monetary-policy",
+    "source-sec-press-releases",
     "source-bls-latest",
     "source-bls-cpi",
     "source-bls-employment-situation",
@@ -22,11 +24,17 @@ export const PUBLIC_SURFACE_SOURCE_MANIFEST = {
     "source-cnbc-economy",
     "source-cnbc-finance",
     "source-marketwatch",
+    "source-heatmap",
     "source-bbc-world",
+    "source-guardian-world",
     "source-foreign-affairs",
     "source-npr-world",
     "source-npr-politics",
+    "source-pbs-newshour",
+    "source-france24",
     "source-propublica-main",
+    "source-semafor",
+    "source-axios",
     "source-cnbc-politics",
     "source-politico-politics",
     "source-politico-congress",
@@ -77,6 +85,10 @@ const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; p
     sourceRole: "secondary_authoritative",
     publicEligible: true,
   },
+  "source-404-media": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
   "source-ft": {
     sourceRole: "primary_authoritative",
     publicEligible: true,
@@ -98,6 +110,10 @@ const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; p
     publicEligible: true,
   },
   "source-fed-monetary-policy": {
+    sourceRole: "primary_institutional",
+    publicEligible: true,
+  },
+  "source-sec-press-releases": {
     sourceRole: "primary_institutional",
     publicEligible: true,
   },
@@ -129,7 +145,15 @@ const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; p
     sourceRole: "corroboration_only",
     publicEligible: true,
   },
+  "source-heatmap": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
   "source-bbc-world": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-guardian-world": {
     sourceRole: "secondary_authoritative",
     publicEligible: true,
   },
@@ -145,8 +169,24 @@ const PUBLIC_SOURCE_GOVERNANCE: Record<string, { sourceRole: PublicSourceRole; p
     sourceRole: "secondary_authoritative",
     publicEligible: true,
   },
+  "source-pbs-newshour": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-france24": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
   "source-propublica-main": {
     sourceRole: "primary_authoritative",
+    publicEligible: true,
+  },
+  "source-semafor": {
+    sourceRole: "secondary_authoritative",
+    publicEligible: true,
+  },
+  "source-axios": {
+    sourceRole: "secondary_authoritative",
     publicEligible: true,
   },
   "source-cnbc-politics": {

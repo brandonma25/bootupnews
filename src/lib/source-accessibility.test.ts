@@ -226,6 +226,29 @@ describe("source accessibility predicates", () => {
     expect(support.coreBlockingReasons).toContain("source_accessibility_insufficient");
   });
 
+  it("does not make thin Batch 2A public feeds Core-capable by source role alone", () => {
+    const support = evaluateSourceAccessibilitySupport([
+      article(source({
+        sourceId: "source-pbs-newshour",
+        source: "PBS NewsHour",
+        homepageUrl: "https://www.pbs.org/newshour",
+        sourceRole: "secondary_authoritative",
+        trustTier: "tier_2",
+        fetch: {
+          feedUrl: "https://www.pbs.org/newshour/feeds/rss/headlines",
+        },
+      }), {
+        summaryText: "Short RSS abstract about a policy development.",
+        contentText: "",
+        extractionMethod: "rss_summary",
+      }),
+    ]);
+
+    expect(support.coreSupported).toBe(false);
+    expect(support.contextSupported).toBe(false);
+    expect(support.coreBlockingReasons).toContain("abstract_only_uncorroborated");
+  });
+
   it("allows substantial partial authoritative sources to support Context and Core", () => {
     const support = evaluateSourceAccessibilitySupport([
       article(source(), {
