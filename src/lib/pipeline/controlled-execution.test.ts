@@ -19,6 +19,8 @@ function buildConfig(overrides: Partial<ControlledPipelineConfig> = {}): Control
     draftTierAllowlist: null,
     draftMaxRows: null,
     artifactDir: ".pipeline-runs",
+    replayArtifactPath: null,
+    replayExpectedRunId: null,
     ...overrides,
   };
 }
@@ -104,6 +106,18 @@ describe("controlled pipeline execution config", () => {
 
     expect(config.draftTierAllowlist).toEqual(["core_signal_eligible", "context_signal_eligible"]);
     expect(config.draftMaxRows).toBe(3);
+    expect(() => assertControlledPipelineCanExecute(config)).not.toThrow();
+  });
+
+  it("resolves explicit replay artifact controls for controlled runs", () => {
+    const config = resolveControlledPipelineConfig({
+      PIPELINE_RUN_MODE: "dry_run",
+      PIPELINE_REPLAY_ARTIFACT_PATH: "/tmp/controlled-dry-run.json",
+      PIPELINE_REPLAY_EXPECTED_RUN_ID: "pipeline-123",
+    } as NodeJS.ProcessEnv);
+
+    expect(config.replayArtifactPath).toBe("/tmp/controlled-dry-run.json");
+    expect(config.replayExpectedRunId).toBe("pipeline-123");
     expect(() => assertControlledPipelineCanExecute(config)).not.toThrow();
   });
 
@@ -219,6 +233,23 @@ describe("controlled pipeline execution config", () => {
     });
 
     expect(() => assertControlledPipelineCanExecute(config)).toThrow(/PIPELINE_DRAFT_\*/);
+  });
+
+  it("does not allow normal mode to accept replay controls", () => {
+    const config = buildConfig({
+      mode: "normal",
+      replayArtifactPath: "/tmp/controlled-dry-run.json",
+    });
+
+    expect(() => assertControlledPipelineCanExecute(config)).toThrow(/PIPELINE_REPLAY_\*/);
+  });
+
+  it("requires a replay artifact path when an expected replay run id is set", () => {
+    const config = buildConfig({
+      replayExpectedRunId: "pipeline-123",
+    });
+
+    expect(() => assertControlledPipelineCanExecute(config)).toThrow(/PIPELINE_REPLAY_EXPECTED_RUN_ID/);
   });
 });
 

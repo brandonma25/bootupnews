@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ControlledPipelineConfig } from "@/lib/pipeline/controlled-execution";
@@ -26,6 +30,8 @@ function buildConfig(overrides: Partial<ControlledPipelineConfig> = {}): Control
     draftTierAllowlist: null,
     draftMaxRows: null,
     artifactDir: ".pipeline-runs",
+    replayArtifactPath: null,
+    replayExpectedRunId: null,
     ...overrides,
   };
 }
@@ -76,6 +82,140 @@ function getPersistedItemIds() {
   const input = persistSignalPostsForBriefing.mock.calls[0]?.[0] as { items: Array<{ id: string }> } | undefined;
 
   return input?.items.map((item) => item.id) ?? [];
+}
+
+function buildReplaySignal(index: number, tier: SignalSelectionEligibilityTier = "core_signal_eligible") {
+  const whyItMatters =
+    tier === "context_signal_eligible"
+      ? "TSA attrition is rising during the shutdown, which matters because it shows whether public institutions can maintain basic services under staffing or funding pressure."
+      : "Prediction-market violations are stacking up, which matters because it tests whether enforcement, settlements, or public oversight change accountability beyond the case itself.";
+
+  return {
+    id: `replay-${index}`,
+    rank: index,
+    title: `Replay signal ${index}`,
+    sourceName: tier === "context_signal_eligible" ? "Politico Congress" : "Politico Politics News",
+    sourceUrl: `https://example.com/replay-${index}`,
+    sourceCount: 1,
+    sourceTier: "tier2",
+    sourceRole: "secondary_authoritative",
+    contentAccessibility: "full_text_available",
+    accessibleTextLength: 1200 + index,
+    extractionMethod: "readability",
+    fetchStatus: "success",
+    parseStatus: "parsed",
+    articleId: `article-${index}`,
+    clusterId: `cluster-${index}`,
+    articleCount: 1,
+    sourceDiversity: 1,
+    recency: 80,
+    velocity: 70,
+    category: "Politics",
+    topic: "Politics",
+    eventType: tier === "context_signal_eligible" ? "government_capacity" : "public_interest_legal_accountability",
+    filterDecision: "pass",
+    filterSeverity: "pass",
+    filterReasons: ["passed_allowed_event_type"],
+    eligibilityTier: tier,
+    structuralImportanceScore: tier === "context_signal_eligible" ? 48 : 62,
+    sourceQualityScore: 76,
+    groupedScoreComponents: {
+      trust_timeliness: 75,
+      event_importance: 70,
+      support_and_novelty: 65,
+      importance_adjustment: 0,
+    },
+    legacyScoreComponents: {
+      credibility: 75,
+      novelty: 70,
+      urgency: 65,
+      reinforcement: 60,
+    },
+    finalScore: 80 - index,
+    rankingProvider: "fns",
+    diversityProvider: "fns",
+    whyItMatters,
+    validationStatus: "passed",
+    validationFailures: [],
+    validationDetails: [],
+    selectionQualityWarnings: [],
+    selectionEligibilityReasons: tier === "context_signal_eligible" ? ["structural_importance_below_core_threshold"] : [],
+    calibratedReasonLabels: [],
+    exclusionCause: null,
+    sourceAccessibilityWarnings: [],
+    coreBlockingReasons: [],
+  };
+}
+
+function buildReplayArtifact(overrides: Record<string, unknown> = {}) {
+  return {
+    mode: "dry_run",
+    testRunId: "source-dry-run",
+    runId: "pipeline-replay-source",
+    generatedBriefingDate: "2026-04-28",
+    candidateCount: 3,
+    clusterCount: 3,
+    signalCount: 3,
+    sourcePlan: {
+      plan: "fallback",
+      surface: null,
+      suppliedByManifest: false,
+      sourceCount: 0,
+      sourceIds: [],
+      sources: [],
+      warnings: [],
+    },
+    activeSourceCount: 0,
+    activeSources: [],
+    sourceDistribution: {},
+    categoryDistribution: {},
+    articleCandidates: [],
+    selectionSummary: {
+      activeSourceCount: 0,
+      activeSourceList: [],
+      sourceDistributionOfIngestedCandidates: {},
+      sourceDistributionOfProposedTopFive: {},
+      categoryDistributionOfCandidates: {},
+      sourcePlanWarnings: [],
+      manifestCoverageWarnings: [],
+      categoriesRepresented: [],
+      eligibleCoreCount: 1,
+      contextEligibleCount: 2,
+      depthOnlyCount: 1,
+      excludedWeakCandidateCount: 1,
+      candidate_pool_insufficient: true,
+      candidate_pool_insufficient_reason: "selection_quality",
+      sourceScarcityLikely: true,
+      sourceAccessibilityLikely: false,
+      functionalSourceCoverageByCategory: {},
+      sourceAccessibilityWarnings: [],
+      selectionQualityWarnings: [],
+    },
+    candidate_pool_insufficient: true,
+    candidate_pool_insufficient_reason: "selection_quality",
+    proposedTopFive: [buildReplaySignal(1)],
+    proposedContextRows: [
+      buildReplaySignal(2, "context_signal_eligible"),
+      buildReplaySignal(3, "context_signal_eligible"),
+    ],
+    proposedDepthRows: [buildReplaySignal(4, "depth_only")],
+    excludedCandidates: [buildReplaySignal(5, "exclude_from_public_candidates")],
+    persistence: null,
+    ...overrides,
+  };
+}
+
+async function writeReplayArtifact(artifact: unknown) {
+  const dir = await mkdtemp(path.join(tmpdir(), "phase-b-replay-test-"));
+  const artifactPath = path.join(dir, "artifact.json");
+  await writeFile(artifactPath, `${JSON.stringify(artifact)}\n`, "utf8");
+
+  return {
+    artifactPath,
+    async cleanup() {
+      await rm(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 describe("runControlledPipeline", () => {
@@ -267,6 +407,143 @@ describe("runControlledPipeline", () => {
       "item-1",
       "item-2",
     ]);
+  });
+
+  it("replays dry_run from a valid controlled artifact without live ingestion or writes", async () => {
+    const { artifactPath, cleanup } = await writeReplayArtifact(buildReplayArtifact());
+
+    try {
+      const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+      const report = await runControlledPipeline(buildConfig({
+        mode: "dry_run",
+        briefingDateOverride: "2026-04-28",
+        testRunId: "replay-dry-run",
+        draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+        draftMaxRows: 3,
+        replayArtifactPath: artifactPath,
+        replayExpectedRunId: "pipeline-replay-source",
+      }));
+
+      expect(generateDailyBriefing).not.toHaveBeenCalled();
+      expect(persistSignalPostsForBriefing).not.toHaveBeenCalled();
+      expect(report.runId).toBe("pipeline-replay-source");
+      expect(report.persistence).toBeNull();
+      expect(report.proposedTopFive).toHaveLength(1);
+      expect(report.proposedContextRows).toHaveLength(2);
+      expect(report.proposedDepthRows).toHaveLength(0);
+      expect(report.excludedCandidates).toHaveLength(0);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("replay draft_only selection respects Core and Context allowlist without Depth or Excluded rows", async () => {
+    const { artifactPath, cleanup } = await writeReplayArtifact(buildReplayArtifact());
+
+    try {
+      const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+      await runControlledPipeline(buildConfig({
+        mode: "draft_only",
+        briefingDateOverride: "2026-04-28",
+        testRunId: "replay-draft-only",
+        draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+        draftMaxRows: 3,
+        replayArtifactPath: artifactPath,
+      }));
+
+      expect(generateDailyBriefing).not.toHaveBeenCalled();
+      expect(persistSignalPostsForBriefing).toHaveBeenCalledWith({
+        briefingDate: "2026-04-28",
+        items: [
+          expect.objectContaining({ id: "replay-replay-1" }),
+          expect.objectContaining({ id: "replay-replay-2" }),
+          expect.objectContaining({ id: "replay-replay-3" }),
+        ],
+        mode: "draft_only",
+      });
+      expect(getPersistedItemIds()).toEqual([
+        "replay-replay-1",
+        "replay-replay-2",
+        "replay-replay-3",
+      ]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("replay max rows cap limits selected Core and Context rows", async () => {
+    const { artifactPath, cleanup } = await writeReplayArtifact(buildReplayArtifact());
+
+    try {
+      const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+      await runControlledPipeline(buildConfig({
+        mode: "draft_only",
+        briefingDateOverride: "2026-04-28",
+        testRunId: "replay-draft-only-capped",
+        draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+        draftMaxRows: 2,
+        replayArtifactPath: artifactPath,
+      }));
+
+      expect(getPersistedItemIds()).toEqual([
+        "replay-replay-1",
+        "replay-replay-2",
+      ]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("replay fails closed for missing artifacts", async () => {
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+
+    await expect(runControlledPipeline(buildConfig({
+      mode: "dry_run",
+      replayArtifactPath: "/tmp/missing-phase-b-replay-artifact.json",
+    }))).rejects.toThrow(/could not be read/);
+  });
+
+  it("replay fails closed for malformed artifacts", async () => {
+    const { artifactPath, cleanup } = await writeReplayArtifact({
+      mode: "dry_run",
+      runId: "pipeline-bad",
+      persistence: null,
+    });
+
+    try {
+      const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+
+      await expect(runControlledPipeline(buildConfig({
+        mode: "dry_run",
+        replayArtifactPath: artifactPath,
+      }))).rejects.toThrow(/proposedTopFive/);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("replay fails closed when selected artifact tiers are outside the allowlist", async () => {
+    const { artifactPath, cleanup } = await writeReplayArtifact(buildReplayArtifact());
+
+    try {
+      const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+
+      await expect(runControlledPipeline(buildConfig({
+        mode: "dry_run",
+        draftTierAllowlist: ["core_signal_eligible"],
+        draftMaxRows: 3,
+        replayArtifactPath: artifactPath,
+      }))).rejects.toThrow(/outside PIPELINE_DRAFT_TIER_ALLOWLIST/);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("keeps replay unavailable unless the explicit replay artifact config is set", async () => {
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await runControlledPipeline(buildConfig({ mode: "dry_run" }));
+
+    expect(generateDailyBriefing).toHaveBeenCalledTimes(1);
   });
 
   it("refuses normal mode from the controlled test runner", async () => {
