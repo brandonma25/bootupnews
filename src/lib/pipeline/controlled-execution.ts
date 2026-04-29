@@ -343,7 +343,6 @@ function getClusterId(item: BriefingItem) {
 function mapSignalReport(item: BriefingItem, rank: number): ControlledPipelineSignalReport {
   const source = item.sources[0] ?? item.relatedArticles?.[0] ?? null;
   const whyItMatters = selectSignalText(item);
-  const validation = validateWhyItMatters(whyItMatters);
   const sourceName = source
     ? "sourceName" in source && typeof source.sourceName === "string"
       ? source.sourceName
@@ -354,6 +353,13 @@ function mapSignalReport(item: BriefingItem, rank: number): ControlledPipelineSi
     item.sourceCount ??
     item.eventIntelligence?.signals.sourceDiversity ??
     new Set(item.sources.map((entry) => entry.title)).size;
+  const validation = validateWhyItMatters(whyItMatters, {
+    title: item.title,
+    eligibilityTier: eligibility?.tier ?? "core_signal_eligible",
+    contentAccessibility: eligibility?.contentAccessibility ?? null,
+    accessibleTextLength: eligibility?.accessibleTextLength ?? null,
+    eventType: eligibility?.eventType ?? item.eventIntelligence?.eventType ?? null,
+  });
 
   return {
     id: item.id,

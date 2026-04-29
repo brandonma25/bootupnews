@@ -6,7 +6,7 @@ import {
   resolveControlledPipelineConfig,
   type ControlledPipelineConfig,
 } from "@/lib/pipeline/controlled-execution";
-import type { DailyBriefing, SignalSelectionEligibilityTier } from "@/lib/types";
+import type { BriefingItem, DailyBriefing, SignalSelectionEligibilityTier } from "@/lib/types";
 
 function buildConfig(overrides: Partial<ControlledPipelineConfig> = {}): ControlledPipelineConfig {
   return {
@@ -36,7 +36,12 @@ function buildBriefing(): DailyBriefing {
   };
 }
 
-function buildItem(index: number, whyItMatters: string, tier: SignalSelectionEligibilityTier = "core_signal_eligible") {
+function buildItem(
+  index: number,
+  whyItMatters: string,
+  tier: SignalSelectionEligibilityTier = "core_signal_eligible",
+  eligibilityOverrides: Partial<NonNullable<BriefingItem["selectionEligibility"]>> = {},
+) {
   return {
     id: `candidate-${index}`,
     topicId: "topic-tech",
@@ -80,6 +85,7 @@ function buildItem(index: number, whyItMatters: string, tier: SignalSelectionEli
       },
       rankingProvider: "fns",
       diversityProvider: "fns",
+      ...eligibilityOverrides,
     },
   };
 }
@@ -303,6 +309,42 @@ describe("controlled pipeline report", () => {
       validationDetails: [],
     });
     expect(report.proposedDepthRows[0].validationStatus).toBe("requires_human_rewrite");
+  });
+
+  it("keeps contextual WITM failure metadata visible for Core/Context rows with thin evidence", () => {
+    const structurallyStrong =
+      "The Federal Reserve decision matters because it can reset rate expectations and the cost of capital before the next policy move.";
+    const report = buildControlledPipelineReport({
+      mode: "dry_run",
+      testRunId: "contextual-validation-test",
+      briefing: {
+        ...buildBriefing(),
+        items: [buildItem(1, structurallyStrong, "context_signal_eligible", {
+          contentAccessibility: "partial_text_available",
+          accessibleTextLength: 178,
+          eventType: "central_bank_policy",
+        })],
+      },
+      publicRankedItems: [
+        buildItem(1, structurallyStrong, "context_signal_eligible", {
+          contentAccessibility: "partial_text_available",
+          accessibleTextLength: 178,
+          eventType: "central_bank_policy",
+        }),
+      ],
+      pipelineRun: {
+        run_id: "pipeline-test",
+        num_clusters: 1,
+      } as never,
+    });
+
+    expect(report.proposedContextRows[0]).toMatchObject({
+      validationStatus: "requires_human_rewrite",
+      validationFailures: expect.arrayContaining(["evidence_accessibility_mismatch"]),
+    });
+    expect(report.proposedContextRows[0].validationDetails).toContain(
+      "evidence_accessibility_mismatch: Core/Context WITM makes a structural claim without enough accessible source evidence.",
+    );
   });
 
   it("reports an insufficient candidate pool instead of filling weak Core slots", () => {

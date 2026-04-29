@@ -159,6 +159,152 @@ describe("why-it-matters quality gate", () => {
     }
   });
 
+  it("flags Context WITM with generic macro placeholder copy", () => {
+    const result = validateWhyItMatters(
+      "Monetary Policy in a Slow (to No) Growth Labor Market, which matters because it gives policymakers and investors a fresh read on individual decision-making. (Signal: Weak)",
+      {
+        title: "Monetary Policy in a Slow (to No) Growth Labor Market",
+        eligibilityTier: "context_signal_eligible",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 8429,
+        eventType: "macro_data_release",
+      },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("template_placeholder_language");
+  });
+
+  it("passes Context WITM with a specific structural mechanism", () => {
+    const result = validateWhyItMatters(
+      "The labor-market slowdown matters because it narrows the Federal Reserve's room to hold policy tight without increasing employment risk.",
+      {
+        title: "Monetary Policy in a Slow (to No) Growth Labor Market",
+        eligibilityTier: "context_signal_eligible",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 8429,
+        eventType: "macro_data_release",
+      },
+    );
+
+    expect(result).toEqual({
+      passed: true,
+      failures: [],
+      failureDetails: [],
+      recommendedAction: "approve",
+    });
+  });
+
+  it("flags Context WITM that only repeats the headline", () => {
+    const result = validateWhyItMatters(
+      "Fed holds rates steady, which matters because Fed holds rates steady.",
+      {
+        title: "Fed holds rates steady",
+        eligibilityTier: "context_signal_eligible",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 1200,
+        eventType: "central_bank_policy",
+      },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("summary_only_wording");
+  });
+
+  it("flags Core WITM with unsupported structural claims when evidence is thin", () => {
+    const result = validateWhyItMatters(
+      "The Federal Reserve decision matters because it can reset rate expectations and the cost of capital before the next policy move.",
+      {
+        title: "Fed Chair Powell holds briefing on interest rate decision",
+        eligibilityTier: "core_signal_eligible",
+        contentAccessibility: "partial_text_available",
+        accessibleTextLength: 178,
+        eventType: "central_bank_policy",
+      },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("evidence_accessibility_mismatch");
+  });
+
+  it("allows full-text evidence to support stronger Core/Context structural claims", () => {
+    const result = validateWhyItMatters(
+      "The Federal Reserve labor-market analysis matters because it narrows the rate path by tying employment slack to inflation pressure.",
+      {
+        title: "Monetary Policy in a Slow Growth Labor Market",
+        eligibilityTier: "context_signal_eligible",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 8429,
+        eventType: "macro_data_release",
+      },
+    );
+
+    expect(result.passed).toBe(true);
+  });
+
+  it("keeps retrospective Core rows rewrite-required instead of hiding selection weakness with better copy", () => {
+    const result = validateWhyItMatters(
+      "The SF Fed topic roundup matters because it shows which inflation, labor, and growth questions dominated institutional attention.",
+      {
+        title: "Economic Letter Countdown: Most Read Topics from 2025",
+        eligibilityTier: "core_signal_eligible",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 8129,
+        eventType: "macro_data_release",
+      },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("unsupported_structural_claim");
+    expect(result.failureDetails).toContain(
+      "unsupported_structural_claim: Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+    );
+  });
+
+  it("preserves failure metadata for rewrite-required Context rows", () => {
+    const result = validateWhyItMatters(
+      "Clean-energy policy matters because markets are watching.",
+      {
+        title: "Trumps Shady Wind Deals Arent Over Yet",
+        eligibilityTier: "context_signal_eligible",
+        contentAccessibility: "full_text_available",
+        accessibleTextLength: 7932,
+        eventType: "mna_funding",
+      },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.recommendedAction).toBe("requires_human_rewrite");
+    expect(result.failureDetails.length).toBeGreaterThan(0);
+  });
+
+  it("does not relax Core/Context standards when weak copy is Depth-only", () => {
+    const depthResult = validateWhyItMatters(
+      "Source review needed for Fed Chair Powell: partial source text is too short, so the pipeline cannot support a public structural explanation yet.",
+      {
+        title: "Fed Chair Powell holds briefing on interest rate decision",
+        eligibilityTier: "depth_only",
+        contentAccessibility: "partial_text_available",
+        accessibleTextLength: 178,
+        eventType: "central_bank_policy",
+      },
+    );
+    const contextResult = validateWhyItMatters(
+      "Source review needed for Fed Chair Powell: partial source text is too short, so the pipeline cannot support a public structural explanation yet.",
+      {
+        title: "Fed Chair Powell holds briefing on interest rate decision",
+        eligibilityTier: "context_signal_eligible",
+        contentAccessibility: "partial_text_available",
+        accessibleTextLength: 178,
+        eventType: "central_bank_policy",
+      },
+    );
+
+    expect(depthResult.failures).toContain("template_placeholder_language");
+    expect(contextResult.failures).toContain("template_placeholder_language");
+    expect(contextResult.passed).toBe(false);
+  });
+
   it("flags multiple homepage audit failure modes simultaneously from card #4", () => {
     const result = validateWhyItMatters(AUDIT_CARD_4);
 
