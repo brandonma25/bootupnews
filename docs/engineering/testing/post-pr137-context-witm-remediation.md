@@ -6,6 +6,8 @@ Remediation / alignment.
 
 This is not net-new product feature work and does not require a canonical PRD. The change aligns deterministic why-it-matters generation and validation with the existing Boot Up product standard: a curated Top 5 Core + Next 2 Context briefing with explicit structural reasoning.
 
+Classification note: this is not a bug-fix lane. It is controlled remediation/alignment after the post-PR137 diagnostic, with the engineering testing report serving as the supporting governance artifact.
+
 ## Source Of Truth
 
 - Primary diagnostic: `docs/engineering/testing/post-pr137-witm-slate-readiness-diagnostic.md`
