@@ -5,6 +5,7 @@ import type {
 import type { HomepageCategoryClassification } from "@/lib/homepage-taxonomy";
 import type { SignalRole } from "@/lib/output-sanity";
 import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
+import type { WhyItMattersValidationResult } from "@/lib/why-it-matters-quality-gate";
 import type {
   ContentAccessibility,
   SourceExtractionMethod,
@@ -158,6 +159,7 @@ export type BriefingItem = {
   keyPoints: [string, string, string];
   whyItMatters: string;
   aiWhyItMatters?: string;
+  whyItMattersValidation?: WhyItMattersValidationResult;
   editedWhyItMatters?: string | null;
   publishedWhyItMatters?: string | null;
   editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
