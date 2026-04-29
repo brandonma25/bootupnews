@@ -935,7 +935,7 @@ describe("signals editorial workflow", () => {
     const result = await persistSignalPostsForBriefing({
       briefingDate: "2026-04-27",
       mode: "draft_only",
-      items: Array.from({ length: 5 }, (_, index) => ({
+      items: Array.from({ length: 7 }, (_, index) => ({
         ...createBriefingItem(index + 1),
         aiWhyItMatters:
           index === 0
@@ -946,15 +946,17 @@ describe("signals editorial workflow", () => {
 
     expect(result.ok).toBe(true);
     expect(result.mode).toBe("draft_only");
-    expect(result.insertedCount).toBe(5);
+    expect(result.insertedCount).toBe(7);
     expect(result.insertedPostIds).toEqual([
       "inserted-1",
       "inserted-2",
       "inserted-3",
       "inserted-4",
       "inserted-5",
+      "inserted-6",
+      "inserted-7",
     ]);
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(7);
     expect(rows.every((row) => row.editorial_status === "needs_review")).toBe(true);
     expect(rows.every((row) => row.is_live === false)).toBe(true);
     expect(rows.every((row) => row.published_at === null)).toBe(true);

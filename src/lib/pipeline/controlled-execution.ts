@@ -163,6 +163,9 @@ const VALID_TARGET_ENVIRONMENTS = new Set<PipelineTargetEnvironment>([
   "staging",
   "production",
 ]);
+const CONTROLLED_DRAFT_DEFAULT_MAX_ROWS_MIN = 1;
+const CONTROLLED_DRAFT_DEFAULT_MAX_ROWS_MAX = 3;
+export const CONTROLLED_CORE_CONTEXT_PRODUCT_TARGET_MAX_ROWS = 7;
 
 function normalizeEnv(value: string | undefined) {
   return value?.trim() ?? "";
@@ -259,11 +262,32 @@ function parseDraftMaxRows(value: string | undefined) {
 
   const maxRows = Number(normalized);
 
-  if (!Number.isSafeInteger(maxRows) || maxRows < 1 || maxRows > 3) {
-    throw new Error("PIPELINE_DRAFT_MAX_ROWS must be an integer from 1 through 3.");
+  const isDefaultControlledCap =
+    Number.isSafeInteger(maxRows) &&
+    maxRows >= CONTROLLED_DRAFT_DEFAULT_MAX_ROWS_MIN &&
+    maxRows <= CONTROLLED_DRAFT_DEFAULT_MAX_ROWS_MAX;
+  const isProductTargetCap = maxRows === CONTROLLED_CORE_CONTEXT_PRODUCT_TARGET_MAX_ROWS;
+
+  if (!isDefaultControlledCap && !isProductTargetCap) {
+    throw new Error(
+      "PIPELINE_DRAFT_MAX_ROWS must be 1, 2, or 3 for normal controlled selection, " +
+        "or exactly 7 for the product-target Core/Context draft_only test.",
+    );
   }
 
   return maxRows;
+}
+
+function isCoreContextProductTargetDraftSelection(config: ControlledPipelineConfig) {
+  const allowedTiers = new Set(config.draftTierAllowlist ?? []);
+
+  return (
+    config.mode === "draft_only" &&
+    config.draftMaxRows === CONTROLLED_CORE_CONTEXT_PRODUCT_TARGET_MAX_ROWS &&
+    allowedTiers.size === 2 &&
+    allowedTiers.has("core_signal_eligible") &&
+    allowedTiers.has("context_signal_eligible")
+  );
 }
 
 export function resolveControlledPipelineConfig(env: NodeJS.ProcessEnv = process.env): ControlledPipelineConfig {
@@ -304,7 +328,17 @@ export function assertControlledPipelineCanExecute(config: ControlledPipelineCon
   }
 
   if (config.draftTierAllowlist && config.draftMaxRows === null) {
-    throw new Error("PIPELINE_DRAFT_TIER_ALLOWLIST requires PIPELINE_DRAFT_MAX_ROWS=1, 2, or 3.");
+    throw new Error("PIPELINE_DRAFT_TIER_ALLOWLIST requires PIPELINE_DRAFT_MAX_ROWS=1, 2, 3, or the Core/Context product-target cap of 7.");
+  }
+
+  if (
+    config.draftMaxRows === CONTROLLED_CORE_CONTEXT_PRODUCT_TARGET_MAX_ROWS &&
+    !isCoreContextProductTargetDraftSelection(config)
+  ) {
+    throw new Error(
+      "PIPELINE_DRAFT_MAX_ROWS=7 is allowed only for mode=draft_only with " +
+        "PIPELINE_DRAFT_TIER_ALLOWLIST=core,context. Depth rows and other modes remain excluded.",
+    );
   }
 
   if (config.mode !== "draft_only") {
