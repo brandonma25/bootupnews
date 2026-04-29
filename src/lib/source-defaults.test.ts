@@ -39,6 +39,16 @@ describe("MVP default source governance", () => {
     "guardian-world",
     "hacker-news-best",
   ];
+  const guardedBatchTwoASourceIds = [
+    "semafor",
+    "axios",
+    "404-media",
+    "heatmap",
+    "guardian-world",
+    "pbs-newshour",
+    "sec-press-releases",
+    "france24",
+  ];
   const pausedTldrSourceIds = [
     "source-tldr-tech",
     "source-tldr-ai",
@@ -74,6 +84,10 @@ describe("MVP default source governance", () => {
       expect.arrayContaining(["BBC World News", "MarketWatch", "ZeroHedge", "AP Top News"]),
     );
     expect(defaultSourceIds.has("source-bbc-world")).toBe(false);
+    expect(defaultSourceIds.has("source-semafor")).toBe(false);
+    expect(defaultSourceIds.has("source-axios")).toBe(false);
+    expect(defaultSourceIds.has("source-404-media")).toBe(false);
+    expect(defaultSourceIds.has("source-sec-press-releases")).toBe(false);
     expect(areMvpDefaultPublicSources(demoSources)).toBe(false);
     expect(recommendedSources.some((source) => source.lifecycleStatus === "active_default")).toBe(false);
 
@@ -157,6 +171,9 @@ describe("MVP default source governance", () => {
     const probationaryRuntimeSourceIds = new Set(PROBATIONARY_RUNTIME_FEED_IDS);
 
     for (const sourceId of guardedBatchOneSourceIds) {
+      expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
+    }
+    for (const sourceId of guardedBatchTwoASourceIds) {
       expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
     }
     expect(probationaryRuntimeSourceIds.has("bbc")).toBe(false);

@@ -44,6 +44,21 @@ describe("source preference policy", () => {
       .toBe("tier1");
   });
 
+  it("classifies Batch 2A additions through explicit host and institutional rules", () => {
+    expect(classifySourcePreference({ sourceName: "Semafor", url: "https://www.semafor.com/story" })).toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "Axios", url: "https://www.axios.com/story" })).toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "404 Media", url: "https://www.404media.co/story" })).toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "Heatmap", url: "https://heatmap.news/story" })).toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "The Guardian World", url: "https://www.theguardian.com/world/story" }))
+      .toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "PBS NewsHour", url: "https://www.pbs.org/newshour/story" }))
+      .toBe("tier2");
+    expect(classifySourcePreference({ sourceName: "SEC Press Releases", url: "https://www.sec.gov/news/press-release/story" }))
+      .toBe("tier1");
+    expect(classifySourcePreference({ sourceName: "France24", url: "https://www.france24.com/en/story" }))
+      .toBe("tier2");
+  });
+
   it("keeps Ars Technica at tier2 in source-policy despite donor metadata differences", () => {
     const serializedRules = JSON.stringify(SOURCE_PREFERENCE_RULES);
 

@@ -6,6 +6,17 @@ import {
   PUBLIC_SURFACE_SOURCE_MANIFEST,
 } from "@/lib/source-manifest";
 
+const batch2ASourceIds = [
+  "source-semafor",
+  "source-axios",
+  "source-404-media",
+  "source-heatmap",
+  "source-guardian-world",
+  "source-pbs-newshour",
+  "source-sec-press-releases",
+  "source-france24",
+];
+
 describe("public source manifest", () => {
   afterEach(() => {
     vi.doUnmock("@/lib/demo-data");
@@ -18,12 +29,13 @@ describe("public source manifest", () => {
     expect(sources).toHaveLength(PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"].length);
   });
 
-  it("includes Category 1 sources in the public.home source plan", () => {
+  it("includes governed Batch 1 and Batch 2A sources in the public.home source plan", () => {
     const sources = getSourcesForPublicSurface("public.home");
     const sourceIds = sources.map((source) => source.id);
 
-    expect(sources).toHaveLength(26);
-    expect(sourceIds[2]).toBe("source-mit-tech-review");
+    expect(sources).toHaveLength(34);
+    expect(sourceIds).toEqual([...PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]]);
+    expect(batch2ASourceIds.every((sourceId) => sourceIds.includes(sourceId))).toBe(true);
     expect(sources.find((source) => source.id === "source-mit-tech-review")).toMatchObject({
       name: "MIT Technology Review",
       feedUrl: "https://www.technologyreview.com/feed/",
@@ -31,73 +43,55 @@ describe("public source manifest", () => {
       topicName: "Tech",
       status: "active",
     });
-    expect(sourceIds[5]).toBe("source-reuters-business");
-    expect(sources.find((source) => source.id === "source-reuters-business")).toMatchObject({
-      name: "Reuters Business",
-      feedUrl: "https://feeds.reuters.com/reuters/businessNews",
-      homepageUrl: "https://www.reuters.com/business/",
+    expect(sources.find((source) => source.id === "source-404-media")).toMatchObject({
+      name: "404 Media",
+      feedUrl: "https://www.404media.co/rss/",
+      homepageUrl: "https://www.404media.co",
+      topicName: "Tech",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-sec-press-releases")).toMatchObject({
+      name: "SEC Press Releases",
+      feedUrl: "https://www.sec.gov/news/pressreleases.rss",
       topicName: "Finance",
       status: "active",
     });
-    expect(sourceIds.slice(6, 17)).toEqual([
-      "source-npr-business",
-      "source-npr-economy",
-      "source-fed-press-all",
-      "source-fed-monetary-policy",
-      "source-bls-latest",
-      "source-bls-cpi",
-      "source-bls-employment-situation",
-      "source-cnbc-business",
-      "source-cnbc-economy",
-      "source-cnbc-finance",
-      "source-marketwatch",
-    ]);
-    expect(sources.find((source) => source.id === "source-fed-press-all")).toMatchObject({
-      name: "Federal Reserve Press Releases",
-      feedUrl: "https://www.federalreserve.gov/feeds/press_all.xml",
+    expect(sources.find((source) => source.id === "source-heatmap")).toMatchObject({
+      name: "Heatmap",
+      feedUrl: "https://heatmap.news/feeds/feed.rss",
       topicName: "Finance",
       status: "active",
     });
-    expect(sources.find((source) => source.id === "source-bls-cpi")).toMatchObject({
-      name: "BLS Consumer Price Index",
-      feedUrl: "https://www.bls.gov/feed/cpi.rss",
-      topicName: "Finance",
-      status: "active",
-    });
-    expect(sources.find((source) => source.id === "source-cnbc-finance")).toMatchObject({
-      name: "CNBC Finance",
-      feedUrl: "https://www.cnbc.com/id/10000664/device/rss/rss.html",
-      topicName: "Finance",
-      status: "active",
-    });
-    expect(sourceIds).toContain("source-bbc-world");
-    expect(sourceIds[17]).toBe("source-bbc-world");
-    expect(sources.find((source) => source.id === "source-bbc-world")).toMatchObject({
-      name: "BBC World News",
-      feedUrl: "http://feeds.bbci.co.uk/news/world/rss.xml",
-      homepageUrl: "https://www.bbc.com/news/world",
+    expect(sources.find((source) => source.id === "source-guardian-world")).toMatchObject({
+      name: "The Guardian World",
+      feedUrl: "https://www.theguardian.com/world/rss",
       topicName: "World",
       status: "active",
     });
-    expect(sourceIds[18]).toBe("source-foreign-affairs");
-    expect(sources.find((source) => source.id === "source-foreign-affairs")).toMatchObject({
-      name: "Foreign Affairs",
-      feedUrl: "https://www.foreignaffairs.com/rss.xml",
-      homepageUrl: "https://www.foreignaffairs.com",
+    expect(sources.find((source) => source.id === "source-pbs-newshour")).toMatchObject({
+      name: "PBS NewsHour",
+      feedUrl: "https://www.pbs.org/newshour/feeds/rss/headlines",
+      topicName: "Politics",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-france24")).toMatchObject({
+      name: "France24",
+      feedUrl: "https://www.france24.com/en/rss",
       topicName: "World",
       status: "active",
     });
-    expect(sourceIds.slice(19, 23)).toEqual([
-      "source-npr-world",
-      "source-npr-politics",
-      "source-propublica-main",
-      "source-cnbc-politics",
-    ]);
-    expect(sourceIds.slice(23)).toEqual([
-      "source-politico-politics",
-      "source-politico-congress",
-      "source-politico-defense",
-    ]);
+    expect(sources.find((source) => source.id === "source-semafor")).toMatchObject({
+      name: "Semafor",
+      feedUrl: "https://www.semafor.com/rss.xml",
+      topicName: "Politics",
+      status: "active",
+    });
+    expect(sources.find((source) => source.id === "source-axios")).toMatchObject({
+      name: "Axios",
+      feedUrl: "https://www.axios.com/feeds/feed.rss",
+      topicName: "Politics",
+      status: "active",
+    });
   });
 
   it("preserves manifest ordering", () => {
@@ -114,12 +108,14 @@ describe("public source manifest", () => {
       "source-ars",
       "source-mit-tech-review",
       "source-techcrunch",
+      "source-404-media",
       "source-ft",
       "source-reuters-business",
       "source-npr-business",
       "source-npr-economy",
       "source-fed-press-all",
       "source-fed-monetary-policy",
+      "source-sec-press-releases",
       "source-bls-latest",
       "source-bls-cpi",
       "source-bls-employment-situation",
@@ -127,11 +123,17 @@ describe("public source manifest", () => {
       "source-cnbc-economy",
       "source-cnbc-finance",
       "source-marketwatch",
+      "source-heatmap",
       "source-bbc-world",
+      "source-guardian-world",
       "source-foreign-affairs",
       "source-npr-world",
       "source-npr-politics",
+      "source-pbs-newshour",
+      "source-france24",
       "source-propublica-main",
+      "source-semafor",
+      "source-axios",
       "source-cnbc-politics",
       "source-politico-politics",
       "source-politico-congress",
@@ -142,6 +144,9 @@ describe("public source manifest", () => {
       "Tech",
       "Tech",
       "Tech",
+      "Tech",
+      "Finance",
+      "Finance",
       "Finance",
       "Finance",
       "Finance",
@@ -158,6 +163,11 @@ describe("public source manifest", () => {
       "World",
       "World",
       "World",
+      "World",
+      "Politics",
+      "Politics",
+      "World",
+      "Politics",
       "Politics",
       "Politics",
       "Politics",
@@ -174,7 +184,7 @@ describe("public source manifest", () => {
       plan: "public_manifest",
       surface: "public.home",
       suppliedByManifest: true,
-      sourceCount: 26,
+      sourceCount: 34,
       warnings: [],
     });
     expect(sourcePlan.sources).toEqual(
@@ -186,19 +196,13 @@ describe("public source manifest", () => {
           publicEligible: true,
         }),
         expect.objectContaining({
-          id: "source-politico-congress",
-          sourceRole: "secondary_authoritative",
-          sourceTier: "tier2",
-          publicEligible: true,
-        }),
-        expect.objectContaining({
           id: "source-fed-press-all",
           sourceRole: "primary_institutional",
           sourceTier: "tier1",
           publicEligible: true,
         }),
         expect.objectContaining({
-          id: "source-bls-employment-situation",
+          id: "source-sec-press-releases",
           sourceRole: "primary_institutional",
           sourceTier: "tier1",
           publicEligible: true,
@@ -215,11 +219,21 @@ describe("public source manifest", () => {
           sourceTier: "tier1",
           publicEligible: true,
         }),
+        ...batch2ASourceIds
+          .filter((sourceId) => sourceId !== "source-sec-press-releases")
+          .map((sourceId) =>
+            expect.objectContaining({
+              id: sourceId,
+              sourceRole: "secondary_authoritative",
+              sourceTier: "tier2",
+              publicEligible: true,
+            }),
+          ),
       ]),
     );
   });
 
-  it("keeps TLDR, AP Politics, Congress.gov, and unapproved batch sources outside the public manifest", () => {
+  it("keeps TLDR, AP Politics, Congress.gov, and deferred Batch 2B/2C sources outside the public manifest", () => {
     const manifestIds = new Set(PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]);
 
     expect([...manifestIds].some((sourceId) => sourceId.includes("tldr"))).toBe(false);
@@ -230,6 +244,13 @@ describe("public source manifest", () => {
     expect(manifestIds.has("source-cnbc-technology")).toBe(false);
     expect(manifestIds.has("source-marketwatch-market-pulse")).toBe(false);
     expect(manifestIds.has("source-treasury-press-releases")).toBe(false);
+    expect(manifestIds.has("source-nyt")).toBe(false);
+    expect(manifestIds.has("source-wsj")).toBe(false);
+    expect(manifestIds.has("source-bloomberg")).toBe(false);
+    expect(manifestIds.has("source-economist")).toBe(false);
+    expect(manifestIds.has("source-wired")).toBe(false);
+    expect(manifestIds.has("source-al-jazeera")).toBe(false);
+    expect(manifestIds.has("source-dw")).toBe(false);
   });
 
   it("throws a descriptive error when a declared source is missing from demoSources", async () => {
