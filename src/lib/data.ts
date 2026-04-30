@@ -232,6 +232,8 @@ type BriefingSummaryFields = Pick<
 
 const LLM_SUMMARY_TIMEOUT_MS = 7000;
 const DEFAULT_ACCOUNT_CATEGORIES: AccountCategoryPreference[] = ["tech", "finance", "politics"];
+const PUBLIC_BRIEFING_TEMPORARILY_UNAVAILABLE_MESSAGE =
+  "The published briefing is temporarily unavailable while the latest edition is verified.";
 
 function createEmptyBriefing(): DailyBriefing {
   return {
@@ -515,7 +517,9 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const sources = getSourcesForPublicSurface("public.home");
 
   if (homepageSignalSnapshot.posts.length === 0) {
-    return buildEmptyPublicHomepageData(homepageSignalSnapshot.errorMessage);
+    return buildEmptyPublicHomepageData(
+      homepageSignalSnapshot.errorMessage ? PUBLIC_BRIEFING_TEMPORARILY_UNAVAILABLE_MESSAGE : undefined,
+    );
   }
 
   const firstBriefingDate = homepageSignalSnapshot.briefingDate ?? homepageSignalSnapshot.posts[0]?.briefingDate;

@@ -30,7 +30,37 @@ import {
 export const SIGNALS_EDITORIAL_ROUTE = "/dashboard/signals/editorial-review";
 export const PUBLIC_SIGNALS_ROUTE = "/signals";
 
-const SIGNAL_POST_REQUIRED_COLUMNS = [
+const PUBLIC_SIGNAL_POST_REQUIRED_COLUMNS = [
+  "id",
+  "briefing_date",
+  "rank",
+  "title",
+  "source_name",
+  "source_url",
+  "summary",
+  "tags",
+  "signal_score",
+  "selection_reason",
+  "published_why_it_matters",
+  "published_why_it_matters_payload",
+  "why_it_matters_validation_status",
+  "why_it_matters_validation_failures",
+  "why_it_matters_validation_details",
+  "why_it_matters_validated_at",
+  "editorial_status",
+  "published_at",
+  "is_live",
+  "created_at",
+  "updated_at",
+];
+
+const PUBLIC_SIGNAL_POST_OPTIONAL_PLACEMENT_COLUMNS = [
+  "final_slate_rank",
+  "final_slate_tier",
+  "editorial_decision",
+];
+
+const ADMIN_SIGNAL_POST_REQUIRED_COLUMNS = [
   "id",
   "briefing_date",
   "rank",
@@ -70,7 +100,12 @@ const SIGNAL_POST_REQUIRED_COLUMNS = [
   "updated_at",
 ];
 
-const SIGNAL_POST_SELECT = SIGNAL_POST_REQUIRED_COLUMNS.join(", ");
+const SIGNAL_POST_SELECT = ADMIN_SIGNAL_POST_REQUIRED_COLUMNS.join(", ");
+const PUBLIC_SIGNAL_POST_BASE_SELECT = PUBLIC_SIGNAL_POST_REQUIRED_COLUMNS.join(", ");
+const PUBLIC_SIGNAL_POST_WITH_OPTIONAL_PLACEMENT_SELECT = [
+  ...PUBLIC_SIGNAL_POST_REQUIRED_COLUMNS,
+  ...PUBLIC_SIGNAL_POST_OPTIONAL_PLACEMENT_COLUMNS,
+].join(", ");
 
 const PUBLISHED_SLATE_REQUIRED_COLUMNS = [
   "id",
@@ -367,6 +402,20 @@ export type HomepageSignalSnapshot = {
   errorMessage?: string;
 };
 
+export type PublicSignalsPageState =
+  | {
+      kind: "published";
+      posts: EditorialSignalPost[];
+    }
+  | {
+      kind: "empty";
+      posts: [];
+    }
+  | {
+      kind: "temporarily_unavailable";
+      posts: [];
+    };
+
 type SignalPostsSchemaPreflightResult =
   | {
       ok: true;
@@ -380,6 +429,8 @@ type SignalPostsSchemaPreflightResult =
     };
 
 let signalPostsSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
+let publicSignalPostsSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
+let publicSignalPostsOptionalPlacementPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
 let publishedSlateAuditSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
 
 function buildSchemaPreflightFailure(label: string, missingColumns: string[]): SignalPostsSchemaPreflightResult {
@@ -444,12 +495,20 @@ function isMissingRelationError(error: unknown, tableName: string) {
 
 async function runSignalPostsSchemaPreflight(
   client: EditorialClient,
+  input: {
+    columns?: string[];
+    label?: string;
+    failureBuilder?: (missingColumns: string[]) => SignalPostsSchemaPreflightResult;
+    logLevel?: "warn" | "error";
+  } = {},
 ): Promise<SignalPostsSchemaPreflightResult> {
+  const columns = input.columns ?? ADMIN_SIGNAL_POST_REQUIRED_COLUMNS;
+  const label = input.label ?? "signal_posts schema preflight";
   const missingColumns: string[] = [];
   const errorMessages: string[] = [];
   const nonSchemaErrorMessages: string[] = [];
 
-  for (const column of SIGNAL_POST_REQUIRED_COLUMNS) {
+  for (const column of columns) {
     const result = await client.from("signal_posts").select(column).limit(0);
 
     if (result.error && isMissingColumnError(result.error, column)) {
@@ -461,7 +520,7 @@ async function runSignalPostsSchemaPreflight(
   }
 
   if (nonSchemaErrorMessages.length > 0 && missingColumns.length === 0) {
-    logServerEvent("warn", "signal_posts schema preflight could not verify columns", {
+    logServerEvent("warn", `${label} could not verify columns`, {
       errorMessages: nonSchemaErrorMessages,
     });
   }
@@ -474,9 +533,11 @@ async function runSignalPostsSchemaPreflight(
     };
   }
 
-  const failure = buildSignalPostsSchemaPreflightFailure(missingColumns);
+  const failure = input.failureBuilder
+    ? input.failureBuilder(missingColumns)
+    : buildSignalPostsSchemaPreflightFailure(missingColumns);
 
-  logServerEvent("error", "signal_posts schema preflight failed", {
+  logServerEvent(input.logLevel ?? "error", `${label} failed`, {
     missingColumns,
     errorMessages,
   });
@@ -489,6 +550,31 @@ function getSignalPostsSchemaPreflight(
 ): Promise<SignalPostsSchemaPreflightResult> {
   signalPostsSchemaPreflightPromise ??= runSignalPostsSchemaPreflight(client);
   return signalPostsSchemaPreflightPromise;
+}
+
+function getPublicSignalPostsSchemaPreflight(
+  client: EditorialClient,
+): Promise<SignalPostsSchemaPreflightResult> {
+  publicSignalPostsSchemaPreflightPromise ??= runSignalPostsSchemaPreflight(client, {
+    columns: PUBLIC_SIGNAL_POST_REQUIRED_COLUMNS,
+    label: "public signal_posts schema preflight",
+    failureBuilder: (missingColumns) => buildSchemaPreflightFailure("public signal_posts", missingColumns),
+    logLevel: "warn",
+  });
+  return publicSignalPostsSchemaPreflightPromise;
+}
+
+function getPublicSignalPostsOptionalPlacementPreflight(
+  client: EditorialClient,
+): Promise<SignalPostsSchemaPreflightResult> {
+  publicSignalPostsOptionalPlacementPreflightPromise ??= runSignalPostsSchemaPreflight(client, {
+    columns: PUBLIC_SIGNAL_POST_OPTIONAL_PLACEMENT_COLUMNS,
+    label: "public optional signal_posts placement preflight",
+    failureBuilder: (missingColumns) =>
+      buildSchemaPreflightFailure("public optional signal_posts placement", missingColumns),
+    logLevel: "warn",
+  });
+  return publicSignalPostsOptionalPlacementPreflightPromise;
 }
 
 async function runPublishedSlateAuditSchemaPreflight(
@@ -659,6 +745,51 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
     updatedAt: row.updated_at,
     persisted: true,
   };
+}
+
+function mapStoredPublicSignalPost(row: Partial<StoredSignalPost> & Pick<
+  StoredSignalPost,
+  | "id"
+  | "briefing_date"
+  | "rank"
+  | "title"
+  | "source_name"
+  | "source_url"
+  | "summary"
+  | "tags"
+  | "signal_score"
+  | "selection_reason"
+  | "published_why_it_matters"
+  | "published_why_it_matters_payload"
+  | "why_it_matters_validation_status"
+  | "why_it_matters_validation_failures"
+  | "why_it_matters_validation_details"
+  | "why_it_matters_validated_at"
+  | "editorial_status"
+  | "published_at"
+  | "is_live"
+  | "created_at"
+  | "updated_at"
+>) {
+  return mapStoredSignalPost({
+    ai_why_it_matters: "",
+    edited_why_it_matters: null,
+    edited_why_it_matters_payload: null,
+    final_slate_rank: null,
+    final_slate_tier: null,
+    editorial_decision: null,
+    decision_note: null,
+    rejected_reason: null,
+    held_reason: null,
+    replacement_of_row_id: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    edited_by: null,
+    edited_at: null,
+    approved_by: null,
+    approved_at: null,
+    ...row,
+  });
 }
 
 function normalizeStringArrayFromJson(value: unknown): string[] {
@@ -1275,6 +1406,7 @@ async function loadPublishedHomepageSnapshotForDate(
   client: EditorialClient,
   briefingDate: string | null,
   limit: number,
+  selectColumns: string,
 ) {
   if (!briefingDate) {
     return [];
@@ -1282,7 +1414,7 @@ async function loadPublishedHomepageSnapshotForDate(
 
   const result = await client
     .from("signal_posts")
-    .select(SIGNAL_POST_SELECT)
+    .select(selectColumns)
     .eq("briefing_date", briefingDate)
     .eq("is_live", true)
     .eq("editorial_status", "published")
@@ -1295,7 +1427,8 @@ async function loadPublishedHomepageSnapshotForDate(
   }
 
   return selectPublicSlatePosts(
-    ((result.data ?? []) as unknown as StoredSignalPost[]).map(mapStoredSignalPost),
+    ((result.data ?? []) as unknown as Array<Parameters<typeof mapStoredPublicSignalPost>[0]>)
+      .map(mapStoredPublicSignalPost),
     limit,
   );
 }
@@ -1303,10 +1436,11 @@ async function loadPublishedHomepageSnapshotForDate(
 async function loadMostRecentPublishedHomepageSnapshot(
   client: EditorialClient,
   limit: number,
+  selectColumns: string,
 ) {
   const result = await client
     .from("signal_posts")
-    .select(SIGNAL_POST_SELECT)
+    .select(selectColumns)
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
@@ -1322,8 +1456,8 @@ async function loadMostRecentPublishedHomepageSnapshot(
     };
   }
 
-  const publishedPosts = ((result.data ?? []) as unknown as StoredSignalPost[])
-    .map(mapStoredSignalPost)
+  const publishedPosts = ((result.data ?? []) as unknown as Array<Parameters<typeof mapStoredPublicSignalPost>[0]>)
+    .map(mapStoredPublicSignalPost)
     .filter(isPublicSlatePost);
   const briefingDate = publishedPosts[0]?.briefingDate ?? null;
 
@@ -1335,6 +1469,28 @@ async function loadMostRecentPublishedHomepageSnapshot(
           limit,
         )
       : [],
+  };
+}
+
+async function getPublicSignalPostSelect(client: EditorialClient) {
+  const schemaPreflight = await getPublicSignalPostsSchemaPreflight(client);
+
+  if (!schemaPreflight.ok) {
+    return {
+      ok: false as const,
+      selectColumns: null,
+      errorMessage: schemaPreflight.message,
+    };
+  }
+
+  const optionalPlacementPreflight = await getPublicSignalPostsOptionalPlacementPreflight(client);
+
+  return {
+    ok: true as const,
+    selectColumns: optionalPlacementPreflight.ok
+      ? PUBLIC_SIGNAL_POST_WITH_OPTIONAL_PLACEMENT_SELECT
+      : PUBLIC_SIGNAL_POST_BASE_SELECT,
+    errorMessage: null,
   };
 }
 
@@ -2963,22 +3119,28 @@ export async function publishSignalPost(input: {
   };
 }
 
-async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalPost[]> {
+async function loadPublishedSignalPostsState(limit: number): Promise<PublicSignalsPageState> {
   const supabase = createSupabaseServiceRoleClient();
 
   if (!supabase) {
-    return [];
+    return {
+      kind: "temporarily_unavailable",
+      posts: [],
+    };
   }
 
-  const schemaPreflight = await getSignalPostsSchemaPreflight(supabase);
+  const publicSelect = await getPublicSignalPostSelect(supabase);
 
-  if (!schemaPreflight.ok) {
-    return [];
+  if (!publicSelect.ok) {
+    return {
+      kind: "temporarily_unavailable",
+      posts: [],
+    };
   }
 
   const result = await supabase
     .from("signal_posts")
-    .select(SIGNAL_POST_SELECT)
+    .select(publicSelect.selectColumns)
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
@@ -2992,24 +3154,43 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
       route: PUBLIC_SIGNALS_ROUTE,
       errorMessage: result.error.message,
     });
-    return [];
+    return {
+      kind: "temporarily_unavailable",
+      posts: [],
+    };
   }
 
-  const publishedPosts = ((result.data ?? []) as unknown as StoredSignalPost[])
-    .map(mapStoredSignalPost)
+  const publishedPosts = ((result.data ?? []) as unknown as Array<Parameters<typeof mapStoredPublicSignalPost>[0]>)
+    .map(mapStoredPublicSignalPost)
     .filter(isPublicSlatePost);
   const briefingDate = publishedPosts[0]?.briefingDate ?? null;
 
-  return briefingDate
+  const posts = briefingDate
     ? selectPublicSlatePosts(
         publishedPosts.filter((post) => post.briefingDate === briefingDate),
         limit,
       )
     : [];
+
+  return posts.length > 0
+    ? {
+        kind: "published",
+        posts,
+      }
+    : {
+        kind: "empty",
+        posts: [],
+      };
 }
 
 export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> {
-  return (await loadPublishedSignalPosts(PUBLIC_SIGNAL_SET_SIZE)).slice(0, PUBLIC_SIGNAL_SET_SIZE);
+  const state = await loadPublishedSignalPostsState(PUBLIC_SIGNAL_SET_SIZE);
+
+  return state.kind === "published" ? state.posts.slice(0, PUBLIC_SIGNAL_SET_SIZE) : [];
+}
+
+export async function getPublicSignalsPageState(): Promise<PublicSignalsPageState> {
+  return loadPublishedSignalPostsState(PUBLIC_SIGNAL_SET_SIZE);
 }
 
 export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): Promise<HomepageSignalSnapshot> {
@@ -3024,15 +3205,15 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
     };
   }
 
-  const schemaPreflight = await getSignalPostsSchemaPreflight(supabase);
+  const publicSelect = await getPublicSignalPostSelect(supabase);
 
-  if (!schemaPreflight.ok) {
+  if (!publicSelect.ok) {
     return {
       source: "none",
       posts: [],
       depthPosts: [],
       briefingDate: null,
-      errorMessage: schemaPreflight.message,
+      errorMessage: publicSelect.errorMessage,
     };
   }
 
@@ -3041,6 +3222,7 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
     supabase,
     todayKey,
     PUBLIC_SIGNAL_SET_SIZE,
+    publicSelect.selectColumns,
   );
   const todayPosts = todayDepthPosts.slice(0, TOP_SIGNAL_SET_SIZE);
 
@@ -3056,6 +3238,7 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
   const recentSnapshot = await loadMostRecentPublishedHomepageSnapshot(
     supabase,
     PUBLIC_SIGNAL_SET_SIZE,
+    publicSelect.selectColumns,
   );
   const recentPosts = recentSnapshot.posts.slice(0, TOP_SIGNAL_SET_SIZE);
 
