@@ -102,6 +102,14 @@ export type EventIntelligence = {
 
 export type EventDisplayState = "new" | "changed" | "escalated" | "unchanged";
 export type EditorialStatus = "draft" | "needs_review" | "approved" | "published";
+export type EditorialDecision =
+  | "pending_review"
+  | "draft_edited"
+  | "approved"
+  | "rewrite_requested"
+  | "rejected"
+  | "held"
+  | "removed_from_slate";
 export type SignalSelectionEligibilityTier =
   | "core_signal_eligible"
   | "context_signal_eligible"

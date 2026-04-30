@@ -13,9 +13,13 @@ import {
   approveSignalPost,
   approveSignalPosts,
   assignSignalPostToFinalSlateSlot,
+  holdSignalPost,
   publishApprovedSignals,
   publishSignalPost,
+  rejectSignalPost,
   removeSignalPostFromFinalSlate,
+  replaceSignalPostInFinalSlate,
+  requestSignalPostRewrite,
   resetSignalPostToAiDraft,
   saveSignalDraft,
   type EditorialMutationResult,
@@ -132,6 +136,45 @@ export async function resetSignalPostToAiDraftAction(formData: FormData) {
   redirectWithResult(result);
 }
 
+export async function requestRewriteAction(formData: FormData) {
+  const result = await requestSignalPostRewrite({
+    postId: String(formData.get("postId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function rejectSignalPostAction(formData: FormData) {
+  const result = await rejectSignalPost({
+    postId: String(formData.get("postId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function holdSignalPostAction(formData: FormData) {
+  const result = await holdSignalPost({
+    postId: String(formData.get("postId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
 export async function publishTopSignalsAction() {
   const result = await publishApprovedSignals();
 
@@ -170,6 +213,20 @@ export async function assignFinalSlateSlotAction(formData: FormData) {
 export async function removeFromFinalSlateAction(formData: FormData) {
   const result = await removeSignalPostFromFinalSlate({
     postId: String(formData.get("postId") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function replaceFinalSlateSlotAction(formData: FormData) {
+  const result = await replaceSignalPostInFinalSlate({
+    originalPostId: String(formData.get("originalPostId") ?? ""),
+    replacementPostId: String(formData.get("replacementPostId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
   });
 
   if (result.ok) {

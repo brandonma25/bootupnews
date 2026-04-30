@@ -11,6 +11,7 @@ import {
   assignFinalSlateSlotAction,
   approveAllSignalPostsAction,
   removeFromFinalSlateAction,
+  replaceFinalSlateSlotAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
 import { ApproveAllButton } from "@/app/dashboard/signals/editorial-review/ApproveAllButton";
 import { SignalPostEditor } from "@/app/dashboard/signals/editorial-review/StructuredEditorialFields";
@@ -357,6 +358,7 @@ function FinalSlateComposer({
                 post={candidates.find((candidate) => candidate.finalSlateRank === rank) ?? null}
                 rowFailures={readiness.rowFailures}
                 slotFailures={readiness.slotFailures[rank] ?? []}
+                candidates={candidates}
                 storageReady={storageReady}
               />
             ))}
@@ -428,16 +430,21 @@ function FinalSlateSlot({
   post,
   rowFailures,
   slotFailures,
+  candidates,
   storageReady,
 }: {
   rank: number;
   post: EditorialSignalPost | null;
   rowFailures: Record<string, string[]>;
   slotFailures: string[];
+  candidates: EditorialSignalPost[];
   storageReady: boolean;
 }) {
   const tier = getFinalSlateTierForRank(rank);
   const failures = post ? rowFailures[post.id] ?? [] : slotFailures;
+  const replacements = post ? getEligibleReplacementCandidates(candidates, post) : [];
+  const previousRank = rank > 1 ? rank - 1 : null;
+  const nextRank = rank < 7 ? rank + 1 : null;
 
   return (
     <div className="min-h-56 rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
@@ -454,6 +461,10 @@ function FinalSlateSlot({
           <div className="flex flex-wrap gap-2">
             <Badge>{post.whyItMattersValidationStatus === "passed" ? "WITM passed" : "WITM rewrite required"}</Badge>
             <Badge>{post.editorialStatus}</Badge>
+            <Badge>{formatDecision(post.editorialDecision)}</Badge>
+            {post.replacementOfRowId ? <Badge>Replacement</Badge> : null}
+            {post.isLive ? <Badge>Live warning</Badge> : null}
+            {post.publishedAt ? <Badge>Published warning</Badge> : null}
           </div>
           {failures.length > 0 ? (
             <ul className="space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
@@ -465,9 +476,57 @@ function FinalSlateSlot({
           <form action={removeFromFinalSlateAction}>
             <input type="hidden" name="postId" value={post.id} />
             <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
-              Remove
+              Demote / Remove
             </Button>
           </form>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {previousRank ? (
+              <form action={assignFinalSlateSlotAction}>
+                <input type="hidden" name="postId" value={post.id} />
+                <input type="hidden" name="finalSlateRank" value={previousRank} />
+                <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+                  Move Up
+                </Button>
+              </form>
+            ) : null}
+            {nextRank ? (
+              <form action={assignFinalSlateSlotAction}>
+                <input type="hidden" name="postId" value={post.id} />
+                <input type="hidden" name="finalSlateRank" value={nextRank} />
+                <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+                  Move Down
+                </Button>
+              </form>
+            ) : null}
+          </div>
+          {replacements.length > 0 ? (
+            <form action={replaceFinalSlateSlotAction} className="space-y-2 rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
+              <input type="hidden" name="originalPostId" value={post.id} />
+              <label className="section-label" htmlFor={`replacementPostId-${post.id}`}>Replace with</label>
+              <select
+                id={`replacementPostId-${post.id}`}
+                name="replacementPostId"
+                className="w-full rounded-button border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                required
+              >
+                {replacements.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.title} - {candidate.sourceName || "Missing source"}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                name="decisionNote"
+                rows={2}
+                placeholder="Replacement reason"
+                className="w-full resize-y rounded-button border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                required
+              />
+              <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+                Replace
+              </Button>
+            </form>
+          ) : null}
         </div>
       ) : (
         <div className="flex min-h-36 flex-col justify-between gap-3">
@@ -492,7 +551,13 @@ function FinalSlateCandidateRow({
   rowFailures: string[];
   storageReady: boolean;
 }) {
-  const canAssign = storageReady && post.persisted && !post.isLive && post.editorialStatus !== "published" && !post.publishedAt;
+  const canAssign =
+    storageReady &&
+    post.persisted &&
+    !post.isLive &&
+    post.editorialStatus !== "published" &&
+    !post.publishedAt &&
+    !isBlockingDecision(post.editorialDecision);
   const placement = post.finalSlateRank ? formatSlotLabel(post.finalSlateRank) : "Not selected";
 
   return (
@@ -501,7 +566,12 @@ function FinalSlateCandidateRow({
         <div className="flex flex-wrap items-center gap-2">
           <Badge>Pipeline rank {post.rank}</Badge>
           <Badge>{placement}</Badge>
+          {post.finalSlateRank ? <Badge>Selected for final slate</Badge> : null}
+          {post.finalSlateTier ? <Badge>{post.finalSlateTier === "core" ? "Core" : "Context"}</Badge> : null}
           <Badge>{post.editorialStatus}</Badge>
+          <Badge>{formatDecision(post.editorialDecision)}</Badge>
+          {post.replacementOfRowId ? <Badge>Replacement</Badge> : null}
+          <Badge>{post.whyItMattersValidationStatus === "passed" ? "WITM passed" : "WITM failed / requires rewrite"}</Badge>
           <Badge>{post.isLive ? "Live" : "Non-live"}</Badge>
           <Badge>{post.publishedAt ? "Published date set" : "Unpublished"}</Badge>
         </div>
@@ -531,9 +601,9 @@ function FinalSlateCandidateRow({
         ) : null}
       </div>
       <div className="space-y-2">
-        <p className="section-label">Assign to slot</p>
-        <div className="grid grid-cols-7 gap-2">
-          {FINAL_SLATE_RANKS.map((rank) => (
+        <p className="section-label">Promote / move to Core slot</p>
+        <div className="grid grid-cols-5 gap-2">
+          {FINAL_SLATE_RANKS.slice(0, 5).map((rank) => (
             <form key={rank} action={assignFinalSlateSlotAction}>
               <input type="hidden" name="postId" value={post.id} />
               <input type="hidden" name="finalSlateRank" value={rank} />
@@ -549,14 +619,99 @@ function FinalSlateCandidateRow({
             </form>
           ))}
         </div>
+        <p className="section-label">Move to Context slot</p>
+        <div className="grid grid-cols-2 gap-2">
+          {FINAL_SLATE_RANKS.slice(5).map((rank) => (
+            <form key={rank} action={assignFinalSlateSlotAction}>
+              <input type="hidden" name="postId" value={post.id} />
+              <input type="hidden" name="finalSlateRank" value={rank} />
+              <Button
+                type="submit"
+                variant={post.finalSlateRank === rank ? "primary" : "secondary"}
+                disabled={!canAssign}
+                className="h-10 w-full px-0"
+                aria-label={`Assign ${post.title} to ${formatSlotLabel(rank)}`}
+              >
+                {rank}
+              </Button>
+            </form>
+          ))}
+        </div>
+        {post.finalSlateRank ? (
+          <form action={removeFromFinalSlateAction}>
+            <input type="hidden" name="postId" value={post.id} />
+            <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+              Remove from slate
+            </Button>
+          </form>
+        ) : null}
         <p className="text-xs leading-5 text-[var(--text-secondary)]">
           {canAssign
             ? "Slot assignment updates draft placement only."
-            : "Only persisted, non-live, unpublished rows can be assigned."}
+            : getAssignmentBlockedReason(post, storageReady)}
         </p>
       </div>
     </div>
   );
+}
+
+function getEligibleReplacementCandidates(
+  candidates: EditorialSignalPost[],
+  original: EditorialSignalPost,
+) {
+  return candidates.filter(
+    (candidate) =>
+      candidate.id !== original.id &&
+      candidate.persisted &&
+      candidate.briefingDate === original.briefingDate &&
+      !candidate.finalSlateRank &&
+      !candidate.isLive &&
+      candidate.editorialStatus !== "published" &&
+      !candidate.publishedAt &&
+      !isBlockingDecision(candidate.editorialDecision),
+  );
+}
+
+function isBlockingDecision(decision: string | null) {
+  return (
+    decision === "rejected" ||
+    decision === "held" ||
+    decision === "rewrite_requested" ||
+    decision === "removed_from_slate"
+  );
+}
+
+function getAssignmentBlockedReason(post: EditorialSignalPost, storageReady: boolean) {
+  if (!storageReady) {
+    return "Editorial storage must be configured before placement can change.";
+  }
+
+  if (!post.persisted) {
+    return "Only persisted rows can be assigned.";
+  }
+
+  if (post.isLive) {
+    return "Live rows cannot be assigned to the draft final slate.";
+  }
+
+  if (post.editorialStatus === "published" || post.publishedAt) {
+    return "Already published rows cannot be assigned.";
+  }
+
+  if (isBlockingDecision(post.editorialDecision)) {
+    return "Rejected, held, rewrite-requested, or removed rows cannot be assigned.";
+  }
+
+  return "Only persisted, non-live, unpublished rows can be assigned.";
+}
+
+function formatDecision(decision: string | null) {
+  return decision
+    ? decision
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+    : "Needs review";
 }
 
 function normalizeStatusFilter(value: string | undefined): EditorialPostStatusFilter {
@@ -629,7 +784,8 @@ function isBulkApprovablePost(post: EditorialSignalPost) {
   return (
     post.persisted &&
     ["draft", "needs_review"].includes(post.editorialStatus) &&
-    post.whyItMattersValidationStatus !== "requires_human_rewrite"
+    post.whyItMattersValidationStatus !== "requires_human_rewrite" &&
+    !isBlockingDecision(post.editorialDecision)
   );
 }
 
@@ -782,6 +938,17 @@ function getApproveAllBlockedReason(
 
   if (rewriteRequiredCount > 0) {
     return `${rewriteRequiredCount} signal posts require a human rewrite before bulk approval.`;
+  }
+
+  const blockedDecisionCount = posts.filter(
+    (post) =>
+      post.persisted &&
+      ["draft", "needs_review"].includes(post.editorialStatus) &&
+      isBlockingDecision(post.editorialDecision),
+  ).length;
+
+  if (blockedDecisionCount > 0) {
+    return `${blockedDecisionCount} signal posts have rejected, held, or rewrite-requested editorial decisions.`;
   }
 
   if (eligibleCount === 0) {

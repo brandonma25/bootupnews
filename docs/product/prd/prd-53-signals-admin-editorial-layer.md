@@ -7,6 +7,8 @@
 - 2026-04-29 readiness label: `ready_for_card_level_editorial_authority_prd_review`
 - 2026-04-30 implementation checkpoint: minimal final-slate composer in review
 - 2026-04-30 readiness label: `ready_for_prd_53_minimal_final_slate_composer_review`
+- 2026-04-30 implementation checkpoint: editorial card controls in review
+- 2026-04-30 readiness label: `ready_for_prd_53_editorial_card_controls_review`
 
 ## Objective
 
@@ -710,12 +712,20 @@ Phase 2 - Admin final-slate composer:
 - Validate readiness for exactly 5 Core rows and 2 Context rows before any future publish workflow.
 - Keep final slate publish execution disabled in this phase.
 - Keep public reads gated by `is_live = true`, `editorial_status = 'published'`, and `published_at IS NOT NULL`; `final_slate_rank` alone is not public visibility.
-- Defer reject, hold, replace, promote, demote, publish batches, rollback execution, historical snapshots, and cron re-enable to later phases.
+- Defer reject, hold, replace, promote, demote, publish batches, rollback execution, historical snapshots, and cron re-enable to later phases from the composer-only checkpoint.
 
 Phase 3 - Replacement / hold / reject / promote / demote actions:
 
 - Approve row, request rewrite, save draft edit, reject row, hold row, replace with existing candidate, promote to Core, demote to Context/Depth, store decision audit trail, and show source concentration warning.
 - Publish can remain disabled or controlled until validation matures.
+
+2026-04-30 implementation checkpoint:
+
+- Add explicit admin controls for approve, save draft edit, request rewrite, reject, hold, replace with existing candidate, promote, demote, reorder, and remove from the draft slate.
+- Persist card-level decision state through nullable `signal_posts.editorial_decision`, decision notes/reasons, replacement linkage, and reviewer metadata.
+- Keep `editorial_status` as the existing draft/review/approved/published lifecycle and use `editorial_decision` for PRD-53 card-level authority so public visibility still requires `is_live = true`, `editorial_status = 'published'`, and `published_at IS NOT NULL`.
+- Block rejected, held, rewrite-requested, removed, live, and already-published rows from draft slate assignment.
+- Keep final public publish execution, publish batches, rollback execution, source concentration controls, historical snapshots, and cron re-enable out of this phase.
 
 Phase 4 - Controlled publish workflow hardening:
 

@@ -14,6 +14,9 @@ import {
 
 import {
   approveSignalPostAction,
+  holdSignalPostAction,
+  rejectSignalPostAction,
+  requestRewriteAction,
   resetSignalPostToAiDraftAction,
   saveSignalDraftAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
@@ -51,10 +54,13 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
   const structuredContent =
     post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
   const controlsDisabled = !storageReady || !post.persisted;
+  const decisionControlsDisabled =
+    controlsDisabled || post.isLive || post.editorialStatus === "published" || Boolean(post.publishedAt);
   const eligibleForApproveAll =
     post.persisted &&
     ["draft", "needs_review"].includes(post.editorialStatus) &&
-    post.whyItMattersValidationStatus !== "requires_human_rewrite";
+    post.whyItMattersValidationStatus !== "requires_human_rewrite" &&
+    !isBlockingDecision(post.editorialDecision);
   const requiresHumanRewrite = post.whyItMattersValidationStatus === "requires_human_rewrite";
   const toggleLabel = isExpanded ? "Collapse" : "Expand";
   const panelId = `editorial-panel-${post.id}`;
@@ -72,8 +78,13 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
                 </span>
                 {post.briefingDate ? <Badge>{post.briefingDate}</Badge> : null}
                 <Badge>{formatStatus(post.editorialStatus)}</Badge>
+                <Badge>{formatDecision(post.editorialDecision)}</Badge>
                 <Badge>{requiresHumanRewrite ? "WITM rewrite required" : "WITM passed"}</Badge>
+                {post.finalSlateRank ? <Badge>Selected for final slate</Badge> : null}
+                {post.finalSlateTier ? <Badge>{formatStatus(post.finalSlateTier)}</Badge> : null}
+                {post.replacementOfRowId ? <Badge>Replacement</Badge> : null}
                 {post.isLive ? <Badge>Live homepage set</Badge> : null}
+                {post.publishedAt ? <Badge>Published warning</Badge> : null}
                 {post.signalScore !== null ? <Badge>Score {Math.round(post.signalScore)}</Badge> : null}
                 {post.tags.map((tag) => (
                   <Badge key={tag}>{tag}</Badge>
@@ -175,6 +186,45 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
               <RotateCcw className="h-4 w-4" />
               Reset to AI Draft
             </Button>
+          </div>
+          <div className="space-y-3 rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
+            <label htmlFor={`decisionNote-${post.id}`} className="text-sm font-semibold text-[var(--text-primary)]">
+              Editorial decision note
+              <textarea
+                id={`decisionNote-${post.id}`}
+                name="decisionNote"
+                defaultValue={post.decisionNote ?? post.rejectedReason ?? post.heldReason ?? ""}
+                rows={3}
+                placeholder="Required for reject, hold, and replacement decisions."
+                className="mt-2 w-full resize-y rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm leading-6 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="submit"
+                formAction={requestRewriteAction}
+                variant="secondary"
+                disabled={decisionControlsDisabled}
+              >
+                Request Rewrite
+              </Button>
+              <Button
+                type="submit"
+                formAction={rejectSignalPostAction}
+                variant="secondary"
+                disabled={decisionControlsDisabled}
+              >
+                Reject
+              </Button>
+              <Button
+                type="submit"
+                formAction={holdSignalPostAction}
+                variant="secondary"
+                disabled={decisionControlsDisabled}
+              >
+                Hold
+              </Button>
+            </div>
           </div>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
             {getPostStateHint(post)}
@@ -406,6 +456,18 @@ function FieldBlock({
 }
 
 function getPostStateHint(post: EditorialSignalPost) {
+  if (post.editorialDecision === "rejected") {
+    return "Rejected rows stay available in admin history and cannot be selected for the final slate.";
+  }
+
+  if (post.editorialDecision === "held") {
+    return "Held rows are retained as editorial evidence and cannot be selected for the final slate.";
+  }
+
+  if (post.editorialDecision === "rewrite_requested") {
+    return "Rewrite-requested rows stay in admin review and cannot pass final-slate readiness.";
+  }
+
   if (post.whyItMattersValidationStatus === "requires_human_rewrite") {
     return "Rewrite the Why it matters copy and approve again before this card can publish.";
   }
@@ -426,4 +488,17 @@ function formatStatus(status: string) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatDecision(decision: string | null) {
+  return decision ? formatStatus(decision) : "Needs review";
+}
+
+function isBlockingDecision(decision: string | null) {
+  return (
+    decision === "rejected" ||
+    decision === "held" ||
+    decision === "rewrite_requested" ||
+    decision === "removed_from_slate"
+  );
 }

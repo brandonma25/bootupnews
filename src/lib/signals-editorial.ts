@@ -18,7 +18,7 @@ import {
   isFinalSlateRank,
   type FinalSlateTier,
 } from "@/lib/final-slate-readiness";
-import type { BriefingItem, EditorialStatus } from "@/lib/types";
+import type { BriefingItem, EditorialDecision, EditorialStatus } from "@/lib/types";
 import {
   validateWhyItMatters,
   type WhyItMattersReviewStatus,
@@ -51,6 +51,13 @@ const SIGNAL_POST_REQUIRED_COLUMNS = [
   "editorial_status",
   "final_slate_rank",
   "final_slate_tier",
+  "editorial_decision",
+  "decision_note",
+  "rejected_reason",
+  "held_reason",
+  "replacement_of_row_id",
+  "reviewed_by",
+  "reviewed_at",
   "edited_by",
   "edited_at",
   "approved_by",
@@ -97,6 +104,13 @@ type StoredSignalPost = {
   editorial_status: EditorialStatus;
   final_slate_rank: number | null;
   final_slate_tier: FinalSlateTier | null;
+  editorial_decision: EditorialDecision | null;
+  decision_note: string | null;
+  rejected_reason: string | null;
+  held_reason: string | null;
+  replacement_of_row_id: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
   edited_by: string | null;
   edited_at: string | null;
   approved_by: string | null;
@@ -130,6 +144,13 @@ export type EditorialSignalPost = {
   editorialStatus: EditorialStatus;
   finalSlateRank: number | null;
   finalSlateTier: FinalSlateTier | null;
+  editorialDecision: EditorialDecision | null;
+  decisionNote: string | null;
+  rejectedReason: string | null;
+  heldReason: string | null;
+  replacementOfRowId: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
   editedBy: string | null;
   editedAt: string | null;
   approvedBy: string | null;
@@ -185,6 +206,7 @@ export type EditorialMutationResult = {
   code:
     | "approved"
     | "bulk_approved"
+    | "decision_updated"
     | "draft_saved"
     | "empty_editorial_text"
     | "not_admin"
@@ -193,6 +215,7 @@ export type EditorialMutationResult = {
     | "published"
     | "publish_blocked"
     | "reset"
+    | "replacement_updated"
     | "slate_updated"
     | "storage_unavailable"
     | "storage_error";
@@ -324,6 +347,23 @@ function normalizeSearchQuery(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
+function normalizeDecisionNote(value: string | null | undefined) {
+  return value?.trim() ?? "";
+}
+
+function isBlockingEditorialDecision(value: EditorialDecision | string | null | undefined) {
+  return (
+    value === "rejected" ||
+    value === "held" ||
+    value === "rewrite_requested" ||
+    value === "removed_from_slate"
+  );
+}
+
+function isPubliclyAllowedEditorialDecision(value: EditorialDecision | string | null | undefined) {
+  return value === null || value === undefined || value === "approved" || value === "draft_edited";
+}
+
 function normalizePageNumber(page?: number) {
   return Number.isFinite(page) && page && page > 0 ? Math.floor(page) : 1;
 }
@@ -377,6 +417,13 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
     editorialStatus: row.editorial_status,
     finalSlateRank: row.final_slate_rank,
     finalSlateTier: row.final_slate_tier,
+    editorialDecision: row.editorial_decision,
+    decisionNote: row.decision_note,
+    rejectedReason: row.rejected_reason,
+    heldReason: row.held_reason,
+    replacementOfRowId: row.replacement_of_row_id,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
     editedBy: row.edited_by,
     editedAt: row.edited_at,
     approvedBy: row.approved_by,
@@ -425,6 +472,13 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
     editorialStatus: "needs_review",
     finalSlateRank: null,
     finalSlateTier: null,
+    editorialDecision: "pending_review",
+    decisionNote: null,
+    rejectedReason: null,
+    heldReason: null,
+    replacementOfRowId: null,
+    reviewedBy: null,
+    reviewedAt: null,
     editedBy: null,
     editedAt: null,
     approvedBy: null,
@@ -696,6 +750,13 @@ async function persistSignalPostCandidates(
       editorial_status: "needs_review",
       final_slate_rank: null,
       final_slate_tier: null,
+      editorial_decision: "pending_review",
+      decision_note: null,
+      rejected_reason: null,
+      held_reason: null,
+      replacement_of_row_id: null,
+      reviewed_by: null,
+      reviewed_at: null,
       published_at: null,
       is_live: false,
       created_at: now,
@@ -832,6 +893,10 @@ async function loadCurrentSignalDepth(client: EditorialClient, briefingDate: str
 
 function selectPublishedEditorialWhyItMatters(post: EditorialSignalPost) {
   if (post.editorialStatus !== "published") {
+    return "";
+  }
+
+  if (!isPubliclyAllowedEditorialDecision(post.editorialDecision)) {
     return "";
   }
 
@@ -1137,7 +1202,7 @@ export async function saveSignalDraft(input: {
   const now = new Date().toISOString();
   const lookup = await context.client
     .from("signal_posts")
-    .select("id, editorial_status")
+    .select("id, editorial_status, editorial_decision")
     .eq("id", input.postId)
     .maybeSingle();
 
@@ -1187,6 +1252,7 @@ export async function saveSignalDraft(input: {
           }
         : {}),
       editorial_status: nextEditorialStatus,
+      editorial_decision: validation.passed ? (nextEditorialStatus === "approved" ? "approved" : "draft_edited") : "rewrite_requested",
       ...buildWhyItMattersValidationFields(validation, now),
       edited_by: context.user.email ?? null,
       edited_at: now,
@@ -1245,6 +1311,7 @@ async function approveSignalPostWithContext(
         edited_why_it_matters: editorialText,
         edited_why_it_matters_payload: structuredContent,
         editorial_status: "needs_review",
+        editorial_decision: "rewrite_requested",
         ...buildWhyItMattersValidationFields(validation, now),
         edited_by: context.user.email ?? null,
         edited_at: now,
@@ -1273,7 +1340,13 @@ async function approveSignalPostWithContext(
       edited_why_it_matters: editorialText,
       edited_why_it_matters_payload: structuredContent,
       editorial_status: "approved",
+      editorial_decision: "approved",
+      decision_note: null,
+      rejected_reason: null,
+      held_reason: null,
       ...buildWhyItMattersValidationFields(validation, now),
+      reviewed_by: context.user.email ?? null,
+      reviewed_at: now,
       edited_by: context.user.email ?? null,
       edited_at: now,
       approved_by: context.user.email ?? null,
@@ -1357,7 +1430,7 @@ export async function approveSignalPosts(input: {
 
   const eligibilityLookup = await context.client
     .from("signal_posts")
-    .select("id, editorial_status")
+    .select("id, editorial_status, editorial_decision")
     .in("id", uniquePosts.map((post) => post.postId));
 
   if (eligibilityLookup.error) {
@@ -1369,8 +1442,12 @@ export async function approveSignalPosts(input: {
   }
 
   const eligibleIds = new Set(
-    (((eligibilityLookup.data ?? []) as Array<Pick<StoredSignalPost, "id" | "editorial_status">>))
-      .filter((post) => post.editorial_status === "draft" || post.editorial_status === "needs_review")
+    (((eligibilityLookup.data ?? []) as Array<Pick<StoredSignalPost, "id" | "editorial_status" | "editorial_decision">>))
+      .filter(
+        (post) =>
+          (post.editorial_status === "draft" || post.editorial_status === "needs_review") &&
+          !isBlockingEditorialDecision(post.editorial_decision),
+      )
       .map((post) => post.id),
   );
   const eligiblePosts = uniquePosts.filter((post) => eligibleIds.has(post.postId));
@@ -1379,7 +1456,7 @@ export async function approveSignalPosts(input: {
     return {
       ok: false,
       code: "publish_blocked",
-      message: "There are no Draft or Needs Review signal posts to approve.",
+      message: "There are no Draft or Needs Review signal posts without blocking editorial decisions to approve.",
     };
   }
 
@@ -1453,6 +1530,7 @@ export async function resetSignalPostToAiDraft(input: {
       edited_why_it_matters: aiDraft,
       edited_why_it_matters_payload: null,
       editorial_status: validation.passed ? "draft" : "needs_review",
+      editorial_decision: validation.passed ? "pending_review" : "rewrite_requested",
       ...buildWhyItMattersValidationFields(validation, now),
       edited_by: context.user.email ?? null,
       edited_at: now,
@@ -1472,6 +1550,248 @@ export async function resetSignalPostToAiDraft(input: {
     ok: true,
     code: "reset",
     message: "Editorial text reset to the AI draft.",
+  };
+}
+
+async function loadDecisionTarget(
+  context: {
+    client: EditorialClient;
+    user: User;
+  },
+  postId: string,
+) {
+  const lookup = await context.client
+    .from("signal_posts")
+    .select("id, briefing_date, editorial_status, editorial_decision, final_slate_rank, final_slate_tier, is_live, published_at")
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (lookup.error || !lookup.data) {
+    return {
+      ok: false as const,
+      code: "not_found" as const,
+      message: "The signal post could not be found.",
+    };
+  }
+
+  const post = lookup.data as Pick<
+    StoredSignalPost,
+    | "id"
+    | "briefing_date"
+    | "editorial_status"
+    | "editorial_decision"
+    | "final_slate_rank"
+    | "final_slate_tier"
+    | "is_live"
+    | "published_at"
+  >;
+
+  return {
+    ok: true as const,
+    post,
+  };
+}
+
+function blockPublishedDecisionTarget(
+  post: Pick<StoredSignalPost, "editorial_status" | "is_live" | "published_at">,
+) {
+  return Boolean(post.is_live || post.editorial_status === "published" || post.published_at);
+}
+
+export async function requestSignalPostRewrite(input: {
+  postId: string;
+  decisionNote?: string | null;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  const target = await loadDecisionTarget(context, input.postId);
+
+  if (!target.ok) {
+    return target;
+  }
+
+  if (blockPublishedDecisionTarget(target.post)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot be marked for rewrite in this non-publish phase.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updateResult = await context.client
+    .from("signal_posts")
+    .update({
+      editorial_status: "needs_review",
+      editorial_decision: "rewrite_requested",
+      decision_note: normalizeDecisionNote(input.decisionNote) || null,
+      final_slate_rank: null,
+      final_slate_tier: null,
+      reviewed_by: context.user.email ?? null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", input.postId);
+
+  if (updateResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The signal post could not be marked for rewrite.",
+    };
+  }
+
+  return {
+    ok: true,
+    code: "decision_updated",
+    message: "Requested rewrite and removed the row from the draft final slate.",
+  };
+}
+
+export async function rejectSignalPost(input: {
+  postId: string;
+  decisionNote?: string | null;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  const note = normalizeDecisionNote(input.decisionNote);
+
+  if (!note) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Add a rejection reason before rejecting this row.",
+    };
+  }
+
+  const target = await loadDecisionTarget(context, input.postId);
+
+  if (!target.ok) {
+    return target;
+  }
+
+  if (blockPublishedDecisionTarget(target.post)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot be rejected in this non-publish phase.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updateResult = await context.client
+    .from("signal_posts")
+    .update({
+      editorial_decision: "rejected",
+      decision_note: note,
+      rejected_reason: note,
+      final_slate_rank: null,
+      final_slate_tier: null,
+      reviewed_by: context.user.email ?? null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", input.postId);
+
+  if (updateResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The signal post could not be rejected.",
+    };
+  }
+
+  return {
+    ok: true,
+    code: "decision_updated",
+    message: "Rejected row and removed it from the draft final slate.",
+  };
+}
+
+export async function holdSignalPost(input: {
+  postId: string;
+  decisionNote?: string | null;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  const note = normalizeDecisionNote(input.decisionNote);
+
+  if (!note) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Add a hold reason before holding this row.",
+    };
+  }
+
+  const target = await loadDecisionTarget(context, input.postId);
+
+  if (!target.ok) {
+    return target;
+  }
+
+  if (blockPublishedDecisionTarget(target.post)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot be held in this non-publish phase.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updateResult = await context.client
+    .from("signal_posts")
+    .update({
+      editorial_decision: "held",
+      decision_note: note,
+      held_reason: note,
+      final_slate_rank: null,
+      final_slate_tier: null,
+      reviewed_by: context.user.email ?? null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", input.postId);
+
+  if (updateResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The signal post could not be held.",
+    };
+  }
+
+  return {
+    ok: true,
+    code: "decision_updated",
+    message: "Held row as editorial evidence and removed it from the draft final slate.",
   };
 }
 
@@ -1510,7 +1830,7 @@ export async function assignSignalPostToFinalSlateSlot(input: {
 
   const lookup = await context.client
     .from("signal_posts")
-    .select("id, briefing_date, editorial_status, is_live, published_at")
+    .select("id, briefing_date, editorial_status, editorial_decision, is_live, published_at")
     .eq("id", input.postId)
     .maybeSingle();
 
@@ -1524,7 +1844,7 @@ export async function assignSignalPostToFinalSlateSlot(input: {
 
   const post = lookup.data as Pick<
     StoredSignalPost,
-    "id" | "briefing_date" | "editorial_status" | "is_live" | "published_at"
+    "id" | "briefing_date" | "editorial_status" | "editorial_decision" | "is_live" | "published_at"
   >;
   const briefingDate = normalizeDateValue(post.briefing_date);
 
@@ -1541,6 +1861,14 @@ export async function assignSignalPostToFinalSlateSlot(input: {
       ok: false,
       code: "publish_blocked",
       message: "Live or already published rows cannot be assigned to the draft final slate.",
+    };
+  }
+
+  if (isBlockingEditorialDecision(post.editorial_decision)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Rejected, held, rewrite-requested, or removed rows cannot be assigned to the final slate.",
     };
   }
 
@@ -1636,6 +1964,170 @@ export async function removeSignalPostFromFinalSlate(input: {
   };
 }
 
+export async function replaceSignalPostInFinalSlate(input: {
+  originalPostId: string;
+  replacementPostId: string;
+  decisionNote?: string | null;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  if (input.originalPostId === input.replacementPostId) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Choose a different row as the replacement.",
+    };
+  }
+
+  const note = normalizeDecisionNote(input.decisionNote);
+
+  if (!note) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Add a replacement reason before replacing this row.",
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(context.client);
+
+  if (!schemaPreflight.ok) {
+    return {
+      ok: false,
+      code: "storage_unavailable",
+      message: schemaPreflight.message,
+    };
+  }
+
+  const [originalTarget, replacementTarget] = await Promise.all([
+    loadDecisionTarget(context, input.originalPostId),
+    loadDecisionTarget(context, input.replacementPostId),
+  ]);
+
+  if (!originalTarget.ok) {
+    return originalTarget;
+  }
+
+  if (!replacementTarget.ok) {
+    return replacementTarget;
+  }
+
+  const original = originalTarget.post;
+  const replacement = replacementTarget.post;
+  const originalRank = original.final_slate_rank;
+
+  if (!isFinalSlateRank(originalRank)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "The original row must occupy a Core or Context slot before it can be replaced.",
+    };
+  }
+
+  const briefingDate = normalizeDateValue(original.briefing_date);
+
+  if (!briefingDate || normalizeDateValue(replacement.briefing_date) !== briefingDate) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Replacement candidates must belong to the same briefing date.",
+    };
+  }
+
+  if (blockPublishedDecisionTarget(original) || blockPublishedDecisionTarget(replacement)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot participate in replacement.",
+    };
+  }
+
+  if (isBlockingEditorialDecision(replacement.editorial_decision)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Rejected, held, rewrite-requested, or removed rows cannot be used as replacements.",
+    };
+  }
+
+  const finalSlateTier = getFinalSlateTierForRank(originalRank);
+  const now = new Date().toISOString();
+  const holdOriginal = await context.client
+    .from("signal_posts")
+    .update({
+      editorial_decision: "held",
+      decision_note: note,
+      held_reason: note,
+      final_slate_rank: null,
+      final_slate_tier: null,
+      reviewed_by: context.user.email ?? null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", input.originalPostId);
+
+  if (holdOriginal.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The original row could not be held before replacement.",
+    };
+  }
+
+  const clearSlotResult = await context.client
+    .from("signal_posts")
+    .update({
+      final_slate_rank: null,
+      final_slate_tier: null,
+      updated_at: now,
+    })
+    .eq("briefing_date", briefingDate)
+    .eq("final_slate_rank", originalRank);
+
+  if (clearSlotResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The existing final-slate slot could not be cleared for replacement.",
+    };
+  }
+
+  const assignReplacement = await context.client
+    .from("signal_posts")
+    .update({
+      final_slate_rank: originalRank,
+      final_slate_tier: finalSlateTier,
+      replacement_of_row_id: input.originalPostId,
+      reviewed_by: context.user.email ?? null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", input.replacementPostId);
+
+  if (assignReplacement.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The replacement row could not be assigned to the final slate.",
+    };
+  }
+
+  return {
+    ok: true,
+    code: "replacement_updated",
+    message: `Held original row and assigned replacement to ${finalSlateTier === "core" ? "Core" : "Context"} slot ${originalRank}.`,
+  };
+}
+
 export async function publishApprovedSignals(input: {
   route?: string;
 } = {}): Promise<EditorialMutationResult> {
@@ -1680,14 +2172,16 @@ export async function publishApprovedSignals(input: {
   }
 
   const notReadyToPublish = topFivePosts.filter(
-    (post) => post.editorialStatus !== "approved" && post.editorialStatus !== "published",
+    (post) =>
+      (post.editorialStatus !== "approved" && post.editorialStatus !== "published") ||
+      isBlockingEditorialDecision(post.editorialDecision),
   );
 
   if (notReadyToPublish.length > 0) {
     return {
       ok: false,
       code: "publish_blocked",
-      message: "Approve all five signal posts before publishing. Already published posts remain publish-ready.",
+      message: "Approve all five signal posts and clear rejected, held, or rewrite-requested decisions before publishing.",
     };
   }
 
@@ -1788,6 +2282,7 @@ export async function publishApprovedSignals(input: {
           published_why_it_matters: text,
           published_why_it_matters_payload: structuredContent,
           editorial_status: "published",
+          editorial_decision: "approved",
           ...buildWhyItMattersValidationFields(validation, now),
           is_live: true,
           published_at: now,
@@ -1851,6 +2346,7 @@ export async function publishApprovedSignals(input: {
           published_why_it_matters: depthText,
           published_why_it_matters_payload: structuredContent,
           editorial_status: "published",
+          editorial_decision: "approved",
           ...buildWhyItMattersValidationFields(validation, now),
           is_live: true,
           published_at: now,
