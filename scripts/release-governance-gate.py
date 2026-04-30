@@ -20,6 +20,7 @@ from governance_common import (
     validate_new_prd_alignment,
     validate_prd_csv_consistency,
     classify_changes,
+    is_canonical_prd,
 )
 
 
@@ -100,10 +101,10 @@ def format_new_feature_without_prd_failure(context: GovernanceContext) -> str:
         explain_classification(context)
         + "\n\nWhy this failed: the PR adds non-test `src/` or `supabase/` files, which the gate treats as "
         "new system/feature surface unless it is mapped to a canonical PRD."
-        + "\n\nFastest valid fix: add one canonical `docs/product/prd/prd-XX-<slug>.md` file, zero-pad "
-        "1-9 as `prd-01` through `prd-09`, and map the same `prd_id` and `prd_file` in "
-        "`docs/product/feature-system.csv`. If this is not actually feature/system work, split or rename "
-        "the change so the diff reflects the narrower scope."
+        + "\n\nFastest valid fix: add or update the mapped canonical `docs/product/prd/prd-XX-<slug>.md` "
+        "file, zero-pad 1-9 as `prd-01` through `prd-09`, and ensure the same `prd_id` and `prd_file` "
+        "exist in `docs/product/feature-system.csv`. If this is not actually feature/system work, split "
+        "or rename the change so the diff reflects the narrower scope."
     )
 
 
@@ -114,6 +115,21 @@ def format_prd_csv_missing_failure(context: GovernanceContext, prd_file: str) ->
         "`docs/product/feature-system.csv` does not contain a matching `prd_file` row."
         + "\n\nFastest valid fix: add exactly one CSV row with the matching `prd_id` and `prd_file`, "
         "or remove the PRD file if it was created accidentally."
+    )
+
+
+def find_existing_mapped_prd_updates(
+    context: GovernanceContext,
+    csv_mappings: dict[str, str],
+    repo_root,
+) -> list[str]:
+    return sorted(
+        path
+        for path in context.changed_paths
+        if is_canonical_prd(path)
+        and path not in context.new_prd_files
+        and path in csv_mappings
+        and (repo_root / path).is_file()
     )
 
 
@@ -179,13 +195,19 @@ def main() -> int:
         return 0
 
     if context.classification == "new-feature-or-system":
-        if not context.new_prd_files:
+        csv_mappings = load_csv_mappings(repo_root)
+        existing_mapped_prd_updates = find_existing_mapped_prd_updates(
+            context,
+            csv_mappings,
+            repo_root,
+        )
+
+        if not context.new_prd_files and not existing_mapped_prd_updates:
             return fail(
-                "New feature or system change detected, but no canonical PRD was added in docs/product/prd/.",
+                "New feature or system change detected, but no mapped canonical PRD was added or updated in docs/product/prd/.",
                 format_new_feature_without_prd_failure(context),
             )
 
-        csv_mappings = load_csv_mappings(repo_root)
         for prd_file in context.new_prd_files:
             if prd_file not in csv_mappings:
                 return fail(

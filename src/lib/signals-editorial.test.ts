@@ -21,6 +21,8 @@ type SignalPostRow = {
   why_it_matters_validation_details: string[];
   why_it_matters_validated_at: string | null;
   editorial_status: "draft" | "needs_review" | "approved" | "published";
+  final_slate_rank: number | null;
+  final_slate_tier: "core" | "context" | null;
   edited_by: string | null;
   edited_at: string | null;
   approved_by: string | null;
@@ -77,6 +79,8 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     why_it_matters_validation_details: overrides.why_it_matters_validation_details ?? [],
     why_it_matters_validated_at: overrides.why_it_matters_validated_at ?? null,
     editorial_status: overrides.editorial_status ?? "needs_review",
+    final_slate_rank: overrides.final_slate_rank ?? null,
+    final_slate_tier: overrides.final_slate_tier ?? null,
     edited_by: overrides.edited_by ?? null,
     edited_at: overrides.edited_at ?? null,
     approved_by: overrides.approved_by ?? null,

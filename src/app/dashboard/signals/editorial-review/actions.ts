@@ -12,8 +12,10 @@ import {
   SIGNALS_EDITORIAL_ROUTE,
   approveSignalPost,
   approveSignalPosts,
+  assignSignalPostToFinalSlateSlot,
   publishApprovedSignals,
   publishSignalPost,
+  removeSignalPostFromFinalSlate,
   resetSignalPostToAiDraft,
   saveSignalDraft,
   type EditorialMutationResult,
@@ -30,6 +32,10 @@ function revalidateEditorialRoutes() {
   revalidatePath("/");
   revalidatePath(SIGNALS_EDITORIAL_ROUTE);
   revalidatePath(PUBLIC_SIGNALS_ROUTE);
+}
+
+function revalidateEditorialReviewRoute() {
+  revalidatePath(SIGNALS_EDITORIAL_ROUTE);
 }
 
 function readStructuredEditorialInput(formData: FormData) {
@@ -143,6 +149,31 @@ export async function publishSignalPostAction(formData: FormData) {
 
   if (result.ok) {
     revalidateEditorialRoutes();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function assignFinalSlateSlotAction(formData: FormData) {
+  const result = await assignSignalPostToFinalSlateSlot({
+    postId: String(formData.get("postId") ?? ""),
+    finalSlateRank: Number(formData.get("finalSlateRank") ?? NaN),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function removeFromFinalSlateAction(formData: FormData) {
+  const result = await removeSignalPostFromFinalSlate({
+    postId: String(formData.get("postId") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
   }
 
   redirectWithResult(result);

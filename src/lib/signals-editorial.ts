@@ -13,6 +13,11 @@ import {
   safeGetUser,
 } from "@/lib/supabase/server";
 import { captureRssFailure, type RssFailureType, type RssPhase } from "@/lib/observability/rss";
+import {
+  getFinalSlateTierForRank,
+  isFinalSlateRank,
+  type FinalSlateTier,
+} from "@/lib/final-slate-readiness";
 import type { BriefingItem, EditorialStatus } from "@/lib/types";
 import {
   validateWhyItMatters,
@@ -44,6 +49,8 @@ const SIGNAL_POST_REQUIRED_COLUMNS = [
   "why_it_matters_validation_details",
   "why_it_matters_validated_at",
   "editorial_status",
+  "final_slate_rank",
+  "final_slate_tier",
   "edited_by",
   "edited_at",
   "approved_by",
@@ -88,6 +95,8 @@ type StoredSignalPost = {
   why_it_matters_validation_details: string[] | null;
   why_it_matters_validated_at: string | null;
   editorial_status: EditorialStatus;
+  final_slate_rank: number | null;
+  final_slate_tier: FinalSlateTier | null;
   edited_by: string | null;
   edited_at: string | null;
   approved_by: string | null;
@@ -119,6 +128,8 @@ export type EditorialSignalPost = {
   whyItMattersValidationDetails: string[];
   whyItMattersValidatedAt: string | null;
   editorialStatus: EditorialStatus;
+  finalSlateRank: number | null;
+  finalSlateTier: FinalSlateTier | null;
   editedBy: string | null;
   editedAt: string | null;
   approvedBy: string | null;
@@ -155,6 +166,7 @@ export type EditorialReviewState =
       adminEmail: string;
       posts: EditorialSignalPost[];
       currentTopFive: EditorialSignalPost[];
+      currentCandidates: EditorialSignalPost[];
       storageReady: boolean;
       warning: string | null;
       page: number;
@@ -181,6 +193,7 @@ export type EditorialMutationResult = {
     | "published"
     | "publish_blocked"
     | "reset"
+    | "slate_updated"
     | "storage_unavailable"
     | "storage_error";
 };
@@ -362,6 +375,8 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
     whyItMattersValidationDetails: row.why_it_matters_validation_details ?? [],
     whyItMattersValidatedAt: row.why_it_matters_validated_at,
     editorialStatus: row.editorial_status,
+    finalSlateRank: row.final_slate_rank,
+    finalSlateTier: row.final_slate_tier,
     editedBy: row.edited_by,
     editedAt: row.edited_at,
     approvedBy: row.approved_by,
@@ -408,6 +423,8 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
     whyItMattersValidationDetails: validation.failureDetails,
     whyItMattersValidatedAt: new Date().toISOString(),
     editorialStatus: "needs_review",
+    finalSlateRank: null,
+    finalSlateTier: null,
     editedBy: null,
     editedAt: null,
     approvedBy: null,
@@ -677,6 +694,8 @@ async function persistSignalPostCandidates(
       why_it_matters_validation_details: post.whyItMattersValidationDetails,
       why_it_matters_validated_at: now,
       editorial_status: "needs_review",
+      final_slate_rank: null,
+      final_slate_tier: null,
       published_at: null,
       is_live: false,
       created_at: now,
@@ -978,6 +997,7 @@ export async function getEditorialReviewState(
       adminEmail: context.userEmail ?? "",
       posts: [],
       currentTopFive: [],
+      currentCandidates: [],
       storageReady: false,
       warning: context.message,
       page: normalizedPage,
@@ -999,6 +1019,7 @@ export async function getEditorialReviewState(
       adminEmail: context.user.email ?? "",
       posts: [],
       currentTopFive: [],
+      currentCandidates: [],
       storageReady: false,
       warning: schemaPreflight.message,
       page: normalizedPage,
@@ -1041,6 +1062,7 @@ export async function getEditorialReviewState(
       adminEmail: context.user.email ?? "",
       posts: [],
       currentTopFive: [],
+      currentCandidates: [],
       storageReady: false,
       warning: `Editorial signal storage could not be read: ${loaded.errorMessage}`,
       page: normalizedPage,
@@ -1054,7 +1076,8 @@ export async function getEditorialReviewState(
     };
   }
 
-  const currentTopFive = await loadCurrentTopFive(context.client, latestBriefingDate);
+  const currentCandidates = await loadCurrentSignalDepth(context.client, latestBriefingDate);
+  const currentTopFive = currentCandidates.slice(0, TOP_SIGNAL_SET_SIZE);
   const warningParts = [
     !latestBriefingDate
       ? "No stored Top 5 signal snapshot exists yet. This page stays read-only until signal posts have been persisted."
@@ -1067,6 +1090,7 @@ export async function getEditorialReviewState(
     adminEmail: context.user.email ?? "",
     posts: loaded.posts,
     currentTopFive,
+    currentCandidates,
     storageReady: true,
     warning: warningParts[0] ?? warningParts[1] ?? null,
     page: normalizedPage,
@@ -1448,6 +1472,167 @@ export async function resetSignalPostToAiDraft(input: {
     ok: true,
     code: "reset",
     message: "Editorial text reset to the AI draft.",
+  };
+}
+
+export async function assignSignalPostToFinalSlateSlot(input: {
+  postId: string;
+  finalSlateRank: number;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  if (!isFinalSlateRank(input.finalSlateRank)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Choose a Core slot 1-5 or Context slot 6-7.",
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(context.client);
+
+  if (!schemaPreflight.ok) {
+    return {
+      ok: false,
+      code: "storage_unavailable",
+      message: schemaPreflight.message,
+    };
+  }
+
+  const lookup = await context.client
+    .from("signal_posts")
+    .select("id, briefing_date, editorial_status, is_live, published_at")
+    .eq("id", input.postId)
+    .maybeSingle();
+
+  if (lookup.error || !lookup.data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "The signal post could not be found.",
+    };
+  }
+
+  const post = lookup.data as Pick<
+    StoredSignalPost,
+    "id" | "briefing_date" | "editorial_status" | "is_live" | "published_at"
+  >;
+  const briefingDate = normalizeDateValue(post.briefing_date);
+
+  if (!briefingDate) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "The selected signal post is missing a briefing date.",
+    };
+  }
+
+  if (post.is_live || post.editorial_status === "published" || post.published_at) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot be assigned to the draft final slate.",
+    };
+  }
+
+  const finalSlateTier = getFinalSlateTierForRank(input.finalSlateRank);
+  const now = new Date().toISOString();
+  const clearSlotResult = await context.client
+    .from("signal_posts")
+    .update({
+      final_slate_rank: null,
+      final_slate_tier: null,
+      updated_at: now,
+    })
+    .eq("briefing_date", briefingDate)
+    .eq("final_slate_rank", input.finalSlateRank);
+
+  if (clearSlotResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The existing final-slate slot could not be cleared.",
+    };
+  }
+
+  const updateResult = await context.client
+    .from("signal_posts")
+    .update({
+      final_slate_rank: input.finalSlateRank,
+      final_slate_tier: finalSlateTier,
+      updated_at: now,
+    })
+    .eq("id", input.postId);
+
+  if (updateResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The signal post could not be assigned to the final slate.",
+    };
+  }
+
+  return {
+    ok: true,
+    code: "slate_updated",
+    message: `Assigned signal post to ${finalSlateTier === "core" ? "Core" : "Context"} slot ${input.finalSlateRank}.`,
+  };
+}
+
+export async function removeSignalPostFromFinalSlate(input: {
+  postId: string;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(context.client);
+
+  if (!schemaPreflight.ok) {
+    return {
+      ok: false,
+      code: "storage_unavailable",
+      message: schemaPreflight.message,
+    };
+  }
+
+  const updateResult = await context.client
+    .from("signal_posts")
+    .update({
+      final_slate_rank: null,
+      final_slate_tier: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.postId);
+
+  if (updateResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The signal post could not be removed from the final slate.",
+    };
+  }
+
+  return {
+    ok: true,
+    code: "slate_updated",
+    message: "Removed signal post from the draft final slate.",
   };
 }
 

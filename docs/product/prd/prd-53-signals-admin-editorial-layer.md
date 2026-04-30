@@ -5,6 +5,8 @@
 - Feature system row: `docs/product/feature-system.csv`
 - 2026-04-29 amendment status: `Draft for review`
 - 2026-04-29 readiness label: `ready_for_card_level_editorial_authority_prd_review`
+- 2026-04-30 implementation checkpoint: minimal final-slate composer in review
+- 2026-04-30 readiness label: `ready_for_prd_53_minimal_final_slate_composer_review`
 
 ## Objective
 
@@ -700,6 +702,15 @@ Phase 2 - Admin final-slate composer:
 - Show WITM status and readiness checklist.
 - Keep publish disabled until validation passes.
 - This phase can be read-only or non-publishing at first.
+
+2026-04-30 implementation checkpoint:
+
+- Implement the minimal composer against the existing PRD-53 admin surface, not a parallel admin architecture.
+- Persist only draft placement metadata on `signal_posts` through nullable `final_slate_rank` and `final_slate_tier`.
+- Validate readiness for exactly 5 Core rows and 2 Context rows before any future publish workflow.
+- Keep final slate publish execution disabled in this phase.
+- Keep public reads gated by `is_live = true`, `editorial_status = 'published'`, and `published_at IS NOT NULL`; `final_slate_rank` alone is not public visibility.
+- Defer reject, hold, replace, promote, demote, publish batches, rollback execution, historical snapshots, and cron re-enable to later phases.
 
 Phase 3 - Replacement / hold / reject / promote / demote actions:
 

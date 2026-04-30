@@ -145,6 +145,10 @@ create table if not exists public.signal_posts (
   why_it_matters_validated_at timestamptz,
   editorial_status text not null default 'needs_review'
     check (editorial_status in ('draft', 'needs_review', 'approved', 'published')),
+  final_slate_rank integer
+    check (final_slate_rank is null or final_slate_rank between 1 and 7),
+  final_slate_tier text
+    check (final_slate_tier is null or final_slate_tier in ('core', 'context')),
   edited_by text,
   edited_at timestamptz,
   approved_by text,
@@ -153,12 +157,21 @@ create table if not exists public.signal_posts (
   is_live boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  check (
+    (final_slate_rank is null and final_slate_tier is null)
+    or (final_slate_rank between 1 and 5 and final_slate_tier = 'core')
+    or (final_slate_rank between 6 and 7 and final_slate_tier = 'context')
+  ),
   unique (briefing_date, rank)
 );
 
 create unique index if not exists signal_posts_live_top_rank_key
 on public.signal_posts (rank)
 where is_live and rank between 1 and 5;
+
+create unique index if not exists signal_posts_briefing_date_final_slate_rank_key
+on public.signal_posts (briefing_date, final_slate_rank)
+where final_slate_rank is not null;
 
 create table if not exists public.pipeline_article_candidates (
   id uuid primary key default gen_random_uuid(),

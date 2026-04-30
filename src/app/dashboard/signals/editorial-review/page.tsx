@@ -8,14 +8,22 @@ import {
 } from "lucide-react";
 
 import {
+  assignFinalSlateSlotAction,
   approveAllSignalPostsAction,
-  publishTopSignalsAction,
+  removeFromFinalSlateAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
 import { ApproveAllButton } from "@/app/dashboard/signals/editorial-review/ApproveAllButton";
 import { SignalPostEditor } from "@/app/dashboard/signals/editorial-review/StructuredEditorialFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import {
+  FINAL_SLATE_RANKS,
+  formatSlotLabel,
+  getFinalSlateTierForRank,
+  validateFinalSlateReadiness,
+  type FinalSlateReadinessResult,
+} from "@/lib/final-slate-readiness";
 import {
   SIGNALS_EDITORIAL_ROUTE,
   getEditorialReviewState,
@@ -29,7 +37,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Top 5 Signals Editorial Review",
+  title: "Signals Final-Slate Composer",
   robots: {
     index: false,
     follow: false,
@@ -89,12 +97,15 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
 
   const posts = sortEditorialHistoryPostsReverseChronological(state.posts);
   const visiblePosts = posts;
+  const currentCandidates = (state.currentCandidates ?? [])
+    .slice()
+    .sort((left, right) => left.rank - right.rank);
   const topFivePosts = (state.currentTopFive ?? posts)
     .slice()
     .sort((left, right) => left.rank - right.rank)
     .slice(0, 5);
-  const allPublished = topFivePosts.length === 5 && topFivePosts.every((post) => post.editorialStatus === "published");
-  const publishBlockedReason = getPublishBlockedReason(topFivePosts, state.storageReady, allPublished);
+  const finalSlateReadiness = validateFinalSlateReadiness(currentCandidates);
+  const publishDisabledReason = getComposerPublishDisabledReason(finalSlateReadiness, state.storageReady);
   const approveAllPosts = visiblePosts.filter(isBulkApprovablePost);
   const statusCounts = getStatusCounts(posts);
   const approveAllBlockedReason = getApproveAllBlockedReason(visiblePosts, state.storageReady, approveAllPosts.length);
@@ -113,15 +124,15 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
             <Badge>{state.adminEmail}</Badge>
             <Badge>{totalMatchingPosts} matching posts</Badge>
             <Badge>{currentSetLabel}</Badge>
-            <Badge>{topFivePosts.length} current cards</Badge>
+            <Badge>{currentCandidates.length || topFivePosts.length} current candidates</Badge>
           </div>
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl space-y-3">
               <h1 className="text-2xl font-semibold tracking-normal text-[var(--text-primary)] md:text-3xl">
-                Top 5 Signals — Editorial Review
+                Signals Final-Slate Composer
               </h1>
               <p className="text-base leading-7 text-[var(--text-secondary)]">
-                Review, edit, approve, and publish the final ‘Why it matters’ layer.
+                Compose the reviewed 5 Core + 2 Context slate before publish hardening.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[34rem]">
@@ -145,21 +156,19 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
                   </p>
                 ) : null}
               </form>
-              <form action={publishTopSignalsAction} className="space-y-2">
+              <div className="space-y-2">
                 <Button
-                  type="submit"
-                  disabled={Boolean(publishBlockedReason)}
+                  type="button"
+                  disabled
                   className="w-full gap-2"
                 >
                   <Send className="h-4 w-4" />
-                  Publish Top 5 Signals
+                  Publish Final Slate
                 </Button>
-                {publishBlockedReason ? (
-                  <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                    {publishBlockedReason}
-                  </p>
-                ) : null}
-              </form>
+                <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                  {publishDisabledReason}
+                </p>
+              </div>
             </div>
           </div>
         </header>
@@ -167,6 +176,12 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
         {successMessage ? <StatusBanner tone="success" message={successMessage} /> : null}
         {errorMessage ? <StatusBanner tone="error" message={errorMessage} /> : null}
         {state.warning ? <StatusBanner tone="warning" message={state.warning} /> : null}
+
+        <FinalSlateComposer
+          candidates={currentCandidates}
+          readiness={finalSlateReadiness}
+          storageReady={state.storageReady}
+        />
 
         <section className="space-y-3">
           <div className="flex flex-wrap gap-2" aria-label="Editorial scope filters">
@@ -233,8 +248,8 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
               </Button>
             </div>
           </form>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            Historical daily Top 5 snapshots are editable here. The current working set is the latest briefing date; the public homepage continues to use only the explicitly live published set.
+          <p className="break-words text-sm leading-6 text-[var(--text-secondary)]">
+            Historical snapshots are editable here. The current working set is the latest briefing date; the public homepage continues to use only the explicitly live published set.
           </p>
         </section>
 
@@ -298,6 +313,251 @@ const STATUS_FILTERS: Array<{ value: EditorialPostStatusFilter; label: string }>
   { value: "approved", label: "Approved" },
   { value: "published", label: "Published" },
 ];
+
+function FinalSlateComposer({
+  candidates,
+  readiness,
+  storageReady,
+}: {
+  candidates: EditorialSignalPost[];
+  readiness: FinalSlateReadinessResult;
+  storageReady: boolean;
+}) {
+  const selectedCount = readiness.selectedRows.length;
+  const coreCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "core").length;
+  const contextCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "context").length;
+  const publishDisabledReason = getComposerPublishDisabledReason(readiness, storageReady);
+
+  return (
+    <section className="space-y-4" aria-labelledby="final-slate-composer-title">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <h2 id="final-slate-composer-title" className="text-xl font-semibold tracking-normal text-[var(--text-primary)]">
+            Final Slate Composer
+          </h2>
+          <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+            Assign reviewed candidates into Core slots 1-5 and Context slots 6-7. Slot placement does not make a row public.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge>{selectedCount}/7 selected</Badge>
+          <Badge>{coreCount}/5 Core</Badge>
+          <Badge>{contextCount}/2 Context</Badge>
+          <Badge>{readiness.ready ? "Slate ready" : "Slate not ready"}</Badge>
+        </div>
+      </div>
+
+      <Panel className="p-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {FINAL_SLATE_RANKS.map((rank) => (
+              <FinalSlateSlot
+                key={rank}
+                rank={rank}
+                post={candidates.find((candidate) => candidate.finalSlateRank === rank) ?? null}
+                rowFailures={readiness.rowFailures}
+                slotFailures={readiness.slotFailures[rank] ?? []}
+                storageReady={storageReady}
+              />
+            ))}
+          </div>
+          <div className="space-y-3 rounded-card border border-[var(--border)] bg-[var(--card)] p-4">
+            <div className="flex items-center gap-2">
+              {readiness.ready ? (
+                <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
+              ) : (
+                <ShieldAlert className="h-4 w-4 text-[var(--accent)]" />
+              )}
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                Publish Readiness
+              </h3>
+            </div>
+            <Button type="button" disabled className="w-full gap-2">
+              <Send className="h-4 w-4" />
+              Publish Final Slate
+            </Button>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              {publishDisabledReason}
+            </p>
+            {readiness.failures.length > 0 ? (
+              <ul className="space-y-1 text-sm leading-6 text-[var(--text-secondary)]">
+                {readiness.failures.slice(0, 8).map((failure) => (
+                  <li key={`${failure.code}-${failure.rowId ?? "slate"}-${failure.rank ?? "none"}-${failure.message}`}>
+                    {failure.message}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+      </Panel>
+
+      <Panel className="p-4">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">Candidate Pool</h3>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              Current briefing candidates stay non-live while editors assign final public placement.
+            </p>
+          </div>
+          <Badge>{candidates.length} candidates</Badge>
+        </div>
+        {candidates.length > 0 ? (
+          <div className="divide-y divide-[var(--border)]">
+            {candidates.map((post) => (
+              <FinalSlateCandidateRow
+                key={post.id}
+                post={post}
+                rowFailures={readiness.rowFailures[post.id] ?? []}
+                storageReady={storageReady}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            No current briefing candidates are available for slate composition.
+          </p>
+        )}
+      </Panel>
+    </section>
+  );
+}
+
+function FinalSlateSlot({
+  rank,
+  post,
+  rowFailures,
+  slotFailures,
+  storageReady,
+}: {
+  rank: number;
+  post: EditorialSignalPost | null;
+  rowFailures: Record<string, string[]>;
+  slotFailures: string[];
+  storageReady: boolean;
+}) {
+  const tier = getFinalSlateTierForRank(rank);
+  const failures = post ? rowFailures[post.id] ?? [] : slotFailures;
+
+  return (
+    <div className="min-h-56 rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <Badge>{formatSlotLabel(rank)}</Badge>
+        <Badge>{tier === "context" ? "Context" : "Core"}</Badge>
+      </div>
+      {post ? (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold leading-5 text-[var(--text-primary)]">{post.title}</p>
+            <p className="text-xs leading-5 text-[var(--text-secondary)]">{post.sourceName || "Missing source"}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge>{post.whyItMattersValidationStatus === "passed" ? "WITM passed" : "WITM rewrite required"}</Badge>
+            <Badge>{post.editorialStatus}</Badge>
+          </div>
+          {failures.length > 0 ? (
+            <ul className="space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
+              {failures.slice(0, 3).map((failure, index) => (
+                <li key={`${failure}-${index}`}>{failure}</li>
+              ))}
+            </ul>
+          ) : null}
+          <form action={removeFromFinalSlateAction}>
+            <input type="hidden" name="postId" value={post.id} />
+            <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+              Remove
+            </Button>
+          </form>
+        </div>
+      ) : (
+        <div className="flex min-h-36 flex-col justify-between gap-3">
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            {slotFailures[0] ?? "No candidate assigned."}
+          </p>
+          <p className="text-xs leading-5 text-[var(--text-secondary)]">
+            Use the assignment controls in the candidate pool.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FinalSlateCandidateRow({
+  post,
+  rowFailures,
+  storageReady,
+}: {
+  post: EditorialSignalPost;
+  rowFailures: string[];
+  storageReady: boolean;
+}) {
+  const canAssign = storageReady && post.persisted && !post.isLive && post.editorialStatus !== "published" && !post.publishedAt;
+  const placement = post.finalSlateRank ? formatSlotLabel(post.finalSlateRank) : "Not selected";
+
+  return (
+    <div className="grid gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge>Pipeline rank {post.rank}</Badge>
+          <Badge>{placement}</Badge>
+          <Badge>{post.editorialStatus}</Badge>
+          <Badge>{post.isLive ? "Live" : "Non-live"}</Badge>
+          <Badge>{post.publishedAt ? "Published date set" : "Unpublished"}</Badge>
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-base font-semibold leading-6 text-[var(--text-primary)]">{post.title}</h4>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            {post.sourceName || "Missing source"}
+            {post.sourceUrl ? ` · ${post.sourceUrl}` : ""}
+          </p>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            WITM status: {post.whyItMattersValidationStatus}
+          </p>
+        </div>
+        {post.whyItMattersValidationDetails.length > 0 ? (
+          <ul className="space-y-1 text-sm leading-6 text-[var(--text-secondary)]">
+            {post.whyItMattersValidationDetails.slice(0, 2).map((detail, index) => (
+              <li key={`${detail}-${index}`}>{detail}</li>
+            ))}
+          </ul>
+        ) : null}
+        {rowFailures.length > 0 ? (
+          <ul className="space-y-1 text-sm leading-6 text-[var(--text-secondary)]">
+            {rowFailures.slice(0, 4).map((failure, index) => (
+              <li key={`${failure}-${index}`}>{failure}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <div className="space-y-2">
+        <p className="section-label">Assign to slot</p>
+        <div className="grid grid-cols-7 gap-2">
+          {FINAL_SLATE_RANKS.map((rank) => (
+            <form key={rank} action={assignFinalSlateSlotAction}>
+              <input type="hidden" name="postId" value={post.id} />
+              <input type="hidden" name="finalSlateRank" value={rank} />
+              <Button
+                type="submit"
+                variant={post.finalSlateRank === rank ? "primary" : "secondary"}
+                disabled={!canAssign}
+                className="h-10 w-full px-0"
+                aria-label={`Assign ${post.title} to ${formatSlotLabel(rank)}`}
+              >
+                {rank}
+              </Button>
+            </form>
+          ))}
+        </div>
+        <p className="text-xs leading-5 text-[var(--text-secondary)]">
+          {canAssign
+            ? "Slot assignment updates draft placement only."
+            : "Only persisted, non-live, unpublished rows can be assigned."}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function normalizeStatusFilter(value: string | undefined): EditorialPostStatusFilter {
   if (
@@ -542,40 +802,19 @@ function getApproveAllBlockedReason(
   return null;
 }
 
-function getPublishBlockedReason(
-  posts: EditorialSignalPost[],
+function getComposerPublishDisabledReason(
+  readiness: FinalSlateReadinessResult,
   storageReady: boolean,
-  allPublished: boolean,
 ) {
   if (!storageReady) {
     return "Publishing is blocked until editorial storage is configured.";
   }
 
-  if (posts.length !== 5) {
-    return `Publishing requires exactly five ranked signal posts. Current count: ${posts.length}.`;
+  if (!readiness.ready) {
+    return `Publish is disabled: ${readiness.failures[0]?.message ?? "final slate validation has not passed."}`;
   }
 
-  if (allPublished) {
-    return "This Top 5 list is already published. Save and approve an edit to publish a new version.";
-  }
-
-  const rewriteRequiredCount = posts.filter(
-    (post) => post.whyItMattersValidationStatus === "requires_human_rewrite",
-  ).length;
-
-  if (rewriteRequiredCount > 0) {
-    return `${rewriteRequiredCount} signal posts require a human rewrite before publishing.`;
-  }
-
-  const blockedCount = posts.filter(
-    (post) => !["approved", "published"].includes(post.editorialStatus),
-  ).length;
-
-  if (blockedCount > 0) {
-    return "Approve all five signal posts before publishing. Already published posts remain publish-ready.";
-  }
-
-  return null;
+  return "Slate readiness passes, but publish execution stays disabled in this Phase 2 composer PR.";
 }
 
 function normalizeEditorialText(value: string | null | undefined) {
