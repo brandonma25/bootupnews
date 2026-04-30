@@ -33,6 +33,7 @@ import {
   type EditorialScopeFilter,
   type EditorialPostStatusFilter,
   type EditorialSignalPost,
+  type PublishedSlateAudit,
 } from "@/lib/signals-editorial";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +108,11 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
     .sort((left, right) => left.rank - right.rank)
     .slice(0, 5);
   const finalSlateReadiness = validateFinalSlateReadiness(currentCandidates);
-  const publishDisabledReason = getComposerPublishDisabledReason(finalSlateReadiness, state.storageReady);
+  const publishDisabledReason = getComposerPublishDisabledReason(
+    finalSlateReadiness,
+    state.storageReady,
+    state.auditStorageReady,
+  );
   const approveAllPosts = visiblePosts.filter(isBulkApprovablePost);
   const statusCounts = getStatusCounts(posts);
   const approveAllBlockedReason = getApproveAllBlockedReason(visiblePosts, state.storageReady, approveAllPosts.length);
@@ -134,7 +139,7 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
                 Signals Final-Slate Composer
               </h1>
               <p className="text-base leading-7 text-[var(--text-secondary)]">
-                Compose the reviewed 5 Core + 2 Context slate before publish hardening.
+                Compose, publish, and audit the reviewed 5 Core + 2 Context slate.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[34rem]">
@@ -180,11 +185,18 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
         {successMessage ? <StatusBanner tone="success" message={successMessage} /> : null}
         {errorMessage ? <StatusBanner tone="error" message={errorMessage} /> : null}
         {state.warning ? <StatusBanner tone="warning" message={state.warning} /> : null}
+        {state.auditWarning ? <StatusBanner tone="warning" message={state.auditWarning} /> : null}
 
         <FinalSlateComposer
           candidates={currentCandidates}
           readiness={finalSlateReadiness}
           storageReady={state.storageReady}
+          auditStorageReady={state.auditStorageReady}
+        />
+
+        <PublishedSlateAuditSummary
+          audit={state.latestPublishedSlateAudit}
+          auditStorageReady={state.auditStorageReady}
         />
 
         <section className="space-y-3">
@@ -322,15 +334,17 @@ function FinalSlateComposer({
   candidates,
   readiness,
   storageReady,
+  auditStorageReady,
 }: {
   candidates: EditorialSignalPost[];
   readiness: FinalSlateReadinessResult;
   storageReady: boolean;
+  auditStorageReady: boolean;
 }) {
   const selectedCount = readiness.selectedRows.length;
   const coreCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "core").length;
   const contextCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "context").length;
-  const publishDisabledReason = getComposerPublishDisabledReason(readiness, storageReady);
+  const publishDisabledReason = getComposerPublishDisabledReason(readiness, storageReady, auditStorageReady);
 
   return (
     <section className="space-y-4" aria-labelledby="final-slate-composer-title">
@@ -445,6 +459,111 @@ function FinalSlateComposer({
         ) : (
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
             No current briefing candidates are available for slate composition.
+          </p>
+        )}
+      </Panel>
+    </section>
+  );
+}
+
+function PublishedSlateAuditSummary({
+  audit,
+  auditStorageReady,
+}: {
+  audit: PublishedSlateAudit | null;
+  auditStorageReady: boolean;
+}) {
+  return (
+    <section className="space-y-4" aria-labelledby="published-slate-audit-title">
+      <div className="space-y-2">
+        <h2 id="published-slate-audit-title" className="text-xl font-semibold tracking-normal text-[var(--text-primary)]">
+          Published Slate Audit
+        </h2>
+        <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+          Internal record of the most recent published 5 Core + 2 Context slate. This is not a public archive surface.
+        </p>
+      </div>
+      <Panel className="p-4">
+        {!auditStorageReady ? (
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            Published-slate audit storage is not ready. Publishing is blocked until audit tables are available.
+          </p>
+        ) : audit ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge>Published {formatAuditTimestamp(audit.publishedAt)}</Badge>
+              <Badge>{audit.publishedBy ? `By ${audit.publishedBy}` : "Publisher unavailable"}</Badge>
+              <Badge>{audit.rowCount} rows</Badge>
+              <Badge>{audit.coreCount} Core</Badge>
+              <Badge>{audit.contextCount} Context</Badge>
+              <Badge>{audit.previousLiveRowIds.length} archived previous live rows</Badge>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-xs uppercase tracking-normal text-[var(--text-secondary)]">
+                    <th className="py-2 pr-3 font-medium">Rank</th>
+                    <th className="py-2 pr-3 font-medium">Tier</th>
+                    <th className="py-2 pr-3 font-medium">Title</th>
+                    <th className="py-2 pr-3 font-medium">Source</th>
+                    <th className="py-2 pr-3 font-medium">Decision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {audit.items.map((item) => (
+                    <tr key={item.id} className="border-b border-[var(--border)] last:border-0">
+                      <td className="py-2 pr-3 text-[var(--text-primary)]">{item.finalSlateRank}</td>
+                      <td className="py-2 pr-3 text-[var(--text-secondary)]">
+                        {item.finalSlateTier === "core" ? "Core" : "Context"}
+                      </td>
+                      <td className="py-2 pr-3 text-[var(--text-primary)]">{item.titleSnapshot}</td>
+                      <td className="py-2 pr-3 text-[var(--text-secondary)]">
+                        {item.sourceNameSnapshot || "Missing source"}
+                      </td>
+                      <td className="py-2 pr-3 text-[var(--text-secondary)]">
+                        {formatDecision(item.editorialDecisionSnapshot)}
+                        {item.replacementOfRowIdSnapshot ? " · Replacement" : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-2 rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Archived previous live rows</h3>
+                <p className="break-words text-xs leading-5 text-[var(--text-secondary)]">
+                  {audit.previousLiveRowIds.length > 0
+                    ? audit.previousLiveRowIds.join(", ")
+                    : "No previous live rows were present."}
+                </p>
+              </div>
+              <div className="space-y-2 rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Rollback preparation</h3>
+                <p className="text-xs leading-5 text-[var(--text-secondary)]">
+                  {audit.rollbackNote ?? "Rollback execution is not implemented in this phase."}
+                </p>
+              </div>
+            </div>
+            {audit.verificationChecklist ? (
+              <div className="space-y-2 border-t border-[var(--border)] pt-3">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                  Verification checklist
+                </h3>
+                <p className="text-xs leading-5 text-[var(--text-secondary)]">
+                  Status: {audit.verificationChecklist.status === "not_run" ? "Not run" : audit.verificationChecklist.status}
+                </p>
+                <ul className="space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
+                  {audit.verificationChecklist.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            No published slate audit record exists yet. The next successful supported publish will create one.
           </p>
         )}
       </Panel>
@@ -741,6 +860,16 @@ function formatDecision(decision: string | null) {
     : "Needs review";
 }
 
+function formatAuditTimestamp(value: string) {
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toISOString();
+}
+
 function normalizeStatusFilter(value: string | undefined): EditorialPostStatusFilter {
   if (
     value === "review" ||
@@ -999,9 +1128,14 @@ function getApproveAllBlockedReason(
 function getComposerPublishDisabledReason(
   readiness: FinalSlateReadinessResult,
   storageReady: boolean,
+  auditStorageReady: boolean,
 ): string | null {
   if (!storageReady) {
     return "Publishing is blocked until editorial storage is configured.";
+  }
+
+  if (!auditStorageReady) {
+    return "Publishing is blocked until published-slate audit storage is configured.";
   }
 
   if (!readiness.ready) {

@@ -11,6 +11,8 @@
 - 2026-04-30 readiness label: `ready_for_prd_53_editorial_card_controls_review`
 - 2026-04-30 implementation checkpoint: seven-row publish workflow hardening in review
 - 2026-04-30 readiness label: `ready_for_prd_53_seven_row_publish_hardening_review`
+- 2026-04-30 implementation checkpoint: minimal published-slate audit/history in review
+- 2026-04-30 readiness label: `ready_for_prd_53_minimal_published_slate_audit_history_review`
 
 ## Objective
 
@@ -52,6 +54,7 @@ The site can produce ranked signal posts, but the final public “Why it matters
 - `src/lib/admin-auth.ts` parses comma-separated admin emails and checks the authenticated Supabase user email.
 - `src/lib/signals-editorial.ts` owns server-side editorial reads and mutations. Mutations require an authenticated admin/editor and use the Supabase service-role key only after that in-app authorization check.
 - `public.signal_posts` stores ranked signal metadata, AI draft reference copy, human edited copy, published copy, status, and edit/approval/publish metadata.
+- `public.published_slates` and `public.published_slate_items` store the minimal internal audit record for supported final-slate publishes: published row IDs, archived previous live row IDs, final rank/tier, Card copy snapshots, source snapshots, replacement metadata, and rollback preparation notes.
 - RLS does not grant direct anonymous table reads. The public `/signals` route reads published rows server-side and renders only sanitized public fields.
 - `/dashboard/signals/editorial-review` is noindexed and blocks unauthenticated and non-admin users.
 - `/signals` shows the final published editorial layer only when all five posts have been published.

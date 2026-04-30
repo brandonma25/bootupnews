@@ -72,6 +72,44 @@ const SIGNAL_POST_REQUIRED_COLUMNS = [
 
 const SIGNAL_POST_SELECT = SIGNAL_POST_REQUIRED_COLUMNS.join(", ");
 
+const PUBLISHED_SLATE_REQUIRED_COLUMNS = [
+  "id",
+  "published_at",
+  "published_by",
+  "row_count",
+  "core_count",
+  "context_count",
+  "previous_live_row_ids",
+  "published_row_ids",
+  "rollback_note",
+  "verification_checklist_json",
+  "created_at",
+];
+
+const PUBLISHED_SLATE_ITEM_REQUIRED_COLUMNS = [
+  "id",
+  "published_slate_id",
+  "signal_post_id",
+  "final_slate_rank",
+  "final_slate_tier",
+  "title_snapshot",
+  "why_it_matters_snapshot",
+  "summary_snapshot",
+  "source_name_snapshot",
+  "source_url_snapshot",
+  "editorial_decision_snapshot",
+  "replacement_of_row_id_snapshot",
+  "decision_note_snapshot",
+  "held_reason_snapshot",
+  "rejected_reason_snapshot",
+  "reviewed_by_snapshot",
+  "reviewed_at_snapshot",
+  "created_at",
+];
+
+const PUBLISHED_SLATE_SELECT = PUBLISHED_SLATE_REQUIRED_COLUMNS.join(", ");
+const PUBLISHED_SLATE_ITEM_SELECT = PUBLISHED_SLATE_ITEM_REQUIRED_COLUMNS.join(", ");
+
 const EDITORIAL_PAGE_SIZE = 20;
 const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
 const TOP_SIGNAL_SET_SIZE = 5;
@@ -123,6 +161,48 @@ type StoredSignalPost = {
   updated_at: string | null;
 };
 
+type StoredPublishedSlate = {
+  id: string;
+  published_at: string;
+  published_by: string | null;
+  row_count: number;
+  core_count: number;
+  context_count: number;
+  previous_live_row_ids: unknown;
+  published_row_ids: unknown;
+  rollback_note: string | null;
+  verification_checklist_json: unknown;
+  created_at: string | null;
+};
+
+type StoredPublishedSlateItem = {
+  id: string;
+  published_slate_id: string;
+  signal_post_id: string;
+  final_slate_rank: number;
+  final_slate_tier: FinalSlateTier;
+  title_snapshot: string;
+  why_it_matters_snapshot: string;
+  summary_snapshot: string | null;
+  source_name_snapshot: string | null;
+  source_url_snapshot: string | null;
+  editorial_decision_snapshot: EditorialDecision | null;
+  replacement_of_row_id_snapshot: string | null;
+  decision_note_snapshot: string | null;
+  held_reason_snapshot: string | null;
+  rejected_reason_snapshot: string | null;
+  reviewed_by_snapshot: string | null;
+  reviewed_at_snapshot: string | null;
+  created_at: string | null;
+};
+
+type FinalSlatePublicationCandidate = {
+  post: EditorialSignalPost;
+  structuredContent: EditorialWhyItMattersContent | null;
+  text: string;
+  validation: WhyItMattersValidationResult;
+};
+
 export type EditorialSignalPost = {
   id: string;
   briefingDate: string | null;
@@ -164,6 +244,47 @@ export type EditorialSignalPost = {
   persisted: boolean;
 };
 
+export type PublishedSlateVerificationChecklist = {
+  status: "not_run";
+  items: string[];
+};
+
+export type PublishedSlateAuditItem = {
+  id: string;
+  publishedSlateId: string;
+  signalPostId: string;
+  finalSlateRank: number;
+  finalSlateTier: FinalSlateTier;
+  titleSnapshot: string;
+  whyItMattersSnapshot: string;
+  summarySnapshot: string;
+  sourceNameSnapshot: string;
+  sourceUrlSnapshot: string;
+  editorialDecisionSnapshot: EditorialDecision | null;
+  replacementOfRowIdSnapshot: string | null;
+  decisionNoteSnapshot: string | null;
+  heldReasonSnapshot: string | null;
+  rejectedReasonSnapshot: string | null;
+  reviewedBySnapshot: string | null;
+  reviewedAtSnapshot: string | null;
+  createdAt: string | null;
+};
+
+export type PublishedSlateAudit = {
+  id: string;
+  publishedAt: string;
+  publishedBy: string | null;
+  rowCount: number;
+  coreCount: number;
+  contextCount: number;
+  previousLiveRowIds: string[];
+  publishedRowIds: string[];
+  rollbackNote: string | null;
+  verificationChecklist: PublishedSlateVerificationChecklist | null;
+  createdAt: string | null;
+  items: PublishedSlateAuditItem[];
+};
+
 export type EditorialPostStatusFilter = "all" | "review" | EditorialStatus;
 export type EditorialScopeFilter = "all" | "current" | "historical";
 
@@ -196,6 +317,9 @@ export type EditorialReviewState =
       pageSize: number;
       totalMatchingPosts: number;
       latestBriefingDate: string | null;
+      latestPublishedSlateAudit: PublishedSlateAudit | null;
+      auditStorageReady: boolean;
+      auditWarning: string | null;
       appliedScope: EditorialScopeFilter;
       appliedStatus: EditorialPostStatusFilter;
       appliedQuery: string;
@@ -205,6 +329,7 @@ export type EditorialReviewState =
 export type EditorialMutationResult = {
   ok: boolean;
   message: string;
+  publishedSlateId?: string;
   code:
     | "approved"
     | "bulk_approved"
@@ -255,18 +380,28 @@ type SignalPostsSchemaPreflightResult =
     };
 
 let signalPostsSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
+let publishedSlateAuditSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
 
-function buildSignalPostsSchemaPreflightFailure(missingColumns: string[]): SignalPostsSchemaPreflightResult {
+function buildSchemaPreflightFailure(label: string, missingColumns: string[]): SignalPostsSchemaPreflightResult {
   return {
     ok: false,
     missingColumns,
-    message: `signal_posts schema preflight failed. Missing expected columns: ${missingColumns.join(", ")}.`,
+    message: `${label} schema preflight failed. Missing expected columns: ${missingColumns.join(", ")}.`,
   };
 }
 
-function isMissingColumnError(error: unknown, column: string) {
+function buildSignalPostsSchemaPreflightFailure(missingColumns: string[]): SignalPostsSchemaPreflightResult {
+  return buildSchemaPreflightFailure("signal_posts", missingColumns);
+}
+
+function buildPublishedSlateAuditSchemaPreflightFailure(missingColumns: string[]): SignalPostsSchemaPreflightResult {
+  return buildSchemaPreflightFailure("published_slate audit", missingColumns);
+}
+
+function isMissingColumnError(error: unknown, column: string, tableName = "signal_posts") {
   const maybeError = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
   const normalizedColumn = column.toLowerCase();
+  const normalizedTableName = tableName.toLowerCase();
   const haystack = [
     maybeError.code,
     maybeError.message,
@@ -280,10 +415,30 @@ function isMissingColumnError(error: unknown, column: string) {
   return (
     haystack.includes("42703") ||
     (haystack.includes("does not exist") &&
-      (haystack.includes(normalizedColumn) || haystack.includes(`signal_posts.${normalizedColumn}`))) ||
+      (haystack.includes(normalizedColumn) || haystack.includes(`${normalizedTableName}.${normalizedColumn}`))) ||
     (haystack.includes("could not find") &&
       haystack.includes(normalizedColumn) &&
       haystack.includes("column"))
+  );
+}
+
+function isMissingRelationError(error: unknown, tableName: string) {
+  const maybeError = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  const normalizedTableName = tableName.toLowerCase();
+  const haystack = [
+    maybeError.code,
+    maybeError.message,
+    maybeError.details,
+    maybeError.hint,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    haystack.includes("42p01") ||
+    (haystack.includes("does not exist") && haystack.includes(normalizedTableName)) ||
+    (haystack.includes("could not find") && haystack.includes(normalizedTableName))
   );
 }
 
@@ -334,6 +489,74 @@ function getSignalPostsSchemaPreflight(
 ): Promise<SignalPostsSchemaPreflightResult> {
   signalPostsSchemaPreflightPromise ??= runSignalPostsSchemaPreflight(client);
   return signalPostsSchemaPreflightPromise;
+}
+
+async function runPublishedSlateAuditSchemaPreflight(
+  client: EditorialClient,
+): Promise<SignalPostsSchemaPreflightResult> {
+  const missingColumns: string[] = [];
+  const errorMessages: string[] = [];
+  const nonSchemaErrorMessages: string[] = [];
+  const requiredChecks = [
+    {
+      tableName: "published_slates",
+      columns: PUBLISHED_SLATE_REQUIRED_COLUMNS,
+    },
+    {
+      tableName: "published_slate_items",
+      columns: PUBLISHED_SLATE_ITEM_REQUIRED_COLUMNS,
+    },
+  ];
+
+  for (const check of requiredChecks) {
+    for (const column of check.columns) {
+      const result = await client.from(check.tableName).select(column).limit(0);
+      const qualifiedColumn = `${check.tableName}.${column}`;
+
+      if (result.error && isMissingRelationError(result.error, check.tableName)) {
+        missingColumns.push(`${check.tableName}.*`);
+        errorMessages.push(`${check.tableName}: ${result.error.message}`);
+        break;
+      }
+
+      if (result.error && isMissingColumnError(result.error, column, check.tableName)) {
+        missingColumns.push(qualifiedColumn);
+        errorMessages.push(`${qualifiedColumn}: ${result.error.message}`);
+      } else if (result.error) {
+        nonSchemaErrorMessages.push(`${qualifiedColumn}: ${result.error.message}`);
+      }
+    }
+  }
+
+  if (nonSchemaErrorMessages.length > 0 && missingColumns.length === 0) {
+    logServerEvent("warn", "published slate audit schema preflight could not verify columns", {
+      errorMessages: nonSchemaErrorMessages,
+    });
+  }
+
+  if (missingColumns.length === 0) {
+    return {
+      ok: true,
+      missingColumns: [],
+      message: null,
+    };
+  }
+
+  const failure = buildPublishedSlateAuditSchemaPreflightFailure(missingColumns);
+
+  logServerEvent("error", "published slate audit schema preflight failed", {
+    missingColumns,
+    errorMessages,
+  });
+
+  return failure;
+}
+
+function getPublishedSlateAuditSchemaPreflight(
+  client: EditorialClient,
+): Promise<SignalPostsSchemaPreflightResult> {
+  publishedSlateAuditSchemaPreflightPromise ??= runPublishedSlateAuditSchemaPreflight(client);
+  return publishedSlateAuditSchemaPreflightPromise;
 }
 
 function normalizeEditorialText(value: string | null | undefined) {
@@ -435,6 +658,86 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     persisted: true,
+  };
+}
+
+function normalizeStringArrayFromJson(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return normalizeStringArrayFromJson(parsed);
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function parsePublishedSlateVerificationChecklist(value: unknown): PublishedSlateVerificationChecklist | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as { status?: unknown; items?: unknown };
+
+  if (candidate.status !== "not_run" || !Array.isArray(candidate.items)) {
+    return null;
+  }
+
+  return {
+    status: "not_run",
+    items: candidate.items.filter((item): item is string => typeof item === "string"),
+  };
+}
+
+function mapStoredPublishedSlateItem(row: StoredPublishedSlateItem): PublishedSlateAuditItem {
+  return {
+    id: row.id,
+    publishedSlateId: row.published_slate_id,
+    signalPostId: row.signal_post_id,
+    finalSlateRank: row.final_slate_rank,
+    finalSlateTier: row.final_slate_tier,
+    titleSnapshot: row.title_snapshot,
+    whyItMattersSnapshot: row.why_it_matters_snapshot,
+    summarySnapshot: row.summary_snapshot ?? "",
+    sourceNameSnapshot: row.source_name_snapshot ?? "",
+    sourceUrlSnapshot: row.source_url_snapshot ?? "",
+    editorialDecisionSnapshot: row.editorial_decision_snapshot,
+    replacementOfRowIdSnapshot: row.replacement_of_row_id_snapshot,
+    decisionNoteSnapshot: row.decision_note_snapshot,
+    heldReasonSnapshot: row.held_reason_snapshot,
+    rejectedReasonSnapshot: row.rejected_reason_snapshot,
+    reviewedBySnapshot: row.reviewed_by_snapshot,
+    reviewedAtSnapshot: row.reviewed_at_snapshot,
+    createdAt: row.created_at,
+  };
+}
+
+function mapStoredPublishedSlate(
+  row: StoredPublishedSlate,
+  items: StoredPublishedSlateItem[],
+): PublishedSlateAudit {
+  return {
+    id: row.id,
+    publishedAt: row.published_at,
+    publishedBy: row.published_by,
+    rowCount: row.row_count,
+    coreCount: row.core_count,
+    contextCount: row.context_count,
+    previousLiveRowIds: normalizeStringArrayFromJson(row.previous_live_row_ids),
+    publishedRowIds: normalizeStringArrayFromJson(row.published_row_ids),
+    rollbackNote: row.rollback_note,
+    verificationChecklist: parsePublishedSlateVerificationChecklist(row.verification_checklist_json),
+    createdAt: row.created_at,
+    items: items
+      .slice()
+      .sort((left, right) => left.final_slate_rank - right.final_slate_rank)
+      .map(mapStoredPublishedSlateItem),
   };
 }
 
@@ -874,6 +1177,54 @@ async function loadCurrentSignalDepth(client: EditorialClient, briefingDate: str
   return ((result.data ?? []) as unknown as StoredSignalPost[]).map(mapStoredSignalPost);
 }
 
+async function loadLatestPublishedSlateAudit(client: EditorialClient): Promise<{
+  audit: PublishedSlateAudit | null;
+  errorMessage: string | null;
+}> {
+  const slateResult = await client
+    .from("published_slates")
+    .select(PUBLISHED_SLATE_SELECT)
+    .order("published_at", { ascending: false })
+    .limit(1);
+
+  if (slateResult.error) {
+    return {
+      audit: null,
+      errorMessage: slateResult.error.message,
+    };
+  }
+
+  const slate = ((slateResult.data ?? []) as unknown as StoredPublishedSlate[])[0];
+
+  if (!slate) {
+    return {
+      audit: null,
+      errorMessage: null,
+    };
+  }
+
+  const itemResult = await client
+    .from("published_slate_items")
+    .select(PUBLISHED_SLATE_ITEM_SELECT)
+    .eq("published_slate_id", slate.id)
+    .order("final_slate_rank", { ascending: true });
+
+  if (itemResult.error) {
+    return {
+      audit: null,
+      errorMessage: itemResult.error.message,
+    };
+  }
+
+  return {
+    audit: mapStoredPublishedSlate(
+      slate,
+      (itemResult.data ?? []) as unknown as StoredPublishedSlateItem[],
+    ),
+    errorMessage: null,
+  };
+}
+
 function selectPublishedEditorialWhyItMatters(post: EditorialSignalPost) {
   if (post.editorialStatus !== "published") {
     return "";
@@ -1077,6 +1428,9 @@ export async function getEditorialReviewState(
       pageSize: EDITORIAL_PAGE_SIZE,
       totalMatchingPosts: 0,
       latestBriefingDate: null,
+      latestPublishedSlateAudit: null,
+      auditStorageReady: false,
+      auditWarning: context.message,
       appliedScope: normalizedScope,
       appliedStatus: normalizedStatus,
       appliedQuery: normalizedQuery,
@@ -1099,6 +1453,9 @@ export async function getEditorialReviewState(
       pageSize: EDITORIAL_PAGE_SIZE,
       totalMatchingPosts: 0,
       latestBriefingDate: null,
+      latestPublishedSlateAudit: null,
+      auditStorageReady: false,
+      auditWarning: schemaPreflight.message,
       appliedScope: normalizedScope,
       appliedStatus: normalizedStatus,
       appliedQuery: normalizedQuery,
@@ -1108,6 +1465,10 @@ export async function getEditorialReviewState(
 
   const latest = await getLatestBriefingDate(context.client);
   const latestBriefingDate = latest.latestBriefingDate;
+  const auditSchemaPreflight = await getPublishedSlateAuditSchemaPreflight(context.client);
+  const latestAudit = auditSchemaPreflight.ok
+    ? await loadLatestPublishedSlateAudit(context.client)
+    : { audit: null, errorMessage: auditSchemaPreflight.message };
   const loaded = await loadStoredSignalPosts(context.client, {
     status: normalizedStatus,
     scope: normalizedScope,
@@ -1121,6 +1482,13 @@ export async function getEditorialReviewState(
     logServerEvent("warn", "Editorial latest briefing date could not be loaded", {
       route,
       errorMessage: latest.errorMessage,
+    });
+  }
+
+  if (latestAudit.errorMessage) {
+    logServerEvent("warn", "Published slate audit history could not be loaded", {
+      route,
+      errorMessage: latestAudit.errorMessage,
     });
   }
 
@@ -1142,6 +1510,11 @@ export async function getEditorialReviewState(
       pageSize: EDITORIAL_PAGE_SIZE,
       totalMatchingPosts: 0,
       latestBriefingDate,
+      latestPublishedSlateAudit: latestAudit.audit,
+      auditStorageReady: auditSchemaPreflight.ok,
+      auditWarning: latestAudit.errorMessage
+        ? `Published slate audit history could not be read: ${latestAudit.errorMessage}`
+        : null,
       appliedScope: normalizedScope,
       appliedStatus: normalizedStatus,
       appliedQuery: normalizedQuery,
@@ -1157,6 +1530,9 @@ export async function getEditorialReviewState(
       : null,
     getEditorialStorageWarning(loaded.totalCount, normalizedScope),
   ].filter(Boolean);
+  const auditWarning = latestAudit.errorMessage
+    ? `Published slate audit history could not be read: ${latestAudit.errorMessage}`
+    : null;
 
   return {
     kind: "authorized",
@@ -1170,6 +1546,9 @@ export async function getEditorialReviewState(
     pageSize: EDITORIAL_PAGE_SIZE,
     totalMatchingPosts: loaded.totalCount,
     latestBriefingDate,
+    latestPublishedSlateAudit: latestAudit.audit,
+    auditStorageReady: auditSchemaPreflight.ok,
+    auditWarning,
     appliedScope: normalizedScope,
     appliedStatus: normalizedStatus,
     appliedQuery: normalizedQuery,
@@ -2159,6 +2538,16 @@ export async function publishApprovedSignals(input: {
     };
   }
 
+  const auditSchemaPreflight = await getPublishedSlateAuditSchemaPreflight(context.client);
+
+  if (!auditSchemaPreflight.ok) {
+    return {
+      ok: false,
+      code: "storage_unavailable",
+      message: auditSchemaPreflight.message,
+    };
+  }
+
   const latest = await getLatestBriefingDate(context.client);
 
   if (latest.errorMessage) {
@@ -2272,6 +2661,30 @@ export async function publishApprovedSignals(input: {
     .map((row) => row.id)
     .filter((id): id is string => Boolean(id));
   const selectedPostIds = publicationCandidates.map((entry) => entry.post.id);
+  const auditResult = await createPublishedSlateAudit(context.client, {
+    publicationCandidates,
+    previousLiveIds,
+    publishedAt: now,
+    publishedBy: context.user.email ?? null,
+  });
+
+  if (!auditResult.ok) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_write_failed",
+      phase: "publish",
+      operation: "create_published_slate_audit",
+      route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+      briefingDate: latest.latestBriefingDate,
+      postCount: publicationCandidates.length,
+      message: "Published slate audit record could not be created before publishing.",
+    });
+
+    return {
+      ok: false,
+      code: "storage_error",
+      message: `The published slate audit record could not be created. No rows were changed. ${auditResult.message}`,
+    };
+  }
 
   if (previousLiveIds.length > 0) {
     const deactivateOldLiveSet = await context.client
@@ -2291,6 +2704,7 @@ export async function publishApprovedSignals(input: {
         briefingDate: latest.latestBriefingDate,
         message: "Previous live RSS signal set could not be archived before publishing.",
       });
+      await deletePublishedSlateAudit(context.client, auditResult.publishedSlateId);
 
       return {
         ok: false,
@@ -2324,6 +2738,7 @@ export async function publishApprovedSignals(input: {
       selectedPostIds,
       now,
     });
+    await deletePublishedSlateAudit(context.client, auditResult.publishedSlateId);
 
     captureRssEditorialStorageFailure({
       failureType: "rss_cache_write_failed",
@@ -2345,10 +2760,11 @@ export async function publishApprovedSignals(input: {
   return {
     ok: true,
     code: "published",
+    publishedSlateId: auditResult.publishedSlateId,
     message:
       previousLiveIds.length > 0
-        ? `Published final slate: 5 Core + 2 Context rows are live. Archived ${previousLiveIds.length} previous live rows.`
-        : "Published final slate: 5 Core + 2 Context rows are live. No previous live slate was present to archive.",
+        ? `Published final slate: 5 Core + 2 Context rows are live. Archived ${previousLiveIds.length} previous live rows. Audit record ${auditResult.publishedSlateId}.`
+        : `Published final slate: 5 Core + 2 Context rows are live. No previous live slate was present to archive. Audit record ${auditResult.publishedSlateId}.`,
   };
 }
 
@@ -2394,6 +2810,136 @@ async function rollbackFailedFinalSlatePublish(
   ]);
 
   return rollbackResults.every((result) => !result.error);
+}
+
+function buildPublishedSlateVerificationChecklist(): PublishedSlateVerificationChecklist {
+  return {
+    status: "not_run",
+    items: [
+      "Homepage returns 200 and shows Core slots 1-5.",
+      "/signals returns 200 and shows Core slots 1-5 plus Context slots 6-7.",
+      "Database has exactly 7 live rows for the new slate.",
+      "Held, rejected, rewrite-requested, Depth, rank-8, and unpublished rows stay hidden.",
+      "Cron remains disabled.",
+    ],
+  };
+}
+
+function buildRollbackPreparationNote(input: {
+  publishedRowIds: string[];
+  previousLiveRowIds: string[];
+}) {
+  return input.previousLiveRowIds.length > 0
+    ? "Rollback execution is not implemented in this phase. This audit record identifies the newly published rows to un-live and the archived previous live rows to restore."
+    : "Rollback execution is not implemented in this phase. This audit record identifies the newly published rows to un-live; no previous live slate existed at publish time.";
+}
+
+async function deletePublishedSlateAudit(client: EditorialClient, publishedSlateId: string) {
+  const deleteResult = await client
+    .from("published_slates")
+    .delete()
+    .eq("id", publishedSlateId);
+
+  if (deleteResult.error) {
+    logServerEvent("warn", "Published slate audit cleanup failed after publish rollback", {
+      publishedSlateId,
+      errorMessage: deleteResult.error.message,
+    });
+  }
+}
+
+async function createPublishedSlateAudit(
+  client: EditorialClient,
+  input: {
+    publicationCandidates: FinalSlatePublicationCandidate[];
+    previousLiveIds: string[];
+    publishedAt: string;
+    publishedBy: string | null;
+  },
+): Promise<
+  | {
+      ok: true;
+      publishedSlateId: string;
+    }
+  | {
+      ok: false;
+      message: string;
+    }
+> {
+  const publishedRowIds = input.publicationCandidates.map((entry) => entry.post.id);
+  const coreCount = input.publicationCandidates.filter((entry) => entry.post.finalSlateTier === "core").length;
+  const contextCount = input.publicationCandidates.filter((entry) => entry.post.finalSlateTier === "context").length;
+  const insertSlateResult = await client
+    .from("published_slates")
+    .insert({
+      published_at: input.publishedAt,
+      published_by: input.publishedBy,
+      row_count: input.publicationCandidates.length,
+      core_count: coreCount,
+      context_count: contextCount,
+      previous_live_row_ids: input.previousLiveIds,
+      published_row_ids: publishedRowIds,
+      rollback_note: buildRollbackPreparationNote({
+        publishedRowIds,
+        previousLiveRowIds: input.previousLiveIds,
+      }),
+      verification_checklist_json: buildPublishedSlateVerificationChecklist(),
+      created_at: input.publishedAt,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (insertSlateResult.error || !insertSlateResult.data) {
+    return {
+      ok: false,
+      message: insertSlateResult.error?.message ?? "The published slate audit record did not return an id.",
+    };
+  }
+
+  const publishedSlateId = ((insertSlateResult.data ?? {}) as { id?: string | null }).id;
+
+  if (!publishedSlateId) {
+    return {
+      ok: false,
+      message: "The published slate audit record did not return an id.",
+    };
+  }
+
+  const itemRows = input.publicationCandidates.map((entry) => ({
+    published_slate_id: publishedSlateId,
+    signal_post_id: entry.post.id,
+    final_slate_rank: entry.post.finalSlateRank,
+    final_slate_tier: entry.post.finalSlateTier,
+    title_snapshot: entry.post.title,
+    why_it_matters_snapshot: entry.text,
+    summary_snapshot: entry.post.summary || null,
+    source_name_snapshot: entry.post.sourceName || null,
+    source_url_snapshot: entry.post.sourceUrl || null,
+    editorial_decision_snapshot: entry.post.editorialDecision,
+    replacement_of_row_id_snapshot: entry.post.replacementOfRowId,
+    decision_note_snapshot: entry.post.decisionNote,
+    held_reason_snapshot: entry.post.heldReason,
+    rejected_reason_snapshot: entry.post.rejectedReason,
+    reviewed_by_snapshot: entry.post.reviewedBy,
+    reviewed_at_snapshot: entry.post.reviewedAt,
+    created_at: input.publishedAt,
+  }));
+
+  const insertItemsResult = await client.from("published_slate_items").insert(itemRows);
+
+  if (insertItemsResult.error) {
+    await deletePublishedSlateAudit(client, publishedSlateId);
+
+    return {
+      ok: false,
+      message: insertItemsResult.error.message,
+    };
+  }
+
+  return {
+    ok: true,
+    publishedSlateId,
+  };
 }
 
 export async function publishSignalPost(input: {
