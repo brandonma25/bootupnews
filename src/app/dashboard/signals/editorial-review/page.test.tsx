@@ -100,6 +100,9 @@ function createAuthorizedState(posts: typeof reviewPost[]) {
     pageSize: 20,
     totalMatchingPosts: posts.length,
     latestBriefingDate: "2026-04-24",
+    latestPublishedSlateAudit: null,
+    auditStorageReady: true,
+    auditWarning: null,
     appliedScope: "all" as const,
     appliedStatus: "all" as const,
     appliedQuery: "",
@@ -207,6 +210,77 @@ describe("signals editorial review page", () => {
     expect(screen.getByText("Rollback preparation")).toBeInTheDocument();
   });
 
+  it("renders the most recent published-slate audit section for admins", async () => {
+    const readySlate = Array.from({ length: 7 }, (_, index) => {
+      const slot = index + 1;
+
+      return {
+        ...approvedPost,
+        id: `ready-${slot}`,
+        rank: slot,
+        title: `Ready Signal ${slot}`,
+        editorialDecision: "approved" as const,
+        finalSlateRank: slot,
+        finalSlateTier: slot <= 5 ? ("core" as const) : ("context" as const),
+        editedWhyItMatters:
+          "This structurally changes how markets price cloud capacity, AI infrastructure, and platform dependency over the next year.",
+      };
+    });
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState(readySlate),
+      latestPublishedSlateAudit: {
+        id: "published-slate-1",
+        publishedAt: "2026-04-30T08:00:00.000Z",
+        publishedBy: "editor@example.com",
+        rowCount: 7,
+        coreCount: 5,
+        contextCount: 2,
+        previousLiveRowIds: ["old-live-1"],
+        publishedRowIds: readySlate.map((post) => post.id),
+        rollbackNote:
+          "Rollback execution is not implemented in this phase. This audit record identifies the rows needed for rollback.",
+        verificationChecklist: {
+          status: "not_run" as const,
+          items: ["Homepage returns 200 and shows Core slots 1-5."],
+        },
+        createdAt: "2026-04-30T08:00:00.000Z",
+        items: readySlate.map((post) => ({
+          id: `audit-item-${post.finalSlateRank}`,
+          publishedSlateId: "published-slate-1",
+          signalPostId: post.id,
+          finalSlateRank: post.finalSlateRank,
+          finalSlateTier: post.finalSlateTier,
+          titleSnapshot: post.title,
+          whyItMattersSnapshot: post.editedWhyItMatters,
+          summarySnapshot: post.summary,
+          sourceNameSnapshot: post.sourceName,
+          sourceUrlSnapshot: post.sourceUrl,
+          editorialDecisionSnapshot: post.editorialDecision,
+          replacementOfRowIdSnapshot: post.finalSlateRank === 5 ? "held-original" : null,
+          decisionNoteSnapshot: null,
+          heldReasonSnapshot: null,
+          rejectedReasonSnapshot: null,
+          reviewedBySnapshot: null,
+          reviewedAtSnapshot: null,
+          createdAt: "2026-04-30T08:00:00.000Z",
+        })),
+      },
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("heading", { name: "Published Slate Audit" })).toBeInTheDocument();
+    expect(screen.getByText("By editor@example.com")).toBeInTheDocument();
+    expect(screen.getByText("7 rows")).toBeInTheDocument();
+    expect(screen.getByText("5 Core")).toBeInTheDocument();
+    expect(screen.getByText("2 Context")).toBeInTheDocument();
+    expect(screen.getByText("old-live-1")).toBeInTheDocument();
+    expect(screen.getAllByText("Ready Signal 5").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Approved · Replacement/)).toBeInTheDocument();
+    expect(screen.getByText("Status: Not run")).toBeInTheDocument();
+  });
+
   it("collapses each editorial panel by default and expands only the selected card", async () => {
     getEditorialReviewState.mockResolvedValue({
       ...createAuthorizedState([reviewPost, approvedPost]),
@@ -303,7 +377,7 @@ describe("signals editorial review page", () => {
 
     expect(Array.from(document.querySelectorAll("h2"))
       .map((heading) => heading.textContent)
-      .filter((heading) => heading !== "Final Slate Composer")).toEqual([
+      .filter((heading) => heading !== "Final Slate Composer" && heading !== "Published Slate Audit")).toEqual([
       "April 26 Higher Signal",
       "April 26 Lower Signal",
       "April 25 Signal",

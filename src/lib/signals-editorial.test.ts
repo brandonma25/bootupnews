@@ -40,6 +40,44 @@ type SignalPostRow = {
   updated_at: string | null;
 };
 
+type PublishedSlateRow = {
+  id: string;
+  published_at: string;
+  published_by: string | null;
+  row_count: number;
+  core_count: number;
+  context_count: number;
+  previous_live_row_ids: string[];
+  published_row_ids: string[];
+  rollback_note: string | null;
+  verification_checklist_json: unknown;
+  created_at: string | null;
+};
+
+type PublishedSlateItemRow = {
+  id: string;
+  published_slate_id: string;
+  signal_post_id: string;
+  final_slate_rank: number;
+  final_slate_tier: "core" | "context";
+  title_snapshot: string;
+  why_it_matters_snapshot: string;
+  summary_snapshot: string | null;
+  source_name_snapshot: string | null;
+  source_url_snapshot: string | null;
+  editorial_decision_snapshot: SignalPostRow["editorial_decision"];
+  replacement_of_row_id_snapshot: string | null;
+  decision_note_snapshot: string | null;
+  held_reason_snapshot: string | null;
+  rejected_reason_snapshot: string | null;
+  reviewed_by_snapshot: string | null;
+  reviewed_at_snapshot: string | null;
+  created_at: string | null;
+};
+
+type TestTableName = "signal_posts" | "published_slates" | "published_slate_items";
+type TestRow = SignalPostRow | PublishedSlateRow | PublishedSlateItemRow;
+
 const safeGetUser = vi.fn();
 const createSupabaseServiceRoleClient = vi.fn();
 const createSupabaseServerClient = vi.fn();
@@ -106,6 +144,48 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
   };
 }
 
+function createPublishedSlateRow(overrides: Partial<PublishedSlateRow> = {}): PublishedSlateRow {
+  return {
+    id: overrides.id ?? "published-slate-1",
+    published_at: overrides.published_at ?? "2026-04-30T08:00:00.000Z",
+    published_by: overrides.published_by ?? "admin@example.com",
+    row_count: overrides.row_count ?? 7,
+    core_count: overrides.core_count ?? 5,
+    context_count: overrides.context_count ?? 2,
+    previous_live_row_ids: overrides.previous_live_row_ids ?? [],
+    published_row_ids: overrides.published_row_ids ?? [],
+    rollback_note: overrides.rollback_note ?? null,
+    verification_checklist_json: overrides.verification_checklist_json ?? {
+      status: "not_run",
+      items: ["Homepage returns 200 and shows Core slots 1-5."],
+    },
+    created_at: overrides.created_at ?? "2026-04-30T08:00:00.000Z",
+  };
+}
+
+function createPublishedSlateItemRow(overrides: Partial<PublishedSlateItemRow> = {}): PublishedSlateItemRow {
+  return {
+    id: overrides.id ?? "published-slate-item-1",
+    published_slate_id: overrides.published_slate_id ?? "published-slate-1",
+    signal_post_id: overrides.signal_post_id ?? "slate-1",
+    final_slate_rank: overrides.final_slate_rank ?? 1,
+    final_slate_tier: overrides.final_slate_tier ?? "core",
+    title_snapshot: overrides.title_snapshot ?? "Published Signal",
+    why_it_matters_snapshot: overrides.why_it_matters_snapshot ?? createValidWhyItMatters("Published"),
+    summary_snapshot: overrides.summary_snapshot ?? "Published summary",
+    source_name_snapshot: overrides.source_name_snapshot ?? "Source",
+    source_url_snapshot: overrides.source_url_snapshot ?? "https://example.com/source",
+    editorial_decision_snapshot: overrides.editorial_decision_snapshot ?? "approved",
+    replacement_of_row_id_snapshot: overrides.replacement_of_row_id_snapshot ?? null,
+    decision_note_snapshot: overrides.decision_note_snapshot ?? null,
+    held_reason_snapshot: overrides.held_reason_snapshot ?? null,
+    rejected_reason_snapshot: overrides.rejected_reason_snapshot ?? null,
+    reviewed_by_snapshot: overrides.reviewed_by_snapshot ?? null,
+    reviewed_at_snapshot: overrides.reviewed_at_snapshot ?? null,
+    created_at: overrides.created_at ?? "2026-04-30T08:00:00.000Z",
+  };
+}
+
 function createFinalSlateRow(slot: number, overrides: Partial<SignalPostRow> = {}) {
   return createRow({
     id: `slate-${slot}`,
@@ -156,43 +236,94 @@ function createBriefingItem(rank: number) {
 
 function createSupabaseMock(
   rows: SignalPostRow[],
-  options: { missingColumns?: string[]; preflightTransportErrorColumns?: string[] } = {},
+  options: {
+    missingColumns?: string[];
+    missingRelations?: TestTableName[];
+    preflightTransportErrorColumns?: string[];
+    publishedSlates?: PublishedSlateRow[];
+    publishedSlateItems?: PublishedSlateItemRow[];
+    insertErrors?: Partial<Record<TestTableName, string>>;
+    updateErrors?: Partial<Record<TestTableName, string>>;
+    deleteErrors?: Partial<Record<TestTableName, string>>;
+    onFrom?: (tableName: TestTableName) => void;
+  } = {},
 ) {
   const missingColumns = new Set(options.missingColumns ?? []);
+  const missingRelations = new Set(options.missingRelations ?? []);
   const preflightTransportErrorColumns = new Set(options.preflightTransportErrorColumns ?? []);
+  const publishedSlates = options.publishedSlates ?? [];
+  const publishedSlateItems = options.publishedSlateItems ?? [];
+
+  function getTableRows(tableName: TestTableName): TestRow[] {
+    if (tableName === "published_slates") {
+      return publishedSlates;
+    }
+
+    if (tableName === "published_slate_items") {
+      return publishedSlateItems;
+    }
+
+    return rows;
+  }
+
+  function createInsertedRow(tableName: TestTableName, value: Record<string, unknown>, index: number): TestRow {
+    if (tableName === "published_slates") {
+      return createPublishedSlateRow({
+        id: typeof value.id === "string" ? value.id : `published-slate-${publishedSlates.length + index + 1}`,
+        ...value,
+      } as Partial<PublishedSlateRow>);
+    }
+
+    if (tableName === "published_slate_items") {
+      return createPublishedSlateItemRow({
+        id: typeof value.id === "string" ? value.id : `published-slate-item-${publishedSlateItems.length + index + 1}`,
+        ...value,
+      } as Partial<PublishedSlateItemRow>);
+    }
+
+    return createRow({
+      id: typeof value.id === "string" ? value.id : `inserted-${index + 1}`,
+      ...value,
+    } as Partial<SignalPostRow>);
+  }
 
   return {
     rows,
-    from(tableName: string) {
-      expect(tableName).toBe("signal_posts");
+    publishedSlates,
+    publishedSlateItems,
+    from(tableName: TestTableName) {
+      expect(["signal_posts", "published_slates", "published_slate_items"]).toContain(tableName);
+      options.onFrom?.(tableName);
 
-      let operation: "select" | "update" | "insert" | null = null;
-      let updateValues: Partial<SignalPostRow> = {};
-      let insertedRows: SignalPostRow[] = [];
+      const tableRows = getTableRows(tableName);
+      let operation: "select" | "update" | "insert" | "delete" | null = null;
+      let updateValues: Record<string, unknown> = {};
+      let insertedRows: TestRow[] = [];
       let selectError: { message: string } | null = null;
       let selectedColumns: string[] = [];
-      const filters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
-      const inclusionFilters: Array<{ column: keyof SignalPostRow; values: unknown[] }> = [];
-      const lessThanFilters: Array<{ column: keyof SignalPostRow; value: unknown }> = [];
-      const notNullFilters: Array<{ column: keyof SignalPostRow }> = [];
+      const filters: Array<{ column: string; value: unknown }> = [];
+      const inclusionFilters: Array<{ column: string; values: unknown[] }> = [];
+      const lessThanFilters: Array<{ column: string; value: unknown }> = [];
+      const notNullFilters: Array<{ column: string }> = [];
       let orSearch = "";
-      const orderRules: Array<{ column: keyof SignalPostRow; ascending: boolean }> = [];
+      const orderRules: Array<{ column: string; ascending: boolean }> = [];
       let rangeStart: number | null = null;
       let rangeEnd: number | null = null;
 
       function applyFilters() {
-        return rows.filter((row) =>
-          filters.every((filter) => row[filter.column] === filter.value) &&
-          inclusionFilters.every((filter) => filter.values.includes(row[filter.column])) &&
+        return tableRows.filter((row) =>
+          filters.every((filter) => (row as Record<string, unknown>)[filter.column] === filter.value) &&
+          inclusionFilters.every((filter) => filter.values.includes((row as Record<string, unknown>)[filter.column])) &&
           lessThanFilters.every((filter) => {
-            const rowValue = row[filter.column];
+            const rowValue = (row as Record<string, unknown>)[filter.column];
             return typeof rowValue === "number" && typeof filter.value === "number"
               ? rowValue < filter.value
               : String(rowValue) < String(filter.value);
           }) &&
-          notNullFilters.every((filter) => row[filter.column] !== null) &&
+          notNullFilters.every((filter) => (row as Record<string, unknown>)[filter.column] !== null) &&
           (orSearch
-            ? row.title.toLowerCase().includes(orSearch) || row.source_name.toLowerCase().includes(orSearch)
+            ? String((row as Record<string, unknown>).title ?? "").toLowerCase().includes(orSearch) ||
+              String((row as Record<string, unknown>).source_name ?? "").toLowerCase().includes(orSearch)
             : true),
         );
       }
@@ -211,8 +342,8 @@ function createSupabaseMock(
         if (orderRules.length > 0) {
           data = data.slice().sort((left, right) => {
             for (const rule of orderRules) {
-              const leftValue = left[rule.column];
-              const rightValue = right[rule.column];
+              const leftValue = (left as Record<string, unknown>)[rule.column];
+              const rightValue = (right as Record<string, unknown>)[rule.column];
               const comparison =
                 typeof leftValue === "number" && typeof rightValue === "number"
                   ? leftValue - rightValue
@@ -247,17 +378,23 @@ function createSupabaseMock(
             .split(",")
             .map((column) => column.trim().split(/\s+/)[0])
             .filter(Boolean);
-          const missingSelectedColumns = selectedColumns.filter((column) => missingColumns.has(column));
+          const missingSelectedColumns = selectedColumns.filter(
+            (column) => missingColumns.has(column) || missingColumns.has(`${tableName}.${column}`),
+          );
 
-          if (missingSelectedColumns.length > 0) {
+          if (missingRelations.has(tableName)) {
             selectError = {
-              message: `column signal_posts.${missingSelectedColumns[0]} does not exist`,
+              message: `relation "${tableName}" does not exist`,
+            };
+          } else if (missingSelectedColumns.length > 0) {
+            selectError = {
+              message: `column ${tableName}.${missingSelectedColumns[0]} does not exist`,
             };
           }
 
           return builder;
         },
-        order(column: keyof SignalPostRow, options?: { ascending?: boolean }) {
+        order(column: string, options?: { ascending?: boolean }) {
           orderRules.push({ column, ascending: options?.ascending ?? true });
           return builder;
         },
@@ -281,41 +418,67 @@ function createSupabaseMock(
           return selectResult();
         },
         maybeSingle() {
+          if (selectError) {
+            return Promise.resolve({
+              data: null,
+              error: selectError,
+            });
+          }
+
+          if (operation === "insert") {
+            return Promise.resolve({
+              data: insertedRows[0] ?? null,
+              error: null,
+            });
+          }
+
           return Promise.resolve({
             data: applyFilters()[0] ?? null,
             error: null,
           });
         },
-        insert(values: Partial<SignalPostRow>[]) {
+        insert(values: Partial<TestRow> | Array<Partial<TestRow>>) {
           operation = "insert";
+          const insertError = options.insertErrors?.[tableName];
+
+          if (insertError) {
+            selectError = { message: insertError };
+            return builder;
+          }
+
           insertedRows = [];
-          values.forEach((value, index) => {
-            const row = createRow({ id: `inserted-${index + 1}`, ...value });
-            rows.push(row);
+          const normalizedValues = Array.isArray(values) ? values : [values];
+          normalizedValues.forEach((value, index) => {
+            const row = createInsertedRow(tableName, value as Record<string, unknown>, index);
+            tableRows.push(row);
             insertedRows.push(row);
           });
 
           return builder;
         },
-        update(values: Partial<SignalPostRow>) {
+        update(values: Record<string, unknown>) {
           operation = "update";
           updateValues = values;
           return builder;
         },
-        eq(column: keyof SignalPostRow, value: unknown) {
+        delete() {
+          operation = "delete";
+          return builder;
+        },
+        eq(column: string, value: unknown) {
           filters.push({ column, value });
 
           return builder;
         },
-        in(column: keyof SignalPostRow, values: unknown[]) {
+        in(column: string, values: unknown[]) {
           inclusionFilters.push({ column, values });
           return builder;
         },
-        lt(column: keyof SignalPostRow, value: unknown) {
+        lt(column: string, value: unknown) {
           lessThanFilters.push({ column, value });
           return builder;
         },
-        not(column: keyof SignalPostRow, operator: string, value: unknown) {
+        not(column: string, operator: string, value: unknown) {
           if (operator === "is" && value === null) {
             notNullFilters.push({ column });
           }
@@ -328,9 +491,13 @@ function createSupabaseMock(
           return builder;
         },
         then<TResult1 = unknown, TResult2 = never>(
-          onfulfilled?: ((value: { data: SignalPostRow[]; error: null; count: number }) => TResult1 | PromiseLike<TResult1>) | null,
+          onfulfilled?: ((value: { data: TestRow[]; error: { message: string } | null; count: number }) => TResult1 | PromiseLike<TResult1>) | null,
           onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
         ) {
+          if (selectError) {
+            return Promise.resolve({ data: [], error: selectError, count: 0 }).then(onfulfilled, onrejected);
+          }
+
           if (operation === "select" || operation === null) {
             return selectResult().then(onfulfilled, onrejected);
           }
@@ -344,9 +511,32 @@ function createSupabaseMock(
           }
 
           if (operation === "update") {
+            const updateError = options.updateErrors?.[tableName];
+
+            if (updateError) {
+              return Promise.resolve({ data: [], error: { message: updateError }, count: 0 }).then(onfulfilled, onrejected);
+            }
+
             applyFilters().forEach((row) => {
               Object.assign(row, updateValues);
             });
+
+            return Promise.resolve({ data: [], error: null, count: 0 }).then(onfulfilled, onrejected);
+          }
+
+          if (operation === "delete") {
+            const deleteError = options.deleteErrors?.[tableName];
+
+            if (deleteError) {
+              return Promise.resolve({ data: [], error: { message: deleteError }, count: 0 }).then(onfulfilled, onrejected);
+            }
+
+            const toDelete = new Set(applyFilters());
+            for (let index = tableRows.length - 1; index >= 0; index -= 1) {
+              if (toDelete.has(tableRows[index])) {
+                tableRows.splice(index, 1);
+              }
+            }
 
             return Promise.resolve({ data: [], error: null, count: 0 }).then(onfulfilled, onrejected);
           }
@@ -475,7 +665,8 @@ describe("signals editorial workflow", () => {
         updated_at: "2026-04-23T12:00:00.000Z",
       }),
     ];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    const supabase = createSupabaseMock(rows);
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
       supabase: {},
@@ -495,9 +686,65 @@ describe("signals editorial workflow", () => {
     ]);
   });
 
+  it("loads the most recent published-slate audit history for admin review", async () => {
+    const rows = createValidFinalSlate();
+    const publishedSlates = [
+      createPublishedSlateRow({
+        id: "older-audit",
+        published_at: "2026-04-29T08:00:00.000Z",
+      }),
+      createPublishedSlateRow({
+        id: "latest-audit",
+        published_at: "2026-04-30T08:00:00.000Z",
+        published_by: "editor@example.com",
+        previous_live_row_ids: ["old-live-1", "old-live-2"],
+        published_row_ids: rows.map((row) => row.id),
+      }),
+    ];
+    const publishedSlateItems = rows.map((row) =>
+      createPublishedSlateItemRow({
+        id: `audit-item-${row.final_slate_rank}`,
+        published_slate_id: "latest-audit",
+        signal_post_id: row.id,
+        final_slate_rank: row.final_slate_rank ?? row.rank,
+        final_slate_tier: row.final_slate_tier ?? "core",
+        title_snapshot: row.title,
+        why_it_matters_snapshot: row.edited_why_it_matters ?? "",
+        source_name_snapshot: row.source_name,
+        replacement_of_row_id_snapshot: row.rank === 5 ? "held-original" : null,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock(rows, {
+        publishedSlates,
+        publishedSlateItems,
+      }),
+    );
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { getEditorialReviewState } = await loadEditorialModule();
+    const state = await getEditorialReviewState();
+
+    expect(state.kind).toBe("authorized");
+    if (state.kind !== "authorized") return;
+    expect(state.auditStorageReady).toBe(true);
+    expect(state.latestPublishedSlateAudit?.id).toBe("latest-audit");
+    expect(state.latestPublishedSlateAudit?.publishedBy).toBe("editor@example.com");
+    expect(state.latestPublishedSlateAudit?.previousLiveRowIds).toEqual(["old-live-1", "old-live-2"]);
+    expect(state.latestPublishedSlateAudit?.publishedRowIds).toEqual(rows.map((row) => row.id));
+    expect(state.latestPublishedSlateAudit?.items).toHaveLength(7);
+    expect(state.latestPublishedSlateAudit?.items.map((item) => item.finalSlateRank)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(state.latestPublishedSlateAudit?.items[4].replacementOfRowIdSnapshot).toBe("held-original");
+  });
+
   it("lets an admin save a draft", async () => {
     const rows = [createRow({ id: "signal-1" })];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    const supabase = createSupabaseMock(rows);
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
       supabase: {},
@@ -520,7 +767,8 @@ describe("signals editorial workflow", () => {
 
   it("stores structured editorial draft content while preserving legacy text output", async () => {
     const rows = [createRow({ id: "signal-1" })];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    const supabase = createSupabaseMock(rows);
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
       supabase: {},
@@ -778,7 +1026,8 @@ describe("signals editorial workflow", () => {
 
   it("blocks final-slate publishing when fewer than seven rows are selected", async () => {
     const rows = createValidFinalSlate().slice(0, 3);
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    const supabase = createSupabaseMock(rows);
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
       supabase: {},
@@ -796,6 +1045,60 @@ describe("signals editorial workflow", () => {
     expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
     expect(rows.every((row) => row.is_live === false)).toBe(true);
     expect(rows.every((row) => row.published_at === null)).toBe(true);
+    expect(supabase.publishedSlates).toHaveLength(0);
+    expect(supabase.publishedSlateItems).toHaveLength(0);
+  });
+
+  it("blocks final-slate publishing before writes when audit storage is unavailable", async () => {
+    const rows = createValidFinalSlate();
+    const supabase = createSupabaseMock(rows, {
+      missingRelations: ["published_slates"],
+    });
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishApprovedSignals } = await loadEditorialModule();
+    const result = await publishApprovedSignals();
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("storage_unavailable");
+    expect(result.message).toContain("published_slate audit schema preflight failed");
+    expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
+    expect(rows.every((row) => row.is_live === false)).toBe(true);
+    expect(rows.every((row) => row.published_at === null)).toBe(true);
+    expect(supabase.publishedSlates).toHaveLength(0);
+    expect(supabase.publishedSlateItems).toHaveLength(0);
+  });
+
+  it("fails closed when audit creation fails before public publish writes", async () => {
+    const rows = createValidFinalSlate();
+    const supabase = createSupabaseMock(rows, {
+      insertErrors: {
+        published_slates: "audit insert failed",
+      },
+    });
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishApprovedSignals } = await loadEditorialModule();
+    const result = await publishApprovedSignals();
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("storage_error");
+    expect(result.message).toContain("The published slate audit record could not be created.");
+    expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
+    expect(rows.every((row) => row.is_live === false)).toBe(true);
+    expect(rows.every((row) => row.published_at === null)).toBe(true);
+    expect(supabase.publishedSlates).toHaveLength(0);
+    expect(supabase.publishedSlateItems).toHaveLength(0);
   });
 
   it.each([
@@ -933,7 +1236,8 @@ describe("signals editorial workflow", () => {
         editorial_decision: "approved",
       }),
     ];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    const supabase = createSupabaseMock(rows);
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
       supabase: {},
@@ -954,6 +1258,26 @@ describe("signals editorial workflow", () => {
     expect(rows[8].editorial_status).toBe("approved");
     expect(rows[8].published_why_it_matters).toBeNull();
     expect(rows[8].is_live).toBe(false);
+    expect(supabase.publishedSlates).toHaveLength(1);
+    expect(supabase.publishedSlateItems).toHaveLength(7);
+    expect(supabase.publishedSlates[0]).toMatchObject({
+      published_by: "admin@example.com",
+      row_count: 7,
+      core_count: 5,
+      context_count: 2,
+      previous_live_row_ids: [],
+      published_row_ids: rows.slice(0, 7).map((row) => row.id),
+    });
+    expect(supabase.publishedSlateItems.map((item) => item.final_slate_rank)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(supabase.publishedSlateItems[4]).toMatchObject({
+      signal_post_id: "promoted-rank-8",
+      final_slate_rank: 5,
+      final_slate_tier: "core",
+      title_snapshot: "Signal 8",
+      why_it_matters_snapshot: createValidWhyItMatters("Promoted replacement"),
+      source_name_snapshot: "Source",
+      editorial_decision_snapshot: "approved",
+    });
   });
 
   it("keeps live-set replacement inside the explicit publish workflow", async () => {
@@ -981,7 +1305,8 @@ describe("signals editorial workflow", () => {
       ),
     );
     const rows = [...oldLiveRows, ...approvedRows];
-    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    const supabase = createSupabaseMock(rows);
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
       supabase: {},
@@ -992,12 +1317,20 @@ describe("signals editorial workflow", () => {
     const result = await publishApprovedSignals();
 
     expect(result.ok).toBe(true);
-    expect(result.message).toBe("Published final slate: 5 Core + 2 Context rows are live. Archived 7 previous live rows.");
+    expect(result.message).toBe(
+      "Published final slate: 5 Core + 2 Context rows are live. Archived 7 previous live rows. Audit record published-slate-1.",
+    );
+    expect(result.publishedSlateId).toBe("published-slate-1");
     expect(oldLiveRows.every((row) => row.is_live === false)).toBe(true);
     expect(approvedRows.every((row) => row.editorial_status === "published")).toBe(true);
     expect(approvedRows.every((row) => row.is_live === true)).toBe(true);
     expect(approvedRows.every((row) => row.published_at !== null)).toBe(true);
     expect(approvedRows[0].published_why_it_matters).toBe(createValidWhyItMatters("New Google 1"));
+    expect(supabase.publishedSlates).toHaveLength(1);
+    expect(supabase.publishedSlates[0].previous_live_row_ids).toEqual(oldLiveRows.map((row) => row.id));
+    expect(supabase.publishedSlates[0].published_row_ids).toEqual(approvedRows.map((row) => row.id));
+    expect(supabase.publishedSlateItems).toHaveLength(7);
+    expect(supabase.publishedSlateItems.map((item) => item.signal_post_id)).toEqual(approvedRows.map((row) => row.id));
     await expect(getPublishedSignalPosts()).resolves.toHaveLength(7);
   });
 
@@ -1713,6 +2046,33 @@ describe("signals editorial workflow", () => {
       depthPosts: [],
       briefingDate: null,
     });
+  });
+
+  it("keeps published-slate audit tables out of public read helpers", async () => {
+    const tableCalls: TestTableName[] = [];
+    const rows = createValidFinalSlate().map((row) => ({
+      ...row,
+      editorial_status: "published" as const,
+      published_why_it_matters: row.edited_why_it_matters,
+      is_live: true,
+      published_at: "2026-04-30T08:00:00.000Z",
+    }));
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock(rows, {
+        publishedSlates: [createPublishedSlateRow({ id: "audit-should-not-be-public" })],
+        onFrom: (tableName) => tableCalls.push(tableName),
+      }),
+    );
+
+    const { getPublishedSignalPosts, getHomepageSignalSnapshot } = await loadEditorialModule();
+    await getPublishedSignalPosts();
+    await getHomepageSignalSnapshot({
+      today: new Date("2026-04-30T12:00:00.000Z"),
+    });
+
+    expect(tableCalls).toContain("signal_posts");
+    expect(tableCalls).not.toContain("published_slates");
+    expect(tableCalls).not.toContain("published_slate_items");
   });
 
   it("keeps rejected, held, and rewrite-requested rows out of public signal reads", async () => {
