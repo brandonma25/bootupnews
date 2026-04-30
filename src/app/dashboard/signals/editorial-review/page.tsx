@@ -10,6 +10,7 @@ import {
 import {
   assignFinalSlateSlotAction,
   approveAllSignalPostsAction,
+  publishFinalSlateAction,
   removeFromFinalSlateAction,
   replaceFinalSlateSlotAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
@@ -158,16 +159,18 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
                 ) : null}
               </form>
               <div className="space-y-2">
-                <Button
-                  type="button"
-                  disabled
-                  className="w-full gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  Publish Final Slate
-                </Button>
+                <form action={publishFinalSlateAction}>
+                  <Button
+                    type="submit"
+                    disabled={Boolean(publishDisabledReason)}
+                    className="w-full gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    Publish Final Slate
+                  </Button>
+                </form>
                 <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                  {publishDisabledReason}
+                  {publishDisabledReason ?? getReadyToPublishMessage()}
                 </p>
               </div>
             </div>
@@ -374,12 +377,17 @@ function FinalSlateComposer({
                 Publish Readiness
               </h3>
             </div>
-            <Button type="button" disabled className="w-full gap-2">
-              <Send className="h-4 w-4" />
-              Publish Final Slate
-            </Button>
+            <form action={publishFinalSlateAction}>
+              <Button type="submit" disabled={Boolean(publishDisabledReason)} className="w-full gap-2">
+                <Send className="h-4 w-4" />
+                Publish Final Slate
+              </Button>
+            </form>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              {publishDisabledReason}
+              {publishDisabledReason ?? getReadyToPublishMessage()}
+            </p>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              Publishing archives the previous live slate and makes only these seven selected rows public.
             </p>
             {readiness.failures.length > 0 ? (
               <ul className="space-y-1 text-sm leading-6 text-[var(--text-secondary)]">
@@ -390,6 +398,25 @@ function FinalSlateComposer({
                 ))}
               </ul>
             ) : null}
+            <div className="space-y-2 border-t border-[var(--border)] pt-3">
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">
+                Post-publish verification
+              </h4>
+              <ul className="space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
+                <li>Homepage returns 200 and shows Core slots 1-5.</li>
+                <li>/signals returns 200 and shows Core slots 1-5 plus Context slots 6-7.</li>
+                <li>Held, rejected, rewrite-requested, Depth, rank-8, and unpublished rows stay hidden.</li>
+                <li>Cron remains disabled.</li>
+              </ul>
+            </div>
+            <div className="space-y-2 border-t border-[var(--border)] pt-3">
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">
+                Rollback preparation
+              </h4>
+              <p className="text-xs leading-5 text-[var(--text-secondary)]">
+                If verification fails, identify the newly live seven rows, turn them non-live, and restore the archived previous live rows.
+              </p>
+            </div>
           </div>
         </div>
       </Panel>
@@ -972,7 +999,7 @@ function getApproveAllBlockedReason(
 function getComposerPublishDisabledReason(
   readiness: FinalSlateReadinessResult,
   storageReady: boolean,
-) {
+): string | null {
   if (!storageReady) {
     return "Publishing is blocked until editorial storage is configured.";
   }
@@ -981,7 +1008,11 @@ function getComposerPublishDisabledReason(
     return `Publish is disabled: ${readiness.failures[0]?.message ?? "final slate validation has not passed."}`;
   }
 
-  return "Slate readiness passes, but publish execution stays disabled in this Phase 2 composer PR.";
+  return null;
+}
+
+function getReadyToPublishMessage() {
+  return "Ready to publish the validated 5 Core + 2 Context slate.";
 }
 
 function normalizeEditorialText(value: string | null | undefined) {

@@ -106,6 +106,29 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
   };
 }
 
+function createFinalSlateRow(slot: number, overrides: Partial<SignalPostRow> = {}) {
+  return createRow({
+    id: `slate-${slot}`,
+    briefing_date: "2026-04-30",
+    rank: slot,
+    edited_why_it_matters: createValidWhyItMatters(`Slate ${slot}`),
+    editorial_status: "approved",
+    editorial_decision: "approved",
+    final_slate_rank: slot,
+    final_slate_tier: slot <= 5 ? "core" : "context",
+    is_live: false,
+    published_at: null,
+    ...overrides,
+  });
+}
+
+function createValidFinalSlate(overrides: Record<number, Partial<SignalPostRow>> = {}) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const slot = index + 1;
+    return createFinalSlateRow(slot, overrides[slot] ?? {});
+  });
+}
+
 function createBriefingItem(rank: number) {
   return {
     id: `generated-${rank}`,
@@ -731,15 +754,13 @@ describe("signals editorial workflow", () => {
     expect(rows[1].editorial_status).toBe("published");
   });
 
-  it("blocks publishing unless all five signal posts are approved", async () => {
-    const rows = Array.from({ length: 5 }, (_, index) =>
-      createRow({
-        id: `signal-${index + 1}`,
-        rank: index + 1,
-        edited_why_it_matters: createValidWhyItMatters(`Anthropic ${index + 1}`),
-        editorial_status: index === 4 ? "draft" : "approved",
-      }),
-    );
+  it("blocks publishing unless all seven final-slate rows are approved", async () => {
+    const rows = createValidFinalSlate({
+      7: {
+        editorial_status: "draft",
+        editorial_decision: "draft_edited",
+      },
+    });
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
@@ -755,18 +776,8 @@ describe("signals editorial workflow", () => {
     expect(rows.some((row) => row.editorial_status === "published")).toBe(false);
   });
 
-  it("blocks Top 5 publishing when the current set has fewer than exactly five approved rows", async () => {
-    const rows = Array.from({ length: 3 }, (_, index) =>
-      createRow({
-        id: `phase-b-${index + 1}`,
-        briefing_date: "2026-04-28",
-        rank: index + 1,
-        edited_why_it_matters: createValidWhyItMatters(`Phase B ${index + 1}`),
-        editorial_status: "approved",
-        is_live: false,
-        published_at: null,
-      }),
-    );
+  it("blocks final-slate publishing when fewer than seven rows are selected", async () => {
+    const rows = createValidFinalSlate().slice(0, 3);
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
@@ -780,25 +791,42 @@ describe("signals editorial workflow", () => {
     expect(result).toMatchObject({
       ok: false,
       code: "publish_blocked",
-      message: "Publishing requires exactly five ranked signal posts. Current count: 3.",
     });
+    expect(result.message).toContain("Final slate requires exactly 7 selected rows. Current count: 3.");
     expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
     expect(rows.every((row) => row.is_live === false)).toBe(true);
     expect(rows.every((row) => row.published_at === null)).toBe(true);
   });
 
-  it("blocks publishing when approved why-it-matters copy fails the pre-publish gate", async () => {
-    const rows = Array.from({ length: 5 }, (_, index) =>
-      createRow({
-        id: `signal-${index + 1}`,
-        rank: index + 1,
-        edited_why_it_matters:
-          index === 0
-            ? "This changes how investors price rates, demand, or risk in rates and equities over."
-            : createValidWhyItMatters(`Anthropic ${index + 1}`),
-        editorial_status: "approved",
-      }),
-    );
+  it.each([
+    {
+      label: "held",
+      overrides: { editorial_decision: "held" as const },
+      expectedMessage: "Selected row is marked held.",
+    },
+    {
+      label: "rejected",
+      overrides: { editorial_decision: "rejected" as const },
+      expectedMessage: "Selected row is marked rejected.",
+    },
+    {
+      label: "rewrite-requested",
+      overrides: { editorial_decision: "rewrite_requested" as const },
+      expectedMessage: "Selected row has rewrite_requested editorial status.",
+    },
+    {
+      label: "WITM-failed",
+      overrides: {
+        why_it_matters_validation_status: "requires_human_rewrite" as const,
+        why_it_matters_validation_failures: ["minimum_specificity"],
+        why_it_matters_validation_details: ["missing specificity"],
+      },
+      expectedMessage: "Row 3 has WITM status requires_human_rewrite.",
+    },
+  ])("blocks final-slate publish when a selected row is $label", async ({ overrides, expectedMessage }) => {
+    const rows = createValidFinalSlate({
+      3: overrides,
+    });
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
       user: { id: "admin-1", email: "admin@example.com" },
@@ -811,41 +839,98 @@ describe("signals editorial workflow", () => {
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe("publish_blocked");
-    expect(rows[0].editorial_status).toBe("needs_review");
-    expect(rows[0].why_it_matters_validation_status).toBe("requires_human_rewrite");
+    expect(result.message).toContain(expectedMessage);
+    expect(rows.every((row) => row.editorial_status !== "published")).toBe(true);
+    expect(rows.every((row) => row.is_live === false)).toBe(true);
+    expect(rows.every((row) => row.published_at === null)).toBe(true);
+  });
+
+  it.each([
+    {
+      label: "duplicate rank",
+      overrides: { 5: { final_slate_rank: 4, final_slate_tier: "core" as const } },
+      expectedMessage: "Rank 4 is duplicated.",
+    },
+    {
+      label: "rank gap",
+      overrides: { 6: { final_slate_rank: null, final_slate_tier: null } },
+      expectedMessage: "Context slot 6 is empty.",
+    },
+    {
+      label: "6 Core + 1 Context",
+      overrides: { 6: { final_slate_tier: "core" as const } },
+      expectedMessage: "6 Core rows selected; 5 required.",
+    },
+  ])("blocks final-slate publish on $label without writes", async ({ overrides, expectedMessage }) => {
+    const rows = createValidFinalSlate(overrides);
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishApprovedSignals } = await loadEditorialModule();
+    const result = await publishApprovedSignals();
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("publish_blocked");
+    expect(result.message).toContain(expectedMessage);
+    expect(rows.every((row) => row.editorial_status !== "published")).toBe(true);
+    expect(rows.every((row) => row.is_live === false)).toBe(true);
+    expect(rows.every((row) => row.published_at === null)).toBe(true);
+  });
+
+  it("blocks publishing when approved why-it-matters copy fails the pre-publish gate without mutating rows", async () => {
+    const rows = createValidFinalSlate({
+      1: {
+        edited_why_it_matters: "This changes how investors price rates, demand, or risk in rates and equities over.",
+      },
+    });
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishApprovedSignals } = await loadEditorialModule();
+    const result = await publishApprovedSignals();
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("publish_blocked");
+    expect(rows[0].editorial_status).toBe("approved");
+    expect(rows[0].why_it_matters_validation_status).toBe("passed");
     expect(rows[0].published_why_it_matters).toBeNull();
-    expect(rows.slice(1).every((row) => row.editorial_status === "approved")).toBe(true);
+    expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
     expect(rows.every((row) => row.is_live === false)).toBe(true);
   });
 
-  it("publishes approved edits without promoting unapproved depth fallback text", async () => {
+  it("publishes exactly the selected 5 Core + 2 Context slate without promoting non-selected candidates", async () => {
     const rows = [
-      createRow({
-        id: "signal-1",
-        rank: 1,
-        edited_why_it_matters: createValidWhyItMatters("Google"),
-        editorial_status: "approved",
+      ...createValidFinalSlate({
+        5: {
+          id: "promoted-rank-8",
+          rank: 8,
+          final_slate_rank: 5,
+          final_slate_tier: "core",
+          edited_why_it_matters: createValidWhyItMatters("Promoted replacement"),
+        },
       }),
-      ...Array.from({ length: 4 }, (_, index) =>
-        createRow({
-          id: `signal-${index + 2}`,
-          rank: index + 2,
-          edited_why_it_matters: createValidWhyItMatters(`Amazon ${index + 2}`),
-          published_why_it_matters: createValidWhyItMatters(`Google ${index + 2}`),
-          editorial_status: "published",
-        }),
-      ),
       createRow({
-        id: "signal-6",
-        rank: 6,
+        id: "rank-8-not-selected",
+        briefing_date: "2026-04-30",
+        rank: 8,
         ai_why_it_matters: "Generated category-depth context.",
         editorial_status: "needs_review",
       }),
       createRow({
-        id: "signal-7",
-        rank: 7,
-        edited_why_it_matters: "Edited category-depth context.",
-        editorial_status: "draft",
+        id: "approved-not-selected",
+        briefing_date: "2026-04-30",
+        rank: 9,
+        edited_why_it_matters: createValidWhyItMatters("Non-selected"),
+        editorial_status: "approved",
+        editorial_decision: "approved",
       }),
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
@@ -859,19 +944,20 @@ describe("signals editorial workflow", () => {
     const result = await publishApprovedSignals();
 
     expect(result.ok).toBe(true);
-    expect(rows.slice(0, 5).every((row) => row.editorial_status === "published")).toBe(true);
-    expect(rows[0].published_why_it_matters).toBe(createValidWhyItMatters("Google"));
-    expect(rows[1].published_why_it_matters).toBe(createValidWhyItMatters("Amazon 2"));
-    expect(rows[5].editorial_status).toBe("needs_review");
-    expect(rows[5].published_why_it_matters).toBeNull();
-    expect(rows[5].is_live).toBe(false);
-    expect(rows[6].editorial_status).toBe("draft");
-    expect(rows[6].published_why_it_matters).toBeNull();
-    expect(rows[6].is_live).toBe(false);
+    expect(rows.filter((row) => row.is_live)).toHaveLength(7);
+    expect(rows.slice(0, 7).every((row) => row.editorial_status === "published")).toBe(true);
+    expect(rows[4].id).toBe("promoted-rank-8");
+    expect(rows[4].published_why_it_matters).toBe(createValidWhyItMatters("Promoted replacement"));
+    expect(rows[7].editorial_status).toBe("needs_review");
+    expect(rows[7].published_why_it_matters).toBeNull();
+    expect(rows[7].is_live).toBe(false);
+    expect(rows[8].editorial_status).toBe("approved");
+    expect(rows[8].published_why_it_matters).toBeNull();
+    expect(rows[8].is_live).toBe(false);
   });
 
   it("keeps live-set replacement inside the explicit publish workflow", async () => {
-    const oldLiveRows = Array.from({ length: 5 }, (_, index) =>
+    const oldLiveRows = Array.from({ length: 7 }, (_, index) =>
       createRow({
         id: `old-live-${index + 1}`,
         briefing_date: "2026-04-26",
@@ -882,15 +968,17 @@ describe("signals editorial workflow", () => {
         published_at: "2026-04-26T10:00:00.000Z",
       }),
     );
-    const approvedRows = Array.from({ length: 5 }, (_, index) =>
-      createRow({
-        id: `approved-${index + 1}`,
-        briefing_date: "2026-04-27",
-        rank: index + 1,
-        edited_why_it_matters: createValidWhyItMatters(`New Google ${index + 1}`),
-        editorial_status: "approved",
-        is_live: false,
-      }),
+    const approvedRows = createValidFinalSlate(
+      Object.fromEntries(
+        Array.from({ length: 7 }, (_, index) => [
+          index + 1,
+          {
+            id: `approved-${index + 1}`,
+            briefing_date: "2026-04-30",
+            edited_why_it_matters: createValidWhyItMatters(`New Google ${index + 1}`),
+          },
+        ]),
+      ),
     );
     const rows = [...oldLiveRows, ...approvedRows];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
@@ -900,15 +988,17 @@ describe("signals editorial workflow", () => {
       sessionCookiePresent: true,
     });
 
-    const { publishApprovedSignals } = await loadEditorialModule();
+    const { publishApprovedSignals, getPublishedSignalPosts } = await loadEditorialModule();
     const result = await publishApprovedSignals();
 
     expect(result.ok).toBe(true);
+    expect(result.message).toBe("Published final slate: 5 Core + 2 Context rows are live. Archived 7 previous live rows.");
     expect(oldLiveRows.every((row) => row.is_live === false)).toBe(true);
     expect(approvedRows.every((row) => row.editorial_status === "published")).toBe(true);
     expect(approvedRows.every((row) => row.is_live === true)).toBe(true);
     expect(approvedRows.every((row) => row.published_at !== null)).toBe(true);
     expect(approvedRows[0].published_why_it_matters).toBe(createValidWhyItMatters("New Google 1"));
+    await expect(getPublishedSignalPosts()).resolves.toHaveLength(7);
   });
 
   it("persists generated signal posts for editorial review without changing the live public set", async () => {
@@ -1153,7 +1243,7 @@ describe("signals editorial workflow", () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe("publish_blocked");
     expect(result.message).toBe(
-      "Individual signal publishing is disabled. Use Publish Top 5 Signals after exactly five ranked posts are approved.",
+      "Individual signal publishing is disabled. Use Publish Final Slate after the 5 Core + 2 Context slate passes validation.",
     );
     expect(rows[0].editorial_status).toBe("approved");
     expect(rows[0].is_live).toBe(false);
@@ -1516,6 +1606,84 @@ describe("signals editorial workflow", () => {
       "live-7",
     ]);
     expect(posts.map((post) => post.rank)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it("uses final-slate placement for public order while keeping visibility gated by live published state", async () => {
+    const rows = [
+      createRow({
+        id: "slot-1-promoted-rank-8",
+        rank: 8,
+        briefing_date: "2026-04-30",
+        final_slate_rank: 1,
+        final_slate_tier: "core",
+        editorial_status: "published",
+        editorial_decision: "approved",
+        published_why_it_matters: createValidWhyItMatters("Promoted"),
+        is_live: true,
+        published_at: "2026-04-30T08:00:00.000Z",
+      }),
+      ...Array.from({ length: 6 }, (_, index) => {
+        const slot = index + 2;
+
+        return createRow({
+          id: `slot-${slot}`,
+          rank: slot,
+          briefing_date: "2026-04-30",
+          final_slate_rank: slot,
+          final_slate_tier: slot <= 5 ? "core" : "context",
+          editorial_status: "published",
+          editorial_decision: "approved",
+          published_why_it_matters: createValidWhyItMatters(`Slot ${slot}`),
+          is_live: true,
+          published_at: "2026-04-30T08:00:00.000Z",
+        });
+      }),
+      createRow({
+        id: "approved-selected-not-live",
+        rank: 1,
+        briefing_date: "2026-04-30",
+        final_slate_rank: 1,
+        final_slate_tier: "core",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        edited_why_it_matters: createValidWhyItMatters("Approved only"),
+        is_live: false,
+        published_at: null,
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { getPublishedSignalPosts, getHomepageSignalSnapshot } = await loadEditorialModule();
+    const publicSignals = await getPublishedSignalPosts();
+    const homepageSnapshot = await getHomepageSignalSnapshot({
+      today: new Date("2026-04-30T12:00:00.000Z"),
+    });
+
+    expect(publicSignals.map((post) => post.id)).toEqual([
+      "slot-1-promoted-rank-8",
+      "slot-2",
+      "slot-3",
+      "slot-4",
+      "slot-5",
+      "slot-6",
+      "slot-7",
+    ]);
+    expect(homepageSnapshot.posts.map((post) => post.id)).toEqual([
+      "slot-1-promoted-rank-8",
+      "slot-2",
+      "slot-3",
+      "slot-4",
+      "slot-5",
+    ]);
+    expect(homepageSnapshot.depthPosts.map((post) => post.id)).toEqual([
+      "slot-1-promoted-rank-8",
+      "slot-2",
+      "slot-3",
+      "slot-4",
+      "slot-5",
+      "slot-6",
+      "slot-7",
+    ]);
   });
 
   it("keeps approved but unpublished rows out of public signal and homepage reads", async () => {

@@ -16,7 +16,9 @@ import { captureRssFailure, type RssFailureType, type RssPhase } from "@/lib/obs
 import {
   getFinalSlateTierForRank,
   isFinalSlateRank,
+  validateFinalSlateReadiness,
   type FinalSlateTier,
+  type FinalSlateValidationFailure,
 } from "@/lib/final-slate-readiness";
 import type { BriefingItem, EditorialDecision, EditorialStatus } from "@/lib/types";
 import {
@@ -853,25 +855,6 @@ async function getLatestBriefingDate(client: EditorialClient) {
   };
 }
 
-async function loadCurrentTopFive(client: EditorialClient, briefingDate: string | null) {
-  if (!briefingDate) {
-    return [];
-  }
-
-  const result = await client
-    .from("signal_posts")
-    .select(SIGNAL_POST_SELECT)
-    .eq("briefing_date", briefingDate)
-    .order("rank", { ascending: true })
-    .limit(5);
-
-  if (result.error) {
-    return [];
-  }
-
-  return ((result.data ?? []) as unknown as StoredSignalPost[]).map(mapStoredSignalPost);
-}
-
 async function loadCurrentSignalDepth(client: EditorialClient, briefingDate: string | null) {
   if (!briefingDate) {
     return [];
@@ -907,12 +890,34 @@ function selectPublishedEditorialWhyItMatters(post: EditorialSignalPost) {
   return normalizeEditorialText(post.publishedWhyItMatters);
 }
 
-function selectApprovedEditorialWhyItMatters(post: EditorialSignalPost) {
-  if (post.editorialStatus !== "approved" && post.editorialStatus !== "published") {
-    return "";
+function getPublicSlateRank(post: EditorialSignalPost) {
+  if (isFinalSlateRank(post.finalSlateRank)) {
+    return post.finalSlateRank;
   }
 
-  return normalizeEditorialText(post.editedWhyItMatters || post.publishedWhyItMatters);
+  return isFinalSlateRank(post.rank) ? post.rank : null;
+}
+
+function isPublicSlatePost(post: EditorialSignalPost) {
+  return Boolean(selectPublishedEditorialWhyItMatters(post) && getPublicSlateRank(post));
+}
+
+function comparePublicSlatePosts(left: EditorialSignalPost, right: EditorialSignalPost) {
+  const leftRank = getPublicSlateRank(left) ?? Number.MAX_SAFE_INTEGER;
+  const rightRank = getPublicSlateRank(right) ?? Number.MAX_SAFE_INTEGER;
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  return left.rank - right.rank;
+}
+
+function selectPublicSlatePosts(posts: EditorialSignalPost[], limit: number) {
+  return posts
+    .filter(isPublicSlatePost)
+    .sort(comparePublicSlatePosts)
+    .slice(0, limit);
 }
 
 async function loadPublishedHomepageSnapshotForDate(
@@ -931,17 +936,17 @@ async function loadPublishedHomepageSnapshotForDate(
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
-    .lt("rank", PUBLIC_SIGNAL_SET_SIZE + 1)
     .order("rank", { ascending: true })
-    .limit(limit);
+    .limit(100);
 
   if (result.error) {
     return [];
   }
 
-  return ((result.data ?? []) as unknown as StoredSignalPost[])
-    .map(mapStoredSignalPost)
-    .filter((post) => selectPublishedEditorialWhyItMatters(post));
+  return selectPublicSlatePosts(
+    ((result.data ?? []) as unknown as StoredSignalPost[]).map(mapStoredSignalPost),
+    limit,
+  );
 }
 
 async function loadMostRecentPublishedHomepageSnapshot(
@@ -954,8 +959,8 @@ async function loadMostRecentPublishedHomepageSnapshot(
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
-    .lt("rank", PUBLIC_SIGNAL_SET_SIZE + 1)
     .order("briefing_date", { ascending: false })
+    .order("published_at", { ascending: false })
     .order("rank", { ascending: true })
     .limit(100);
 
@@ -968,13 +973,16 @@ async function loadMostRecentPublishedHomepageSnapshot(
 
   const publishedPosts = ((result.data ?? []) as unknown as StoredSignalPost[])
     .map(mapStoredSignalPost)
-    .filter((post) => selectPublishedEditorialWhyItMatters(post));
+    .filter(isPublicSlatePost);
   const briefingDate = publishedPosts[0]?.briefingDate ?? null;
 
   return {
     briefingDate,
     posts: briefingDate
-      ? publishedPosts.filter((post) => post.briefingDate === briefingDate).slice(0, limit)
+      ? selectPublicSlatePosts(
+          publishedPosts.filter((post) => post.briefingDate === briefingDate),
+          limit,
+        )
       : [],
   };
 }
@@ -1173,11 +1181,11 @@ function getEditorialStorageWarning(postCount: number, scope: EditorialScopeFilt
   if (postCount < 5) {
     return scope === "historical"
       ? `Editorial archive currently has ${postCount} matching historical signal posts.`
-      : `Editorial storage currently has ${postCount} matching signal posts. Publishing requires exactly five ranked signal posts in the current set.`;
+      : `Editorial storage currently has ${postCount} matching signal posts. Publishing requires a validated 5 Core + 2 Context final slate.`;
   }
 
   if (postCount > 5 && scope === "all") {
-    return `Editorial storage has ${postCount} matching signal posts. This page is paginated; publishing still uses only the latest five ranked posts.`;
+    return `Editorial storage has ${postCount} matching signal posts. This page is paginated; publishing still uses only the latest validated final slate.`;
   }
 
   return null;
@@ -2141,64 +2149,63 @@ export async function publishApprovedSignals(input: {
     };
   }
 
+  const schemaPreflight = await getSignalPostsSchemaPreflight(context.client);
+
+  if (!schemaPreflight.ok) {
+    return {
+      ok: false,
+      code: "storage_unavailable",
+      message: schemaPreflight.message,
+    };
+  }
+
   const latest = await getLatestBriefingDate(context.client);
-  const topFivePosts = await loadCurrentTopFive(context.client, latest.latestBriefingDate);
-  const depthPosts = (await loadCurrentSignalDepth(context.client, latest.latestBriefingDate)).filter(
-    (post) => post.rank > TOP_SIGNAL_SET_SIZE,
-  );
 
   if (latest.errorMessage) {
     captureRssEditorialStorageFailure({
       failureType: "rss_cache_read_failed",
       phase: "publish",
-      operation: "load_latest_signal_snapshot_for_publish",
+      operation: "load_latest_final_slate_for_publish",
       route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
-      message: "RSS signal set could not be loaded for publishing.",
+      message: "Final slate candidates could not be loaded for publishing.",
     });
 
     return {
       ok: false,
       code: "storage_error",
-      message: "The Top 5 list could not be loaded for publishing.",
+      message: "The final slate candidates could not be loaded for publishing.",
     };
   }
 
-  if (topFivePosts.length !== 5) {
+  const currentCandidates = await loadCurrentSignalDepth(context.client, latest.latestBriefingDate);
+  const readiness = validateFinalSlateReadiness(currentCandidates);
+
+  if (!readiness.ready) {
     return {
       ok: false,
       code: "publish_blocked",
-      message: `Publishing requires exactly five ranked signal posts. Current count: ${topFivePosts.length}.`,
+      message: buildFinalSlatePublishFailureMessage(readiness.failures),
     };
   }
 
-  const notReadyToPublish = topFivePosts.filter(
-    (post) =>
-      (post.editorialStatus !== "approved" && post.editorialStatus !== "published") ||
-      isBlockingEditorialDecision(post.editorialDecision),
+  const selectedIds = new Set(readiness.selectedRows.map((row) => row.id));
+  const selectedPosts = currentCandidates
+    .filter((post) => selectedIds.has(post.id))
+    .sort((left, right) => (left.finalSlateRank ?? 0) - (right.finalSlateRank ?? 0));
+  const missingSelectedPosts = readiness.selectedRows.filter(
+    (row) => !selectedPosts.some((post) => post.id === row.id),
   );
 
-  if (notReadyToPublish.length > 0) {
+  if (selectedPosts.length !== PUBLIC_SIGNAL_SET_SIZE || missingSelectedPosts.length > 0) {
     return {
       ok: false,
       code: "publish_blocked",
-      message: "Approve all five signal posts and clear rejected, held, or rewrite-requested decisions before publishing.",
-    };
-  }
-
-  const missingEditorialText = topFivePosts.filter(
-    (post) => !normalizeEditorialText(post.editedWhyItMatters || post.publishedWhyItMatters),
-  );
-
-  if (missingEditorialText.length > 0) {
-    return {
-      ok: false,
-      code: "publish_blocked",
-      message: "Every approved signal post needs editorial Why it matters text before publishing.",
+      message: "Final slate selection changed before publish. Reload the composer and validate the slate again.",
     };
   }
 
   const now = new Date().toISOString();
-  const topFivePublicationCandidates = topFivePosts.map((post) => {
+  const publicationCandidates = selectedPosts.map((post) => {
     const structuredContent =
       post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
     const text = normalizeEditorialText(
@@ -2215,67 +2222,86 @@ export async function publishApprovedSignals(input: {
       validation: validateWhyItMatters(text),
     };
   });
-  const invalidTopFive = topFivePublicationCandidates.filter((entry) => !entry.validation.passed);
 
-  if (invalidTopFive.length > 0) {
-    const flagResults = await Promise.all(
-      invalidTopFive.map(({ post, validation }) =>
-        context.client
-          .from("signal_posts")
-          .update({
-            editorial_status: "needs_review",
-            ...buildWhyItMattersValidationFields(validation, now),
-            updated_at: now,
-          })
-          .eq("id", post.id),
-      ),
-    );
+  const missingEditorialText = publicationCandidates.filter((entry) => !entry.text);
 
-    if (flagResults.some((result) => result.error)) {
-      return {
-        ok: false,
-        code: "storage_error",
-        message: "The invalid signal posts could not be flagged for rewrite.",
-      };
-    }
+  if (missingEditorialText.length > 0) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Every selected final-slate row needs editorial Why it matters text before publishing. No rows were changed.",
+    };
+  }
 
+  const invalidPublicationCandidates = publicationCandidates.filter((entry) => !entry.validation.passed);
+
+  if (invalidPublicationCandidates.length > 0) {
     return {
       ok: false,
       code: "publish_blocked",
       message:
-        invalidTopFive.length === 1
-          ? getValidationFailureMessage(invalidTopFive[0].validation)
-          : `${invalidTopFive.length} signal posts require human rewrite before publishing.`,
+        invalidPublicationCandidates.length === 1
+          ? `${getValidationFailureMessage(invalidPublicationCandidates[0].validation)} No rows were changed.`
+          : `${invalidPublicationCandidates.length} final-slate rows require human rewrite before publishing. No rows were changed.`,
     };
   }
 
-  const deactivateOldLiveSet = await context.client
+  const previousLiveResult = await context.client
     .from("signal_posts")
-    .update({
-      is_live: false,
-      updated_at: now,
-    })
+    .select("id")
     .eq("is_live", true);
 
-  if (deactivateOldLiveSet.error) {
+  if (previousLiveResult.error) {
     captureRssEditorialStorageFailure({
-      failureType: "rss_cache_write_failed",
+      failureType: "rss_cache_read_failed",
       phase: "publish",
-      operation: "archive_previous_live_signal_set_for_publish",
+      operation: "load_previous_live_signal_set_for_publish",
       route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
       briefingDate: latest.latestBriefingDate,
-      message: "Previous live RSS signal set could not be archived before publishing.",
+      message: "Previous live RSS signal set could not be loaded before publishing.",
     });
 
     return {
       ok: false,
       code: "storage_error",
-      message: "The previous live signal set could not be archived before publishing.",
+      message: "The previous live signal set could not be loaded before publishing.",
     };
   }
 
+  const previousLiveIds = ((previousLiveResult.data ?? []) as Array<Pick<StoredSignalPost, "id">>)
+    .map((row) => row.id)
+    .filter((id): id is string => Boolean(id));
+  const selectedPostIds = publicationCandidates.map((entry) => entry.post.id);
+
+  if (previousLiveIds.length > 0) {
+    const deactivateOldLiveSet = await context.client
+      .from("signal_posts")
+      .update({
+        is_live: false,
+        updated_at: now,
+      })
+      .in("id", previousLiveIds);
+
+    if (deactivateOldLiveSet.error) {
+      captureRssEditorialStorageFailure({
+        failureType: "rss_cache_write_failed",
+        phase: "publish",
+        operation: "archive_previous_live_signal_set_for_publish",
+        route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
+        briefingDate: latest.latestBriefingDate,
+        message: "Previous live RSS signal set could not be archived before publishing.",
+      });
+
+      return {
+        ok: false,
+        code: "storage_error",
+        message: "The previous live signal set could not be archived before publishing.",
+      };
+    }
+  }
+
   const updateResults = await Promise.all(
-    topFivePublicationCandidates.map(({ post, structuredContent, text, validation }) =>
+    publicationCandidates.map(({ post, structuredContent, text, validation }) =>
       context.client
         .from("signal_posts")
         .update({
@@ -2292,97 +2318,82 @@ export async function publishApprovedSignals(input: {
     ),
   );
 
-  const depthPublicationCandidates = depthPosts
-    .map((post) => {
-      const structuredContent =
-        post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
-      const humanEditorialText = selectApprovedEditorialWhyItMatters(post);
-      const depthText = normalizeEditorialText(
-        humanEditorialText
-          ? buildEditorialWhyItMattersText(
-              structuredContent,
-              humanEditorialText,
-            )
-          : "",
-      );
+  if (updateResults.some((result) => result.error)) {
+    await rollbackFailedFinalSlatePublish(context.client, {
+      previousLiveIds,
+      selectedPostIds,
+      now,
+    });
 
-      return {
-        post,
-        structuredContent,
-        depthText,
-        validation: depthText ? validateWhyItMatters(depthText) : null,
-      };
-    })
-    .filter((entry) => entry.depthText);
-  const invalidDepthCandidates = depthPublicationCandidates.flatMap((entry) =>
-    entry.validation && !entry.validation.passed
-      ? [{ ...entry, validation: entry.validation }]
-      : [],
-  );
-  const validDepthCandidates = depthPublicationCandidates.flatMap((entry) =>
-    entry.validation?.passed
-      ? [{ ...entry, validation: entry.validation }]
-      : [],
-  );
-
-  const depthValidationResults = await Promise.all(
-    invalidDepthCandidates.map(({ post, validation }) =>
-      context.client
-        .from("signal_posts")
-        .update({
-          editorial_status: "needs_review",
-          ...buildWhyItMattersValidationFields(validation, now),
-          updated_at: now,
-        })
-        .eq("id", post.id),
-    ),
-  );
-
-  const depthUpdateResults = await Promise.all(
-    validDepthCandidates.map(({ post, structuredContent, depthText, validation }) =>
-      context.client
-        .from("signal_posts")
-        .update({
-          published_why_it_matters: depthText,
-          published_why_it_matters_payload: structuredContent,
-          editorial_status: "published",
-          editorial_decision: "approved",
-          ...buildWhyItMattersValidationFields(validation, now),
-          is_live: true,
-          published_at: now,
-          updated_at: now,
-        })
-        .eq("id", post.id),
-    ),
-  );
-
-  if (
-    updateResults.some((result) => result.error) ||
-    depthUpdateResults.some((result) => result.error) ||
-    depthValidationResults.some((result) => result.error)
-  ) {
     captureRssEditorialStorageFailure({
       failureType: "rss_cache_write_failed",
       phase: "publish",
-      operation: "publish_signal_set",
+      operation: "publish_final_slate_signal_set",
       route: input.route ?? SIGNALS_EDITORIAL_ROUTE,
       briefingDate: latest.latestBriefingDate,
-      postCount: topFivePosts.length + depthPosts.length,
-      message: "RSS signal set could not be published completely.",
+      postCount: publicationCandidates.length,
+      message: "Final slate signal set could not be published completely.",
     });
 
     return {
       ok: false,
       code: "storage_error",
-      message: "The signal set could not be published completely.",
+      message: "The final slate could not be published completely. Previous live visibility was restored where possible.",
     };
   }
 
   return {
     ok: true,
     code: "published",
-    message: "Top 5 Signals published.",
+    message:
+      previousLiveIds.length > 0
+        ? `Published final slate: 5 Core + 2 Context rows are live. Archived ${previousLiveIds.length} previous live rows.`
+        : "Published final slate: 5 Core + 2 Context rows are live. No previous live slate was present to archive.",
   };
+}
+
+function buildFinalSlatePublishFailureMessage(failures: FinalSlateValidationFailure[]) {
+  const reasons = failures.slice(0, 3).map((failure) => failure.message);
+
+  if (reasons.length === 0) {
+    return "Final slate validation failed. No rows were changed.";
+  }
+
+  return `Final slate validation failed: ${reasons.join(" ")} No rows were changed.`;
+}
+
+async function rollbackFailedFinalSlatePublish(
+  client: EditorialClient,
+  input: {
+    previousLiveIds: string[];
+    selectedPostIds: string[];
+    now: string;
+  },
+) {
+  const rollbackResults = await Promise.all([
+    input.selectedPostIds.length > 0
+      ? client
+          .from("signal_posts")
+          .update({
+            editorial_status: "approved",
+            is_live: false,
+            published_at: null,
+            updated_at: input.now,
+          })
+          .in("id", input.selectedPostIds)
+      : Promise.resolve({ error: null }),
+    input.previousLiveIds.length > 0
+      ? client
+          .from("signal_posts")
+          .update({
+            is_live: true,
+            updated_at: input.now,
+          })
+          .in("id", input.previousLiveIds)
+      : Promise.resolve({ error: null }),
+  ]);
+
+  return rollbackResults.every((result) => !result.error);
 }
 
 export async function publishSignalPost(input: {
@@ -2402,7 +2413,7 @@ export async function publishSignalPost(input: {
   return {
     ok: false,
     code: "publish_blocked",
-    message: "Individual signal publishing is disabled. Use Publish Top 5 Signals after exactly five ranked posts are approved.",
+    message: "Individual signal publishing is disabled. Use Publish Final Slate after the 5 Core + 2 Context slate passes validation.",
   };
 }
 
@@ -2425,9 +2436,10 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
-    .lt("rank", PUBLIC_SIGNAL_SET_SIZE + 1)
+    .order("briefing_date", { ascending: false })
+    .order("published_at", { ascending: false })
     .order("rank", { ascending: true })
-    .limit(limit);
+    .limit(100);
 
   if (result.error) {
     logServerEvent("warn", "Published signal posts could not be loaded", {
@@ -2437,9 +2449,17 @@ async function loadPublishedSignalPosts(limit: number): Promise<EditorialSignalP
     return [];
   }
 
-  return ((result.data ?? []) as unknown as StoredSignalPost[])
+  const publishedPosts = ((result.data ?? []) as unknown as StoredSignalPost[])
     .map(mapStoredSignalPost)
-    .filter((post) => selectPublishedEditorialWhyItMatters(post));
+    .filter(isPublicSlatePost);
+  const briefingDate = publishedPosts[0]?.briefingDate ?? null;
+
+  return briefingDate
+    ? selectPublicSlatePosts(
+        publishedPosts.filter((post) => post.briefingDate === briefingDate),
+        limit,
+      )
+    : [];
 }
 
 export async function getPublishedSignalPosts(): Promise<EditorialSignalPost[]> {
