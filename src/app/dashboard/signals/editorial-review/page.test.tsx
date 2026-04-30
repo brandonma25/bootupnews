@@ -17,6 +17,7 @@ vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
   saveSignalDraftAction: vi.fn(),
   approveSignalPostAction: vi.fn(),
   resetSignalPostToAiDraftAction: vi.fn(),
+  publishFinalSlateAction: vi.fn(),
   publishTopSignalsAction: vi.fn(),
   publishSignalPostAction: vi.fn(),
   assignFinalSlateSlotAction: vi.fn(),
@@ -173,6 +174,37 @@ describe("signals editorial review page", () => {
     expect(screen.getAllByRole("button", { name: "Publish Final Slate" })[0]).toBeDisabled();
     expect(screen.getByText("Slate not ready")).toBeInTheDocument();
     expect(screen.getAllByText(/Final slate requires exactly 7 selected rows/i)[0]).toBeInTheDocument();
+  });
+
+  it("enables final-slate publish only after the 5 Core + 2 Context slate is ready", async () => {
+    const readySlate = Array.from({ length: 7 }, (_, index) => {
+      const slot = index + 1;
+
+      return {
+        ...approvedPost,
+        id: `ready-${slot}`,
+        rank: slot === 5 ? 8 : slot,
+        title: `Ready Signal ${slot}`,
+        editorialDecision: "approved" as const,
+        finalSlateRank: slot,
+        finalSlateTier: slot <= 5 ? ("core" as const) : ("context" as const),
+        editedWhyItMatters:
+          "This structurally changes how markets price cloud capacity, AI infrastructure, and platform dependency over the next year.",
+      };
+    });
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState(readySlate),
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Slate ready")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Publish Final Slate" }).every((button) => !button.hasAttribute("disabled")))
+      .toBe(true);
+    expect(screen.getAllByText("Ready to publish the validated 5 Core + 2 Context slate.")[0]).toBeInTheDocument();
+    expect(screen.getByText("Post-publish verification")).toBeInTheDocument();
+    expect(screen.getByText("Rollback preparation")).toBeInTheDocument();
   });
 
   it("collapses each editorial panel by default and expands only the selected card", async () => {

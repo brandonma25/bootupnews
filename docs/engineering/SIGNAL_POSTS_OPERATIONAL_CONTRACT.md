@@ -41,7 +41,7 @@ The current table is not allowed to serve these purposes:
 
 - `src/lib/signals-editorial.ts`
   - `persistSignalPostsForBriefing()` writes daily placement/card candidates.
-  - `publishApprovedSignals()` publishes approved placement/card rows.
+  - `publishApprovedSignals()` publishes the validated `5 Core + 2 Context` final Surface Placement slate.
   - `getPublishedSignalPosts()` reads public `/signals` card rows.
   - `getHomepageSignalSnapshot()` reads homepage placement/card snapshots.
 - `src/lib/data.ts`

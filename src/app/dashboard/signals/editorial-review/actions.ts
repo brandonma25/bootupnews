@@ -175,7 +175,7 @@ export async function holdSignalPostAction(formData: FormData) {
   redirectWithResult(result);
 }
 
-export async function publishTopSignalsAction() {
+async function runPublishFinalSlateAction() {
   const result = await publishApprovedSignals();
 
   if (result.ok) {
@@ -183,6 +183,14 @@ export async function publishTopSignalsAction() {
   }
 
   redirectWithResult(result);
+}
+
+export async function publishFinalSlateAction() {
+  await runPublishFinalSlateAction();
+}
+
+export async function publishTopSignalsAction() {
+  await runPublishFinalSlateAction();
 }
 
 export async function publishSignalPostAction(formData: FormData) {

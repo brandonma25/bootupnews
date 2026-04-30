@@ -9,6 +9,8 @@
 - 2026-04-30 readiness label: `ready_for_prd_53_minimal_final_slate_composer_review`
 - 2026-04-30 implementation checkpoint: editorial card controls in review
 - 2026-04-30 readiness label: `ready_for_prd_53_editorial_card_controls_review`
+- 2026-04-30 implementation checkpoint: seven-row publish workflow hardening in review
+- 2026-04-30 readiness label: `ready_for_prd_53_seven_row_publish_hardening_review`
 
 ## Objective
 
