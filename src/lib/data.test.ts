@@ -278,7 +278,7 @@ describe("homepage read model", () => {
     expect(serializedOutput).not.toMatch(/placeholder|stored public signal snapshot|rail readable|sample slot/i);
   });
 
-  it("surfaces signal_posts schema preflight failures instead of a generic empty state", async () => {
+  it("sanitizes public homepage schema failures into a safe unavailable state", async () => {
     getHomepageSignalSnapshot.mockResolvedValue({
       source: "none",
       briefingDate: null,
@@ -293,13 +293,14 @@ describe("homepage read model", () => {
 
     expect(state.data.briefing.items).toEqual([]);
     expect(state.data.briefing.intro).toBe(
-      "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_status.",
+      "The published briefing is temporarily unavailable while the latest edition is verified.",
     );
     expect(state.data.homepageFreshnessNotice).toEqual({
       kind: "empty",
-      text: "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_status.",
+      text: "The published briefing is temporarily unavailable while the latest edition is verified.",
       briefingDate: null,
     });
+    expect(JSON.stringify(state.data)).not.toMatch(/schema preflight|why_it_matters_validation_status/i);
   });
 });
 

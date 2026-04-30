@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
-  getPublishedSignalPosts,
+  getPublicSignalsPageState,
   type EditorialSignalPost,
 } from "@/lib/signals-editorial";
 
@@ -18,10 +18,11 @@ export const metadata: Metadata = {
 };
 
 export default async function PublicSignalsPage() {
-  const posts = await getPublishedSignalPosts();
+  const state = await getPublicSignalsPageState();
+  const posts = state.kind === "published" ? state.posts : [];
   const corePosts = posts.filter((post) => post.rank >= 1 && post.rank <= 5);
   const contextPosts = posts.filter((post) => post.rank >= 6 && post.rank <= 7);
-  const hasPublishedPosts = posts.length > 0;
+  const hasPublishedPosts = state.kind === "published";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 md:px-6">
@@ -29,7 +30,7 @@ export default async function PublicSignalsPage() {
         <header className="space-y-4 border-b border-[var(--border)] pb-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>Published editorial layer</Badge>
-            <Badge>{posts.length} signals</Badge>
+            {hasPublishedPosts ? <Badge>{posts.length} signals</Badge> : <Badge>Briefing pending</Badge>}
           </div>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl space-y-3">
@@ -61,6 +62,15 @@ export default async function PublicSignalsPage() {
               />
             ) : null}
           </div>
+        ) : state.kind === "temporarily_unavailable" ? (
+          <Panel className="p-6">
+            <p className="text-base font-semibold text-[var(--text-primary)]">
+              Published briefing is temporarily unavailable
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+              The reviewed briefing is being kept offline until it can be read safely. Check back shortly.
+            </p>
+          </Panel>
         ) : (
           <Panel className="p-6">
             <p className="text-base font-semibold text-[var(--text-primary)]">

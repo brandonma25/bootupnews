@@ -1941,6 +1941,88 @@ describe("signals editorial workflow", () => {
     expect(posts.map((post) => post.rank)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
+  it("loads public rows when PRD-53 admin placement columns are missing", async () => {
+    const rows = Array.from({ length: 7 }, (_, index) =>
+      createRow({
+        id: `legacy-live-${index + 1}`,
+        rank: index + 1,
+        briefing_date: "2026-04-24",
+        editorial_status: "published",
+        published_why_it_matters: createValidWhyItMatters(`Legacy ${index + 1}`),
+        why_it_matters_validation_status: "passed",
+        why_it_matters_validation_failures: [],
+        why_it_matters_validation_details: [],
+        is_live: true,
+        published_at: `2026-04-24T08:0${index}:00.000Z`,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock(rows, {
+        missingColumns: [
+          "final_slate_rank",
+          "final_slate_tier",
+          "editorial_decision",
+          "decision_note",
+          "rejected_reason",
+          "held_reason",
+          "replacement_of_row_id",
+          "reviewed_by",
+          "reviewed_at",
+        ],
+      }),
+    );
+
+    const { getPublishedSignalPosts, getPublicSignalsPageState, getHomepageSignalSnapshot } = await loadEditorialModule();
+    const publicSignals = await getPublishedSignalPosts();
+    const pageState = await getPublicSignalsPageState();
+    const homepageSnapshot = await getHomepageSignalSnapshot({
+      today: new Date("2026-04-24T12:00:00.000Z"),
+    });
+
+    expect(publicSignals.map((post) => post.id)).toEqual([
+      "legacy-live-1",
+      "legacy-live-2",
+      "legacy-live-3",
+      "legacy-live-4",
+      "legacy-live-5",
+      "legacy-live-6",
+      "legacy-live-7",
+    ]);
+    expect(pageState.kind).toBe("published");
+    expect(homepageSnapshot.source).toBe("published_live");
+    expect(homepageSnapshot.posts.map((post) => post.id)).toEqual([
+      "legacy-live-1",
+      "legacy-live-2",
+      "legacy-live-3",
+      "legacy-live-4",
+      "legacy-live-5",
+    ]);
+    expect(homepageSnapshot.errorMessage).toBeUndefined();
+  });
+
+  it("keeps admin review blocked when PRD-53 admin placement columns are missing", async () => {
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock([], {
+        missingColumns: ["final_slate_rank", "editorial_decision", "reviewed_at"],
+      }),
+    );
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { getEditorialReviewState } = await loadEditorialModule();
+    const state = await getEditorialReviewState();
+
+    expect(state.kind).toBe("authorized");
+    if (state.kind !== "authorized") return;
+    expect(state.storageReady).toBe(false);
+    expect(state.warning).toBe(
+      "signal_posts schema preflight failed. Missing expected columns: final_slate_rank, editorial_decision, reviewed_at.",
+    );
+  });
+
   it("uses final-slate placement for public order while keeping visibility gated by live published state", async () => {
     const rows = [
       createRow({
@@ -2346,7 +2428,7 @@ describe("signals editorial workflow", () => {
     });
   });
 
-  it("returns a homepage snapshot schema error instead of silently emptying public results", async () => {
+  it("returns an internal homepage snapshot error only when public-read columns are missing", async () => {
     createSupabaseServiceRoleClient.mockReturnValue(
       createSupabaseMock([], {
         missingColumns: ["why_it_matters_validation_failures"],
@@ -2363,7 +2445,7 @@ describe("signals editorial workflow", () => {
       posts: [],
       depthPosts: [],
       briefingDate: null,
-      errorMessage: "signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_failures.",
+      errorMessage: "public signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_failures.",
     });
   });
 });

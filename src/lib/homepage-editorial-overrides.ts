@@ -7,14 +7,14 @@ import type { BriefingItem, DashboardData } from "@/lib/types";
 
 type PublishedSignalPostRow = {
   rank: number | null;
-  final_slate_rank: number | null;
-  final_slate_tier: string | null;
+  final_slate_rank?: number | null;
+  final_slate_tier?: string | null;
   title: string | null;
   source_url: string | null;
   published_why_it_matters: string | null;
   published_why_it_matters_payload: unknown | null;
   editorial_status: string | null;
-  editorial_decision: string | null;
+  editorial_decision?: string | null;
   published_at: string | null;
 };
 
@@ -130,7 +130,7 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
 
   const result = await client
     .from("signal_posts")
-    .select("rank, final_slate_rank, final_slate_tier, title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status, editorial_decision, published_at")
+    .select("rank, title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status, published_at")
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
