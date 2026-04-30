@@ -16,6 +16,7 @@ export type FinalSlateValidationRow = {
   sourceName?: string | null;
   sourceUrl?: string | null;
   editorialStatus?: string | null;
+  editorialDecision?: string | null;
   isLive?: boolean | null;
   publishedAt?: string | null;
   whyItMattersValidationStatus?: string | null;
@@ -23,6 +24,7 @@ export type FinalSlateValidationRow = {
   whyItMattersValidationDetails?: string[] | null;
   finalSlateRank?: number | null;
   finalSlateTier?: string | null;
+  replacementOfRowId?: string | null;
 };
 
 export type FinalSlateValidationFailure = {
@@ -193,19 +195,21 @@ function addRowContentFailures(
 ) {
   const rank = row.finalSlateRank ?? undefined;
   const editorialStatus = row.editorialStatus ?? "";
+  const editorialDecision = row.editorialDecision ?? "";
   const validationStatus = row.whyItMattersValidationStatus ?? "";
   const validationFailures = row.whyItMattersValidationFailures ?? [];
   const validationDetails = row.whyItMattersValidationDetails ?? [];
 
-  // Current signal_posts status values are draft/needs_review/approved/published.
-  // PRD-53 follow-up controls may add held/rejected/rewrite_requested, so the
-  // readiness gate treats those future decision states as hard blockers too.
-  if (editorialStatus === "rejected") {
+  if (editorialDecision === "rejected" || editorialStatus === "rejected") {
     addRowFailure(row, "Selected row is marked rejected.", "rejected_row", rank);
-  } else if (editorialStatus === "held") {
+  } else if (editorialDecision === "held" || editorialStatus === "held") {
     addRowFailure(row, "Selected row is marked held.", "held_row", rank);
-  } else if (editorialStatus === "rewrite_requested") {
+  } else if (editorialDecision === "rewrite_requested" || editorialStatus === "rewrite_requested") {
     addRowFailure(row, "Selected row has rewrite_requested editorial status.", "rewrite_requested_row", rank);
+  } else if (editorialDecision === "removed_from_slate") {
+    addRowFailure(row, "Selected row was removed from the final slate.", "removed_from_slate", rank);
+  } else if (editorialDecision && editorialDecision !== "approved") {
+    addRowFailure(row, "Selected row must have an approved editorial decision before readiness.", "decision_not_approved", rank);
   } else if (editorialStatus === "published") {
     addRowFailure(row, "Selected row is already published.", "already_published", rank);
   } else if (editorialStatus !== "approved") {

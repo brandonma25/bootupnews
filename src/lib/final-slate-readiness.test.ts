@@ -19,6 +19,7 @@ function makeRow(
     sourceName: overrides.sourceName ?? "Source",
     sourceUrl: overrides.sourceUrl ?? `https://example.com/source-${slot}`,
     editorialStatus: overrides.editorialStatus ?? "approved",
+    editorialDecision: overrides.editorialDecision ?? null,
     isLive: overrides.isLive ?? false,
     publishedAt: overrides.publishedAt ?? null,
     whyItMattersValidationStatus: overrides.whyItMattersValidationStatus ?? "passed",
@@ -122,10 +123,32 @@ describe("final slate readiness", () => {
     expect(result.rowFailures["signal-2"]).toContain("Selected row is marked held.");
   });
 
+  it("fails when a selected row has a held editorial decision", () => {
+    const result = validateFinalSlateReadiness(
+      validSlate({
+        2: { editorialDecision: "held" },
+      }),
+    );
+
+    expect(result.ready).toBe(false);
+    expect(result.rowFailures["signal-2"]).toContain("Selected row is marked held.");
+  });
+
   it("fails when a selected row is rejected", () => {
     const result = validateFinalSlateReadiness(
       validSlate({
         2: { editorialStatus: "rejected" },
+      }),
+    );
+
+    expect(result.ready).toBe(false);
+    expect(result.rowFailures["signal-2"]).toContain("Selected row is marked rejected.");
+  });
+
+  it("fails when a selected row has a rejected editorial decision", () => {
+    const result = validateFinalSlateReadiness(
+      validSlate({
+        2: { editorialDecision: "rejected" },
       }),
     );
 
@@ -142,6 +165,30 @@ describe("final slate readiness", () => {
 
     expect(result.ready).toBe(false);
     expect(result.rowFailures["signal-2"]).toContain("Selected row has rewrite_requested editorial status.");
+  });
+
+  it("fails when a selected row has a rewrite-requested editorial decision", () => {
+    const result = validateFinalSlateReadiness(
+      validSlate({
+        2: { editorialDecision: "rewrite_requested" },
+      }),
+    );
+
+    expect(result.ready).toBe(false);
+    expect(result.rowFailures["signal-2"]).toContain("Selected row has rewrite_requested editorial status.");
+  });
+
+  it("fails when an approved selected row still has a draft-edited decision", () => {
+    const result = validateFinalSlateReadiness(
+      validSlate({
+        2: { editorialDecision: "draft_edited" },
+      }),
+    );
+
+    expect(result.ready).toBe(false);
+    expect(result.rowFailures["signal-2"]).toContain(
+      "Selected row must have an approved editorial decision before readiness.",
+    );
   });
 
   it("fails when a selected row is already live before publish", () => {

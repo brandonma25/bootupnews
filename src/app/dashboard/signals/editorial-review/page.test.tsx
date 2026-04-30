@@ -21,6 +21,10 @@ vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
   publishSignalPostAction: vi.fn(),
   assignFinalSlateSlotAction: vi.fn(),
   removeFromFinalSlateAction: vi.fn(),
+  requestRewriteAction: vi.fn(),
+  rejectSignalPostAction: vi.fn(),
+  holdSignalPostAction: vi.fn(),
+  replaceFinalSlateSlotAction: vi.fn(),
 }));
 
 const reviewPost = {
@@ -46,6 +50,13 @@ const reviewPost = {
   editorialStatus: "needs_review",
   finalSlateRank: null,
   finalSlateTier: null,
+  editorialDecision: null,
+  decisionNote: null,
+  rejectedReason: null,
+  heldReason: null,
+  replacementOfRowId: null,
+  reviewedBy: null,
+  reviewedAt: null,
   editedBy: null,
   editedAt: null,
   approvedBy: null,
@@ -140,6 +151,10 @@ describe("signals editorial review page", () => {
     expect(screen.getByRole("button", { name: "Approve All" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Expand" }));
     expect(screen.getByLabelText("Thesis / opening statement")).toHaveValue("Raw AI draft");
+    expect(screen.getByRole("button", { name: "Request Rewrite" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Hold" })).toBeEnabled();
+    expect(screen.getByLabelText("Editorial decision note")).toBeInTheDocument();
   });
 
   it("renders the final-slate composer slots and disabled readiness state", async () => {

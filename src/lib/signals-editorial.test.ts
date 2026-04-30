@@ -23,6 +23,13 @@ type SignalPostRow = {
   editorial_status: "draft" | "needs_review" | "approved" | "published";
   final_slate_rank: number | null;
   final_slate_tier: "core" | "context" | null;
+  editorial_decision: "pending_review" | "draft_edited" | "approved" | "rewrite_requested" | "rejected" | "held" | "removed_from_slate" | null;
+  decision_note: string | null;
+  rejected_reason: string | null;
+  held_reason: string | null;
+  replacement_of_row_id: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
   edited_by: string | null;
   edited_at: string | null;
   approved_by: string | null;
@@ -81,6 +88,13 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     editorial_status: overrides.editorial_status ?? "needs_review",
     final_slate_rank: overrides.final_slate_rank ?? null,
     final_slate_tier: overrides.final_slate_tier ?? null,
+    editorial_decision: overrides.editorial_decision ?? null,
+    decision_note: overrides.decision_note ?? null,
+    rejected_reason: overrides.rejected_reason ?? null,
+    held_reason: overrides.held_reason ?? null,
+    replacement_of_row_id: overrides.replacement_of_row_id ?? null,
+    reviewed_by: overrides.reviewed_by ?? null,
+    reviewed_at: overrides.reviewed_at ?? null,
     edited_by: overrides.edited_by ?? null,
     edited_at: overrides.edited_at ?? null,
     approved_by: overrides.approved_by ?? null,
@@ -268,14 +282,6 @@ function createSupabaseMock(
         eq(column: keyof SignalPostRow, value: unknown) {
           filters.push({ column, value });
 
-          if (operation === "update") {
-            applyFilters().forEach((row) => {
-              Object.assign(row, updateValues);
-            });
-
-            return Promise.resolve({ error: null });
-          }
-
           return builder;
         },
         in(column: keyof SignalPostRow, values: unknown[]) {
@@ -312,6 +318,14 @@ function createSupabaseMock(
               error: null,
               count: insertedRows.length,
             }).then(onfulfilled, onrejected);
+          }
+
+          if (operation === "update") {
+            applyFilters().forEach((row) => {
+              Object.assign(row, updateValues);
+            });
+
+            return Promise.resolve({ data: [], error: null, count: 0 }).then(onfulfilled, onrejected);
           }
 
           return Promise.resolve({ data: [], error: null, count: 0 }).then(onfulfilled, onrejected);
@@ -710,7 +724,9 @@ describe("signals editorial workflow", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toBe("There are no Draft or Needs Review signal posts to approve.");
+    expect(result.message).toBe(
+      "There are no Draft or Needs Review signal posts without blocking editorial decisions to approve.",
+    );
     expect(rows[0].editorial_status).toBe("approved");
     expect(rows[1].editorial_status).toBe("published");
   });
@@ -1145,6 +1161,283 @@ describe("signals editorial workflow", () => {
     expect(rows[0].published_why_it_matters).toBeNull();
   });
 
+  it("reject action clears final-slate placement and records the rejection reason", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        final_slate_rank: 1,
+        final_slate_tier: "core",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { rejectSignalPost } = await loadEditorialModule();
+    const result = await rejectSignalPost({
+      postId: "signal-1",
+      decisionNote: "Duplicate of a stronger candidate.",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].editorial_decision).toBe("rejected");
+    expect(rows[0].rejected_reason).toBe("Duplicate of a stronger candidate.");
+    expect(rows[0].final_slate_rank).toBeNull();
+    expect(rows[0].final_slate_tier).toBeNull();
+    expect(rows[0].reviewed_by).toBe("admin@example.com");
+  });
+
+  it("hold action clears final-slate placement and stores training evidence reason", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "needs_review",
+        final_slate_rank: 2,
+        final_slate_tier: "core",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { holdSignalPost } = await loadEditorialModule();
+    const result = await holdSignalPost({
+      postId: "signal-1",
+      decisionNote: "Useful calibration case, but unsupported structural claim.",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].editorial_decision).toBe("held");
+    expect(rows[0].held_reason).toBe("Useful calibration case, but unsupported structural claim.");
+    expect(rows[0].final_slate_rank).toBeNull();
+    expect(rows[0].final_slate_tier).toBeNull();
+  });
+
+  it("request rewrite excludes the row from readiness without publishing it", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        final_slate_rank: 3,
+        final_slate_tier: "core",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { requestSignalPostRewrite } = await loadEditorialModule();
+    const result = await requestSignalPostRewrite({
+      postId: "signal-1",
+      decisionNote: "Needs a stronger structural link.",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].editorial_status).toBe("needs_review");
+    expect(rows[0].editorial_decision).toBe("rewrite_requested");
+    expect(rows[0].final_slate_rank).toBeNull();
+    expect(rows[0].is_live).toBe(false);
+    expect(rows[0].published_at).toBeNull();
+  });
+
+  it("remove-from-slate clears placement without rejecting the row", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        final_slate_rank: 4,
+        final_slate_tier: "core",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { removeSignalPostFromFinalSlate } = await loadEditorialModule();
+    const result = await removeSignalPostFromFinalSlate({ postId: "signal-1" });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].editorial_decision).toBe("approved");
+    expect(rows[0].final_slate_rank).toBeNull();
+    expect(rows[0].final_slate_tier).toBeNull();
+  });
+
+  it("promote assigns final-slate tier and rank through the composer model", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { assignSignalPostToFinalSlateSlot } = await loadEditorialModule();
+    const result = await assignSignalPostToFinalSlateSlot({
+      postId: "signal-1",
+      finalSlateRank: 1,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].final_slate_rank).toBe(1);
+    expect(rows[0].final_slate_tier).toBe("core");
+    expect(rows[0].is_live).toBe(false);
+    expect(rows[0].published_at).toBeNull();
+  });
+
+  it("demote moves a Core row to Context placement without rejecting it", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        final_slate_rank: 2,
+        final_slate_tier: "core",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { assignSignalPostToFinalSlateSlot } = await loadEditorialModule();
+    const result = await assignSignalPostToFinalSlateSlot({
+      postId: "signal-1",
+      finalSlateRank: 6,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].editorial_decision).toBe("approved");
+    expect(rows[0].final_slate_rank).toBe(6);
+    expect(rows[0].final_slate_tier).toBe("context");
+  });
+
+  it("blocks rejected rows from final-slate assignment", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "approved",
+        editorial_decision: "rejected",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { assignSignalPostToFinalSlateSlot } = await loadEditorialModule();
+    const result = await assignSignalPostToFinalSlateSlot({
+      postId: "signal-1",
+      finalSlateRank: 1,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(rows[0].final_slate_rank).toBeNull();
+    expect(rows[0].final_slate_tier).toBeNull();
+  });
+
+  it("replacement candidate occupies the original slot and stores replacement relationship when valid", async () => {
+    const rows = [
+      createRow({
+        id: "original",
+        rank: 1,
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        final_slate_rank: 1,
+        final_slate_tier: "core",
+      }),
+      createRow({
+        id: "replacement",
+        rank: 8,
+        editorial_status: "approved",
+        editorial_decision: "approved",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { replaceSignalPostInFinalSlate } = await loadEditorialModule();
+    const result = await replaceSignalPostInFinalSlate({
+      originalPostId: "original",
+      replacementPostId: "replacement",
+      decisionNote: "Stronger source evidence.",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].editorial_decision).toBe("held");
+    expect(rows[0].final_slate_rank).toBeNull();
+    expect(rows[1].replacement_of_row_id).toBe("original");
+    expect(rows[1].final_slate_rank).toBe(1);
+    expect(rows[1].final_slate_tier).toBe("core");
+    expect(rows[1].is_live).toBe(false);
+    expect(rows[1].published_at).toBeNull();
+  });
+
+  it("blocks invalid replacement candidates before moving the original slot", async () => {
+    const rows = [
+      createRow({
+        id: "original",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        final_slate_rank: 1,
+        final_slate_tier: "core",
+      }),
+      createRow({
+        id: "replacement",
+        rank: 8,
+        editorial_status: "approved",
+        editorial_decision: "held",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { replaceSignalPostInFinalSlate } = await loadEditorialModule();
+    const result = await replaceSignalPostInFinalSlate({
+      originalPostId: "original",
+      replacementPostId: "replacement",
+      decisionNote: "Try invalid replacement.",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(rows[0].editorial_decision).toBe("approved");
+    expect(rows[0].final_slate_rank).toBe(1);
+    expect(rows[1].replacement_of_row_id).toBeNull();
+  });
+
   it("loads published Core and Context rows while excluding parked and non-public rows", async () => {
     const rows = [
       ...Array.from({ length: 7 }, (_, index) =>
@@ -1252,6 +1545,62 @@ describe("signals editorial workflow", () => {
       depthPosts: [],
       briefingDate: null,
     });
+  });
+
+  it("keeps rejected, held, and rewrite-requested rows out of public signal reads", async () => {
+    const rows = [
+      createRow({
+        id: "live-approved",
+        briefing_date: "2026-04-28",
+        rank: 1,
+        editorial_status: "published",
+        editorial_decision: "approved",
+        published_why_it_matters: createValidWhyItMatters("Google"),
+        is_live: true,
+        published_at: "2026-04-28T08:00:00.000Z",
+      }),
+      createRow({
+        id: "live-rejected",
+        briefing_date: "2026-04-28",
+        rank: 2,
+        editorial_status: "published",
+        editorial_decision: "rejected",
+        published_why_it_matters: createValidWhyItMatters("Amazon"),
+        is_live: true,
+        published_at: "2026-04-28T08:01:00.000Z",
+      }),
+      createRow({
+        id: "live-held",
+        briefing_date: "2026-04-28",
+        rank: 3,
+        editorial_status: "published",
+        editorial_decision: "held",
+        published_why_it_matters: createValidWhyItMatters("Microsoft"),
+        is_live: true,
+        published_at: "2026-04-28T08:02:00.000Z",
+      }),
+      createRow({
+        id: "live-rewrite",
+        briefing_date: "2026-04-28",
+        rank: 4,
+        editorial_status: "published",
+        editorial_decision: "rewrite_requested",
+        published_why_it_matters: createValidWhyItMatters("OpenAI"),
+        is_live: true,
+        published_at: "2026-04-28T08:03:00.000Z",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { getPublishedSignalPosts, getHomepageSignalSnapshot } = await loadEditorialModule();
+    const publicSignals = await getPublishedSignalPosts();
+    const homepageSnapshot = await getHomepageSignalSnapshot({
+      today: new Date("2026-04-28T12:00:00.000Z"),
+    });
+
+    expect(publicSignals.map((post) => post.id)).toEqual(["live-approved"]);
+    expect(homepageSnapshot.posts.map((post) => post.id)).toEqual(["live-approved"]);
+    expect(homepageSnapshot.depthPosts.map((post) => post.id)).toEqual(["live-approved"]);
   });
 
   it("uses today's published rows as the homepage Tier 1 signal set", async () => {

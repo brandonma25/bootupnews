@@ -11,6 +11,7 @@ type PublishedSignalPostRow = {
   published_why_it_matters: string | null;
   published_why_it_matters_payload: unknown | null;
   editorial_status: string | null;
+  editorial_decision: string | null;
   published_at: string | null;
 };
 
@@ -27,6 +28,10 @@ function normalizeMatchValue(value: string | null | undefined) {
 
 function normalizeEditorialText(value: string | null | undefined) {
   return value?.trim() ?? "";
+}
+
+function isPubliclyAllowedEditorialDecision(value: string | null | undefined) {
+  return value === null || value === undefined || value === "approved" || value === "draft_edited";
 }
 
 function getItemSourceUrl(item: BriefingItem) {
@@ -110,7 +115,7 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
 
   const result = await client
     .from("signal_posts")
-    .select("title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status, published_at")
+    .select("title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status, editorial_decision, published_at")
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
@@ -122,6 +127,7 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
   }
 
   return ((result.data ?? []) as PublishedSignalPostRow[])
+    .filter((row) => isPubliclyAllowedEditorialDecision(row.editorial_decision))
     .map((row) => ({
       title: normalizeEditorialText(row.title),
       sourceUrl: normalizeEditorialText(row.source_url),

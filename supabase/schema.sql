@@ -149,6 +149,25 @@ create table if not exists public.signal_posts (
     check (final_slate_rank is null or final_slate_rank between 1 and 7),
   final_slate_tier text
     check (final_slate_tier is null or final_slate_tier in ('core', 'context')),
+  editorial_decision text
+    check (
+      editorial_decision is null
+      or editorial_decision in (
+        'pending_review',
+        'draft_edited',
+        'approved',
+        'rewrite_requested',
+        'rejected',
+        'held',
+        'removed_from_slate'
+      )
+    ),
+  decision_note text,
+  rejected_reason text,
+  held_reason text,
+  replacement_of_row_id uuid references public.signal_posts(id) on delete set null,
+  reviewed_by text,
+  reviewed_at timestamptz,
   edited_by text,
   edited_at timestamptz,
   approved_by text,
