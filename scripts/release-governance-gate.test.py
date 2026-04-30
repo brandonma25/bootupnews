@@ -23,6 +23,7 @@ GATE_SPEC.loader.exec_module(release_governance_gate)
 
 format_missing_doc_failure = release_governance_gate.format_missing_doc_failure
 format_new_feature_without_prd_failure = release_governance_gate.format_new_feature_without_prd_failure
+find_existing_mapped_prd_updates = release_governance_gate.find_existing_mapped_prd_updates
 
 
 def run_git(repo_root: Path, *args: str) -> str:
@@ -138,6 +139,40 @@ class GovernanceGateVelocityTests(unittest.TestCase):
         self.assertIn("src/lib/source-policy.ts", message)
         self.assertIn("Fastest valid fix", message)
         self.assertIn("docs/product/prd/prd-XX-<slug>.md", message)
+
+    def test_existing_mapped_prd_update_satisfies_feature_prd_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            prd_file = "docs/product/prd/prd-53-signals-admin-editorial-layer.md"
+            write_file(repo_root, prd_file, "# PRD-53\n")
+            changes = {
+                prd_file: Change(prd_file, "M", 5, 0),
+                "src/lib/final-slate-readiness.ts": Change(
+                    "src/lib/final-slate-readiness.ts",
+                    "A",
+                    40,
+                    0,
+                ),
+                "supabase/migrations/20260430100000_signal_posts_final_slate_composer.sql": Change(
+                    "supabase/migrations/20260430100000_signal_posts_final_slate_composer.sql",
+                    "A",
+                    20,
+                    0,
+                ),
+            }
+            context = classify_changes(
+                changes,
+                "codex/prd-53-minimal-final-slate-composer",
+                "PRD-53 minimal final-slate composer",
+            )
+
+            self.assertEqual(context.classification, "new-feature-or-system")
+            self.assertEqual(context.new_prd_files, [])
+            self.assertEqual(find_missing_doc_groups(context), [])
+            self.assertEqual(
+                find_existing_mapped_prd_updates(context, {prd_file: "PRD-53"}, repo_root),
+                [prd_file],
+            )
 
     def test_audit_remediation_feature_with_explicit_no_prd_change_record_uses_documented_lane(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
