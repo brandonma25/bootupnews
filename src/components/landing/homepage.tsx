@@ -9,6 +9,7 @@ import { BriefingCardCategory } from "@/components/home/BriefingCardCategory";
 import { CategoryPreviewGrid } from "@/components/home/CategoryPreviewGrid";
 import { CategoryTabStrip } from "@/components/home/CategoryTabStrip";
 import { DevelopingNow } from "@/components/home/DevelopingNow";
+import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -21,6 +22,7 @@ import {
   buildIntentionalEditorialPreview,
   type EditorialWhyItMattersContent,
 } from "@/lib/editorial-content";
+import { trackMvpMeasurementEvent } from "@/lib/mvp-measurement-client";
 import type { DashboardData, ViewerAccount } from "@/lib/types";
 import { cn, getBriefingDateKey, minutesToLabel } from "@/lib/utils";
 
@@ -55,6 +57,21 @@ export default function LandingHomepage({
 
   return (
     <AppShell currentPath="/" mode={data.mode} account={viewer}>
+      <MvpMeasurementTracker
+        pageView={{
+          eventName: "homepage_view",
+          route: "/",
+          surface: "home",
+          briefingDate: briefingDateKey,
+          metadata: {
+            visibleSignalCount: topEvents.length,
+            publicRankedSignalCount: data.publicRankedItems?.length ?? topEvents.length,
+            coreSignalCount: homepageViewModel.debug.coreSignalCount,
+            contextSignalCount: homepageViewModel.debug.contextSignalCount,
+            rendersCoreAndContext: homepageViewModel.debug.coreSignalCount >= 5 && homepageViewModel.debug.contextSignalCount >= 2,
+          },
+        }}
+      />
       <div className="space-y-5 py-2">
         {authMessage ? (
           <Panel className="p-4" role="alert">
@@ -187,6 +204,13 @@ function HomeTopEventCard({
           <Link
             href={detailHref}
             className="text-sm font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+            data-mvp-measurement-event="signal_details_click"
+            data-mvp-route="/"
+            data-mvp-surface="home_top_event"
+            data-mvp-signal-post-id={event.id}
+            data-mvp-signal-slug={event.title}
+            data-mvp-signal-rank={rank}
+            data-mvp-briefing-date={detailHref.replace("/briefing/", "")}
           >
             Details
           </Link>
@@ -213,7 +237,18 @@ function HomeTopEventCard({
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
               Why it matters
             </p>
-            <WhyItMattersPreview text={whyItMatters} structuredContent={event.editorialWhyItMatters} />
+            <WhyItMattersPreview
+              text={whyItMatters}
+              structuredContent={event.editorialWhyItMatters}
+              measurement={{
+                route: "/",
+                surface: "home_top_event",
+                signalPostId: event.id,
+                signalSlug: event.title,
+                signalRank: rank,
+                briefingDate: detailHref.replace("/briefing/", ""),
+              }}
+            />
           </div>
         ) : null}
 
@@ -247,6 +282,14 @@ function HomeTopEventCard({
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-start justify-between gap-3 rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm text-[var(--text-primary)] transition-colors hover:border-[var(--text-secondary)]"
+                  data-mvp-measurement-event="source_click"
+                  data-mvp-route="/"
+                  data-mvp-surface="home_top_event_supporting_coverage"
+                  data-mvp-signal-post-id={event.id}
+                  data-mvp-signal-slug={event.title}
+                  data-mvp-signal-rank={rank}
+                  data-mvp-briefing-date={detailHref.replace("/briefing/", "")}
+                  data-mvp-source-name={article.sourceName}
                 >
                   <span className="min-w-0">
                     <span className="font-semibold">{article.sourceName}</span>
@@ -268,9 +311,18 @@ const WHY_IT_MATTERS_PREVIEW_THRESHOLD = 220;
 function WhyItMattersPreview({
   text,
   structuredContent,
+  measurement,
 }: {
   text: string;
   structuredContent?: EditorialWhyItMattersContent | null;
+  measurement: {
+    route: string;
+    surface: string;
+    signalPostId: string;
+    signalSlug: string;
+    signalRank: number;
+    briefingDate: string;
+  };
 }) {
   const [expanded, setExpanded] = useState(false);
   const normalizedText = text.trim();
@@ -310,7 +362,19 @@ function WhyItMattersPreview({
           type="button"
           aria-expanded={expanded}
           className="mt-3 inline-flex text-sm font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
-          onClick={() => setExpanded((current) => !current)}
+          onClick={() => {
+            if (!expanded) {
+              void trackMvpMeasurementEvent({
+                eventName: "signal_full_expansion_proxy",
+                ...measurement,
+                metadata: {
+                  proxyReason: "homepage_why_it_matters_read_more",
+                  hasStructuredWhyItMatters: Boolean(structuredExpandedContent),
+                },
+              });
+            }
+            setExpanded((current) => !current);
+          }}
         >
           {expanded ? "Show less" : "Read more"}
         </button>

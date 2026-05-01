@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
+import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -23,9 +24,25 @@ export default async function PublicSignalsPage() {
   const corePosts = posts.filter((post) => post.rank >= 1 && post.rank <= 5);
   const contextPosts = posts.filter((post) => post.rank >= 6 && post.rank <= 7);
   const hasPublishedPosts = state.kind === "published";
+  const briefingDate = posts[0]?.briefingDate ?? null;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 md:px-6">
+      <MvpMeasurementTracker
+        pageView={{
+          eventName: "signals_page_view",
+          route: "/signals",
+          surface: "signals_index",
+          briefingDate,
+          metadata: {
+            visibleSignalCount: posts.length,
+            coreSignalCount: corePosts.length,
+            contextSignalCount: contextPosts.length,
+            rendersCoreAndContext: corePosts.length === 5 && contextPosts.length === 2,
+            stateKind: state.kind,
+          },
+        }}
+      />
       <div className="space-y-5">
         <header className="space-y-4 border-b border-[var(--border)] pb-5">
           <div className="flex flex-wrap items-center gap-2">
@@ -50,15 +67,17 @@ export default async function PublicSignalsPage() {
         {hasPublishedPosts ? (
           <div className="space-y-7">
             <SignalSection
-              title="Top 5 Core Signals"
-              description="The five highest-priority published Signals for the current briefing."
-              posts={corePosts}
-            />
+                title="Top 5 Core Signals"
+                description="The five highest-priority published Signals for the current briefing."
+                posts={corePosts}
+                briefingDate={briefingDate}
+              />
             {contextPosts.length > 0 ? (
               <SignalSection
                 title="Next 2 Context Signals"
                 description="Published Context Signals that add useful adjacent explanation without displacing the Core slate."
                 posts={contextPosts}
+                briefingDate={briefingDate}
               />
             ) : null}
           </div>
@@ -90,10 +109,12 @@ function SignalSection({
   title,
   description,
   posts,
+  briefingDate,
 }: {
   title: string;
   description: string;
   posts: EditorialSignalPost[];
+  briefingDate: string | null;
 }) {
   if (posts.length === 0) {
     return null;
@@ -132,6 +153,14 @@ function SignalSection({
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
+                          data-mvp-measurement-event="source_click"
+                          data-mvp-route="/signals"
+                          data-mvp-surface="signals_published_slate"
+                          data-mvp-signal-post-id={post.id}
+                          data-mvp-signal-slug={post.title}
+                          data-mvp-signal-rank={post.rank}
+                          data-mvp-briefing-date={briefingDate ?? undefined}
+                          data-mvp-source-name={post.sourceName || "Unknown source"}
                         >
                           Source
                           <ExternalLink className="h-3.5 w-3.5" />
