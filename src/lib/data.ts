@@ -1167,7 +1167,19 @@ export async function getBriefingDetailPageState(dateKey: string, route = `/brie
 
   if (authState.supabase && authState.user) {
     const history = await loadStoredBriefings(authState.supabase, authState.user.id, 14, route);
-    briefing = history.find((candidate) => getBriefingDateKey(candidate.briefingDate) === dateKey) ?? null;
+    const historicalMatch = history.find(
+      (candidate) => getBriefingDateKey(candidate.briefingDate) === dateKey,
+    );
+    if (historicalMatch) {
+      briefing = historicalMatch;
+    }
+  }
+
+  if (!briefing) {
+    const publicData = authState.user ? await buildPublicHomepageData() : data;
+    if (getBriefingDateKey(publicData.briefing.briefingDate) === dateKey) {
+      briefing = publicData.briefing;
+    }
   }
 
   return {
