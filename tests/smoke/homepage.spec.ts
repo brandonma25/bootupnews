@@ -1,5 +1,8 @@
 import { expect, test } from "../utils/audit-fixture";
 
+const fallbackBriefingCopy =
+  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./;
+
 test.describe("homepage smoke", () => {
   test("loads the public V1 homepage and respects the current fallback state", async ({ page }) => {
     await page.goto("/");
@@ -8,7 +11,7 @@ test.describe("homepage smoke", () => {
 
     const detailLink = page.getByRole("link", { name: "Details" }).first();
     if (!(await detailLink.isVisible())) {
-      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expect(page.getByText(fallbackBriefingCopy).first()).toBeVisible();
       await expect(page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail/i)).toHaveCount(0);
       return;
     }
