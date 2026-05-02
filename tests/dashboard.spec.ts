@@ -7,6 +7,9 @@ function isAccountAuthGateUrl(url: URL) {
   );
 }
 
+const fallbackBriefingCopy =
+  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./;
+
 test.describe("V1 shell and routing", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -52,7 +55,7 @@ test.describe("V1 shell and routing", () => {
 
     const detailLink = page.getByRole("link", { name: "Details" }).first();
     if (!(await detailLink.isVisible())) {
-      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expect(page.getByText(fallbackBriefingCopy).first()).toBeVisible();
       await expect(page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail/i)).toHaveCount(0);
       return;
     }
