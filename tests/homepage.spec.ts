@@ -8,6 +8,16 @@ async function expectNoStaticHomepagePlaceholder(page: Page) {
   ).toHaveCount(0);
 }
 
+async function expectFallbackBriefingCopy(page: Page) {
+  await expect(
+    page
+      .getByText(
+        /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./,
+      )
+      .first(),
+  ).toBeVisible();
+}
+
 test.describe("homepage", () => {
   test("renders the public V1 briefing flow", async ({ page, diagnostics }) => {
     await page.goto("/");
@@ -17,7 +27,7 @@ test.describe("homepage", () => {
     if (await page.getByRole("link", { name: "Details" }).first().isVisible()) {
       await expect(page.getByRole("link", { name: "Details" }).first()).toBeVisible();
     } else {
-      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expectFallbackBriefingCopy(page);
     }
     await expectNoStaticHomepagePlaceholder(page);
     await expect(page.getByText("Daily Intelligence Aggregator")).toHaveCount(0);
@@ -45,7 +55,7 @@ test.describe("homepage", () => {
 
     const topEventCount = await topEventCards.count();
     if (topEventCount === 0) {
-      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expectFallbackBriefingCopy(page);
       await expect(page.getByRole("link", { name: "Details" })).toHaveCount(0);
       await expectNoStaticHomepagePlaceholder(page);
       expect(diagnostics.entries).toEqual([]);
@@ -135,7 +145,7 @@ test.describe("homepage", () => {
     const topEventCount = await topEventCards.count();
 
     if (topEventCount === 0) {
-      await expect(page.getByText("Today's briefing is being prepared.").first()).toBeVisible();
+      await expectFallbackBriefingCopy(page);
       await expect(page.getByText(gateCopy)).toHaveCount(0);
       await expectNoStaticHomepagePlaceholder(page);
       expect(diagnostics.entries).toEqual([]);

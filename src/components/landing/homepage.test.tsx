@@ -449,7 +449,7 @@ describe("LandingHomepage", () => {
       {
         homepageFreshnessNotice: {
           kind: "stale",
-          text: "Last updated Sunday, April 26 — Today's briefing is being prepared.",
+          text: "Showing the latest published briefing from Sunday, April 26.",
           briefingDate: "2026-04-26",
         },
       },
@@ -465,7 +465,7 @@ describe("LandingHomepage", () => {
     );
 
     expect(screen.getByTestId("home-freshness-notice")).toHaveTextContent(
-      "Last updated Sunday, April 26 — Today's briefing is being prepared.",
+      "Showing the latest published briefing from Sunday, April 26.",
     );
     expect(screen.getByText("Previously published signal")).toBeInTheDocument();
   });
@@ -474,7 +474,7 @@ describe("LandingHomepage", () => {
     const data = createData([], {
       homepageFreshnessNotice: {
         kind: "empty",
-        text: "Today's briefing is being prepared.",
+        text: "The latest briefing is not yet available. Please check back soon.",
         briefingDate: null,
       },
     });
@@ -489,9 +489,9 @@ describe("LandingHomepage", () => {
     );
 
     expect(screen.getByTestId("home-freshness-notice")).toHaveTextContent(
-      "Today's briefing is being prepared.",
+      "The latest briefing is not yet available. Please check back soon.",
     );
-    expect(screen.getAllByText("Today's briefing is being prepared.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("The latest briefing is not yet available. Please check back soon.").length).toBeGreaterThan(0);
     expect(screen.queryByText(/placeholder|stored public signal snapshot|rail readable|sample slot/i)).not.toBeInTheDocument();
   });
 
