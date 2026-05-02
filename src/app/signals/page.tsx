@@ -140,7 +140,6 @@ function SignalSection({
                       {post.tags.map((tag) => (
                         <Badge key={tag}>{tag}</Badge>
                       ))}
-                      {post.signalScore !== null ? <Badge>Score {Math.round(post.signalScore)}</Badge> : null}
                     </div>
                     <h3 className="mt-3 text-xl font-semibold leading-7 text-[var(--text-primary)]">
                       {post.title}

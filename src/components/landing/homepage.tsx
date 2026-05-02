@@ -170,8 +170,11 @@ function HomeTopEventCard({
   detailHref: string;
   featured: boolean;
 }) {
+  const titleNormalized = event.title.trim();
   const keyPoints = Array.isArray(event.keyPoints)
-    ? event.keyPoints.map((point) => point.trim()).filter(Boolean)
+    ? event.keyPoints
+        .map((point) => point.trim())
+        .filter((point) => Boolean(point) && point !== titleNormalized)
     : [];
   const sourceNames = event.relatedArticles
     .map((article) => article.sourceName.trim())
@@ -196,8 +199,6 @@ function HomeTopEventCard({
               <p className="section-label">Top Event</p>
               <div className="flex flex-wrap gap-2">
                 <Badge>{event.topicName}</Badge>
-                <Badge>{event.intelligence.sourceLabel}</Badge>
-                <Badge>{event.intelligence.confidenceLabel}</Badge>
               </div>
             </div>
           </div>
@@ -218,7 +219,9 @@ function HomeTopEventCard({
 
         <div>
           <h2 className="briefing-title text-[var(--text-primary)]">{event.title}</h2>
-          <p className="mt-3 text-base text-[var(--text-secondary)]">{event.summary}</p>
+          {event.summary && event.summary.trim() !== titleNormalized ? (
+            <p className="mt-3 text-base text-[var(--text-secondary)]">{event.summary}</p>
+          ) : null}
         </div>
 
         {keyPoints.length ? (
@@ -267,8 +270,6 @@ function HomeTopEventCard({
 
         <div className="flex flex-wrap gap-2 text-xs font-medium text-[var(--text-secondary)]">
           <MetaPill>{minutesToLabel(event.estimatedMinutes)} read</MetaPill>
-          <MetaPill>{event.intelligence.impactLabel}</MetaPill>
-          <MetaPill>{event.intelligence.recencyLabel}</MetaPill>
         </div>
 
         {event.relatedArticles.length ? (
@@ -293,7 +294,9 @@ function HomeTopEventCard({
                 >
                   <span className="min-w-0">
                     <span className="font-semibold">{article.sourceName}</span>
-                    <span className="text-[var(--text-secondary)]">: {article.title}</span>
+                    {article.title && article.title.trim() !== article.sourceName.trim() ? (
+                      <span className="text-[var(--text-secondary)]">: {article.title}</span>
+                    ) : null}
                   </span>
                   <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
                 </a>

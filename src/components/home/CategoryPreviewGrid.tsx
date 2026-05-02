@@ -19,7 +19,7 @@ export function CategoryPreviewGrid({ categoryPreviews }: CategoryPreviewGridPro
             By Category
           </h2>
           <p className="text-sm text-[var(--text-secondary)]">
-            Fresh coverage across the core lenses the homepage already uses.
+            More from today&apos;s briefing, by category.
           </p>
         </div>
       </div>
