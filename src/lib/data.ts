@@ -480,7 +480,7 @@ function formatHomepageFreshnessDate(dateKey: string) {
   }).format(date);
 }
 
-function buildEmptyPublicHomepageData(message = "Today's briefing is being prepared."): DashboardData {
+function buildEmptyPublicHomepageData(message = "The latest briefing is not yet available. Please check back soon."): DashboardData {
   const sources = getSourcesForPublicSurface("public.home");
   const briefingDate = normalizeCalendarSafeBriefingDate(getBriefingDateKey(formatISO(new Date())));
 
@@ -532,12 +532,12 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const intro =
     homepageSignalSnapshot.source === "published_live"
       ? "The homepage renders from today's published signal set instead of triggering feed ingestion during SSR."
-      : "Today's briefing is being prepared. Showing the most recently published signal set with its original date.";
+      : "Showing the most recently published briefing.";
   const homepageFreshnessNotice =
     homepageSignalSnapshot.source === "recent_published" && homepageSignalSnapshot.briefingDate
       ? {
           kind: "stale" as const,
-          text: `Last updated ${formatHomepageFreshnessDate(homepageSignalSnapshot.briefingDate)} — Today's briefing is being prepared.`,
+          text: `Showing the latest published briefing from ${formatHomepageFreshnessDate(homepageSignalSnapshot.briefingDate)}.`,
           briefingDate: homepageSignalSnapshot.briefingDate,
         }
       : undefined;

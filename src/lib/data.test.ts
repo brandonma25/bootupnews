@@ -228,11 +228,11 @@ describe("homepage read model", () => {
     const state = await getHomepagePageState("/");
 
     expect(state.data.briefing.intro).toBe(
-      "Today's briefing is being prepared. Showing the most recently published signal set with its original date.",
+      "Showing the most recently published briefing.",
     );
     expect(state.data.homepageFreshnessNotice).toEqual({
       kind: "stale",
-      text: "Last updated Saturday, April 25 — Today's briefing is being prepared.",
+      text: "Showing the latest published briefing from Saturday, April 25.",
       briefingDate: "2026-04-25",
     });
     expect(state.data.briefing.items.map((item) => item.title)).toEqual([
@@ -264,12 +264,12 @@ describe("homepage read model", () => {
     const viewModel = buildHomepageViewModel(state.data);
     const serializedOutput = JSON.stringify(state.data);
 
-    expect(state.data.briefing.intro).toBe("Today's briefing is being prepared.");
+    expect(state.data.briefing.intro).toBe("The latest briefing is not yet available. Please check back soon.");
     expect(state.data.briefing.items).toEqual([]);
     expect(state.data.publicRankedItems).toEqual([]);
     expect(state.data.homepageFreshnessNotice).toEqual({
       kind: "empty",
-      text: "Today's briefing is being prepared.",
+      text: "The latest briefing is not yet available. Please check back soon.",
       briefingDate: null,
     });
     expect(viewModel.featured).toBeNull();
