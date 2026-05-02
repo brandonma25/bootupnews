@@ -51,6 +51,12 @@ describe("MVP measurement summary", () => {
       "2026-05-02": 2,
       "2026-05-08": 1,
     });
+    expect(summary.eventCountByEventName).toMatchObject({
+      homepage_view: 2,
+      signals_page_view: 1,
+      signal_details_click: 1,
+      comprehension_prompt_answered: 1,
+    });
     expect(summary.eventCountByRoute).toMatchObject({
       "/": 3,
       "/signals": 2,

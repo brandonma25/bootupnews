@@ -14,6 +14,7 @@ export type MvpMeasurementSummary = {
   uniqueVisitorCount: number;
   uniqueSessionCount: number;
   eventCountByDate: Record<string, number>;
+  eventCountByEventName: Partial<Record<MvpMeasurementEventName, number>>;
   eventCountByRoute: Record<string, number>;
   day7Return: {
     denominator: number;
@@ -40,11 +41,64 @@ export type MvpMeasurementSummary = {
   };
 };
 
+export type MvpMeasurementSummaryResult = {
+  ok: true;
+  windowDays: number;
+  since: string;
+  summary: MvpMeasurementSummary;
+  limitations: {
+    day7Retention: string;
+    comprehensionPrompt: string;
+    strictFullExpansion: string;
+  };
+};
+
+type MvpMeasurementSummaryQueryResult = {
+  data?: unknown[] | null;
+  error?: {
+    message: string;
+  } | null;
+};
+
+type MvpMeasurementSummaryQueryClient = {
+  from(table: "mvp_measurement_events"): {
+    select(columns: string): {
+      gte(column: "occurred_at", value: string): {
+        order(
+          column: "occurred_at",
+          options: { ascending: boolean },
+        ): {
+          limit(count: number): PromiseLike<MvpMeasurementSummaryQueryResult>;
+        };
+      };
+    };
+  };
+};
+
 const DEPTH_PROXY_EVENTS = new Set<MvpMeasurementEventName>([
   "signal_full_expansion",
   "signal_full_expansion_proxy",
   "signal_details_click",
 ]);
+
+const DEFAULT_SUMMARY_WINDOW_DAYS = 30;
+const MAX_SUMMARY_WINDOW_DAYS = 90;
+const SUMMARY_ROW_LIMIT = 10000;
+
+export function normalizeMvpMeasurementSummaryWindowDays(value: unknown) {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : DEFAULT_SUMMARY_WINDOW_DAYS;
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_SUMMARY_WINDOW_DAYS;
+  }
+
+  return Math.min(Math.floor(parsed), MAX_SUMMARY_WINDOW_DAYS);
+}
 
 function dateKey(value: string) {
   const date = new Date(value);
@@ -72,6 +126,7 @@ function metadataResponse(row: MvpMeasurementSummaryRow) {
 
 export function summarizeMvpMeasurementEvents(rows: MvpMeasurementSummaryRow[]): MvpMeasurementSummary {
   const eventCountByDate: Record<string, number> = {};
+  const eventCountByEventName: Partial<Record<MvpMeasurementEventName, number>> = {};
   const eventCountByRoute: Record<string, number> = {};
   const visitorDates = new Map<string, Set<string>>();
   const sessionEvents = new Map<string, Set<MvpMeasurementEventName>>();
@@ -84,6 +139,8 @@ export function summarizeMvpMeasurementEvents(rows: MvpMeasurementSummaryRow[]):
 
   rows.forEach((row) => {
     visitors.add(row.visitor_id);
+    eventCountByEventName[row.event_name] = (eventCountByEventName[row.event_name] ?? 0) + 1;
+
     const rowDate = dateKey(row.occurred_at);
     if (rowDate) {
       eventCountByDate[rowDate] = (eventCountByDate[rowDate] ?? 0) + 1;
@@ -176,6 +233,7 @@ export function summarizeMvpMeasurementEvents(rows: MvpMeasurementSummaryRow[]):
     uniqueVisitorCount: visitors.size,
     uniqueSessionCount: sessionEvents.size,
     eventCountByDate,
+    eventCountByEventName,
     eventCountByRoute,
     day7Return: {
       denominator: day7Denominator,
@@ -199,6 +257,38 @@ export function summarizeMvpMeasurementEvents(rows: MvpMeasurementSummaryRow[]):
       denominator: firstThreeDenominator,
       numerator: firstThreeNumerator,
       rate: rate(firstThreeNumerator, firstThreeDenominator),
+    },
+  };
+}
+
+export async function readMvpMeasurementSummary(
+  client: MvpMeasurementSummaryQueryClient,
+  inputDays?: unknown,
+): Promise<MvpMeasurementSummaryResult> {
+  const windowDays = normalizeMvpMeasurementSummaryWindowDays(inputDays);
+  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+  const result = await client
+    .from("mvp_measurement_events")
+    .select("event_name, visitor_id, session_id, occurred_at, route, metadata")
+    .gte("occurred_at", since)
+    .order("occurred_at", { ascending: true })
+    .limit(SUMMARY_ROW_LIMIT);
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  return {
+    ok: true,
+    windowDays,
+    since,
+    summary: summarizeMvpMeasurementEvents(
+      (result.data ?? []) as unknown as MvpMeasurementSummaryRow[],
+    ),
+    limitations: {
+      day7Retention: "Requires seven elapsed calendar days and returning visitor events; absence of data is not a failure.",
+      comprehensionPrompt: "Visible comprehension prompt UI remains deferred; prompt events summarize when explicitly captured.",
+      strictFullExpansion: "Current UI can report strict full-expansion events when present and depth proxies separately.",
     },
   };
 }
