@@ -10,6 +10,15 @@ type CategoryPreviewGridProps = {
 };
 
 export function CategoryPreviewGrid({ categoryPreviews }: CategoryPreviewGridProps) {
+  const totalEvents = HOMEPAGE_CATEGORY_CONFIG.reduce(
+    (sum, category) => sum + (categoryPreviews[category.key]?.length ?? 0),
+    0,
+  );
+
+  if (totalEvents === 0) {
+    return null;
+  }
+
   return (
     <section aria-labelledby="by-category-heading" className="space-y-4">
       <div className="space-y-2">
