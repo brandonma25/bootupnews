@@ -12,8 +12,14 @@ import {
   SIGNALS_EDITORIAL_ROUTE,
   approveSignalPost,
   approveSignalPosts,
+  assignSignalPostToFinalSlateSlot,
+  holdSignalPost,
   publishApprovedSignals,
   publishSignalPost,
+  rejectSignalPost,
+  removeSignalPostFromFinalSlate,
+  replaceSignalPostInFinalSlate,
+  requestSignalPostRewrite,
   resetSignalPostToAiDraft,
   saveSignalDraft,
   type EditorialMutationResult,
@@ -30,6 +36,10 @@ function revalidateEditorialRoutes() {
   revalidatePath("/");
   revalidatePath(SIGNALS_EDITORIAL_ROUTE);
   revalidatePath(PUBLIC_SIGNALS_ROUTE);
+}
+
+function revalidateEditorialReviewRoute() {
+  revalidatePath(SIGNALS_EDITORIAL_ROUTE);
 }
 
 function readStructuredEditorialInput(formData: FormData) {
@@ -126,7 +136,46 @@ export async function resetSignalPostToAiDraftAction(formData: FormData) {
   redirectWithResult(result);
 }
 
-export async function publishTopSignalsAction() {
+export async function requestRewriteAction(formData: FormData) {
+  const result = await requestSignalPostRewrite({
+    postId: String(formData.get("postId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function rejectSignalPostAction(formData: FormData) {
+  const result = await rejectSignalPost({
+    postId: String(formData.get("postId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function holdSignalPostAction(formData: FormData) {
+  const result = await holdSignalPost({
+    postId: String(formData.get("postId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+async function runPublishFinalSlateAction() {
   const result = await publishApprovedSignals();
 
   if (result.ok) {
@@ -136,6 +185,14 @@ export async function publishTopSignalsAction() {
   redirectWithResult(result);
 }
 
+export async function publishFinalSlateAction() {
+  await runPublishFinalSlateAction();
+}
+
+export async function publishTopSignalsAction() {
+  await runPublishFinalSlateAction();
+}
+
 export async function publishSignalPostAction(formData: FormData) {
   const result = await publishSignalPost({
     postId: String(formData.get("postId") ?? ""),
@@ -143,6 +200,45 @@ export async function publishSignalPostAction(formData: FormData) {
 
   if (result.ok) {
     revalidateEditorialRoutes();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function assignFinalSlateSlotAction(formData: FormData) {
+  const result = await assignSignalPostToFinalSlateSlot({
+    postId: String(formData.get("postId") ?? ""),
+    finalSlateRank: Number(formData.get("finalSlateRank") ?? NaN),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function removeFromFinalSlateAction(formData: FormData) {
+  const result = await removeSignalPostFromFinalSlate({
+    postId: String(formData.get("postId") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  redirectWithResult(result);
+}
+
+export async function replaceFinalSlateSlotAction(formData: FormData) {
+  const result = await replaceSignalPostInFinalSlate({
+    originalPostId: String(formData.get("originalPostId") ?? ""),
+    replacementPostId: String(formData.get("replacementPostId") ?? ""),
+    decisionNote: String(formData.get("decisionNote") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
   }
 
   redirectWithResult(result);

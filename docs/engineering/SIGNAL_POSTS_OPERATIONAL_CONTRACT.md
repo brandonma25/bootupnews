@@ -13,6 +13,8 @@ This document defines the operational meaning of `public.signal_posts` until a c
 
 `signal_posts` represents an editorial/published Surface Placement plus Card copy and public read model. Rows may describe the current live Top 5, historical daily placement snapshots, and public depth-pool card rows, but those rows are not durable event or Signal identities.
 
+`published_slates` and `published_slate_items` are minimal audit/history companions for supported PRD-53 final-slate publishes. They snapshot the published Surface Placement and Card copy at publish time; they are not canonical Signal identity, a public archive surface, or the Phase 2 historical content model.
+
 `signal_posts.id`, `signal_posts.rank`, and `(briefing_date, rank)` must not be treated as stable event identity, durable Signal identity, or canonical cross-day lineage.
 
 `signal_posts` must not be used as the canonical foundation for Phase 2 progression, lineage, Signal history, event evolution, or duplicate suppression.
@@ -28,6 +30,7 @@ The current table is allowed to serve these purposes:
 - Live public Surface Placement state through `is_live`.
 - Daily placement archive through `briefing_date` and `rank`.
 - Public depth-pool rows for homepage/category rendering.
+- Internal published-slate audit references through `published_slate_items.signal_post_id`.
 
 The current table is not allowed to serve these purposes:
 
@@ -41,13 +44,15 @@ The current table is not allowed to serve these purposes:
 
 - `src/lib/signals-editorial.ts`
   - `persistSignalPostsForBriefing()` writes daily placement/card candidates.
-  - `publishApprovedSignals()` publishes approved placement/card rows.
+  - `publishApprovedSignals()` publishes the validated `5 Core + 2 Context` final Surface Placement slate.
   - `getPublishedSignalPosts()` reads public `/signals` card rows.
   - `getHomepageSignalSnapshot()` reads homepage placement/card snapshots.
 - `src/lib/data.ts`
   - maps homepage signal-post rows back into `BriefingItem` card objects.
 - `src/lib/homepage-editorial-overrides.ts`
   - applies published `signal_posts` copy as homepage card-copy overrides.
+- `public.published_slates` / `public.published_slate_items`
+  - store internal publish audit rows for the most recent and prior supported final-slate publishes.
 
 ## Required Future Constraint
 

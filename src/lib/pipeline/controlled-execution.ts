@@ -3,7 +3,7 @@ import type { PublicSourcePlan } from "@/lib/source-manifest";
 import type { CandidatePoolInsufficientReason, ContentAccessibility, SourceRole } from "@/lib/source-accessibility-types";
 import type { SignalSnapshotPersistenceResult } from "@/lib/signals-editorial";
 import type { BriefingItem, DailyBriefing, SignalSelectionEligibilityTier } from "@/lib/types";
-import { validateWhyItMatters } from "@/lib/why-it-matters-quality-gate";
+import { validateWhyItMatters, type WhyItMattersFailureMode } from "@/lib/why-it-matters-quality-gate";
 import { summarizeSourceDistribution } from "@/lib/signal-selection-eligibility";
 
 export type PipelineRunMode = "normal" | "dry_run" | "draft_only";
@@ -60,7 +60,7 @@ export type ControlledPipelineSignalReport = {
   diversityProvider: string | null;
   whyItMatters: string;
   validationStatus: "passed" | "requires_human_rewrite";
-  validationFailures: string[];
+  validationFailures: WhyItMattersFailureMode[];
   validationDetails: string[];
   selectionQualityWarnings: string[];
   selectionEligibilityReasons: string[];
@@ -387,7 +387,7 @@ function mapSignalReport(item: BriefingItem, rank: number): ControlledPipelineSi
     item.sourceCount ??
     item.eventIntelligence?.signals.sourceDiversity ??
     new Set(item.sources.map((entry) => entry.title)).size;
-  const validation = validateWhyItMatters(whyItMatters, {
+  const validation = item.whyItMattersValidation ?? validateWhyItMatters(whyItMatters, {
     title: item.title,
     eligibilityTier: eligibility?.tier ?? "core_signal_eligible",
     contentAccessibility: eligibility?.contentAccessibility ?? null,

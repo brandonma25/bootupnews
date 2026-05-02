@@ -6,11 +6,15 @@ import {
 import type { BriefingItem, DashboardData } from "@/lib/types";
 
 type PublishedSignalPostRow = {
+  rank: number | null;
+  final_slate_rank?: number | null;
+  final_slate_tier?: string | null;
   title: string | null;
   source_url: string | null;
   published_why_it_matters: string | null;
   published_why_it_matters_payload: unknown | null;
   editorial_status: string | null;
+  editorial_decision?: string | null;
   published_at: string | null;
 };
 
@@ -27,6 +31,22 @@ function normalizeMatchValue(value: string | null | undefined) {
 
 function normalizeEditorialText(value: string | null | undefined) {
   return value?.trim() ?? "";
+}
+
+function isPubliclyAllowedEditorialDecision(value: string | null | undefined) {
+  return value === null || value === undefined || value === "approved" || value === "draft_edited";
+}
+
+function getPublicSlateRank(row: PublishedSignalPostRow) {
+  if (typeof row.final_slate_rank === "number" && row.final_slate_rank >= 1 && row.final_slate_rank <= 7) {
+    return row.final_slate_rank;
+  }
+
+  if (typeof row.rank === "number" && row.rank >= 1 && row.rank <= 7) {
+    return row.rank;
+  }
+
+  return null;
 }
 
 function getItemSourceUrl(item: BriefingItem) {
@@ -110,18 +130,26 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
 
   const result = await client
     .from("signal_posts")
-    .select("title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status, published_at")
+    .select("rank, title, source_url, published_why_it_matters, published_why_it_matters_payload, editorial_status, published_at")
     .eq("is_live", true)
     .eq("editorial_status", "published")
     .not("published_at", "is", null)
     .order("rank", { ascending: true })
-    .limit(5);
+    .limit(100);
 
   if (result.error) {
     return [];
   }
 
   return ((result.data ?? []) as PublishedSignalPostRow[])
+    .filter((row) => isPubliclyAllowedEditorialDecision(row.editorial_decision))
+    .filter((row) => {
+      const publicRank = getPublicSlateRank(row);
+
+      return Boolean(publicRank && publicRank <= 5 && (!row.final_slate_tier || row.final_slate_tier === "core"));
+    })
+    .sort((left, right) => (getPublicSlateRank(left) ?? 99) - (getPublicSlateRank(right) ?? 99))
+    .slice(0, 5)
     .map((row) => ({
       title: normalizeEditorialText(row.title),
       sourceUrl: normalizeEditorialText(row.source_url),

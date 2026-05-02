@@ -5,6 +5,7 @@ import type {
 import type { HomepageCategoryClassification } from "@/lib/homepage-taxonomy";
 import type { SignalRole } from "@/lib/output-sanity";
 import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
+import type { WhyItMattersValidationResult } from "@/lib/why-it-matters-quality-gate";
 import type {
   ContentAccessibility,
   SourceExtractionMethod,
@@ -101,6 +102,14 @@ export type EventIntelligence = {
 
 export type EventDisplayState = "new" | "changed" | "escalated" | "unchanged";
 export type EditorialStatus = "draft" | "needs_review" | "approved" | "published";
+export type EditorialDecision =
+  | "pending_review"
+  | "draft_edited"
+  | "approved"
+  | "rewrite_requested"
+  | "rejected"
+  | "held"
+  | "removed_from_slate";
 export type SignalSelectionEligibilityTier =
   | "core_signal_eligible"
   | "context_signal_eligible"
@@ -158,6 +167,7 @@ export type BriefingItem = {
   keyPoints: [string, string, string];
   whyItMatters: string;
   aiWhyItMatters?: string;
+  whyItMattersValidation?: WhyItMattersValidationResult;
   editedWhyItMatters?: string | null;
   publishedWhyItMatters?: string | null;
   editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
