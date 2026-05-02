@@ -401,18 +401,12 @@ function buildHomepageSignalKeyPoints(
   post: HomepageSignalPost,
   source: HomepageSignalSnapshotSource,
 ): [string, string, string] {
-  const sourcePoint = post.sourceName
-    ? `Lead coverage is anchored by ${post.sourceName}.`
-    : source === "published_live"
-      ? "Lead coverage is anchored by the published signal set."
-      : "Lead coverage is anchored by the previously published signal set.";
-  const rankPoint =
-    source === "published_live"
-      ? `Published as live signal #${post.rank} for the homepage briefing.`
-      : `Previously published at rank #${post.rank} for the homepage briefing.`;
   const summaryPoint = post.summary || post.selectionReason || selectHomepageSignalWhyItMatters(post, source);
+  const titleNormalized = post.title.trim();
+  const summaryTrimmed = summaryPoint.trim();
+  const dedupedSummary = summaryTrimmed && summaryTrimmed !== titleNormalized ? summaryTrimmed : "";
 
-  return [sourcePoint, rankPoint, summaryPoint];
+  return [dedupedSummary, "", ""];
 }
 
 function mapHomepageSignalPostToBriefingItem(
