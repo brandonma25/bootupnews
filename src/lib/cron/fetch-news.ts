@@ -1,15 +1,5 @@
-import { generateDailyBriefing } from "@/lib/data";
-import { demoTopics } from "@/lib/demo-data";
 import { logServerEvent } from "@/lib/observability";
-import {
-  captureRssCronCheckIn,
-  captureRssFailure,
-  withRssSpan,
-} from "@/lib/observability/rss";
-import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
-import { getPublicSourcePlanForSurface, getRequiredSourcesForPublicSurface } from "@/lib/source-manifest";
 import type { BriefingItem } from "@/lib/types";
-import { validateWhyItMatters } from "@/lib/why-it-matters-quality-gate";
 
 const CRON_ROUTE = "/api/cron/fetch-news";
 const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 8;
@@ -34,6 +24,12 @@ export type DailyNewsCronDiagnosticStage =
   | "route_failure";
 
 type DiagnosticLogLevel = "info" | "warn" | "error";
+type CronRuntimeDependencies = Awaited<ReturnType<typeof loadCronRuntimeDependencies>>;
+type RssObservabilityDependencies = Pick<
+  CronRuntimeDependencies,
+  "captureRssCronCheckIn" | "captureRssFailure"
+>;
+type ValidateWhyItMatters = typeof import("@/lib/why-it-matters-quality-gate").validateWhyItMatters;
 
 type DailyNewsCronDiagnosticContext = {
   request_id: string;
@@ -234,6 +230,36 @@ function buildFailureResult(
   });
 }
 
+async function loadCronRuntimeDependencies() {
+  const [
+    dataModule,
+    demoDataModule,
+    rssObservabilityModule,
+    signalsEditorialModule,
+    sourceManifestModule,
+    whyItMattersQualityGateModule,
+  ] = await Promise.all([
+    import("@/lib/data"),
+    import("@/lib/demo-data"),
+    import("@/lib/observability/rss"),
+    import("@/lib/signals-editorial"),
+    import("@/lib/source-manifest"),
+    import("@/lib/why-it-matters-quality-gate"),
+  ]);
+
+  return {
+    generateDailyBriefing: dataModule.generateDailyBriefing,
+    demoTopics: demoDataModule.demoTopics,
+    captureRssCronCheckIn: rssObservabilityModule.captureRssCronCheckIn,
+    captureRssFailure: rssObservabilityModule.captureRssFailure,
+    withRssSpan: rssObservabilityModule.withRssSpan,
+    persistSignalPostsForBriefing: signalsEditorialModule.persistSignalPostsForBriefing,
+    getPublicSourcePlanForSurface: sourceManifestModule.getPublicSourcePlanForSurface,
+    getRequiredSourcesForPublicSurface: sourceManifestModule.getRequiredSourcesForPublicSurface,
+    validateWhyItMatters: whyItMattersQualityGateModule.validateWhyItMatters,
+  };
+}
+
 export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): Promise<DailyNewsCronRunResult> {
   const timestamp = new Date().toISOString();
   const startedAtMs = context.startedAtMs ?? Date.now();
@@ -258,7 +284,8 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
     elapsed_ms: 0,
   };
   let currentStage: DailyNewsCronDiagnosticStage = "pipeline_start";
-  const checkInId = captureRssCronCheckIn("in_progress");
+  let rssObservability: RssObservabilityDependencies | null = null;
+  let checkInId: string | undefined;
 
   logServerEvent("info", "Daily news cron started", {
     route: diagnostics.route,
@@ -268,6 +295,20 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
 
   try {
     currentStage = markStage(diagnostics, "source_manifest_load");
+    const {
+      captureRssCronCheckIn,
+      captureRssFailure,
+      demoTopics,
+      generateDailyBriefing,
+      getPublicSourcePlanForSurface,
+      getRequiredSourcesForPublicSurface,
+      persistSignalPostsForBriefing,
+      validateWhyItMatters,
+      withRssSpan,
+    } = await loadCronRuntimeDependencies();
+    rssObservability = { captureRssCronCheckIn, captureRssFailure };
+    checkInId = captureRssCronCheckIn("in_progress");
+
     const sourcePlan = getPublicSourcePlanForSurface("public.home");
     const sources = getRequiredSourcesForPublicSurface("public.home");
     diagnostics.source_manifest = {
@@ -336,7 +377,7 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
     logDailyNewsCronDiagnostic("info", "witm_validation_start", diagnostics, {
       selected_briefing_item_count: briefing.items.length,
     });
-    diagnostics.witm_validation = summarizeWhyItMattersValidation(briefing.items);
+    diagnostics.witm_validation = summarizeWhyItMattersValidation(briefing.items, validateWhyItMatters);
     markStage(diagnostics, "witm_validation_complete");
     logDailyNewsCronDiagnostic("info", "witm_validation_complete", diagnostics, diagnostics.witm_validation);
 
@@ -524,18 +565,20 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       errorMessage: sanitizedMessage,
       errorStackTop: diagnostics.sanitized_stack_top,
     });
-    captureRssFailure(new Error(sanitizedMessage), {
-      failureType: "rss_refresh_job_failed",
-      phase: "refresh",
-      level: "error",
-      message: result.summary.message,
-      extra: {
-        route: diagnostics.route,
-        request_id: diagnostics.request_id,
-        failedStage: diagnostics.failed_stage,
-      },
-    });
-    captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
+    if (rssObservability) {
+      rssObservability.captureRssFailure(new Error(sanitizedMessage), {
+        failureType: "rss_refresh_job_failed",
+        phase: "refresh",
+        level: "error",
+        message: result.summary.message,
+        extra: {
+          route: diagnostics.route,
+          request_id: diagnostics.request_id,
+          failedStage: diagnostics.failed_stage,
+        },
+      });
+      rssObservability.captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
+    }
 
     return result;
   } finally {
@@ -612,7 +655,7 @@ function countBriefingSignalRoles(items: BriefingItem[]) {
   );
 }
 
-function summarizeWhyItMattersValidation(items: BriefingItem[]) {
+function summarizeWhyItMattersValidation(items: BriefingItem[], validateWhyItMatters: ValidateWhyItMatters) {
   return items.reduce(
     (counts, item) => {
       const validation = item.whyItMattersValidation ?? validateWhyItMatters(item.aiWhyItMatters ?? item.whyItMatters ?? "");
