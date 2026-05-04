@@ -5,7 +5,7 @@
 - Preview URL: `https://daily-intelligence-aggregator-git-ba69cc-brandonma25s-projects.vercel.app`
 - Vercel deployment: `dpl_G4EBrPivZAstu92dudtFNKNJmkUf`
 - Deployment URL: `https://daily-intelligence-aggregator-ybs9-crycvfce0.vercel.app`
-- Legacy note consolidated from: `docs/changes/003-reuters-verification-blocker.md`
+- Canonical record after `docs/changes/` removal: this testing note is the durable verification record.
 
 ## Classification
 

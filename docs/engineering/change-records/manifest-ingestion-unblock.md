@@ -3,7 +3,7 @@
 - Date: 2026-04-23
 - Branch: `feature/public-source-manifest-v2`
 - Canonical PRD: `docs/product/prd/prd-54-public-source-manifest.md`
-- Legacy note consolidated from: `docs/changes/002-manifest-ingestion-unblock-pr.md`
+- Canonical record after `docs/changes/` removal: this change record is the durable manifest-ingestion unblock record.
 
 ## Summary
 

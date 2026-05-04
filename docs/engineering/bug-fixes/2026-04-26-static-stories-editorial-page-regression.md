@@ -12,7 +12,7 @@
 - Branch: `bugfix/static-stories-editorial-page-regression`
 - Head SHA: `a45fdb6d93d4ea4f220b641dfe194964218b0528`
 - Merge SHA: `ab4536b7a6b05ac9642dc5b4053f0778096cd5b8`
-- GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; legacy `docs/bugs/2026-04-26-regression-static-stories-editorial-page.md` now redirects here.
+- GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; deprecated legacy redirect was removed on 2026-05-04.
 - External references reviewed, if any: PR #109 metadata and the legacy bug report.
 - Google Sheet / Work Log reference, if historically relevant: historical tracker-sync reference only, `docs/operations/tracker-sync/2026-04-26-static-stories-editorial-page-regression.md`.
 - Branch cleanup status: branch deletion state not independently recoverable in this cleanup; PR metadata preserves branch and SHA.

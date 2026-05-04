@@ -20,7 +20,7 @@
 - Branch: `bugfix/homepage-tabs-signal-regression`
 - Head SHA: `f3d4448c8078be9fef374d762420e2cafd71e3fb`
 - Merge SHA: `c6e0fb6f745f6a19e2a18e2fa40f4e38d0b02d45`
-- GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; legacy `docs/bugs/homepage-tabs-signal-regression-politics-tldr.md` now redirects here.
+- GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; deprecated legacy redirect was removed on 2026-05-04.
 - External references reviewed, if any: PR #114 metadata and the legacy bug report.
 - Google Sheet / Work Log reference, if historically relevant: historical tracker-sync reference only, `docs/operations/tracker-sync/2026-04-26-homepage-tabs-signal-regression-politics-tldr.md`.
 - Branch cleanup status: branch is still present locally at `/Users/bm/dev/worktrees/daily-intel-homepage-tabs-signal-regression`; no deletion was performed in this branch.
