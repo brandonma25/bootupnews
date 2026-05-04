@@ -6,7 +6,7 @@
 - Affected object level: Surface Placement and Card persistence diagnostics in the existing `signal_posts` editorial workflow.
 
 ## Fix
-- Exact change: added a request id, safe structured stage diagnostics, sanitized failure fields, and explicit success/failure response metadata to the existing cron route and runner. A follow-up commit lazy-loads the cron runner dependencies after route auth/env diagnostics so production module-load failures can be returned as a stage-level failure instead of an opaque pre-route 500.
+- Exact change: added a request id, safe structured stage diagnostics, sanitized failure fields, and explicit success/failure response metadata to the existing cron route and runner. Follow-up commits lazy-load the cron runner dependencies after route auth/env diagnostics and bypass auth-session proxy refresh for `/api/cron/*`, leaving the cron route's own `CRON_SECRET` gate as the authority.
 - Related PRD: none. This is a scoped production remediation hotfix, not a new product feature.
 - Branch: `hotfix/cron-stage-diagnostics-20260504`
 - Base SHA: `c579e1162d9e68d8cdfcecbb36b7940a82cf8ca7`
@@ -22,6 +22,7 @@
 ## Validation
 - Automated checks:
   - `npm test -- src/app/api/cron/fetch-news/route.test.ts`
+  - `npm test -- src/proxy.test.ts`
   - `npm run lint`
   - `npm run build`
 - Human checks:

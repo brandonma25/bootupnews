@@ -7,7 +7,14 @@ import { env, isSupabaseConfigured } from "@/lib/env";
 export async function proxy(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const isAuthCallbackRequest = requestUrl.pathname === "/auth/callback";
+  const isCronRequest = requestUrl.pathname.startsWith("/api/cron/");
   const isPasswordResetRequest = requestUrl.pathname === "/reset-password";
+
+  if (isCronRequest) {
+    return NextResponse.next({
+      request,
+    });
+  }
 
   if (
     isSupabaseConfigured &&

@@ -64,6 +64,23 @@ describe("proxy auth return handling", () => {
     expect(getUser).not.toHaveBeenCalled();
   });
 
+  it("does not refresh auth state before cron routes", async () => {
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      {
+        url: "http://localhost:3000/api/cron/fetch-news",
+        cookies: {
+          getAll: () => [],
+          set: () => undefined,
+        },
+      } as unknown as NextRequest,
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
   it("leaves reset-password recovery query params on the reset page", async () => {
     const { proxy } = await import("@/proxy");
 
