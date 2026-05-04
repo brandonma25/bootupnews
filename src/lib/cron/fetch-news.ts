@@ -587,6 +587,26 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       markFailure(diagnostics, currentStage, errorName, sanitizedMessage, error),
     );
 
+    if (!emitStageLogs) {
+      logDailyNewsCronDiagnostic("error", "route_failure", diagnostics, {
+        elapsed_ms: result.elapsed_ms,
+        failed_stage: result.failed_stage,
+        error_name: result.error_name,
+        sanitized_error_message: result.sanitized_error_message,
+        diagnostics: {
+          stages_seen: result.diagnostics.stages_seen,
+          auth: result.diagnostics.auth,
+          env: result.diagnostics.env,
+          source_manifest: result.diagnostics.source_manifest,
+          source_fetch: result.diagnostics.source_fetch,
+          ranking_selection: result.diagnostics.ranking_selection,
+          witm_validation: result.diagnostics.witm_validation,
+          persistence: result.diagnostics.persistence,
+          health_update: result.diagnostics.health_update,
+        },
+      });
+    }
+
     if (emitStageLogs) {
       logServerEvent("error", "Daily news cron failed", {
         route: diagnostics.route,
