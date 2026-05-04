@@ -2483,6 +2483,20 @@ export async function removeSignalPostFromFinalSlate(input: {
     };
   }
 
+  const target = await loadDecisionTarget(context, input.postId);
+
+  if (!target.ok) {
+    return target;
+  }
+
+  if (blockPublishedDecisionTarget(target.post)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot be removed from the draft final slate.",
+    };
+  }
+
   const updateResult = await context.client
     .from("signal_posts")
     .update({
