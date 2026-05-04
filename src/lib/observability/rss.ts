@@ -366,8 +366,14 @@ export function captureRssFailure(error: unknown, context: RssFailureContext) {
   });
 }
 
-export function addRssBreadcrumb(message: string, context: Record<string, unknown> = {}) {
-  logRssEvent("info", message, context);
+export function addRssBreadcrumb(
+  message: string,
+  context: Record<string, unknown> = {},
+  options: { logToConsole?: boolean } = {},
+) {
+  if (options.logToConsole !== false) {
+    logRssEvent("info", message, context);
+  }
 
   if (!isSentryConfigured("server")) {
     return;
@@ -462,7 +468,7 @@ export async function initializeRssMonitoringAtBoot() {
   const state = getRuntimeState();
   const startedAt = new Date().toISOString();
   state.bootStartedAt = startedAt;
-  addRssBreadcrumb("rss boot started", { phase: "boot", bootStartedAt: startedAt });
+  addRssBreadcrumb("rss boot started", { phase: "boot", bootStartedAt: startedAt }, { logToConsole: false });
 
   try {
     await withRssSpan("rss.boot", "boot", { "rss.boot": true }, async () => {
@@ -521,7 +527,7 @@ export async function initializeRssMonitoringAtBoot() {
     const completedAt = new Date().toISOString();
     state.bootCompletedAt = completedAt;
     state.bootStatus = "ok";
-    addRssBreadcrumb("rss boot succeeded", { phase: "boot", bootCompletedAt: completedAt });
+    addRssBreadcrumb("rss boot succeeded", { phase: "boot", bootCompletedAt: completedAt }, { logToConsole: false });
   } catch (error) {
     const completedAt = new Date().toISOString();
     state.bootCompletedAt = completedAt;
