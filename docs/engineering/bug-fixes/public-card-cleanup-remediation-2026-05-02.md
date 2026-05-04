@@ -63,4 +63,4 @@
 
 ## Remaining Risks / Follow-up
 - This consolidated record does not claim production validation or Google tracker updates.
-- Separate decommissioning may still be needed for historical tracker-sync artifacts and any active Google sync workflow.
+- Active Google sync workflow decommissioning was completed in `docs/engineering/change-records/2026-05-04-google-sheets-sync-decommission.md`; historical tracker-sync artifacts remain compatibility records.

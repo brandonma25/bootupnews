@@ -12,14 +12,11 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   production-route-probe:
     name: production-route-probe
     runs-on: ubuntu-latest
-    outputs:
-      promotion_ready: ${{ steps.mark-ready.outputs.ready || 'false' }}
     env:
       PRODUCTION_URL: ${{ github.event.inputs.production_url || vars.PRODUCTION_BASE_URL }}
     steps:
@@ -39,82 +36,8 @@ jobs:
         if: ${{ env.PRODUCTION_URL != '' }}
         run: npm run release:production -- --base-url "$PRODUCTION_URL"
 
-      - name: Mark Built promotion ready
-        id: mark-ready
-        if: ${{ env.PRODUCTION_URL != '' && success() }}
-        run: echo "ready=true" >> "$GITHUB_OUTPUT"
-
       - name: Skip when production URL is not configured
         if: ${{ env.PRODUCTION_URL == '' }}
         run: |
           echo "PRODUCTION_BASE_URL repo variable is not configured. Skipping production route probe."
           echo "Configure PRODUCTION_BASE_URL or dispatch this workflow with production_url." >> "$GITHUB_STEP_SUMMARY"
-
-  promote-built-status:
-    name: promote-built-status
-    runs-on: ubuntu-latest
-    needs: production-route-probe
-    if: ${{ needs.production-route-probe.outputs.promotion_ready == 'true' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Validate required Google Sheets secrets
-        env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-        run: |
-          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "Missing required secret: GOOGLE_SERVICE_ACCOUNT_JSON" >&2
-            exit 1
-          fi
-          if [ -z "$GOOGLE_SHEET_ID" ]; then
-            echo "Missing required secret: GOOGLE_SHEET_ID" >&2
-            exit 1
-          fi
-
-      - name: Resolve merged pull request
-        id: pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const commitSha = context.sha;
-            const response = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner,
-              repo,
-              commit_sha: commitSha,
-            });
-
-            const mergedPr = response.data.find(
-              (pr) => pr.base.ref === "main" && pr.merged_at && pr.merge_commit_sha === commitSha,
-            ) ?? response.data.find((pr) => pr.base.ref === "main" && pr.merged_at);
-            if (!mergedPr) {
-              core.notice(`No merged pull request was associated with commit ${commitSha}. Skipping Built promotion.`);
-              core.setOutput("found", "false");
-              return;
-            }
-
-            core.setOutput("found", "true");
-            core.setOutput(
-              "payload",
-              JSON.stringify({
-                title: mergedPr.title,
-                branchName: mergedPr.head.ref,
-                url: mergedPr.html_url,
-                mergedAt: mergedPr.merged_at,
-              }),
-            );
-
-      - name: Promote Merged to Built in Google Sheets
-        if: ${{ steps.pr.outputs.found == 'true' }}
-        env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          PR_PAYLOAD_JSON: ${{ steps.pr.outputs.payload }}
-        run: node scripts/github-sheets-sync.mjs --event production-verify --verification-passed true --payload-json "$PR_PAYLOAD_JSON"

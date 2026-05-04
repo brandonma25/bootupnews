@@ -103,7 +103,7 @@ No new bug-fix records were needed in this branch.
 
 - None required for `docs/bugs/` or `docs/changes/`; tracked legacy files were removed.
 - Optional future cleanup: enrich older pre-template canonical records with PR/branch/SHA metadata where useful.
-- Separate non-docs follow-up remains available only if explicitly requested: audit dormant Google tracker sync scripts/workflows for decommissioning.
+- Completed follow-up: dormant Google tracker sync scripts/workflows were decommissioned in `docs/engineering/change-records/2026-05-04-google-sheets-sync-decommission.md`.
 
 ## 9. Explicit Non-Actions
 

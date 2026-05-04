@@ -115,7 +115,7 @@ Completed follow-up:
 Remaining:
 
 - Audit PRD-53 controlled-cycle records for possible consolidation if future branch cleanup or release reconstruction requires finer mapping.
-- Separately audit and decommission Google Sheets sync scripts/workflows if the team wants runtime automation removed, not just governance retired.
+- Completed follow-up: Google Sheets sync scripts/workflows were decommissioned in `docs/engineering/change-records/2026-05-04-google-sheets-sync-decommission.md`.
 
 ## 11. Branch Cleanup Risk Due To Earlier Deletion Of Approximately 30 Branches
 
@@ -145,6 +145,6 @@ Mitigation completed:
 
 ## 13. Remaining Actions, If Any
 
-- Separate non-docs branch: audit whether `.github/workflows/github-sheets-status-sync.yml`, `scripts/github-sheets-sync.mjs`, and related tests should be disabled, deleted, or retained as dormant compatibility artifacts.
+- Completed follow-up: `.github/workflows/github-sheets-status-sync.yml`, `scripts/github-sheets-sync.mjs`, `scripts/github-sheets/sync.mjs`, related targeted tests, and Google Sheets promotion in production verification were decommissioned in `docs/engineering/change-records/2026-05-04-google-sheets-sync-decommission.md`.
 - Consider adding a short `docs/engineering/incidents/README.md` if incident records are created later; the folder is reserved but absent in this checkout.
 - Continue to avoid Google Sheet updates and routine tracker-sync fallback creation unless the user explicitly requests a historical Google-reference reconciliation artifact.
