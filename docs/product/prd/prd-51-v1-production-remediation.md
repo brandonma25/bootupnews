@@ -74,5 +74,5 @@ This remediation spans the Experience and Data layers. The app shell, route surf
 - Production sanity check complete, only after preview is good: Not complete.
 - PRD summary stored in repo: Yes.
 - Bug-fix report stored in repo, if applicable: Yes.
-- Google Sheets tracker updated and verified: Direct live Sheets update unavailable in this environment.
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual payload: Yes.
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.

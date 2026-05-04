@@ -55,5 +55,6 @@ When public source supply is healthy, the homepage surfaces materially more than
 - Production sanity check complete, only after preview is good:
 - PRD summary stored in repo:
 - Bug-fix report stored in repo, if applicable:
-- Google Sheets tracker updated and verified:
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual update payload:
+- `docs/product/feature-system.csv` updated if PRD/feature metadata changed:
+- GitHub documentation closeout completed in the canonical lane:
+- Google Sheet / Google Work Log not treated as canonical or updated for routine closeout:

@@ -3,8 +3,13 @@
 ## Summary
 - Date: 2026-04-26
 - Branch: `fix/editorial-history-ordering`
+- PR: #111, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/111`
+- Head SHA: `d2d399acf28e209130e035e978b03ff8feceb5be`
+- Merge SHA: `bdefaedec1bfb8f2eab8c9ff32ecbb73766fe93c`
+- GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; legacy `docs/bugs/editorial-history-ordering.md` now redirects here.
 - Area: `/dashboard/signals/editorial-review`
 - Data source: `signal_posts`
+- Affected object level: Surface Placement.
 
 ## Problem
 Editorial history cards were not consistently rendered in reverse chronological order. Older signal dates could appear above newer signal dates after the older rows were edited or published.
@@ -44,3 +49,5 @@ Tie-breakers:
 - Homepage ranking logic was not changed.
 - Ingestion, clustering, scoring, and editorial approval logic were not changed.
 - Signed-in admin visual validation remains a preview/human check.
+- Google Sheet / Work Log reference, if historically relevant: historical tracker-sync reference only, `docs/operations/tracker-sync/2026-04-26-editorial-history-ordering.md`.
+- Branch cleanup status: branch deletion state not independently recoverable in this cleanup; PR metadata preserves branch and SHA.

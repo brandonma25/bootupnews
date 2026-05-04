@@ -52,5 +52,6 @@ This depends on the source activation and architecture audits committed under `d
 - Production sanity check complete, only after preview is good: pending merge.
 - PRD summary stored in repo: yes.
 - Bug-fix report stored in repo, if applicable: not applicable.
-- Google Sheets tracker updated and verified: pending external tracker sync.
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual update payload: pending if live tracker access is unavailable.
+- `docs/product/feature-system.csv` updated if PRD/feature metadata changed: yes.
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Google Work Log not treated as canonical or updated for routine closeout: yes.

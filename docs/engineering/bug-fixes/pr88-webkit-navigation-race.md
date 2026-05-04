@@ -20,9 +20,9 @@
   - `npm run dev`, then `curl -I http://localhost:3000/` and `curl -I http://localhost:3000/dashboard`
 - Human checks: Preview and real auth/session validation remain required before merge readiness.
 
-## Tracker Closeout
-- Google Sheets tracker row updated and verified: No direct Sheets access was used in this session.
-- Fallback tracker-sync file, if direct Sheets update was unavailable: `docs/operations/tracker-sync/2026-04-21-playwright-ui-audit-automation.md`
+## Documentation Closeout
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.
 
 ## Remaining Risks / Follow-up
 - Re-run PR88's GitHub `pr-e2e-webkit` check after this patch is pushed.

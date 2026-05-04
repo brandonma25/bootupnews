@@ -6,8 +6,9 @@
 - `test-checklist.md` = validation reference
 - `prd-template.md` = planning standard
 - `pull_request_template.md` = merge enforcement
-- Google Sheets workbook `Features Table` = live feature-tracking status and intake source of truth
+- GitHub repo documentation = canonical source of truth for bug-fix, remediation, branch-cleanup, validation, release, and governance history
 - `docs/product/feature-system.csv` = repo-side feature control layer for PRD mapping and build order
+- Google Sheet / Google Work Log records = historical reference inputs only
 
 ## 1. Core Operating Model
 - The user is the PM and architect.
@@ -24,9 +25,8 @@
 
 ## 3. PRD Standard
 - PRD identity is governed by a unique `PRD-XX` ID, and that ID is the single source of truth for a feature across the repo.
-- Google Sheets `Sheet1` is the governed live tracker for mapped work, and `Intake Queue` is the only quarantine lane for unmapped or ambiguous work.
-- GitHub merge automation must never auto-create new governed rows in `Sheet1`; unmapped work goes to `Intake Queue`.
-- Schema-aware feature-tracking automation must validate expected headers before writing, must use the immutable `Record ID` as the exact-match governed key, and must never write human-managed or computed columns.
+- `docs/product/feature-system.csv` is the repo-side feature/PRD control file for mappings, build order, dependencies, decisions, and durable feature metadata.
+- Google Sheet / Google Work Log records are not canonical and must not be updated for routine closeout.
 - Before creating a PRD, Codex must check both `docs/product/prd/` and `docs/product/feature-system.csv` for an existing `PRD-XX`.
 - If the PRD ID already exists, Codex must update the existing document instead of creating a new file.
 - If the feature is new, Codex must assign the next sequential `PRD-XX`, create exactly one canonical file at `docs/product/prd/prd-XX-<feature-name>.md`, and register the mapping in `docs/product/feature-system.csv`.
@@ -53,6 +53,9 @@
 - Meaningful audits, migrations, consolidations, taxonomy changes, and repo-structure updates live at `docs/engineering/change-records/`.
 - Meaningful validation reports and execution notes live at `docs/engineering/testing/`.
 - Rules, checklists, templates, and standards live at `docs/engineering/protocols/`.
+- Branch cleanup reconciliation lives at `docs/operations/branch-cleanup/`.
+- `docs/bugs/` and `docs/changes/` are deprecated and non-canonical. Do not add new records there.
+- Durable history in deprecated folders must be migrated or consolidated into the canonical lane, leaving at most a redirect note.
 - "Meaningful" means the work materially changes behavior, implementation shape, operational expectations, or future maintenance understanding. Small copy tweaks and tiny mechanical edits do not need standalone docs.
 - If a work item needs more than one supporting doc, choose the smallest truthful set instead of duplicating the same narrative in multiple places.
 
@@ -144,7 +147,7 @@ Implementation checklist:
 - Use this exact flow before creating a new branch:
 
 ```bash
-cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
+cd "/Users/bm/dev/daily-intelligence-aggregator"
 pwd
 git checkout main
 git pull
@@ -169,6 +172,8 @@ git checkout -b feature/prd-<number>-<short-name>
 
 ### Post-Merge Cleanup Requirement
 - Delete merged branches immediately after merge, both locally and remotely.
+- Before deleting any remediation, bug-fix, hotfix, Codex, feature, or docs branch, capture the branch name, PR number or `no PR found`, recoverable head SHA, merge state, canonical documentation path, cleanup date, and cleanup reason.
+- Bulk branch deletion events require a reconciliation record in `docs/operations/branch-cleanup/`.
 - Use this exact cleanup flow:
 
 ```bash
@@ -254,8 +259,9 @@ are true:
 ## 10c. Local Repo and Worktree Discipline
 
 - This rule prevents dirty-tree confusion, wrong-branch continuation, duplicate branch ownership, and accidental cross-lane contamination.
-- The canonical local project root is `/Users/bm/Documents/daily-intelligence-aggregator-main`.
-- Do not use `/Users/bm/Documents/Daily news intel aggregator` for Git or Codex work; it is a symlink alias and increases directory-confusion risk.
+- The canonical local project root is `/Users/bm/dev/daily-intelligence-aggregator`.
+- New worktrees for this repo should live under `/Users/bm/dev/worktrees/`.
+- Treat old `/Users/bm/Documents/...` and iCloud wrapper paths as stale unless the user explicitly points back to them and Git identity checks prove they are real checkouts.
 - A branch may have only one owning worktree at a time in normal operation. The owner is the path shown by `git worktree list`.
 - Before installs, edits, tests, branch switches, continuation work, refactors, or any prompt step that assumes branch context, Codex must confirm the active workspace identity.
 - Run this identity check first:

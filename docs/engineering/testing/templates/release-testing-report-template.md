@@ -16,10 +16,10 @@
 - Preview gate:
 - Production verification gate:
 
-## Tracker Closeout
-- Google Sheets tracker update:
-- Verified row / item:
-- Fallback tracker-sync file, if direct Sheets update was unavailable:
+## Documentation Closeout
+- GitHub documentation lane:
+- `docs/product/feature-system.csv` updated if applicable:
+- Google Sheet / Work Log reference, if historically relevant:
 
 ## Human Auth / Session Results
 - Google OAuth:

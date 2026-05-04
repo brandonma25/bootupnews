@@ -94,18 +94,16 @@ Minimum production verification:
 ### Gate 6 — Documentation Gate
 For every serious feature, fix, consolidation, or release, Codex must update concise repo-safe docs.
 
-### Gate 7 — Tracker Closeout Gate
-Before a task is considered complete, Codex must update the Google Sheets workbook `Features Table`.
+### Gate 7 — GitHub Documentation Closeout Gate
+Before a task is considered complete, Codex must update the canonical GitHub repo documentation lane.
 
-Required tracker closeout:
-- If direct Sheets access is available, update the existing mapped row and verify the row after writing.
-- If the work is unmapped or ambiguous, route it to the appropriate review lane instead of creating a duplicate governed row.
-- Update governed `Sheet1` rows only by exact `Record ID`; do not create duplicate governed rows for existing PRDs.
-- Status fields must use normalized tracker values, not prose sentences, PR numbers, or malformed variants.
-- If a canonical repo PRD file exists, populate the live `PRD File` field with the exact `docs/product/prd/...` path.
-- Codex may claim tracker closeout only after rereading the live row and confirming the intended values are visible.
-- If direct Sheets access is unavailable, create a concise fallback tracker-sync markdown file in `docs/operations/tracker-sync/` with the exact manual update payload.
-- Do not mark the task complete until the live sheet is verified or the fallback file exists.
+Required documentation closeout:
+- GitHub repo documentation is canonical for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- `docs/product/feature-system.csv` remains the repo-side feature/PRD control file when feature metadata changes.
+- Google Sheet / Google Work Log records are retired as source-of-truth systems and may be used only as historical reference inputs.
+- Do not update Google Sheets or claim tracker updates for routine closeout.
+- Do not create routine tracker-sync fallback files. `docs/operations/tracker-sync/` remains historical compatibility only unless the user explicitly asks for a Google-reference reconciliation artifact.
+- If external Google context matters, cite it in the relevant GitHub doc without making it canonical.
 
 ---
 
@@ -193,7 +191,7 @@ For serious implementation or release work, Codex should report in a structured 
 3. validation performed
 4. preview status
 5. human-only checks still needed
-6. Google Sheets tracker status or fallback tracker-sync file
+6. GitHub documentation closeout status
 7. merge decision
 8. exact git result
 9. docs updated
@@ -202,11 +200,11 @@ For serious implementation or release work, Codex should report in a structured 
 
 ## 11. Reusable Codex Closeout Block
 Before closing any feature, fix, refactor, governance, or UX task:
-1. Update required repo docs.
-2. Update the Google Sheets tracker using the existing governed `Sheet1` row, or route unmapped work to `Intake Queue`.
-3. Reread the live tracker row and verify the intended status, owner, PRD file path, notes, and other changed fields are visible.
-4. If direct Sheets update is unavailable, create `docs/operations/tracker-sync/YYYY-MM-DD-<slug>.md` with the exact manual update payload.
-5. Do not mark the task complete or claim tracker closeout until the live row is verified or the fallback tracker-sync file exists.
+1. Update required GitHub repo docs.
+2. Update `docs/product/feature-system.csv` only when PRD/feature metadata changes.
+3. Do not update Google Sheets or claim Google tracker closeout.
+4. Do not create a routine tracker-sync fallback file unless the user explicitly requested a Google-reference reconciliation artifact.
+5. Do not mark the task complete until the canonical GitHub documentation closeout is present and validation results are recorded.
 
 ---
 

@@ -8,6 +8,10 @@ Before ANY substantial implementation work, you MUST read:
 - `docs/engineering/protocols/prd-template.md`
 - `docs/engineering/protocols/release-machine.md`
 - `docs/engineering/protocols/release-automation-operating-guide.md`
+- `docs/product/documentation-rules.md`
+- `docs/engineering/protocols/bug-tracking-governance.md`
+- `docs/engineering/bug-fixes/templates/bug-fix-record-template.md`
+- `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
 
 ## Branch Discipline Rules (Mandatory)
 
@@ -90,7 +94,7 @@ Before starting any new development:
 Required branch creation flow:
 
 ```bash
-cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
+cd "/Users/bm/dev/daily-intelligence-aggregator"
 pwd
 git checkout main
 git pull
@@ -100,12 +104,12 @@ git checkout -b feature/prd-<number>-<short-name>
 Required worktree creation flow when a dedicated worktree is requested:
 
 ```bash
-cd "/Users/bm/Documents/daily-intelligence-aggregator-main"
+cd "/Users/bm/dev/daily-intelligence-aggregator"
 pwd
 git checkout main
 git pull
-git worktree add "/Users/bm/Documents/daily-intelligence-aggregator-<short-name>" -b <branch-name>
-cd "/Users/bm/Documents/daily-intelligence-aggregator-<short-name>"
+git worktree add "/Users/bm/dev/worktrees/daily-intelligence-aggregator-<short-name>" -b <branch-name>
+cd "/Users/bm/dev/worktrees/daily-intelligence-aggregator-<short-name>"
 pwd
 git branch --show-current
 git status --short --branch
@@ -203,25 +207,15 @@ Rules:
 - Update repo-safe documentation for every serious feature or fix.
 - Never commit or expose API keys, tokens, secrets, auth vulnerabilities, exploit steps, cookies, headers, or sensitive logs.
 
-## 7a. Google Sheets Feature Tracking Governance
-- Google Sheets workbook `Features Table` is the master live planning and feature-tracking system.
-- `Sheet1` is the governed approved feature table.
-- `Intake Queue` is the only allowed destination for unmapped, spontaneous, newly discovered, or ambiguous work.
-- `Record ID` in `Sheet1` is immutable and may be used only as the lookup key for governed writes.
-- Only explicitly approved automation-managed columns may be updated automatically.
-- Formula or computed columns must never be written by automation.
-- Codex must never auto-create unmapped rows directly in `Sheet1`.
-- Tracker closeout is part of Definition of Done for feature, fix, refactor, UX, and governance work.
-- Codex must not claim a tracker update unless it has reread and verified the exact live row after writing, or created a fallback tracker-sync artifact.
-- Existing governed rows in `Sheet1` must be updated by `Record ID`; do not duplicate governed rows.
-- Unmapped or ambiguous work must go to `Intake Queue`, not a made-up governed row.
-- `Status` must use normalized tracker values such as `Not Built`, `In Progress`, `In Review`, `Merged`, `Built`, or `Deprecated`; do not write prose sentences or malformed status variants.
-- If a canonical PRD file exists in `docs/product/prd/`, the live `PRD File` column must contain that path.
-- For mapped work, merge to `main` may update status to `Merged`.
-- `Merged` may move to `Built` only after production verification succeeds.
-- Any workflow or automation that touches feature tracking must preserve `Sheet1` and `Intake Queue` separation.
-- Automation changes must fail safely and must not silently write to the wrong row.
-- If direct Sheets access fails, Codex must create `docs/operations/tracker-sync/YYYY-MM-DD-<slug>.md` with the exact manual update payload before final closeout.
+## 7a. GitHub Documentation Source-of-Truth Governance
+- GitHub repo documentation is canonical for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- `docs/product/feature-system.csv` is the repo-side control file for PRD mapping, build order, dependencies, decisions, and durable feature governance metadata.
+- Google Sheet / Google Work Log records are retired as source-of-truth systems. They may be read only as historical reference inputs when relevant.
+- Codex must not update Google Sheets, claim tracker updates, or treat the Google Work Log as canonical.
+- Codex must not create new `docs/operations/tracker-sync/` files for routine closeout. `tracker-sync` remains a historical compatibility folder unless the user explicitly asks for a Google-reference reconciliation artifact.
+- If an external Google Sheet or Work Log reference materially explains a decision, cite it inside the relevant GitHub doc without making it canonical.
+- Closeout for feature, fix, refactor, UX, and governance work must update the relevant GitHub repo documentation and `docs/product/feature-system.csv` when PRD/feature metadata changes.
+- Agents must not claim production, preview, tracker, or Google Work Log validation unless that exact system was actually checked in the current task.
 
 ## 8. Merge Conditions
 - Do not recommend merge unless build passes, local validation is complete, preview validation is confirmed, and docs are updated.
@@ -232,8 +226,9 @@ This repository uses a strict documentation system to prevent bloat and maintain
 
 ### Source of Truth
 - `PRD-XX` is the single source of truth for feature identity across the repo.
-- Google Sheets workbook `Features Table` is the source of truth for live feature-tracking status and intake review.
-- `/docs/product/feature-system.csv` remains the repo-side source of truth for PRD mapping, build order, dependencies, and durable repo governance metadata.
+- GitHub repo documentation is the source of truth for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- `/docs/product/feature-system.csv` remains the repo-side source of truth for PRD mapping, build order, dependencies, decisions, and durable repo governance metadata.
+- Google Sheet and Google Work Log records are historical reference inputs only.
 
 ### PRD Rules
 - Every feature must have a unique PRD ID using the format `PRD-XX` where `XX` is the canonical numeric identifier.
@@ -299,13 +294,28 @@ The CSV must be updated in the same PR as the feature work whenever feature stat
 - Product control documents remain at `docs/product/`.
 - Product briefs for meaningful feature work belong in `docs/product/briefs/`.
 - Numbered feature PRDs belong in `docs/product/prd/`.
-- Meaningful defect records belong in `docs/engineering/bug-fixes/`.
-- Meaningful governance, process, release, or workflow failures belong in `docs/engineering/incidents/`.
-- Meaningful repo, documentation, audit, migration, or consolidation records belong in `docs/engineering/change-records/`.
-- Meaningful validation notes and test reports belong in `docs/engineering/testing/`.
-- Operating rules, checklists, templates, and standards belong in `docs/engineering/protocols/`.
+- Defects, regressions, hotfixes, and remediations with root cause belong in `docs/engineering/bug-fixes/`.
+- Audits, migrations, repo-structure cleanup, and source-of-truth cleanup belong in `docs/engineering/change-records/`.
+- Validation notes and test records belong in `docs/engineering/testing/`.
+- Governance, process, release, and workflow failures belong in `docs/engineering/incidents/`.
+- Operating rules, templates, checklists, and standards belong in `docs/engineering/protocols/`.
+- Branch cleanup reconciliation records belong in `docs/operations/branch-cleanup/`.
+- Do not create new records under `docs/bugs/` or `docs/changes/`; those folders are deprecated and non-canonical.
+- If existing `docs/bugs/` or `docs/changes/` files contain durable history, migrate or consolidate the useful content into the canonical GitHub doc lane and leave at most a redirect note.
 - "Meaningful" means work that changes behavior, coordination, validation expectations, or future maintenance understanding. Tiny copy edits, trivial renames, and purely mechanical one-line fixes do not require standalone docs.
 - When uncertain between bug-fix, incident, and change-record docs:
   1. Use `bug-fixes` for user-facing or system-facing defects with a real root cause and fix.
   2. Use `incidents` for process, governance, release, or operational failures that need lessons and follow-up.
   3. Use `change-records` for audits, migrations, structural cleanup, and normalization passes.
+
+### Branch Cleanup Documentation
+- Before deleting any remediation, bug-fix, hotfix, Codex, feature, or docs branch, capture:
+  - branch name
+  - PR number or `no PR found`
+  - head SHA if recoverable
+  - merge state
+  - canonical documentation path
+  - cleanup date
+  - cleanup reason
+- Bulk branch deletion events require a branch cleanup record in `docs/operations/branch-cleanup/`.
+- Deleted branches must remain reconcilable from GitHub documentation and PR metadata.

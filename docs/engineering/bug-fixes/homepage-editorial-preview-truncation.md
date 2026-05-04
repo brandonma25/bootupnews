@@ -13,9 +13,9 @@
 - Browser checks: local homepage verification at `http://localhost:3000/` found five `Why it matters` boxes, all ending with complete sentence punctuation, with no literal `...` or `…` in collapsed summaries. `Read more` / `Show less` still worked.
 - Human checks: PM confirmed all manual tests passed.
 
-## Tracker Closeout
-- Google Sheets tracker row updated and verified: not performed in this local remediation pass.
-- Fallback tracker-sync file, if direct Sheets update was unavailable: not created.
+## Documentation Closeout
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.
 
 ## Remaining Risks / Follow-up
 - Broad full-suite and Chromium Playwright runs still show unrelated route/test timing failures outside this homepage summary rendering path. Preview and auth/session truth still need normal preview-environment validation before production confidence.

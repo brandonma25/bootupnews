@@ -44,14 +44,15 @@
 - Product brief added or updated if the feature work is meaningful.
 - `docs/product/feature-system.csv` updated if applicable.
 - Bug-fix, incident, or change-record doc created if applicable.
+- Branch cleanup record created in `docs/operations/branch-cleanup/` if branch deletion or bulk branch cleanup occurred.
 - Testing note added if meaningful validation was performed.
-- Google Sheets tracker updated and verified, or fallback tracker-sync file created in `docs/operations/tracker-sync/`.
-- Live tracker verification confirms normalized `Status`, correct `Owner`, and canonical `PRD File` path when a PRD file exists.
+- Google Sheet / Google Work Log was not treated as canonical and was not updated for routine closeout.
+- No routine tracker-sync fallback file was created.
 - No sensitive information is included.
 
 ## 8. Merge Readiness
 - Build passes.
 - Preview validation is complete.
-- Tracker closeout is complete: live Google Sheets row verified or exact manual update payload recorded in repo fallback.
-- Codex has not claimed tracker closeout from intent alone; the live row was reread after write, or the fallback file exists.
+- GitHub documentation closeout is complete in the correct canonical lane.
+- Codex has not claimed Google tracker, preview, production, or external-log validation unless that system was actually checked.
 - No known blockers remain.
