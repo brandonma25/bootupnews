@@ -345,6 +345,12 @@ function FinalSlateComposer({
   const coreCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "core").length;
   const contextCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "context").length;
   const publishDisabledReason = getComposerPublishDisabledReason(readiness, storageReady, auditStorageReady);
+  const assignableCandidateCount = candidates.filter((post) =>
+    isFinalSlateCandidateAssignable(post, storageReady)
+  ).length;
+  const allCandidatesLockedByPublishState =
+    candidates.length > 0 &&
+    candidates.every((post) => post.isLive || post.editorialStatus === "published" || Boolean(post.publishedAt));
 
   return (
     <section className="space-y-4" aria-labelledby="final-slate-composer-title">
@@ -364,6 +370,16 @@ function FinalSlateComposer({
           <Badge>{readiness.ready ? "Slate ready" : "Slate not ready"}</Badge>
         </div>
       </div>
+
+      {candidates.length > 0 && assignableCandidateCount === 0 ? (
+        <Panel className="p-4">
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            {allCandidatesLockedByPublishState
+              ? "No editable draft final-slate candidates are available in the current set. Published rows are locked. Create or review draft candidates to change the final slate."
+              : "No editable draft final-slate candidates are available in the current set. Only persisted, non-live, unpublished rows can be assigned."}
+          </p>
+        </Panel>
+      ) : null}
 
       <Panel className="p-4">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -702,13 +718,7 @@ function FinalSlateCandidateRow({
   rowFailures: string[];
   storageReady: boolean;
 }) {
-  const canAssign =
-    storageReady &&
-    post.persisted &&
-    !post.isLive &&
-    post.editorialStatus !== "published" &&
-    !post.publishedAt &&
-    !isBlockingDecision(post.editorialDecision);
+  const canAssign = isFinalSlateCandidateAssignable(post, storageReady);
   const placement = post.finalSlateRank ? formatSlotLabel(post.finalSlateRank) : "Not selected";
 
   return (
@@ -803,6 +813,17 @@ function FinalSlateCandidateRow({
         </p>
       </div>
     </div>
+  );
+}
+
+function isFinalSlateCandidateAssignable(post: EditorialSignalPost, storageReady: boolean) {
+  return (
+    storageReady &&
+    post.persisted &&
+    !post.isLive &&
+    post.editorialStatus !== "published" &&
+    !post.publishedAt &&
+    !isBlockingDecision(post.editorialDecision)
   );
 }
 

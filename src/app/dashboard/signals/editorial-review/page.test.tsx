@@ -520,6 +520,11 @@ describe("signals editorial review page", () => {
         name: `Assign ${lockedPost.title} to Core slot 1`,
       }),
     ).toBeDisabled();
+    expect(
+      screen.getByText(
+        "No editable draft final-slate candidates are available in the current set. Published rows are locked. Create or review draft candidates to change the final slate.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Live rows are locked in the final slate.")[0]).toBeInTheDocument();
   });
 
@@ -562,6 +567,65 @@ describe("signals editorial review page", () => {
     expect(
       screen.getByRole("button", { name: "Assign Replacement Signal to Core slot 2" }),
     ).toBeEnabled();
+  });
+
+  it("keeps historical needs-review row controls usable when current slate candidates are locked", async () => {
+    const lockedCurrentPost = {
+      ...publishedPost,
+      id: "current-locked",
+      title: "Current Published Signal",
+      briefingDate: "2026-05-01",
+      editorialDecision: "approved" as const,
+      finalSlateRank: 1,
+      finalSlateTier: "core" as const,
+      isLive: true,
+      publishedAt: "2026-05-01T07:44:07.384Z",
+    };
+    const staleNeedsReviewPost = {
+      ...reviewPost,
+      id: "stale-needs-review",
+      title: "Stale Needs Review Signal",
+      briefingDate: "2026-04-29",
+      rank: 8,
+      editorialStatus: "needs_review" as const,
+      isLive: false,
+      publishedAt: null,
+    };
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState([staleNeedsReviewPost]),
+      currentCandidates: [lockedCurrentPost],
+      currentTopFive: [lockedCurrentPost],
+      latestBriefingDate: "2026-05-01",
+      appliedScope: "historical",
+      appliedStatus: "needs_review",
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({
+      searchParams: Promise.resolve({
+        error: "Live or already published rows cannot be assigned to the draft final slate.",
+        scope: "historical",
+        status: "needs_review",
+      }),
+    }));
+
+    expect(
+      screen.getByText("Live or already published rows cannot be assigned to the draft final slate."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "No editable draft final-slate candidates are available in the current set. Published rows are locked. Create or review draft candidates to change the final slate.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+
+    expect(screen.getByRole("button", { name: "Save Edits" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reset to AI Draft" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Request Rewrite" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Hold" })).toBeEnabled();
   });
 
   it("blocks composer readiness with a seven-row slate message for a three-row current set", async () => {
