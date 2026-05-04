@@ -18,9 +18,9 @@
 - Human checks:
   - Real Google OAuth, email/password success, session persistence, deployed Supabase persistence, preview validation, and production validation remain required.
 
-## Tracker Closeout
-- Google Sheets tracker row updated and verified: not completed in this local Codex session.
-- Fallback tracker-sync file, if direct Sheets update was unavailable: `docs/operations/tracker-sync/2026-04-21-v1-production-remediation.md`.
+## Documentation Closeout
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.
 
 ## Remaining Risks / Follow-up
 - Apply the Supabase migration before expecting deployed Account category/newsletter controls to persist.

@@ -64,5 +64,5 @@ The category tabs are client-side state only. `homepage-model.ts` remains the so
 - Production sanity check complete, only after preview is good: Not yet.
 - PRD summary stored in repo: Yes, this file.
 - Bug-fix report stored in repo, if applicable: Not applicable.
-- Google Sheets tracker updated and verified: Direct live Sheets update unavailable in this environment.
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual update payload: Yes, `docs/operations/tracker-sync/2026-04-20-home-category-tabs.md`.
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.

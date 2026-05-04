@@ -41,4 +41,5 @@
 - `docs/product/prd/` when the release maps to numbered feature work
 - `docs/engineering/testing/`
 - `docs/engineering/bug-fixes/` when a real defect was fixed
-- Google Sheets tracker updated and verified, or fallback tracker-sync file created in `docs/operations/tracker-sync/`
+- `docs/operations/branch-cleanup/` when branch deletion or bulk branch cleanup occurred
+- GitHub documentation closeout completed in the canonical lane

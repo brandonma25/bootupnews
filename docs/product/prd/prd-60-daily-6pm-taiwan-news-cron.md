@@ -73,4 +73,5 @@ The scheduled route delegates to the existing `generateDailyBriefing` pipeline a
 - Local validation complete: yes, with local persistence blocked by missing Supabase service-role env in this worktree.
 - Preview validation complete, if applicable: production cron execution requires Vercel production logs after deployment.
 - Production sanity check complete: pending merge/deploy.
-- Google Sheets tracker updated and verified: pending external tracker access or fallback closeout.
+- GitHub documentation closeout completed in the canonical lane: pending review.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.

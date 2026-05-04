@@ -25,9 +25,9 @@
 - Human checks:
   - Validate locally and in Vercel preview that the loading state no longer suggests a fake duration and that the skeleton layout still feels correct.
 
-## Tracker Closeout
-- Google Sheets tracker row updated and verified: not completed in this local Codex session.
-- Fallback tracker-sync file, if direct Sheets update was unavailable: `docs/operations/tracker-sync/2026-04-21-remove-hardcoded-feed-loading-time-messaging-tracker-sync.md`.
+## Documentation Closeout
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.
 
 ## Remaining Risks / Follow-up
 - Loading duration perception still depends on actual runtime performance, which this remediation does not change.

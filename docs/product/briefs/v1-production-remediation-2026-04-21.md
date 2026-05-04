@@ -46,4 +46,4 @@
 - `docs/product/briefs/v1-production-remediation-2026-04-21.md`
 - `docs/engineering/bug-fixes/v1-production-remediation-2026-04-21.md`
 - `docs/engineering/testing/v1-production-remediation-local-validation-2026-04-21.md`
-- `docs/operations/tracker-sync/2026-04-21-v1-production-remediation.md`
+- GitHub documentation closeout in the canonical lane; historical tracker-sync records are not canonical.

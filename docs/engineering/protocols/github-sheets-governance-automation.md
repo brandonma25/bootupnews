@@ -1,16 +1,19 @@
-# GitHub Sheets Governance Automation
+# GitHub Sheets Governance Automation — Retired Compatibility Record
 
 ## Purpose
-- Keep GitHub merge activity synced to the Google Sheets workbook `Features Table` without breaking governed feature tracking.
-- Treat Google Sheets as the live feature-tracking system while preserving the repo's PRD and documentation rules.
+- Preserve historical implementation context for the former GitHub-to-Google-Sheets sync path.
+- This document is no longer an active closeout protocol.
+- GitHub repo documentation is now canonical for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- `docs/product/feature-system.csv` is the repo-side feature/PRD control file.
+- Google Sheet / Google Work Log records are historical reference inputs only.
+- Codex must not update Google Sheets, claim tracker updates, or create routine tracker-sync fallback files for closeout.
 
-## Source of Truth Model
+## Historical Source Model
 - Workbook: `Features Table`
 - Governed feature table tab: `Sheet1`
 - Intake / quarantine tab: `Intake Queue`
-- `Sheet1` is the only governed table for approved mapped work.
-- `Intake Queue` is the only allowed destination for unmapped, spontaneous, newly discovered, or ambiguous merged work.
-- Repo automation must never auto-create new governed rows directly in `Sheet1`.
+- These are historical external references, not current source-of-truth systems.
+- Do not create new governed Google rows or Intake Queue entries from routine GitHub closeout.
 
 ## Schema Enforcement
 - The implementation reads both tabs by header name, not by hard-coded column letter alone.
@@ -190,11 +193,9 @@
 - Automation prefers explicit no-op reporting over silent success.
 
 ## Rollback and Recovery
-1. Disable the `GitHub Sheets Status Sync` workflow if merge-driven updates are behaving incorrectly.
-2. Disable the `promote-built-status` job or revert the production promotion change if `Merged -> Built` behavior is incorrect.
-3. Correct any bad statuses manually in `Features Table`.
-4. Re-run the workflow only after fixing the workbook structure or PR metadata issue.
-5. Audit `Intake Queue` for any items that should be promoted manually into governed planning.
+1. Treat this automation as retired unless a user explicitly asks for Google-reference reconciliation.
+2. If old workflows are still enabled, audit them in a separate decommissioning branch before changing scripts, secrets, or workflow behavior.
+3. Do not use this document to justify routine Google Sheet writes.
 
 ## Secrets and Configuration
 - Required GitHub secrets:
@@ -213,4 +214,4 @@
   - `PRD-24 GitHub Sheets governance automation`
   - `feature/prd-24-github-sheets-governance-automation`
   - `fix/prd-24-status-sync-hardening`
-- Work that does not map cleanly to a governed row should be allowed to land, but it should enter `Intake Queue` for human review instead of creating a new governed row automatically.
+- Work that does not map cleanly to a PRD should be documented in the correct GitHub repo lane instead of being routed to Google Intake Queue.
