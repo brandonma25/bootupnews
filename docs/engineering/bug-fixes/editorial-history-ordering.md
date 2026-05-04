@@ -7,6 +7,7 @@
 - Head SHA: `d2d399acf28e209130e035e978b03ff8feceb5be`
 - Merge SHA: `bdefaedec1bfb8f2eab8c9ff32ecbb73766fe93c`
 - GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; deprecated legacy redirect was removed on 2026-05-04.
+- External references reviewed, if any: GitHub PR #111 metadata and the legacy bug report.
 - Area: `/dashboard/signals/editorial-review`
 - Data source: `signal_posts`
 - Affected object level: Surface Placement.

@@ -6,6 +6,18 @@
 - Root cause: public read helpers reused the full admin/editorial PRD-53 `signal_posts` schema preflight, so missing admin/final-slate columns blocked public rendering of already-published live rows.
 - Effective change type: hotfix / remediation, not net-new feature work.
 
+## GitHub Source-of-Truth Metadata
+
+- Affected object level: Card and Surface Placement.
+- PR: #162, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/162`.
+- Branch: `codex/hotfix-public-schema-preflight-fallback`.
+- Head SHA: `863af2ca788292d45ca5f434246868bb164c93dc`.
+- Merge SHA: `1f31eed95bb88268775c24cb0cc0962d0d5702d5`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #162 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the deleted/suspected-deleted branch recovery details; no branch deletion was performed in this metadata enrichment branch.
+
 ## Source Of Truth
 
 - Product position: Boot Up is a curated daily intelligence briefing, not a feed.

@@ -1,5 +1,16 @@
 # Bug Fix: OAuth Session Persistence
 
+## GitHub Source-of-Truth Metadata
+- Affected object level: Surface Placement.
+- PR: no PR found for the historical implementation branches listed below; canonical documentation was backfilled in PR #45, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/45`.
+- Branch: historical branches listed by this record: `feature/auth-real-session`, `feature/google-auth-config-fix`, `feature/oauth-session-finalization-fix`.
+- Head SHA: not recoverable from GitHub PR metadata for the listed historical branches; PR #45 documentation head SHA `96bdd47ab6db18002ec38035d890f69c41dedd64`.
+- Merge SHA: not recoverable from GitHub PR metadata for the listed historical branches; PR #45 documentation merge SHA `c182403f25f98aa40d82073a3eedb24328ee926c`.
+- GitHub source-of-truth status: canonical historical bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #45 metadata, branch-name PR search, file history, and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: the historical branch refs were not found in GitHub PR metadata or remote refs during this pass; no branch deletion was performed in this metadata enrichment branch.
+
 ## Problem
 Google sign-in could start and sometimes appear to complete, but the app did not reliably remember signed-in state afterward. Users could still land on the homepage showing public-mode prompts, and later login attempts could fail with callback-related errors.
 
