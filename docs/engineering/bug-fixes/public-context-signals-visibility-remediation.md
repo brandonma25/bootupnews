@@ -6,6 +6,18 @@
 - Branch: `codex/public-context-signals-visibility-remediation`
 - Object level: Surface Placement
 
+## GitHub Source-of-Truth Metadata
+
+- Affected object level: Signal and Surface Placement.
+- PR: #148, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/148`.
+- Branch: `codex/public-context-signals-visibility-remediation`.
+- Head SHA: `1a89fd8252875845f561bfd578fb9e3e8c9a75a6`.
+- Merge SHA: `07dde932c142eb424d0893f63bd4485899b795d3`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #148 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the deleted/suspected-deleted branch recovery details; no branch deletion was performed in this metadata enrichment branch.
+
 ## Source Of Truth
 
 - April 29 controlled manual publish verification: `april_29_controlled_manual_publish_verified`

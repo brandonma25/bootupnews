@@ -3,6 +3,7 @@
 ## Summary
 - Problem addressed: the editorial review route could show enabled-looking Final Slate Composer placement buttons for rows that were already live or published.
 - Root cause: the composer slot controls only checked whether editorial storage was configured, while the server-side remove action cleared placement without first checking live/published state. Assignment already rejected those rows, producing an error banner while the UI still looked actionable.
+- Affected object level: Card and Surface Placement.
 
 ## Fix
 - Exact change: lock final-slate placement controls for non-persisted, live, already-published, or blocking-decision rows; hide replacement controls for locked rows; keep valid unpublished draft-slate controls enabled; add a server guard preventing remove-from-slate mutations on live or already-published rows.

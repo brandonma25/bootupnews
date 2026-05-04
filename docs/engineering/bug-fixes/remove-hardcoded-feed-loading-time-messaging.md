@@ -8,6 +8,17 @@
 - Problem addressed: the route-level loading UI displayed a fixed-duration loading estimate, which created a false expectation that loading should take a predictable amount of time.
 - Root Cause: Static placeholder copy not defined in the artifact system and not tied to real performance.
 
+## GitHub Source-of-Truth Metadata
+- Affected object level: Surface Placement.
+- PR: #94, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/94`.
+- Branch: `fix/v1-production-remediation`.
+- Head SHA: `c6ce9e5cc5e946c2c9c386daf3f1ef51ebc7f996`.
+- Merge SHA: `63f1a748fb55730d305dff3140f70423ad8132c9`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #94 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the branch recovery details; no branch deletion was performed in this metadata enrichment branch.
+
 ## Fix
 - Fix: Replaced time-based loading message with neutral loading state.
 - Exact change: replaced the time-based loading sentence with the neutral loading copy `Preparing your feed...` while preserving the existing skeleton layout and component structure.

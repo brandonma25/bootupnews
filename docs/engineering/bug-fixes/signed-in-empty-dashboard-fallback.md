@@ -1,5 +1,16 @@
 # Signed-In Empty Dashboard Fallback
 
+## GitHub Source-of-Truth Metadata
+- Affected object level: Signal and Surface Placement.
+- PR: #54, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/54`.
+- Branch: `feature/ingestion-v1`.
+- Head SHA: `0c7903edd9b8c71f0ae7bbc21ff2987218fa8e26`.
+- Merge SHA: `bc16e875ad9579acafad3ac768768284a528c151`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #54 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the branch recovery details; no branch deletion was performed in this metadata enrichment branch.
+
 ## Root Cause
 
 Signed-out requests used the Phase 1 public pipeline through `getPublicDashboardData()`, but signed-in requests switched immediately to user-scoped `topics`, `sources`, `articles`, `events`, and `article_topics` queries in `getDashboardData()`. When a signed-in user had no bootstrap rows yet, those queries succeeded with empty results and the code returned `mode: "live"` with an empty briefing instead of falling back to the working public pipeline.

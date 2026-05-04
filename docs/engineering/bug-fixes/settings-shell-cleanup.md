@@ -1,5 +1,16 @@
 # Settings shell cleanup
 
+## GitHub Source-of-Truth Metadata
+- Affected object level: Surface Placement.
+- PR: #56, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/56`.
+- Branch: `fix/settings-shell-cleanup`.
+- Head SHA: `d8d9807d98eb49db802395e787e37b95c8d99113`.
+- Merge SHA: `f74ccd1ed188e530f98c237e565090d2bba6dd65`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #56 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the branch recovery details; no branch deletion was performed in this metadata enrichment branch.
+
 ## Sections affected
 - Profile details
 - Delivery cadence
