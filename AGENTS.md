@@ -8,6 +8,10 @@ Before ANY substantial implementation work, you MUST read:
 - `docs/engineering/protocols/prd-template.md`
 - `docs/engineering/protocols/release-machine.md`
 - `docs/engineering/protocols/release-automation-operating-guide.md`
+- `docs/product/documentation-rules.md`
+- `docs/engineering/protocols/bug-tracking-governance.md`
+- `docs/engineering/bug-fixes/templates/bug-fix-record-template.md`
+- `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
 
 ## Branch Discipline Rules (Mandatory)
 
