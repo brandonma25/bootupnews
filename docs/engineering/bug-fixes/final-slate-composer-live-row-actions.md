@@ -6,6 +6,7 @@
 
 ## Fix
 - Exact change: lock final-slate placement controls for non-persisted, live, already-published, or blocking-decision rows; hide replacement controls for locked rows; keep valid unpublished draft-slate controls enabled; add a server guard preventing remove-from-slate mutations on live or already-published rows.
+- Click-level follow-up: authenticated preview inspection confirmed guarded controls were HTML-disabled, but disabled primary buttons still retained active green styling. The shared button component now renders disabled buttons with neutral disabled styling so guarded actions no longer look clickable.
 - Related PRD: existing PRD-53 signals admin editorial workflow; no new canonical PRD is required.
 
 ## Terminology Requirement
@@ -16,11 +17,13 @@
 ## Validation
 - Automated checks:
   - `npm test -- src/app/dashboard/signals/editorial-review/page.test.tsx src/lib/signals-editorial.test.ts`
+  - `npm test -- src/components/ui/button.test.tsx src/app/dashboard/signals/editorial-review/page.test.tsx`
   - `npm test`
   - `npm run lint`
   - `npm run build`
 - Human checks:
   - Authenticated production inspection confirmed the reported URL renders a current set of live/published rows with placement controls that appear actionable before this fix is deployed.
+  - Authenticated preview inspection confirmed the same controls are disabled by HTML state and blocked by the live/published guard; the remaining defect was disabled-state visual affordance, not a missing click handler or overlay.
   - Mutating production remove actions were not clicked during investigation.
 
 ## Tracker Closeout

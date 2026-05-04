@@ -515,6 +515,11 @@ describe("signals editorial review page", () => {
     expect(screen.getByRole("button", { name: "Demote / Remove" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Move Down" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Remove from slate" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", {
+        name: `Assign ${lockedPost.title} to Core slot 1`,
+      }),
+    ).toBeDisabled();
     expect(screen.getAllByText("Live rows are locked in the final slate.")[0]).toBeInTheDocument();
   });
 
