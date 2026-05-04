@@ -92,7 +92,7 @@ Several standing docs also told agents to update or fall back to Google Sheets d
 | --- | --- | --- |
 | PR #180, #181, #187, #189 public-card cleanup sequence | Product-facing remediation lacked one durable canonical bug-fix/remediation record. | Added `docs/engineering/bug-fixes/public-card-cleanup-remediation-2026-05-02.md`. |
 | PR #190 final slate composer buttons | Canonical bug-fix record existed but lacked new source-of-truth metadata fields. | Updated `docs/engineering/bug-fixes/final-slate-composer-live-row-actions.md`. |
-| PR #141 controlled draft cap and PR #143 WITM metadata persistence | Meaningful remediation exists, but current canonical records live under `docs/engineering/testing/` rather than `docs/engineering/bug-fixes/`. | Left existing records as-is in this branch; remaining follow-up is to decide whether these code remediations need bug-fix records or whether testing/remediation records are sufficient. |
+| PR #141 controlled draft cap and PR #143 WITM metadata persistence | Meaningful remediation existed only under `docs/engineering/testing/`. | Follow-up completed in `docs/engineering/change-records/2026-05-04-pr141-pr143-remediation-record-review.md`; canonical bug-fix records added under `docs/engineering/bug-fixes/`. |
 | PR #148 public Context visibility remediation | Canonical bug-fix record exists. | Left as-is. |
 | PR #162 public schema preflight fallback | Canonical bug-fix record exists. | Left as-is. |
 | PRs #149-#174 PRD-53 controlled-cycle/schema/migration work | Records are split across `docs/engineering/change-records/` and `docs/operations/controlled-cycles/`. | Branch cleanup record flags #166-#149 grouped items for future consolidation review if needed. |
@@ -108,9 +108,12 @@ Completed in this branch:
 - Durable manifest ingestion unblock details were moved to `docs/engineering/change-records/`.
 - Public-card cleanup phases were consolidated into one canonical bug-fix/remediation record.
 
+Completed follow-up:
+
+- PR #141 and PR #143 remediation-record review completed; dedicated bug-fix records now exist and the testing records remain detailed validation evidence.
+
 Remaining:
 
-- Decide whether PR #141 and PR #143 should receive dedicated bug-fix records or remain as testing/remediation records.
 - Audit PRD-53 controlled-cycle records for possible consolidation if future branch cleanup or release reconstruction requires finer mapping.
 - Separately audit and decommission Google Sheets sync scripts/workflows if the team wants runtime automation removed, not just governance retired.
 
@@ -143,6 +146,5 @@ Mitigation completed:
 ## 13. Remaining Actions, If Any
 
 - Separate non-docs branch: audit whether `.github/workflows/github-sheets-status-sync.yml`, `scripts/github-sheets-sync.mjs`, and related tests should be disabled, deleted, or retained as dormant compatibility artifacts.
-- Decide whether to create dedicated bug-fix records for PR #141 and PR #143.
 - Consider adding a short `docs/engineering/incidents/README.md` if incident records are created later; the folder is reserved but absent in this checkout.
 - Continue to avoid Google Sheet updates and routine tracker-sync fallback creation unless the user explicitly requests a historical Google-reference reconciliation artifact.
