@@ -591,6 +591,8 @@ function FinalSlateSlot({
   const replacements = post ? getEligibleReplacementCandidates(candidates, post) : [];
   const previousRank = rank > 1 ? rank - 1 : null;
   const nextRank = rank < 7 ? rank + 1 : null;
+  const mutationBlockedReason = post ? getFinalSlateMutationBlockedReason(post, storageReady) : null;
+  const canMutateSlot = !mutationBlockedReason;
 
   return (
     <div className="min-h-56 rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
@@ -621,7 +623,7 @@ function FinalSlateSlot({
           ) : null}
           <form action={removeFromFinalSlateAction}>
             <input type="hidden" name="postId" value={post.id} />
-            <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+            <Button type="submit" variant="secondary" disabled={!canMutateSlot} className="w-full">
               Demote / Remove
             </Button>
           </form>
@@ -630,7 +632,7 @@ function FinalSlateSlot({
               <form action={assignFinalSlateSlotAction}>
                 <input type="hidden" name="postId" value={post.id} />
                 <input type="hidden" name="finalSlateRank" value={previousRank} />
-                <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+                <Button type="submit" variant="secondary" disabled={!canMutateSlot} className="w-full">
                   Move Up
                 </Button>
               </form>
@@ -639,13 +641,16 @@ function FinalSlateSlot({
               <form action={assignFinalSlateSlotAction}>
                 <input type="hidden" name="postId" value={post.id} />
                 <input type="hidden" name="finalSlateRank" value={nextRank} />
-                <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+                <Button type="submit" variant="secondary" disabled={!canMutateSlot} className="w-full">
                   Move Down
                 </Button>
               </form>
             ) : null}
           </div>
-          {replacements.length > 0 ? (
+          {mutationBlockedReason ? (
+            <p className="text-xs leading-5 text-[var(--text-secondary)]">{mutationBlockedReason}</p>
+          ) : null}
+          {replacements.length > 0 && canMutateSlot ? (
             <form action={replaceFinalSlateSlotAction} className="space-y-2 rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
               <input type="hidden" name="originalPostId" value={post.id} />
               <label className="section-label" htmlFor={`replacementPostId-${post.id}`}>Replace with</label>
@@ -786,7 +791,7 @@ function FinalSlateCandidateRow({
         {post.finalSlateRank ? (
           <form action={removeFromFinalSlateAction}>
             <input type="hidden" name="postId" value={post.id} />
-            <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+            <Button type="submit" variant="secondary" disabled={!canAssign} className="w-full">
               Remove from slate
             </Button>
           </form>
@@ -828,6 +833,16 @@ function isBlockingDecision(decision: string | null) {
 }
 
 function getAssignmentBlockedReason(post: EditorialSignalPost, storageReady: boolean) {
+  const mutationBlockedReason = getFinalSlateMutationBlockedReason(post, storageReady);
+
+  if (mutationBlockedReason) {
+    return mutationBlockedReason;
+  }
+
+  return "Only persisted, non-live, unpublished rows can be assigned.";
+}
+
+function getFinalSlateMutationBlockedReason(post: EditorialSignalPost, storageReady: boolean) {
   if (!storageReady) {
     return "Editorial storage must be configured before placement can change.";
   }
@@ -837,18 +852,18 @@ function getAssignmentBlockedReason(post: EditorialSignalPost, storageReady: boo
   }
 
   if (post.isLive) {
-    return "Live rows cannot be assigned to the draft final slate.";
+    return "Live rows are locked in the final slate.";
   }
 
   if (post.editorialStatus === "published" || post.publishedAt) {
-    return "Already published rows cannot be assigned.";
+    return "Already published rows are locked in the final slate.";
   }
 
   if (isBlockingDecision(post.editorialDecision)) {
-    return "Rejected, held, rewrite-requested, or removed rows cannot be assigned.";
+    return "Rejected, held, rewrite-requested, or removed rows cannot be changed in the final slate.";
   }
 
-  return "Only persisted, non-live, unpublished rows can be assigned.";
+  return null;
 }
 
 function formatDecision(decision: string | null) {

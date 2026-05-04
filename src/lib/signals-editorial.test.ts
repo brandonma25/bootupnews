@@ -1701,6 +1701,34 @@ describe("signals editorial workflow", () => {
     expect(rows[0].final_slate_tier).toBeNull();
   });
 
+  it("blocks remove-from-slate for live or already published rows", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "published",
+        editorial_decision: "approved",
+        final_slate_rank: 4,
+        final_slate_tier: "core",
+        is_live: true,
+        published_at: "2026-04-24T12:00:00.000Z",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { removeSignalPostFromFinalSlate } = await loadEditorialModule();
+    const result = await removeSignalPostFromFinalSlate({ postId: "signal-1" });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toBe("Live or already published rows cannot be removed from the draft final slate.");
+    expect(rows[0].final_slate_rank).toBe(4);
+    expect(rows[0].final_slate_tier).toBe("core");
+  });
+
   it("promote assigns final-slate tier and rank through the composer model", async () => {
     const rows = [
       createRow({
@@ -1782,6 +1810,37 @@ describe("signals editorial workflow", () => {
     expect(result.ok).toBe(false);
     expect(rows[0].final_slate_rank).toBeNull();
     expect(rows[0].final_slate_tier).toBeNull();
+  });
+
+  it("blocks live or already published rows from final-slate assignment", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "published",
+        editorial_decision: "approved",
+        final_slate_rank: 1,
+        final_slate_tier: "core",
+        is_live: true,
+        published_at: "2026-04-24T12:00:00.000Z",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { assignSignalPostToFinalSlateSlot } = await loadEditorialModule();
+    const result = await assignSignalPostToFinalSlateSlot({
+      postId: "signal-1",
+      finalSlateRank: 2,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toBe("Live or already published rows cannot be assigned to the draft final slate.");
+    expect(rows[0].final_slate_rank).toBe(1);
+    expect(rows[0].final_slate_tier).toBe("core");
   });
 
   it("replacement candidate occupies the original slot and stores replacement relationship when valid", async () => {

@@ -497,6 +497,68 @@ describe("signals editorial review page", () => {
     expect(screen.getAllByText(/Final slate requires exactly 7 selected rows/i)[0]).toBeInTheDocument();
   });
 
+  it("locks final-slate composer controls for live or already published rows", async () => {
+    const lockedPost = {
+      ...publishedPost,
+      finalSlateRank: 1,
+      finalSlateTier: "core",
+      isLive: true,
+      publishedAt: "2026-04-24T12:00:00.000Z",
+    };
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState([lockedPost]),
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("button", { name: "Demote / Remove" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move Down" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove from slate" })).toBeDisabled();
+    expect(screen.getAllByText("Live rows are locked in the final slate.")[0]).toBeInTheDocument();
+  });
+
+  it("keeps valid draft-slate controls usable when an error query param is present", async () => {
+    const selectedPost = {
+      ...approvedPost,
+      finalSlateRank: 1,
+      finalSlateTier: "core",
+      isLive: false,
+      publishedAt: null,
+    };
+    const replacementPost = {
+      ...approvedPost,
+      id: "signal-replacement",
+      rank: 8,
+      title: "Replacement Signal",
+      finalSlateRank: null,
+      finalSlateTier: null,
+      isLive: false,
+      publishedAt: null,
+    };
+    getEditorialReviewState.mockResolvedValue({
+      ...createAuthorizedState([selectedPost, replacementPost]),
+    });
+
+    const Page = (await import("@/app/dashboard/signals/editorial-review/page")).default;
+    render(await Page({
+      searchParams: Promise.resolve({
+        error: "Live or already published rows cannot be assigned to the draft final slate.",
+        scope: "current",
+      }),
+    }));
+
+    expect(
+      screen.getByText("Live or already published rows cannot be assigned to the draft final slate."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Demote / Remove" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Move Down" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Replace" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Assign Replacement Signal to Core slot 2" }),
+    ).toBeEnabled();
+  });
+
   it("blocks composer readiness with a seven-row slate message for a three-row current set", async () => {
     getEditorialReviewState.mockResolvedValue({
       ...createAuthorizedState([
