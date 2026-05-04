@@ -61,9 +61,9 @@ Branch cleanup reduces stale branch clutter after merged remediation, validation
 | #148 | merged | remote-missing | `codex/public-context-signals-visibility-remediation` | `1a89fd8252875845f561bfd578fb9e3e8c9a75a6` | `07dde932c142eb424d0893f63bd4485899b795d3` | `docs/engineering/bug-fixes/public-context-signals-visibility-remediation.md` | reconciled | None. |
 | #147-#145 | merged | remote-missing | Core/Context editorial packet branches | see PR metadata | see PR metadata | `docs/engineering/testing/` | reconciled | None. |
 | #144 | merged | remote-missing | `codex/witm-metadata-targeted-repair-validation-20260429` | `674252a8673723fce4774741c6c486e811e8acce` | `e648a1c5c65c6ec4b333d35a8e22014ea9613eb8` | `docs/engineering/testing/witm-metadata-targeted-repair-validation-20260429.md` | reconciled | None. |
-| #143 | merged | remote-missing | `codex/preserve-witm-metadata-draft-persistence` | `f634ad1750117e84d43d2b81d9402387e7e9f70b` | `a25328a8378f73082e0e10cc35989c11c1c7c0c8` | `docs/engineering/testing/witm-metadata-draft-persistence-remediation.md` | reconciled | None. |
+| #143 | merged | remote-missing | `codex/preserve-witm-metadata-draft-persistence` | `f634ad1750117e84d43d2b81d9402387e7e9f70b` | `a25328a8378f73082e0e10cc35989c11c1c7c0c8` | `docs/engineering/bug-fixes/witm-metadata-draft-persistence-remediation.md` | reconciled | None. |
 | #142 | merged | remote-missing | `codex/limited-core-context-draft-only-validation-20260429` | `a6b3802a0c3a2e01a0f29fa09f33e9f0967b1ae6` | `a17e2fffbdcfb0c1b078865b98475de3bbaf2b76` | `docs/engineering/testing/limited-core-context-draft-only-validation-20260429.md` | reconciled | None. |
-| #141 | merged | remote-missing | `codex/controlled-draft-core-context-cap-7` | `390b7b0d0c7d82c63504f49b1fdbe2f81fbe8e66` | `efb1eea94d0452863b487c5e5b796635380597b8` | `docs/engineering/testing/controlled-core-context-draft-cap-7-remediation.md` | reconciled | None. |
+| #141 | merged | remote-missing | `codex/controlled-draft-core-context-cap-7` | `390b7b0d0c7d82c63504f49b1fdbe2f81fbe8e66` | `efb1eea94d0452863b487c5e5b796635380597b8` | `docs/engineering/bug-fixes/controlled-core-context-draft-cap-7-remediation.md` | reconciled | None. |
 
 ## Remaining Risk
 
