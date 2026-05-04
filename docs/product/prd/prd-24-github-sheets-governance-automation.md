@@ -2,6 +2,7 @@
 
 ## Current Status
 - Status: Deprecated as an active source-of-truth workflow on 2026-05-04.
+- Implementation status: active workflow, script, and targeted tests decommissioned on 2026-05-04.
 - Replacement source of truth: GitHub repo documentation plus `docs/product/feature-system.csv`.
 - Google Sheet / Google Work Log records are historical reference inputs only.
 - Do not use this PRD to justify routine Google Sheet writes, Intake Queue writes, or tracker-sync fallback creation.
@@ -38,12 +39,13 @@
 ## Done When
 - Historical implementation context remains documented.
 - Active governance docs and templates no longer instruct agents to update Google Sheets or create routine tracker-sync fallback files.
-- Any future decommissioning of scripts, workflows, or secrets happens in a separate scoped branch.
+- The active workflow, scripts, and targeted tests have been removed from the repo.
+- Secret cleanup, if needed, happens outside the repo and is not claimed by this PRD.
 
 ## Dependencies / Risks
 - Historical dependency: GitHub secrets `GOOGLE_SERVICE_ACCOUNT_JSON` and `GOOGLE_SHEET_ID`.
 - Historical dependency: the target workbook kept `Sheet1` and `Intake Queue` available with the expected schema.
-- Current risk: scripts/workflows may still exist even though Google tracking is retired as source of truth; audit and decommission separately if needed.
+- Current risk: GitHub repository settings may still contain old Google Sheets secrets even though repo workflows no longer use them. Secret cleanup requires repository settings access and is outside repo-file scope.
 
 ## Evidence and Confidence
 - Repo evidence used:

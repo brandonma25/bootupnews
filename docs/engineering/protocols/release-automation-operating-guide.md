@@ -36,15 +36,15 @@
 - Lint, unit-test, and Playwright failures are reported explicitly and still return a non-zero exit code.
 
 ### 1a. Retired Google Tracker Compatibility
-- Prior workflow: `.github/workflows/github-sheets-status-sync.yml`
-- Prior script entrypoint: `node scripts/github-sheets-sync.mjs --event pr-merge --payload-file <path>`
+- Removed workflow: `.github/workflows/github-sheets-status-sync.yml`
+- Removed script entrypoint: `node scripts/github-sheets-sync.mjs --event pr-merge --payload-file <path>`
 - Current rule:
   - GitHub repo documentation is canonical for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
   - `docs/product/feature-system.csv` is the repo-side feature/PRD control file.
   - Google Sheet / Google Work Log records are retired as source-of-truth systems and may be used only as historical reference inputs.
   - Codex must not update Google Sheets, claim tracker updates, or create routine tracker-sync fallback files for closeout.
   - `docs/operations/tracker-sync/` remains historical compatibility only unless the user explicitly requests a Google-reference reconciliation artifact.
-  - The old sync script and workflow remain implementation artifacts for a separate decommissioning task; this guide no longer treats them as a release gate.
+  - The old sync script, tests, and workflow have been removed; this guide does not treat Google Sheets sync as a release gate or compatibility runner.
 
 ### 2. PR Gate
 - Workflow: `.github/workflows/ci.yml`
@@ -118,7 +118,7 @@
 - Standard wrapper: `node scripts/prod-check.js https://app.example.com`
 - Runs after merge to `main` or manually with a supplied production URL.
 - Confirms `/` and `/dashboard` return `200` and do not expose obvious deployment failure markers.
-- Prior Google Sheets promotion behavior is retired as a source-of-truth workflow. Production verification results should be recorded in the relevant GitHub validation or release/governance record.
+- Prior Google Sheets promotion behavior has been removed from the workflow. Production verification results should be recorded in the relevant GitHub validation or release/governance record.
 
 ### 6. Release Documentation Gate
 - Template scaffolder: `npm run release:docs -- --slug your-release-slug --title "Your Release Title"`
