@@ -12,7 +12,7 @@ import {
 } from "@/lib/observability/rss";
 import { getUrlHost } from "@/lib/sentry-config";
 import type { SourceExtractionMethod } from "@/lib/source-accessibility-types";
-import { fetchTldrFeed, isTldrFeedUrl, type TldrDiscoveryMetadata } from "@/lib/tldr";
+import type { TldrDiscoveryMetadata } from "@/lib/tldr";
 import { stripHtml } from "@/lib/utils";
 
 export type FeedArticle = {
@@ -92,6 +92,8 @@ async function fetchFeedArticlesUnchecked(
   requestOptions: FeedRequestOptions = {},
 ) {
   if (isTldrFeedUrl(feedUrl)) {
+    const { fetchTldrFeed } = await import("@/lib/tldr");
+
     return fetchTldrFeed(feedUrl, sourceName, requestFeed);
   }
 
@@ -213,6 +215,18 @@ async function fetchFeedArticlesUnchecked(
       extractionMethod,
     };
   });
+}
+
+function isTldrFeedUrl(feedUrl: string) {
+  const normalizedFeedUrl = feedUrl.trim().toLowerCase();
+
+  if (normalizedFeedUrl === "https://tldr.tech/rss" || normalizedFeedUrl === "https://tldr.tech/ai/rss") {
+    return true;
+  }
+
+  return /^https:\/\/tldr\.tech\/api\/rss\/(?:tech|ai|product|founders|design|fintech|it|crypto|marketing)$/.test(
+    normalizedFeedUrl,
+  );
 }
 
 export async function fetchApiArticles(
