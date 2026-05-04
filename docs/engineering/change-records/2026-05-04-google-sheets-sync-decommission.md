@@ -59,8 +59,9 @@ Completed in this branch:
 - `git diff --check` - passed.
 - `python3 scripts/validate-documentation-coverage.py --diff-mode local --branch-name chore/decommission-google-sheets-sync --pr-title "chore: decommission Google Sheets sync"` - passed.
 - `python3 scripts/release-governance-gate.py --diff-mode local --branch-name chore/decommission-google-sheets-sync --pr-title "chore: decommission Google Sheets sync"` - passed.
-- `npm run lint || true` - ran; local dependency install was absent, so the command reported `eslint: command not found`.
-- `npm run test -- scripts/github-sheets-sync.test.ts || true` - ran; local dependency install was absent, so the command reported `vitest: command not found`.
+- `npm install` - passed; reported 2 audit findings unrelated to this cleanup.
+- `npm run lint || true` - passed after dependency install.
+- `npm run test -- scripts || true` - no test files found because the only Google Sheets sync script test was removed with the retired implementation.
 - Targeted removed-artifact/reference check - passed; no active `.github`, `scripts`, or `package.json` invocation remains for `node scripts/github-sheets-sync`, `GOOGLE_SERVICE_ACCOUNT_JSON`, or `GOOGLE_SHEET_ID`.
 
 ## Remaining Risks Or Follow-Up
