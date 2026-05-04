@@ -88,15 +88,6 @@ export async function GET(request: Request) {
   const requestId = createDailyNewsCronRequestId(request.headers.get("x-vercel-id"));
   const routeDiagnostics = buildRouteDiagnostics({ request, requestId, startedAtMs });
 
-  logDailyNewsCronDiagnostic("info", "route_start", routeDiagnostics, {
-    timestamp: routeDiagnostics.started_at,
-    runtime: routeDiagnostics.runtime,
-    environment: routeDiagnostics.environment,
-    deployment_commit: routeDiagnostics.deployment_commit,
-    vercel_region: routeDiagnostics.vercel_region,
-    method: request.method,
-  });
-
   const auth = getAuthorizationState(request);
   routeDiagnostics.auth = {
     authorization_header_present: auth.authorizationHeaderPresent,
@@ -104,24 +95,21 @@ export async function GET(request: Request) {
     auth_passed: auth.authPassed,
   };
   routeDiagnostics.stages_seen.push("auth_check");
-  logDailyNewsCronDiagnostic(auth.authPassed ? "info" : "warn", "auth_check", routeDiagnostics, routeDiagnostics.auth);
 
   if (!auth.authPassed) {
     logDailyNewsCronDiagnostic("warn", "route_failure", routeDiagnostics, {
       failed_stage: "auth_check",
       error_name: "UnauthorizedCronRequest",
+      diagnostics: {
+        stages_seen: routeDiagnostics.stages_seen,
+        auth: routeDiagnostics.auth,
+      },
     });
 
     return buildUnauthorizedResponse(routeDiagnostics);
   }
 
   routeDiagnostics.stages_seen.push("env_check");
-  logDailyNewsCronDiagnostic("info", "env_check", routeDiagnostics, {
-    required_env_present: routeDiagnostics.env,
-    missing_env_names: Object.entries(routeDiagnostics.env ?? {})
-      .filter(([, present]) => !present)
-      .map(([name]) => name),
-  });
 
   const result = await runDailyNewsCron({
     requestId,
@@ -131,12 +119,14 @@ export async function GET(request: Request) {
     envPresence: routeDiagnostics.env,
     auth: routeDiagnostics.auth,
     initialStages: routeDiagnostics.stages_seen,
+    emitStageLogs: false,
   });
 
   logDailyNewsCronDiagnostic(result.success ? "info" : "error", result.success ? "route_success" : "route_failure", result.diagnostics, {
     elapsed_ms: result.elapsed_ms,
     failed_stage: result.failed_stage,
     error_name: result.error_name,
+    sanitized_error_message: result.sanitized_error_message,
     summary: {
       briefingDate: result.summary.briefingDate,
       insertedSignalPostCount: result.summary.insertedSignalPostCount,
@@ -144,6 +134,17 @@ export async function GET(request: Request) {
       rankedClusterCount: result.summary.rankedClusterCount,
       usedSeedFallback: result.summary.usedSeedFallback,
       feedFailureCount: result.summary.feedFailureCount,
+    },
+    diagnostics: {
+      stages_seen: result.diagnostics.stages_seen,
+      auth: result.diagnostics.auth,
+      env: result.diagnostics.env,
+      source_manifest: result.diagnostics.source_manifest,
+      source_fetch: result.diagnostics.source_fetch,
+      ranking_selection: result.diagnostics.ranking_selection,
+      witm_validation: result.diagnostics.witm_validation,
+      persistence: result.diagnostics.persistence,
+      health_update: result.diagnostics.health_update,
     },
   });
 

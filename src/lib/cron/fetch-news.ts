@@ -133,6 +133,7 @@ export type DailyNewsCronRunContext = {
   envPresence?: Record<string, boolean>;
   auth?: DailyNewsCronDiagnostics["auth"];
   initialStages?: DailyNewsCronDiagnosticStage[];
+  emitStageLogs?: boolean;
 };
 
 export function createDailyNewsCronRequestId(candidate?: string | null) {
@@ -203,6 +204,20 @@ export function logDailyNewsCronDiagnostic(
     stage,
     ...details,
   });
+}
+
+function maybeLogDailyNewsCronDiagnostic(
+  enabled: boolean,
+  level: DiagnosticLogLevel,
+  stage: DailyNewsCronDiagnosticStage,
+  context: Pick<DailyNewsCronDiagnostics, "request_id" | "route">,
+  details: Record<string, unknown> = {},
+) {
+  if (!enabled) {
+    return;
+  }
+
+  logDailyNewsCronDiagnostic(level, stage, context, details);
 }
 
 function buildFailureResult(
@@ -286,12 +301,15 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
   let currentStage: DailyNewsCronDiagnosticStage = "pipeline_start";
   let rssObservability: RssObservabilityDependencies | null = null;
   let checkInId: string | undefined;
+  const emitStageLogs = context.emitStageLogs ?? true;
 
-  logServerEvent("info", "Daily news cron started", {
-    route: diagnostics.route,
-    request_id: diagnostics.request_id,
-    timestamp,
-  });
+  if (emitStageLogs) {
+    logServerEvent("info", "Daily news cron started", {
+      route: diagnostics.route,
+      request_id: diagnostics.request_id,
+      timestamp,
+    });
+  }
 
   try {
     currentStage = markStage(diagnostics, "source_manifest_load");
@@ -321,15 +339,15 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       supplied_by_manifest: sourcePlan.suppliedByManifest,
       warnings: sourcePlan.warnings,
     };
-    logDailyNewsCronDiagnostic("info", "source_manifest_load", diagnostics, diagnostics.source_manifest);
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "source_manifest_load", diagnostics, diagnostics.source_manifest);
 
     currentStage = markStage(diagnostics, "pipeline_start");
-    logDailyNewsCronDiagnostic("info", "pipeline_start", diagnostics, {
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "pipeline_start", diagnostics, {
       source_count: sources.length,
     });
 
     currentStage = markStage(diagnostics, "source_fetch_start");
-    logDailyNewsCronDiagnostic("info", "source_fetch_start", diagnostics, {
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "source_fetch_start", diagnostics, {
       source_count: sources.length,
     });
     const { briefing, publicRankedItems, pipelineRun } = await withRssSpan(
@@ -351,10 +369,10 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
         .map((failure) => failure.source),
     };
     markStage(diagnostics, "source_fetch_complete");
-    logDailyNewsCronDiagnostic("info", "source_fetch_complete", diagnostics, diagnostics.source_fetch);
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "source_fetch_complete", diagnostics, diagnostics.source_fetch);
 
     currentStage = markStage(diagnostics, "ranking_selection_start");
-    logDailyNewsCronDiagnostic("info", "ranking_selection_start", diagnostics, {
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "ranking_selection_start", diagnostics, {
       raw_item_count: pipelineRun.num_raw_items,
       cluster_count: pipelineRun.num_clusters,
       ranked_item_count: publicRankedItems.length,
@@ -371,15 +389,15 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       seed_fallback: pipelineRun.used_seed_fallback,
     };
     markStage(diagnostics, "ranking_selection_complete");
-    logDailyNewsCronDiagnostic("info", "ranking_selection_complete", diagnostics, diagnostics.ranking_selection);
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "ranking_selection_complete", diagnostics, diagnostics.ranking_selection);
 
     currentStage = markStage(diagnostics, "witm_validation_start");
-    logDailyNewsCronDiagnostic("info", "witm_validation_start", diagnostics, {
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "witm_validation_start", diagnostics, {
       selected_briefing_item_count: briefing.items.length,
     });
     diagnostics.witm_validation = summarizeWhyItMattersValidation(briefing.items, validateWhyItMatters);
     markStage(diagnostics, "witm_validation_complete");
-    logDailyNewsCronDiagnostic("info", "witm_validation_complete", diagnostics, diagnostics.witm_validation);
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "witm_validation_complete", diagnostics, diagnostics.witm_validation);
 
     const briefingDate = briefing.briefingDate.slice(0, 10);
     const baseSummary = {
@@ -409,11 +427,13 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
         },
       });
 
-      logServerEvent("warn", "Daily news cron skipped seed fallback output", {
-        route: diagnostics.route,
-        request_id: diagnostics.request_id,
-        ...result.summary,
-      });
+      if (emitStageLogs) {
+        logServerEvent("warn", "Daily news cron skipped seed fallback output", {
+          route: diagnostics.route,
+          request_id: diagnostics.request_id,
+          ...result.summary,
+        });
+      }
       captureRssFailure(new Error(result.summary.message), {
         failureType: "rss_refresh_job_failed",
         phase: "refresh",
@@ -445,12 +465,14 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
         },
       });
 
-      logServerEvent("warn", "Daily news cron produced too few items", {
-        route: diagnostics.route,
-        request_id: diagnostics.request_id,
-        ...result.summary,
-        briefingItemCount: briefing.items.length,
-      });
+      if (emitStageLogs) {
+        logServerEvent("warn", "Daily news cron produced too few items", {
+          route: diagnostics.route,
+          request_id: diagnostics.request_id,
+          ...result.summary,
+          briefingItemCount: briefing.items.length,
+        });
+      }
       captureRssFailure(new Error(result.summary.message), {
         failureType: "rss_refresh_job_failed",
         phase: "refresh",
@@ -479,7 +501,7 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       rows_inserted_or_updated: 0,
       error_message: null,
     };
-    logDailyNewsCronDiagnostic("info", "persistence_start", diagnostics, diagnostics.persistence);
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "persistence_start", diagnostics, diagnostics.persistence);
 
     const snapshot = await persistSignalPostsForBriefing({
       briefingDate,
@@ -492,10 +514,16 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       error_message: snapshot.ok ? null : sanitizedSnapshotMessage,
     };
     markStage(diagnostics, "persistence_complete");
-    logDailyNewsCronDiagnostic(snapshot.ok ? "info" : "error", "persistence_complete", diagnostics, diagnostics.persistence);
+    maybeLogDailyNewsCronDiagnostic(
+      emitStageLogs,
+      snapshot.ok ? "info" : "error",
+      "persistence_complete",
+      diagnostics,
+      diagnostics.persistence,
+    );
 
     currentStage = markStage(diagnostics, "health_update_start");
-    logDailyNewsCronDiagnostic("info", "health_update_start", diagnostics, {
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "health_update_start", diagnostics, {
       mode: "derived_from_signal_posts_created_at",
       explicit_update_attempted: false,
     });
@@ -506,7 +534,7 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       error_message: null,
     };
     markStage(diagnostics, "health_update_complete");
-    logDailyNewsCronDiagnostic("info", "health_update_complete", diagnostics, diagnostics.health_update);
+    maybeLogDailyNewsCronDiagnostic(emitStageLogs, "info", "health_update_complete", diagnostics, diagnostics.health_update);
 
     if (!snapshot.ok) {
       markFailure(diagnostics, "persistence_complete", "PersistenceFailed", sanitizedSnapshotMessage);
@@ -523,11 +551,13 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       },
     });
 
-    logServerEvent(snapshot.ok ? "info" : "error", snapshot.ok ? "Daily news cron succeeded" : "Daily news cron failed", {
-      route: diagnostics.route,
-      request_id: diagnostics.request_id,
-      ...result.summary,
-    });
+    if (emitStageLogs) {
+      logServerEvent(snapshot.ok ? "info" : "error", snapshot.ok ? "Daily news cron succeeded" : "Daily news cron failed", {
+        route: diagnostics.route,
+        request_id: diagnostics.request_id,
+        ...result.summary,
+      });
+    }
 
     if (!snapshot.ok) {
       captureRssFailure(new Error("RSS signal post persistence failed during daily refresh."), {
@@ -557,14 +587,16 @@ export async function runDailyNewsCron(context: DailyNewsCronRunContext = {}): P
       markFailure(diagnostics, currentStage, errorName, sanitizedMessage, error),
     );
 
-    logServerEvent("error", "Daily news cron failed", {
-      route: diagnostics.route,
-      request_id: diagnostics.request_id,
-      timestamp,
-      errorName,
-      errorMessage: sanitizedMessage,
-      errorStackTop: diagnostics.sanitized_stack_top,
-    });
+    if (emitStageLogs) {
+      logServerEvent("error", "Daily news cron failed", {
+        route: diagnostics.route,
+        request_id: diagnostics.request_id,
+        timestamp,
+        errorName,
+        errorMessage: sanitizedMessage,
+        errorStackTop: diagnostics.sanitized_stack_top,
+      });
+    }
     if (rssObservability) {
       rssObservability.captureRssFailure(new Error(sanitizedMessage), {
         failureType: "rss_refresh_job_failed",
