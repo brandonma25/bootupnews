@@ -33,8 +33,8 @@ Several standing docs also told agents to update or fall back to Google Sheets d
 | `docs/engineering/bug-fixes/` | canonical bug-fix record lane | Canonical for meaningful defects, regressions, hotfixes, and remediations with root cause. Thin records were found and upgraded where high-priority. |
 | `docs/engineering/bug-fixes/phase1/` | canonical bug-fix record lane | Existing Phase 1 remediation records; left as-is. |
 | `docs/engineering/bug-fixes/templates/` | operating template lane | Template updated with PR/branch/SHA/source-of-truth metadata. |
-| `docs/bugs/` | deprecated/non-canonical record lane | Three legacy duplicate bug reports now redirect to canonical bug-fix records. |
-| `docs/changes/` | deprecated/non-canonical PR note lane | Six legacy PR/change notes now redirect to canonical PRD, ADR, change-record, or testing records. |
+| `docs/bugs/` | removed deprecated/non-canonical record lane | Three redirect-only legacy duplicate bug reports were removed after canonical records were confirmed. |
+| `docs/changes/` | removed deprecated/non-canonical PR note lane | Six redirect-only legacy PR/change notes were removed after canonical records were confirmed. |
 | `docs/engineering/change-records/` | structural change record lane | Canonical for audits, migrations, source-of-truth cleanup, repo-structure cleanup, and governance records. |
 | `docs/engineering/testing/` | validation/testing record lane | Canonical for meaningful validation reports and test evidence. Reuters/BBC preview notes were moved here from `docs/changes/`. |
 | `docs/engineering/incidents/` | incident lane | Folder was absent in this checkout; routing rules still reserve it for governance/process/release/workflow failures. |
@@ -67,15 +67,15 @@ Several standing docs also told agents to update or fall back to Google Sheets d
 
 | Legacy doc | Canonical doc | Classification | Branch action |
 | --- | --- | --- | --- |
-| `docs/bugs/editorial-history-ordering.md` | `docs/engineering/bug-fixes/editorial-history-ordering.md` | duplicate legacy bug report | Legacy file replaced with redirect; canonical metadata upgraded. |
-| `docs/bugs/homepage-tabs-signal-regression-politics-tldr.md` | `docs/engineering/bug-fixes/homepage-tabs-signal-regression-politics-tldr.md` | duplicate legacy bug report | Legacy file replaced with redirect; canonical metadata upgraded. |
-| `docs/bugs/2026-04-26-regression-static-stories-editorial-page.md` | `docs/engineering/bug-fixes/2026-04-26-static-stories-editorial-page-regression.md` | duplicate legacy bug report / thin canonical record | Legacy detail merged into canonical file; legacy file replaced with redirect. |
-| `docs/changes/001-public-source-manifest-pr.md` | `docs/product/prd/prd-54-public-source-manifest.md`, `docs/adr/001-public-source-manifest.md`, `docs/engineering/change-records/public-source-manifest-governance.md` | PR note / change note | Legacy file replaced with redirect. |
-| `docs/changes/002-manifest-ingestion-unblock-pr.md` | `docs/engineering/change-records/manifest-ingestion-unblock.md` | PR note / structural change record | Canonical change-record added; legacy file replaced with redirect. |
-| `docs/changes/003-reuters-verification-blocker.md` | `docs/engineering/testing/2026-04-23-reuters-world-preview-verification-blocker.md` | validation/testing record | Canonical testing record added; legacy file replaced with redirect. |
-| `docs/changes/004-bbc-world-verification-success.md` | `docs/engineering/testing/2026-04-23-bbc-world-preview-verification-success.md` | validation/testing record | Canonical testing record added; legacy file replaced with redirect. |
-| `docs/changes/005-category-1-supply-expansion-pr.md` | `docs/engineering/change-records/category-1-public-source-supply-expansion.md`, `docs/engineering/testing/2026-04-23-bbc-world-preview-verification-success.md`, `docs/product/prd/prd-54-public-source-manifest.md` | PR note / structural change record | Legacy file replaced with redirect. |
-| `docs/changes/006-homepage-volume-layers-pr.md` | `docs/product/prd/prd-57-homepage-volume-layers.md`, `docs/engineering/change-records/homepage-volume-layers-governance-coverage.md` | PR note / change note | Legacy file replaced with redirect. |
+| `docs/bugs/editorial-history-ordering.md` | `docs/engineering/bug-fixes/editorial-history-ordering.md` | duplicate legacy bug report | Legacy redirect removed after canonical metadata was upgraded. |
+| `docs/bugs/homepage-tabs-signal-regression-politics-tldr.md` | `docs/engineering/bug-fixes/homepage-tabs-signal-regression-politics-tldr.md` | duplicate legacy bug report | Legacy redirect removed after canonical metadata was upgraded. |
+| `docs/bugs/2026-04-26-regression-static-stories-editorial-page.md` | `docs/engineering/bug-fixes/2026-04-26-static-stories-editorial-page-regression.md` | duplicate legacy bug report / thin canonical record | Legacy detail was merged into the canonical file; redirect removed. |
+| `docs/changes/001-public-source-manifest-pr.md` | `docs/product/prd/prd-54-public-source-manifest.md`, `docs/adr/001-public-source-manifest.md`, `docs/engineering/change-records/public-source-manifest-governance.md` | PR note / change note | Legacy redirect removed. |
+| `docs/changes/002-manifest-ingestion-unblock-pr.md` | `docs/engineering/change-records/manifest-ingestion-unblock.md` | PR note / structural change record | Canonical change-record added; legacy redirect removed. |
+| `docs/changes/003-reuters-verification-blocker.md` | `docs/engineering/testing/2026-04-23-reuters-world-preview-verification-blocker.md` | validation/testing record | Canonical testing record added; legacy redirect removed. |
+| `docs/changes/004-bbc-world-verification-success.md` | `docs/engineering/testing/2026-04-23-bbc-world-preview-verification-success.md` | validation/testing record | Canonical testing record added; legacy redirect removed. |
+| `docs/changes/005-category-1-supply-expansion-pr.md` | `docs/engineering/change-records/category-1-public-source-supply-expansion.md`, `docs/engineering/testing/2026-04-23-bbc-world-preview-verification-success.md`, `docs/product/prd/prd-54-public-source-manifest.md` | PR note / structural change record | Legacy redirect removed. |
+| `docs/changes/006-homepage-volume-layers-pr.md` | `docs/product/prd/prd-57-homepage-volume-layers.md`, `docs/engineering/change-records/homepage-volume-layers-governance-coverage.md` | PR note / change note | Legacy redirect removed. |
 
 ## 8. Thin Docs Found
 
@@ -102,8 +102,8 @@ Several standing docs also told agents to update or fall back to Google Sheets d
 
 Completed in this branch:
 
-- `docs/bugs/` high-priority duplicates now redirect to canonical bug-fix records.
-- `docs/changes/` files now redirect to canonical PRD, ADR, change-record, or testing records.
+- `docs/bugs/` high-priority duplicates were consolidated into canonical bug-fix records; redirect-only leftovers were removed in the 2026-05-04 hard-consolidation follow-up.
+- `docs/changes/` files were consolidated into canonical PRD, ADR, change-record, or testing records; redirect-only leftovers were removed in the 2026-05-04 hard-consolidation follow-up.
 - Durable Reuters/BBC preview verification details were moved to `docs/engineering/testing/`.
 - Durable manifest ingestion unblock details were moved to `docs/engineering/change-records/`.
 - Public-card cleanup phases were consolidated into one canonical bug-fix/remediation record.

@@ -4,7 +4,7 @@
 - Branch: `feature/public-source-manifest-v3`
 - Preview URL: `https://daily-intelligence-aggregator-ybs9-80swm3ghi.vercel.app`
 - Vercel deployment: `dpl_F8toFvs4UHPeoYNLK4UH4YWWDw2m`
-- Legacy note consolidated from: `docs/changes/004-bbc-world-verification-success.md`
+- Canonical record after `docs/changes/` removal: this testing note is the durable verification record.
 
 ## Classification
 
