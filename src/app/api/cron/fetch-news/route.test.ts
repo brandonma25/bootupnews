@@ -64,6 +64,10 @@ describe("/api/cron/fetch-news", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     process.env.CRON_SECRET = "local-cron-secret";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-test-secret";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-test-secret";
+    process.env.OPENAI_API_KEY = "openai-test-secret";
     generateDailyBriefing.mockResolvedValue(buildBriefingResult());
     persistSignalPostsForBriefing.mockResolvedValue({
       ok: true,
@@ -80,6 +84,14 @@ describe("/api/cron/fetch-news", () => {
 
     expect(response.status).toBe(401);
     expect(body.success).toBe(false);
+    expect(body.ok).toBe(false);
+    expect(body.failed_stage).toBe("auth_check");
+    expect(body.request_id).toEqual(expect.any(String));
+    expect(body.diagnostics.auth).toMatchObject({
+      authorization_header_present: true,
+      cron_secret_present: true,
+      auth_passed: false,
+    });
     expect(generateDailyBriefing).not.toHaveBeenCalled();
     expect(persistSignalPostsForBriefing).not.toHaveBeenCalled();
   });
@@ -102,6 +114,8 @@ describe("/api/cron/fetch-news", () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
       success: true,
+      ok: true,
+      request_id: expect.any(String),
       summary: {
         briefingDate: "2026-04-27",
         insertedSignalPostCount: 5,
@@ -110,6 +124,21 @@ describe("/api/cron/fetch-news", () => {
         clusterCount: 5,
         rankedClusterCount: 5,
         usedSeedFallback: false,
+      },
+      diagnostics: {
+        source_manifest: {
+          source_count: expect.any(Number),
+          enabled_public_source_count: expect.any(Number),
+          required_source_count: expect.any(Number),
+        },
+        persistence: {
+          write_mode: "normal",
+          target_tables: ["signal_posts"],
+          draft_review_intent: true,
+          public_publish_attempted: false,
+          rows_attempted: 5,
+          rows_inserted_or_updated: 5,
+        },
       },
     });
     expect(generateDailyBriefing).toHaveBeenCalledTimes(1);
@@ -150,6 +179,10 @@ describe("/api/cron/fetch-news", () => {
 
     expect(response.status).toBe(500);
     expect(body.success).toBe(false);
+    expect(body.ok).toBe(false);
+    expect(body.failed_stage).toBe("persistence_complete");
+    expect(body.request_id).toEqual(expect.any(String));
+    expect(body.sanitized_error_message).toBe("The current Top 5 could not be persisted for editing.");
     expect(captureRssFailure).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
@@ -162,6 +195,44 @@ describe("/api/cron/fetch-news", () => {
       }),
     );
     expect(captureRssCronCheckIn).toHaveBeenCalledWith("error", "check-in-id", expect.any(Number));
+  });
+
+  it("redacts secrets from diagnostic failure responses", async () => {
+    persistSignalPostsForBriefing.mockResolvedValue({
+      ok: false,
+      briefingDate: "2026-04-27",
+      insertedCount: 0,
+      message:
+        "The current Top 5 failed with Authorization: Bearer local-cron-secret and SUPABASE_SERVICE_ROLE_KEY=service-role-test-secret.",
+    });
+
+    const { GET } = await import("@/app/api/cron/fetch-news/route");
+    const response = await GET(buildRequest("local-cron-secret"));
+    const body = await response.json();
+    const responseText = JSON.stringify(body);
+
+    expect(response.status).toBe(500);
+    expect(body.failed_stage).toBe("persistence_complete");
+    expect(body.sanitized_error_message).toContain("[REDACTED");
+    expect(responseText).not.toContain("local-cron-secret");
+    expect(responseText).not.toContain("service-role-test-secret");
+    expect(responseText).not.toContain("Bearer local-cron-secret");
+  });
+
+  it("returns the failing stage when the pipeline throws before persistence", async () => {
+    generateDailyBriefing.mockRejectedValue(new Error("source fetch exploded with Bearer local-cron-secret"));
+
+    const { GET } = await import("@/app/api/cron/fetch-news/route");
+    const response = await GET(buildRequest("local-cron-secret"));
+    const body = await response.json();
+    const responseText = JSON.stringify(body);
+
+    expect(response.status).toBe(500);
+    expect(body.failed_stage).toBe("source_fetch_start");
+    expect(body.error_name).toBe("Error");
+    expect(body.sanitized_error_message).toMatch(/^source fetch exploded with Bearer \[REDACTED/);
+    expect(responseText).not.toContain("local-cron-secret");
+    expect(persistSignalPostsForBriefing).not.toHaveBeenCalled();
   });
 
   it("does not persist seed fallback output as editorial signal posts", async () => {
