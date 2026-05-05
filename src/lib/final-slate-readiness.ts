@@ -1,5 +1,7 @@
 export type FinalSlateTier = "core" | "context";
 
+export const FINAL_SLATE_MIN_PUBLIC_ROWS = 1;
+export const FINAL_SLATE_MAX_PUBLIC_ROWS = 5;
 export const FINAL_SLATE_CORE_RANKS = [1, 2, 3, 4, 5] as const;
 export const FINAL_SLATE_CONTEXT_RANKS = [6, 7] as const;
 export const FINAL_SLATE_RANKS = [
@@ -123,44 +125,21 @@ export function validateFinalSlateReadiness(
     addRowContentFailures(row, addRowFailure);
   }
 
-  if (selectedRows.length !== FINAL_SLATE_RANKS.length) {
+  if (selectedRows.length < FINAL_SLATE_MIN_PUBLIC_ROWS) {
     addFailure({
-      code: "wrong_total_count",
-      message: `Final slate requires exactly 7 selected rows. Current count: ${selectedRows.length}.`,
+      code: "empty_public_slate",
+      message: "Cannot publish an empty slate. Select 1-5 rows before publishing.",
     });
   }
 
-  const coreRows = selectedRows.filter((row) => row.finalSlateTier === "core");
-  const contextRows = selectedRows.filter((row) => row.finalSlateTier === "context");
-
-  if (coreRows.length !== FINAL_SLATE_CORE_RANKS.length) {
+  if (selectedRows.length > FINAL_SLATE_MAX_PUBLIC_ROWS) {
     addFailure({
-      code: "wrong_core_count",
-      message:
-        coreRows.length < FINAL_SLATE_CORE_RANKS.length
-          ? `Only ${coreRows.length} Core rows selected; 5 required.`
-          : `${coreRows.length} Core rows selected; 5 required.`,
+      code: "prd36_public_slate_cap",
+      message: `PRD-36 caps the public slate at 5 rows. Current count: ${selectedRows.length}.`,
     });
   }
 
-  if (contextRows.length !== FINAL_SLATE_CONTEXT_RANKS.length) {
-    addFailure({
-      code: "wrong_context_count",
-      message:
-        contextRows.length < FINAL_SLATE_CONTEXT_RANKS.length
-          ? `Only ${contextRows.length} Context rows selected; 2 required.`
-          : `${contextRows.length} Context rows selected; 2 required.`,
-    });
-  }
-
-  for (const rank of FINAL_SLATE_RANKS) {
-    const rowsAtRank = selectedRowsByRank.get(rank) ?? [];
-
-    if (rowsAtRank.length === 0) {
-      addSlotFailure(rank, `${formatSlotLabel(rank)} is empty.`, "rank_gap");
-      continue;
-    }
-
+  for (const [rank, rowsAtRank] of selectedRowsByRank.entries()) {
     if (rowsAtRank.length > 1) {
       const message = `Rank ${rank} is duplicated.`;
       addSlotFailure(rank, message, "duplicate_rank");

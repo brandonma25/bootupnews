@@ -473,7 +473,7 @@ function getPostStateHint(post: EditorialSignalPost) {
   }
 
   if (post.editorialStatus === "approved") {
-    return "Approved and waiting for the full Top 5 publish gate.";
+    return "Approved and waiting for the final-slate publish gate.";
   }
 
   if (post.editorialStatus === "published") {
