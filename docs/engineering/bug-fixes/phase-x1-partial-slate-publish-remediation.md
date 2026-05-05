@@ -9,11 +9,11 @@
 - Exact change: publish readiness now accepts 1-5 selected Core/Context rows, rejects zero rows, rejects more than five rows with an explicit PRD-36 cap message, preserves the WITM publish gate, keeps individual-row publish disabled, and updates admin/public copy so partial slates are described honestly.
 - Public surface behavior: homepage and `/signals` render only the live rows returned by the published read model; no placeholder or stale slots are added for unfilled positions.
 - Related PRD: PRD-36 and Decisions D1/D2/D3/D5 in `BOOT_UP_WORK_LOG_v2.md`; no new canonical PRD required.
-- PR: TBD.
+- PR: #199, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/199`.
 - Branch: `codex/phase-x1-partial-slate-publish`.
 - Head SHA: TBD.
 - Merge SHA: TBD.
-- GitHub source-of-truth status: pending PR.
+- GitHub source-of-truth status: PR opened for Phase X.1 remediation validation.
 - External references reviewed, if any: PRs #119/#124/#126/#127/#190 and Phase X handoff context from 2026-05-06.
 - Google Sheet / Work Log reference, if historically relevant: Phase X handoff; no Sheet treated as canonical.
 - Branch cleanup status: pending after merge.
