@@ -36,6 +36,8 @@ function createHomepageSignalPost(overrides: Partial<{
   approvedAt: string | null;
   publishedAt: string | null;
   isLive: boolean;
+  finalSlateRank: number | null;
+  finalSlateTier: "core" | "context" | null;
   createdAt: string | null;
   updatedAt: string | null;
   persisted: boolean;
@@ -63,6 +65,8 @@ function createHomepageSignalPost(overrides: Partial<{
     approvedAt: overrides.approvedAt ?? null,
     publishedAt: overrides.publishedAt ?? null,
     isLive: overrides.isLive ?? false,
+    finalSlateRank: overrides.finalSlateRank ?? null,
+    finalSlateTier: overrides.finalSlateTier ?? null,
     createdAt: overrides.createdAt ?? null,
     updatedAt: overrides.updatedAt ?? null,
     persisted: overrides.persisted ?? true,
@@ -248,6 +252,50 @@ describe("homepage read model", () => {
     ]);
     expect(state.data.briefing.items.some((item) => item.whyItMatters === "Stored AI why it matters")).toBe(false);
     expect(state.data.publicRankedItems?.map((item) => item.title)).toContain("Stored tech depth signal");
+  }, 10_000);
+
+  it("renders a partial live signal set without placeholder or stale slots", async () => {
+    const partialFixtures = [
+      { title: "Fed liquidity shift", tags: ["finance"], summary: "Fed balance-sheet pressure changed funding conditions." },
+      { title: "Apple supply-chain move", tags: ["tech"], summary: "Apple adjusted supplier commitments for AI hardware." },
+      { title: "NATO procurement signal", tags: ["politics"], summary: "NATO members moved defense procurement timelines." },
+    ];
+    const partialPosts = partialFixtures.map((fixture, index) =>
+      createHomepageSignalPost({
+        id: `partial-${index + 1}`,
+        rank: index + 1,
+        title: fixture.title,
+        tags: fixture.tags,
+        summary: fixture.summary,
+        editorialStatus: "published",
+        isLive: true,
+        publishedAt: "2026-05-06T09:00:00.000Z",
+        publishedWhyItMatters: `Partial live editorial note ${index + 1}`,
+      }),
+    );
+    getHomepageSignalSnapshot.mockResolvedValue({
+      source: "published_live",
+      briefingDate: "2026-05-06",
+      posts: partialPosts,
+      depthPosts: partialPosts,
+    });
+
+    const { getHomepagePageState } = await loadDataModule();
+    const { buildHomepageViewModel } = await import("@/lib/homepage-model");
+    const state = await getHomepagePageState("/");
+    const viewModel = buildHomepageViewModel(state.data);
+    const topEvents = [viewModel.featured, ...viewModel.topRanked].filter(Boolean);
+    const serializedOutput = JSON.stringify(state.data);
+
+    expect(state.data.briefing.items).toHaveLength(3);
+    expect(state.data.publicRankedItems).toHaveLength(3);
+    expect(topEvents).toHaveLength(3);
+    expect(state.data.briefing.items.map((item) => item.title)).toEqual([
+      "Fed liquidity shift",
+      "Apple supply-chain move",
+      "NATO procurement signal",
+    ]);
+    expect(serializedOutput).not.toMatch(/Partial live signal 4|Partial live signal 5|placeholder|stale slot/i);
   }, 10_000);
 
   it("uses the Tier 3 honest empty state when no published signal set exists", async () => {

@@ -20,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
+  FINAL_SLATE_MAX_PUBLIC_ROWS,
+  FINAL_SLATE_MIN_PUBLIC_ROWS,
   FINAL_SLATE_RANKS,
   formatSlotLabel,
   getFinalSlateTierForRank,
@@ -78,7 +80,7 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
     return (
       <AccessState
         title="Admin sign-in required"
-        detail="Sign in with an authorized Google account to review Top 5 Signals."
+        detail="Sign in with an authorized Google account to review Signals."
         badge="Unauthenticated"
         href={`/login?redirectTo=${encodeURIComponent(SIGNALS_EDITORIAL_ROUTE)}`}
         cta="Sign in"
@@ -90,7 +92,7 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
     return (
       <AccessState
         title="Not authorized"
-        detail={`${state.userEmail ?? "This account"} does not have admin/editor access for Top 5 Signals.`}
+        detail={`${state.userEmail ?? "This account"} does not have admin/editor access for Signals.`}
         badge="Unauthorized"
         href="/"
         cta="Return home"
@@ -139,7 +141,7 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
                 Signals Final-Slate Composer
               </h1>
               <p className="text-base leading-7 text-[var(--text-secondary)]">
-                Compose, publish, and audit the reviewed 5 Core + 2 Context slate.
+                Compose, publish, and audit the reviewed public slate.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[34rem]">
@@ -360,13 +362,13 @@ function FinalSlateComposer({
             Final Slate Composer
           </h2>
           <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
-            Assign reviewed candidates into Core slots 1-5 and Context slots 6-7. Slot placement does not make a row public.
+            Assign reviewed candidates into Core slots 1-5 and optional Context slots 6-7. Publishing accepts 1-5 selected rows.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge>{selectedCount}/7 selected</Badge>
-          <Badge>{coreCount}/5 Core</Badge>
-          <Badge>{contextCount}/2 Context</Badge>
+          <Badge>{selectedCount}/{FINAL_SLATE_MAX_PUBLIC_ROWS} selected</Badge>
+          <Badge>{coreCount} Core</Badge>
+          <Badge>{contextCount} Context</Badge>
           <Badge>{readiness.ready ? "Slate ready" : "Slate not ready"}</Badge>
         </div>
       </div>
@@ -417,7 +419,7 @@ function FinalSlateComposer({
               {publishDisabledReason ?? getReadyToPublishMessage()}
             </p>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              Publishing archives the previous live slate and makes only these seven selected rows public.
+              Publishing archives the previous live slate and makes only the selected 1-5 rows public.
             </p>
             {readiness.failures.length > 0 ? (
               <ul className="space-y-1 text-sm leading-6 text-[var(--text-secondary)]">
@@ -433,9 +435,9 @@ function FinalSlateComposer({
                 Post-publish verification
               </h4>
               <ul className="space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
-                <li>Homepage returns 200 and shows Core slots 1-5.</li>
-                <li>/signals returns 200 and shows Core slots 1-5 plus Context slots 6-7.</li>
-                <li>Held, rejected, rewrite-requested, Depth, rank-8, and unpublished rows stay hidden.</li>
+                <li>Homepage returns 200 and shows only the newly published rows.</li>
+                <li>/signals returns 200 and shows only the newly published rows.</li>
+                <li>Held, rejected, rewrite-requested, Depth, and unselected rows stay hidden.</li>
                 <li>Cron remains disabled.</li>
               </ul>
             </div>
@@ -444,7 +446,7 @@ function FinalSlateComposer({
                 Rollback preparation
               </h4>
               <p className="text-xs leading-5 text-[var(--text-secondary)]">
-                If verification fails, identify the newly live seven rows, turn them non-live, and restore the archived previous live rows.
+                If verification fails, identify the newly live rows, turn them non-live, and restore the archived previous live rows.
               </p>
             </div>
           </div>
@@ -496,7 +498,7 @@ function PublishedSlateAuditSummary({
           Published Slate Audit
         </h2>
         <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
-          Internal record of the most recent published 5 Core + 2 Context slate. This is not a public archive surface.
+          Internal record of the most recent published public slate. This is not a public archive surface.
         </p>
       </div>
       <Panel className="p-4">
@@ -1182,7 +1184,7 @@ function getComposerPublishDisabledReason(
 }
 
 function getReadyToPublishMessage() {
-  return "Ready to publish the validated 5 Core + 2 Context slate.";
+  return `Ready to publish the validated ${FINAL_SLATE_MIN_PUBLIC_ROWS}-${FINAL_SLATE_MAX_PUBLIC_ROWS} row slate.`;
 }
 
 function normalizeEditorialText(value: string | null | undefined) {

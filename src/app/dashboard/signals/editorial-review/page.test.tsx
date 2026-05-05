@@ -176,11 +176,11 @@ describe("signals editorial review page", () => {
     expect(screen.getByText("Context slot 7")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Publish Final Slate" })[0]).toBeDisabled();
     expect(screen.getByText("Slate not ready")).toBeInTheDocument();
-    expect(screen.getAllByText(/Final slate requires exactly 7 selected rows/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Cannot publish an empty slate/i)[0]).toBeInTheDocument();
   });
 
-  it("enables final-slate publish only after the 5 Core + 2 Context slate is ready", async () => {
-    const readySlate = Array.from({ length: 7 }, (_, index) => {
+  it("enables final-slate publish after a valid partial slate is ready", async () => {
+    const readySlate = Array.from({ length: 3 }, (_, index) => {
       const slot = index + 1;
 
       return {
@@ -205,7 +205,7 @@ describe("signals editorial review page", () => {
     expect(screen.getByText("Slate ready")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Publish Final Slate" }).every((button) => !button.hasAttribute("disabled")))
       .toBe(true);
-    expect(screen.getAllByText("Ready to publish the validated 5 Core + 2 Context slate.")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Ready to publish the validated 1-5 row slate.")[0]).toBeInTheDocument();
     expect(screen.getByText("Post-publish verification")).toBeInTheDocument();
     expect(screen.getByText("Rollback preparation")).toBeInTheDocument();
   });
@@ -273,8 +273,8 @@ describe("signals editorial review page", () => {
     expect(screen.getByRole("heading", { name: "Published Slate Audit" })).toBeInTheDocument();
     expect(screen.getByText("By editor@example.com")).toBeInTheDocument();
     expect(screen.getByText("7 rows")).toBeInTheDocument();
-    expect(screen.getByText("5 Core")).toBeInTheDocument();
-    expect(screen.getByText("2 Context")).toBeInTheDocument();
+    expect(screen.getAllByText("5 Core").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2 Context").length).toBeGreaterThan(0);
     expect(screen.getByText("old-live-1")).toBeInTheDocument();
     expect(screen.getAllByText("Ready Signal 5").length).toBeGreaterThan(0);
     expect(screen.getByText(/Approved · Replacement/)).toBeInTheDocument();
@@ -463,7 +463,7 @@ describe("signals editorial review page", () => {
     expect(screen.getAllByText(/Publish is disabled:/)[0]).toBeInTheDocument();
   });
 
-  it("keeps approved rows waiting for the full Top 5 publish gate", async () => {
+  it("keeps approved rows waiting for the final-slate publish gate", async () => {
     getEditorialReviewState.mockResolvedValue({
       ...createAuthorizedState([approvedPost]),
     });
@@ -473,10 +473,10 @@ describe("signals editorial review page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Expand" }));
     expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Approved and waiting for the full Top 5 publish gate/i)).toBeInTheDocument();
+    expect(screen.getByText(/Approved and waiting for the final-slate publish gate/i)).toBeInTheDocument();
   });
 
-  it("shows final-slate readiness instead of the old Top 5 publish gate", async () => {
+  it("shows final-slate readiness instead of the old individual publish gate", async () => {
     getEditorialReviewState.mockResolvedValue({
       ...createAuthorizedState([
         reviewPost,
@@ -494,7 +494,7 @@ describe("signals editorial review page", () => {
 
     expect(screen.getAllByRole("button", { name: "Publish Final Slate" })[0]).toBeDisabled();
     expect(screen.getByText("Slate not ready")).toBeInTheDocument();
-    expect(screen.getAllByText(/Final slate requires exactly 7 selected rows/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Cannot publish an empty slate/i)[0]).toBeInTheDocument();
   });
 
   it("locks final-slate composer controls for live or already published rows", async () => {
@@ -628,7 +628,7 @@ describe("signals editorial review page", () => {
     expect(screen.getByRole("button", { name: "Hold" })).toBeEnabled();
   });
 
-  it("blocks composer readiness with a seven-row slate message for a three-row current set", async () => {
+  it("blocks composer readiness when no rows are selected for a three-row current set", async () => {
     getEditorialReviewState.mockResolvedValue({
       ...createAuthorizedState([
         reviewPost,
@@ -655,7 +655,7 @@ describe("signals editorial review page", () => {
     expect(screen.getByText("3 current candidates")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Publish Final Slate" })[0]).toBeDisabled();
     expect(
-      screen.getAllByText("Final slate requires exactly 7 selected rows. Current count: 0.")[0],
+      screen.getAllByText("Cannot publish an empty slate. Select 1-5 rows before publishing.")[0],
     ).toBeInTheDocument();
   });
 
@@ -692,7 +692,7 @@ describe("signals editorial review page", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Publish Final Slate" })[0]).toBeDisabled();
     expect(
-      screen.getAllByText("Final slate requires exactly 7 selected rows. Current count: 0.")[0],
+      screen.getAllByText("Cannot publish an empty slate. Select 1-5 rows before publishing.")[0],
     ).toBeInTheDocument();
   });
 
