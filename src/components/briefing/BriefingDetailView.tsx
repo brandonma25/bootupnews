@@ -44,9 +44,6 @@ export function BriefingDetailView({
             <h1 className="text-2xl font-semibold tracking-normal text-[var(--text-primary)] md:text-[32px] md:leading-[1.25]">
               {data.briefing.title}
             </h1>
-            <p className="max-w-2xl text-base text-[var(--text-secondary)]">
-              {data.briefing.intro}
-            </p>
             <div className="flex flex-wrap gap-2">
               <Badge>{topEvents.length} {topEvents.length === 1 ? "top event" : "top events"}</Badge>
               <Badge>{data.briefing.readingWindow}</Badge>
@@ -117,7 +114,10 @@ function BriefingEventDetailCard({
   featured: boolean;
 }) {
   return (
-    <Panel className={cn("p-5", featured && "p-6")}>
+    <div
+      className={cn("rounded-card border border-transparent bg-[var(--card)] p-5", featured && "p-6")}
+      data-testid="briefing-detail-card"
+    >
       <article className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -193,7 +193,7 @@ function BriefingEventDetailCard({
           </section>
         ) : null}
       </article>
-    </Panel>
+    </div>
   );
 }
 
