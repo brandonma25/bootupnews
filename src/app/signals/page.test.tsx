@@ -78,6 +78,23 @@ describe("public signals page", () => {
     expect(screen.queryByText("Raw AI draft should not be public")).not.toBeInTheDocument();
   }, 10000);
 
+  it("renders public card-face labels and clamps the why-this-ranks preview", async () => {
+    getPublicSignalsPageState.mockResolvedValue({
+      kind: "published",
+      posts: [createPublishedPost(1)],
+    });
+
+    const Page = (await import("@/app/signals/page")).default;
+    render(await Page());
+
+    expect(screen.getByText("Why this ranks")).toBeInTheDocument();
+    expect(screen.queryByText("Why it matters")).not.toBeInTheDocument();
+    expect(screen.queryByText("WHY IT MATTERS")).not.toBeInTheDocument();
+    expect(screen.queryByText("Top Event")).not.toBeInTheDocument();
+    expect(screen.queryByText("TOP EVENT")).not.toBeInTheDocument();
+    expect(screen.getByTestId("signals-why-it-matters-preview")).toHaveClass("line-clamp-2");
+  }, 10000);
+
   it("renders Core and Context sections for the published slate", async () => {
     getPublicSignalsPageState.mockResolvedValue({
       kind: "published",

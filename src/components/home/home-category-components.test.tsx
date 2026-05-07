@@ -141,7 +141,7 @@ describe("CategoryTabStrip", () => {
           createSection({ key: "finance", label: "Finance", events: [] }),
         ]}
         isAuthenticated
-        gatedCategoryState={<div>Create a free account to read Tech News, Economics, and Politics</div>}
+        gatedCategoryState={<div>Sign up to be notified when new signals are published.</div>}
         renderTopEvent={(event) => <article>{event.title}</article>}
         renderCategoryEvent={(event) => <article>{event.title}</article>}
       />,
@@ -152,7 +152,7 @@ describe("CategoryTabStrip", () => {
     expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Tech category event")).toBeInTheDocument();
     expect(screen.queryByText("Top ranked event")).not.toBeInTheDocument();
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
   });
 
@@ -188,7 +188,7 @@ describe("CategoryTabStrip", () => {
         isAuthenticated={false}
         gatedCategoryState={({ onDismiss }) => (
           <div>
-            <p>Create a free account to read Tech News, Economics, and Politics</p>
+            <p>Sign up to be notified when new signals are published.</p>
             <button type="button" onClick={onDismiss}>Dismiss</button>
           </div>
         )}
@@ -197,12 +197,12 @@ describe("CategoryTabStrip", () => {
       />,
     );
 
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
 
     fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
 
-    expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText("Top ranked event")).not.toBeInTheDocument();
     expect(screen.getByText("Tech category event")).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe("CategoryTabStrip", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(screen.getByText("Top ranked event")).toBeInTheDocument();
   });
 
@@ -224,7 +224,7 @@ describe("CategoryTabStrip", () => {
           createSection({ key: "politics", label: "Politics", events: [], emptyReason: "No major politics signals in today's briefing." }),
         ]}
         isAuthenticated={false}
-        gatedCategoryState={<div>Create a free account to read Tech News, Economics, and Politics</div>}
+        gatedCategoryState={<div>Sign up to be notified when new signals are published.</div>}
         renderTopEvent={(event) => <article>{event.title}</article>}
         renderCategoryEvent={(event) => <article>{event.title}</article>}
       />,
@@ -236,7 +236,7 @@ describe("CategoryTabStrip", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Economics" }));
 
-    expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
     expect(screen.getByText("No major economics signals in today's briefing.")).toBeInTheDocument();
     expect(screen.queryByText("Top ranked event")).not.toBeInTheDocument();
   });
