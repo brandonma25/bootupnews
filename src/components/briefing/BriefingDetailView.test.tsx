@@ -89,4 +89,20 @@ describe("BriefingDetailView", () => {
     expect(detailCard).not.toHaveClass("glass-panel");
     expect(detailCard).toHaveClass("border-transparent");
   });
+
+  it("does not render internal ranking explanation copy on public detail cards", () => {
+    render(<BriefingDetailView data={createData()} viewer={null} />);
+
+    expect(screen.queryByText(/why this ranks here/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/confirmed-event rail/i)).not.toBeInTheDocument();
+  });
+
+  it("does not duplicate the lead paragraph in the What happened section", () => {
+    const item = createItem();
+
+    render(<BriefingDetailView data={createData()} viewer={null} />);
+
+    expect(screen.getAllByText(item.whatHappened)).toHaveLength(1);
+    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
+  });
 });
