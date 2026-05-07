@@ -16,12 +16,13 @@
 - Related PRD: none; bug-fix / public surface copy remediation only.
 - PR: #202, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/202`.
 - Branch: `bugfix/public-surface-copy-remediation`.
-- Head SHA: `4a9f348e37236f642dbda22ca1006f2f6441ea10` before PR metadata update.
-- Merge SHA: pending.
-- GitHub source-of-truth status: PR open.
+- Implementation SHA: `4a9f348e37236f642dbda22ca1006f2f6441ea10`.
+- Final head SHA: `ca8df01b825bfa32984df9b9f7f62d01ee168f86`.
+- Merge SHA: `93b41cdd8728ce1e421582003db96cd8f15a437a`.
+- GitHub source-of-truth status: merged into `main` at `2026-05-07T04:58:00Z`.
 - External references reviewed, if any: Cowork analysis supplied in prompt, Product Position guidance supplied in prompt, and PR #201 scoped hotfix precedent.
 - Google Sheet / Work Log reference, if historically relevant: none used as a write target.
-- Branch cleanup status: pending post-merge cleanup.
+- Branch cleanup status: remote branch, local branch, and temporary implementation worktree removed after production verification.
 
 ## Fix Decisions
 - Fix 3a: removed the public `Why this ranks here` block because the available text is generated template copy from the homepage view model, not a trusted reader-facing card-specific field. The reader-facing `Why it matters` copy remains.
@@ -48,10 +49,22 @@
   - `python3 scripts/check-governance-hotspots.py --diff-mode local --branch-name bugfix/public-surface-copy-remediation --pr-title "bug-fix: remove internal editorial vocabulary from /briefing and /signals public surfaces"` passed.
   - `python3 scripts/release-governance-gate.py --diff-mode local --branch-name bugfix/public-surface-copy-remediation --pr-title "bug-fix: remove internal editorial vocabulary from /briefing and /signals public surfaces"` passed.
   - `python3 scripts/pr-governance-audit.py --diff-mode local --branch-name bugfix/public-surface-copy-remediation --pr-title "bug-fix: remove internal editorial vocabulary from /briefing and /signals public surfaces"` passed.
+  - GitHub PR Gate passed after the final metadata update: Vercel, Vercel Preview Comments, feature-system CSV validation, PR build, Chromium E2E, WebKit E2E, lint, PR summary, unit tests, and release-governance gate.
 - Human checks:
   - Local browser `/signals` confirmed `Published editorial layer`, `watch`, and `High` were absent and the `Signals` public badge rendered.
   - Local browser `/briefing/2026-05-06` did not have production snapshot data available, but confirmed `Why this ranks here` and `confirmed-event rail` were absent from the rendered page.
-  - Preview and production verification remain pending deployment.
+  - Vercel preview verification passed for `/`, `/signals`, and `/briefing/2026-05-06`; removed internal strings were absent and unchanged public content remained visible.
+  - Production deployment: `dpl_5vYVQSc3ak8Wi39B6E42xUsDSsva`, `https://bootup-l9r4iysw2-brandonma25s-projects.vercel.app`, created `2026-05-07T04:58:31Z`, target `production`, status `Ready`.
+  - Production alias checked: `https://daily-intelligence-aggregator-ybs9.vercel.app`.
+  - Production HTTP checks passed: `/` 200, `/signals` 200, `/briefing/2026-05-06` 200.
+  - Production Chrome incognito click-level QA passed: homepage category tabs, category gates, login routing, briefing detail navigation, detail tabs, `/signals`, and `/signals` to homepage navigation all worked.
+  - Fix-specific production QA passed: `/briefing/2026-05-06` no longer rendered `Why this ranks here` or `confirmed-event rail`; `/signals` no longer rendered `watch`, `High`, or `Published editorial layer`; `/signals` still rendered category tags such as `Finance` and `Tech`.
+
+## Documentation Closeout
+- `docs/engineering/testing/pr-202-public-surface-copy-remediation-validation.md` records the post-merge preview, production, and click-level QA evidence.
+- No binary screenshot artifact is committed with this docs closeout; the production UI state is recorded as route, click, and string-presence evidence to keep the documentation PR lightweight.
+- No Google Sheet, Work Log, tracker sync, or external documentation target was written.
 
 ## Remaining Risks / Follow-up
 - Cowork Fix 5 and Fix 6 remain separate and out of scope for this PR.
+- This record does not claim broader UI cleanup beyond PR #202's public-surface copy remediation.
