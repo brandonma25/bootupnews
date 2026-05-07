@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ErrorBoundaryPage from "@/app/error";
@@ -105,6 +105,12 @@ describe("LandingHomepage", () => {
     expect(screen.getByText("Point two")).toBeInTheDocument();
     expect(screen.getByText("Point three")).toBeInTheDocument();
     expect(screen.getAllByText("Reuters").length).toBeGreaterThan(0);
+    const card = screen.getByTestId("home-top-event-card");
+    expect(within(card).getByText("Core Signal")).toBeInTheDocument();
+    expect(within(card).getByText("Why this ranks")).toBeInTheDocument();
+    expect(within(card).queryByText("Top Event")).not.toBeInTheDocument();
+    expect(within(card).queryByText("WHY IT MATTERS")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Why it matters")).not.toBeInTheDocument();
     expect(screen.queryByText(/Open full briefing/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Details" })).toHaveAttribute(
       "href",
@@ -166,7 +172,7 @@ describe("LandingHomepage", () => {
     expect(whyItMatters).toHaveTextContent(
       "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
     );
-    expect(whyItMatters).not.toHaveClass("line-clamp-3");
+    expect(whyItMatters).toHaveClass("line-clamp-2");
     expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -343,7 +349,7 @@ describe("LandingHomepage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Read more" }));
     const expandedBody = screen.getByTestId("home-why-it-matters-text");
-    expect(expandedBody).not.toHaveClass("line-clamp-3");
+    expect(expandedBody).not.toHaveClass("line-clamp-2");
     expect(
       Array.from(expandedBody.querySelectorAll("p"))
         .map((paragraph) => paragraph.textContent)
@@ -352,7 +358,7 @@ describe("LandingHomepage", () => {
     expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(screen.getByRole("button", { name: "Show less" }));
-    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-2");
     expect(screen.getByTestId("home-why-it-matters-text")).toHaveTextContent(
       "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
     );
@@ -410,7 +416,7 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-2");
     expect(screen.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
   });
 
@@ -431,7 +437,7 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    expect(screen.queryByText("Why it matters")).not.toBeInTheDocument();
+    expect(screen.queryByText("Why this ranks")).not.toBeInTheDocument();
     expect(screen.queryByTestId("home-why-it-matters-text")).not.toBeInTheDocument();
   });
 
@@ -613,6 +619,35 @@ describe("LandingHomepage", () => {
     expect(screen.getAllByTestId("home-top-event-card")).toHaveLength(5);
   });
 
+  it("uses neutral signup copy when a signed-out category tab is empty", () => {
+    const data = createData([
+      createItem({
+        id: "top-tech",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Cloud providers expand AI capacity plans",
+        matchedKeywords: ["cloud", "ai", "capacity"],
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+
+    const techPanel = document.getElementById("tech-panel");
+    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
+    expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("No major technology signals in today's briefing.");
+  });
+
   it("lets signed-in users read populated category tabs without showing the signed-out gate", () => {
     const topItems = [
       createItem({
@@ -736,14 +771,14 @@ describe("LandingHomepage", () => {
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
 
     expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryAllByTestId("home-top-event-card")).toHaveLength(0);
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
   });
 
   it("shows signed-out category stories when publicRankedItems has eligible depth", () => {
@@ -881,7 +916,7 @@ describe("LandingHomepage", () => {
 
     const techPanel = document.getElementById("tech-panel");
 
-    expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
     expect(techPanel).not.toBeNull();
     expect(techPanel).toHaveTextContent("Open source database maintainers ship a query planner update");
     expect(techPanel).toHaveTextContent("Cloud security teams automate secrets rotation across edge workloads");

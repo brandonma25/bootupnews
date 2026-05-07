@@ -196,7 +196,7 @@ function HomeTopEventCard({
               #{rank}
             </span>
             <div className="space-y-2">
-              <p className="section-label">Top Event</p>
+              <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">Core Signal</p>
               <div className="flex flex-wrap gap-2">
                 <Badge>{event.topicName}</Badge>
               </div>
@@ -237,8 +237,8 @@ function HomeTopEventCard({
 
         {whyItMatters ? (
           <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-4">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
-              Why it matters
+            <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">
+              Why this ranks
             </p>
             <WhyItMattersPreview
               text={whyItMatters}
@@ -354,7 +354,7 @@ function WhyItMattersPreview({
         </div>
       ) : (
         <p
-          className="text-base leading-7 text-[var(--text-primary)]"
+          className="line-clamp-2 text-base leading-7 text-[var(--text-primary)]"
           data-testid="home-why-it-matters-text"
         >
           {shouldCollapse ? collapsedPreview : displayedPreview}
@@ -456,7 +456,7 @@ function CategorySoftGate({
       <div className="flex items-start justify-between gap-4">
         <div className="max-w-xl">
           <p className="text-base font-semibold text-[var(--text-primary)]">
-            Create a free account to read Tech News, Economics, and Politics
+            Sign up to be notified when new signals are published.
           </p>
         </div>
         <Button

@@ -22,7 +22,7 @@ test.describe("homepage", () => {
   test("renders the public V1 briefing flow", async ({ page, diagnostics }) => {
     await page.goto("/");
 
-    await expect(page).toHaveTitle(/Daily Intelligence Briefing/i);
+    await expect(page).toHaveTitle(/Boot Up/i);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
     if (await page.getByRole("link", { name: "Details" }).first().isVisible()) {
       await expect(page.getByRole("link", { name: "Details" }).first()).toBeVisible();
@@ -140,13 +140,15 @@ test.describe("homepage", () => {
     await page.goto("/");
 
     const topEventCards = page.getByTestId("home-top-event-card");
-    const gateCopy = "Create a free account to read Tech News, Economics, and Politics";
+    const gateCopy = "Sign up to be notified when new signals are published.";
+    const oldGateCopy = "Create a free account to read Tech News, Economics, and Politics";
     const techNewsTab = page.getByRole("tab", { name: "Tech News" });
     const topEventCount = await topEventCards.count();
 
     if (topEventCount === 0) {
       await expectFallbackBriefingCopy(page);
       await expect(page.getByText(gateCopy)).toHaveCount(0);
+      await expect(page.getByText(oldGateCopy)).toHaveCount(0);
       await expectNoStaticHomepagePlaceholder(page);
       expect(diagnostics.entries).toEqual([]);
       return;
@@ -154,6 +156,7 @@ test.describe("homepage", () => {
 
     await expect(topEventCards.first()).toBeVisible();
     await expect(page.getByText(gateCopy)).toHaveCount(0);
+    await expect(page.getByText(oldGateCopy)).toHaveCount(0);
 
     await expect(techNewsTab).toBeVisible();
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -171,6 +174,7 @@ test.describe("homepage", () => {
     await expect(techNewsTab).toHaveAttribute("aria-selected", "true");
     await expect(gate).toBeVisible();
     await expect(gate.getByText(gateCopy)).toBeVisible();
+    await expect(gate.getByText(oldGateCopy)).toHaveCount(0);
     await expect(gate.getByRole("link", { name: "Sign Up" })).toHaveAttribute("href", "/signup?redirectTo=%2F");
     await expect(gate.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/login?redirectTo=%2F");
     await expect(topEventCards).toHaveCount(0);
@@ -178,6 +182,7 @@ test.describe("homepage", () => {
     await page.getByRole("button", { name: "Dismiss category gate" }).click();
 
     await expect(page.getByText(gateCopy)).toHaveCount(0);
+    await expect(page.getByText(oldGateCopy)).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
     await expect(topEventCards.first()).toBeVisible();
     expect(diagnostics.entries).toEqual([]);

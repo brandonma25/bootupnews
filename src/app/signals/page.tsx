@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Published Signals",
+  title: "Boot Up — Today's Signals",
 };
 
 const INTERNAL_PUBLIC_SIGNAL_TAGS = new Set(["critical", "high", "watch"]);
@@ -171,8 +171,13 @@ function SignalSection({
                   </div>
                   <p className="text-sm leading-6 text-[var(--text-secondary)]">{post.summary}</p>
                   <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] p-4">
-                    <p className="section-label">Why it matters</p>
-                    <p className="mt-2 text-base leading-7 text-[var(--text-primary)]">
+                    <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">
+                      Why this ranks
+                    </p>
+                    <p
+                      className="mt-2 line-clamp-2 text-base leading-7 text-[var(--text-primary)]"
+                      data-testid="signals-why-it-matters-preview"
+                    >
                       {post.publishedWhyItMatters}
                     </p>
                   </div>
