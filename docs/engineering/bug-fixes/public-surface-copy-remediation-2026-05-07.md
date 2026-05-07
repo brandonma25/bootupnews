@@ -14,11 +14,11 @@
 ## Fix
 - Exact change: remove the public `/briefing/[date]` `Why this ranks here` block, suppress the `What happened` section only when it duplicates the lead copy exactly, filter internal `/signals` tag badges, and replace the `/signals` internal header badge with reader-facing `Signals`.
 - Related PRD: none; bug-fix / public surface copy remediation only.
-- PR: pending.
+- PR: #202, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/202`.
 - Branch: `bugfix/public-surface-copy-remediation`.
-- Head SHA: pending.
+- Head SHA: `4a9f348e37236f642dbda22ca1006f2f6441ea10` before PR metadata update.
 - Merge SHA: pending.
-- GitHub source-of-truth status: pending PR.
+- GitHub source-of-truth status: PR open.
 - External references reviewed, if any: Cowork analysis supplied in prompt, Product Position guidance supplied in prompt, and PR #201 scoped hotfix precedent.
 - Google Sheet / Work Log reference, if historically relevant: none used as a write target.
 - Branch cleanup status: pending post-merge cleanup.
