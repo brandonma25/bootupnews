@@ -8,9 +8,9 @@
 ## Fix
 - Exact change: Recompute fallback persisted WITM validation with the same Core/Context context fields used by the controlled pipeline report, while still preserving supplied validation metadata when present.
 - Related PRD: No new PRD required; this is controlled operations remediation for the existing Phase 1 editorial cycle validation path.
-- PR: TBD.
+- PR: https://github.com/brandonma25/daily-intelligence-aggregator/pull/207.
 - Branch: `fix/draft-only-witm-validation-context-20260508`.
-- Head SHA at PR creation: TBD.
+- Head SHA at PR creation: `671931c513ff8001b329af9f126925d9e7fc685d`.
 - Merge SHA: TBD.
 - GitHub source-of-truth status: pending PR.
 - External references reviewed, if any: BOOT_UP_WORK_LOG_v2 decisions supplied by PM; Product Position fail-closed principles supplied by PM; live `draft_only` artifact and database readback from the 2026-05-08 second editorial cycle; PR #206 selection remediation.
