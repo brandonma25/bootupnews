@@ -885,7 +885,13 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
     item.importanceLabel,
   ].filter((value): value is string => Boolean(value));
   const aiWhyItMatters = normalizeEditorialText(item.aiWhyItMatters ?? item.whyItMatters);
-  const validation = item.whyItMattersValidation ?? validateWhyItMatters(aiWhyItMatters);
+  const validation = item.whyItMattersValidation ?? validateWhyItMatters(aiWhyItMatters, {
+    title: item.title,
+    eligibilityTier: item.selectionEligibility?.tier ?? "core_signal_eligible",
+    contentAccessibility: item.selectionEligibility?.contentAccessibility ?? null,
+    accessibleTextLength: item.selectionEligibility?.accessibleTextLength ?? null,
+    eventType: item.selectionEligibility?.eventType ?? item.eventIntelligence?.eventType ?? null,
+  });
 
   return {
     id: `candidate-${index + 1}`,
