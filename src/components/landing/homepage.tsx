@@ -172,9 +172,7 @@ function HomeTopEventCard({
 }) {
   const titleNormalized = event.title.trim();
   const keyPoints = Array.isArray(event.keyPoints)
-    ? event.keyPoints
-        .map((point) => point.trim())
-        .filter((point) => Boolean(point) && point !== titleNormalized)
+    ? getDistinctKeyPoints(event.keyPoints, [event.title, event.summary, event.whatHappened])
     : [];
   const sourceNames = event.relatedArticles
     .map((article) => article.sourceName.trim())
@@ -307,6 +305,48 @@ function HomeTopEventCard({
       </article>
     </Panel>
   );
+}
+
+function getDistinctKeyPoints(points: string[], comparisons: string[]) {
+  const seen = new Set<string>();
+
+  return points
+    .map((point) => point.trim())
+    .filter((point) => {
+      const normalizedPoint = normalizeReaderCopy(point);
+
+      if (!normalizedPoint || seen.has(normalizedPoint)) {
+        return false;
+      }
+
+      seen.add(normalizedPoint);
+      return comparisons.every((comparison) => isMateriallyDistinctReaderCopy(normalizedPoint, comparison));
+    });
+}
+
+function isMateriallyDistinctReaderCopy(normalizedPoint: string, comparison: string) {
+  const normalizedComparison = normalizeReaderCopy(comparison);
+
+  if (!normalizedComparison || normalizedPoint === normalizedComparison) {
+    return !normalizedComparison;
+  }
+
+  const shorter = normalizedPoint.length < normalizedComparison.length ? normalizedPoint : normalizedComparison;
+  const longer = shorter === normalizedPoint ? normalizedComparison : normalizedPoint;
+
+  if (shorter.length < 40) {
+    return true;
+  }
+
+  return !(longer.startsWith(shorter) && shorter.length / longer.length >= 0.85);
+}
+
+function normalizeReaderCopy(value: string) {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/[.…]+$/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 const WHY_IT_MATTERS_PREVIEW_THRESHOLD = 220;

@@ -142,7 +142,7 @@ test.describe("homepage", () => {
     const topEventCards = page.getByTestId("home-top-event-card");
     const gateCopy = "Sign up to be notified when new signals are published.";
     const oldGateCopy = "Create a free account to read Tech News, Economics, and Politics";
-    const techNewsTab = page.getByRole("tab", { name: "Tech News" });
+    const techTab = page.getByRole("tab", { name: "Tech" });
     const topEventCount = await topEventCards.count();
 
     if (topEventCount === 0) {
@@ -158,11 +158,11 @@ test.describe("homepage", () => {
     await expect(page.getByText(gateCopy)).toHaveCount(0);
     await expect(page.getByText(oldGateCopy)).toHaveCount(0);
 
-    await expect(techNewsTab).toBeVisible();
+    await expect(techTab).toBeVisible();
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await techNewsTab.click();
+      await techTab.click();
 
-      if ((await techNewsTab.getAttribute("aria-selected")) === "true") {
+      if ((await techTab.getAttribute("aria-selected")) === "true") {
         break;
       }
 
@@ -171,7 +171,7 @@ test.describe("homepage", () => {
 
     const gate = page.getByTestId("category-soft-gate");
 
-    await expect(techNewsTab).toHaveAttribute("aria-selected", "true");
+    await expect(techTab).toHaveAttribute("aria-selected", "true");
     await expect(gate).toBeVisible();
     await expect(gate.getByText(gateCopy)).toBeVisible();
     await expect(gate.getByText(oldGateCopy)).toHaveCount(0);

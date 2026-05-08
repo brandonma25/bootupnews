@@ -48,10 +48,11 @@ function createData(
   options: {
     publicRankedItems?: BriefingItem[] | null;
     homepageFreshnessNotice?: DashboardData["homepageFreshnessNotice"];
+    mode?: DashboardData["mode"];
   } = {},
 ): DashboardData {
   return {
-    mode: "live",
+    mode: options.mode ?? "live",
     briefing: {
       id: "briefing-1",
       briefingDate: "2026-04-15T09:00:00.000Z",
@@ -116,6 +117,31 @@ describe("LandingHomepage", () => {
       "href",
       "/briefing/2026-04-15",
     );
+  });
+
+  it("does not repeat the lead summary as a homepage card bullet", () => {
+    const duplicateSummary = "Cloud AI capacity expanded across three hyperscalers.";
+    const data = createData([
+      createItem({
+        id: "duplicate-summary-card",
+        title: "Hyperscalers expand AI capacity",
+        whatHappened: duplicateSummary,
+        keyPoints: [duplicateSummary],
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const card = screen.getByTestId("home-top-event-card");
+    expect(within(card).getAllByText(duplicateSummary)).toHaveLength(1);
+    expect(within(card).queryByTestId("home-top-event-key-points")).not.toBeInTheDocument();
   });
 
   it("renders Top Events from the supplied homepage model instead of raw briefing items", () => {
@@ -619,14 +645,14 @@ describe("LandingHomepage", () => {
     expect(screen.getAllByTestId("home-top-event-card")).toHaveLength(5);
   });
 
-  it("uses neutral signup copy when a signed-out category tab is empty", () => {
+  it("hides the signup gate when a signed-out category tab is empty", () => {
     const data = createData([
       createItem({
-        id: "top-tech",
-        topicId: "tech",
-        topicName: "Tech",
-        title: "Cloud providers expand AI capacity plans",
-        matchedKeywords: ["cloud", "ai", "capacity"],
+        id: "top-finance",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Treasury yields climb after inflation surprise",
+        matchedKeywords: ["treasury", "inflation", "rates"],
       }),
     ]);
 
@@ -639,13 +665,93 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
     const techPanel = document.getElementById("tech-panel");
     expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
-    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(techPanel).not.toBeNull();
-    expect(techPanel).toHaveTextContent("No major technology signals in today's briefing.");
+    expect(techPanel).toHaveTextContent("No major tech signals in today's briefing.");
+  });
+
+  it("routes Finance and Tech cards into matching category tabs when the published set has no depth pool", () => {
+    const financeItem = createItem({
+      id: "published-finance-1",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Treasury yields climb after inflation surprise",
+      matchedKeywords: ["Finance", "watch"],
+      homepageClassification: {
+        primaryCategory: "finance",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 0, finance: 12, politics: 0 },
+        matchedSignals: { tech: [], finance: ["treasury"], politics: [] },
+      },
+    });
+    const secondFinanceItem = createItem({
+      id: "published-finance-2",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Trade flows reroute through Asia suppliers",
+      matchedKeywords: ["Finance", "watch"],
+      homepageClassification: {
+        primaryCategory: "finance",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 0, finance: 12, politics: 0 },
+        matchedSignals: { tech: [], finance: ["trade"], politics: [] },
+      },
+    });
+    const techItem = createItem({
+      id: "published-tech-1",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "AI infrastructure deal expands",
+      matchedKeywords: ["Tech", "watch"],
+      homepageClassification: {
+        primaryCategory: "tech",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 12, finance: 0, politics: 0 },
+        matchedSignals: { tech: ["ai"], finance: [], politics: [] },
+      },
+    });
+    const data = createData([financeItem, secondFinanceItem, techItem], { mode: "public" });
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Tech News" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Economics" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Finance" }));
+    const financePanel = document.getElementById("finance-panel");
+    expect(financePanel).not.toBeNull();
+    expect(financePanel).toHaveTextContent("Treasury yields climb after inflation surprise");
+    expect(financePanel).toHaveTextContent("Trade flows reroute through Asia suppliers");
+    expect(financePanel).not.toHaveTextContent("AI infrastructure deal expands");
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
+    const techPanel = document.getElementById("tech-panel");
+    expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("AI infrastructure deal expands");
+    expect(techPanel).not.toHaveTextContent("Treasury yields climb after inflation surprise");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Politics" }));
+    const politicsPanel = document.getElementById("politics-panel");
+    expect(politicsPanel).not.toBeNull();
+    expect(politicsPanel).toHaveTextContent("No major politics signals in today's briefing.");
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
   });
 
   it("lets signed-in users read populated category tabs without showing the signed-out gate", () => {
@@ -770,12 +876,12 @@ describe("LandingHomepage", () => {
     );
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
     expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
-    expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Tech" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryAllByTestId("home-top-event-card")).toHaveLength(0);
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
@@ -912,7 +1018,7 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
     const techPanel = document.getElementById("tech-panel");
 
@@ -921,7 +1027,7 @@ describe("LandingHomepage", () => {
     expect(techPanel).toHaveTextContent("Open source database maintainers ship a query planner update");
     expect(techPanel).toHaveTextContent("Cloud security teams automate secrets rotation across edge workloads");
     expect(screen.queryByText("Cloud providers expand AI capacity plans")).not.toBeInTheDocument();
-    expect(techPanel).not.toHaveTextContent("No major technology signals in today's briefing.");
+    expect(techPanel).not.toHaveTextContent("No major tech signals in today's briefing.");
   });
 
   it("renders debug diagnostics for QA when enabled", () => {

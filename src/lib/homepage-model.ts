@@ -119,7 +119,6 @@ export type HomepageViewModel = {
 
 const TOP_EVENTS_LIMIT = 4;
 const MIN_PUBLIC_TOP_EVENTS = 3;
-const EDITORIAL_SIGNAL_SET_SIZE = 5;
 const CATEGORY_TAB_LIMIT = 6;
 const DEVELOPING_NOW_EVENT_LIMIT = 10;
 const CATEGORY_PREVIEW_LIMIT = 3;
@@ -217,6 +216,7 @@ export function buildHomepageViewModel(
     topLayerEvents,
     depthLayerEvents,
     topSignalEventIds,
+    allowTopLayerFallback: data.mode === "public",
   });
   const categoryTabSourceEvents = categoryTabPool.sourceEvents;
   const excludedCategoryTabIds = new Set(categoryTabPool.initialExcludedEventIds);
@@ -520,16 +520,18 @@ function resolveCategoryTabPool({
   topLayerEvents,
   depthLayerEvents,
   topSignalEventIds,
+  allowTopLayerFallback,
 }: {
   topLayerEvents: HomepageEvent[];
   depthLayerEvents: HomepageEvent[];
   topSignalEventIds: Set<string>;
+  allowTopLayerFallback: boolean;
 }) {
   const nonTopCategoryDepthEvents = depthLayerEvents.filter(
     (event) => Boolean(event.classification.primaryCategory) && !topSignalEventIds.has(event.id),
   );
   const usesTopLayerFallback =
-    nonTopCategoryDepthEvents.length === 0 && topLayerEvents.length === EDITORIAL_SIGNAL_SET_SIZE;
+    allowTopLayerFallback && nonTopCategoryDepthEvents.length === 0 && topLayerEvents.length > 0;
 
   return {
     sourceEvents: usesTopLayerFallback ? topLayerEvents : depthLayerEvents,
@@ -750,9 +752,9 @@ function sanitizeWhyItMatters(
 function getCategoryTabLabel(categoryKey: HomepageCategoryKey) {
   switch (categoryKey) {
     case "tech":
-      return "Technology";
+      return "Tech";
     case "finance":
-      return "Economics";
+      return "Finance";
     case "politics":
       return "Politics";
   }
@@ -761,9 +763,9 @@ function getCategoryTabLabel(categoryKey: HomepageCategoryKey) {
 function getCategoryTabEmptyReason(categoryKey: HomepageCategoryKey) {
   switch (categoryKey) {
     case "tech":
-      return "No major technology signals in today's briefing.";
+      return "No major tech signals in today's briefing.";
     case "finance":
-      return "No major economics signals in today's briefing.";
+      return "No major finance signals in today's briefing.";
     case "politics":
       return "No major politics signals in today's briefing.";
   }
