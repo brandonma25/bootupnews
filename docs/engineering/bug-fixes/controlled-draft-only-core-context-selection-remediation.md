@@ -8,9 +8,9 @@
 ## Fix
 - Exact change: For the approved seven-row controlled draft-only path, select up to five `core_signal_eligible` rows and up to two `context_signal_eligible` rows from the same ranked candidate pool, preserving fail-closed exclusion of Depth rows.
 - Related PRD: No new PRD required; this is controlled operations remediation for the existing Phase 1 editorial cycle validation path.
-- PR: TBD.
+- PR: https://github.com/brandonma25/daily-intelligence-aggregator/pull/206.
 - Branch: `fix/controlled-draft-only-core-context-selection-20260508`.
-- Head SHA: TBD.
+- Head SHA at PR creation: `7a8fd1d65d3ea88441edf85286c7f5a9d42061a4`.
 - Merge SHA: TBD.
 - GitHub source-of-truth status: pending PR.
 - External references reviewed, if any: BOOT_UP_WORK_LOG_v2 decisions supplied by PM; Product Position fail-closed and signal-card principles supplied by PM; PR #141 controlled draft cap remediation; PR #205 category public-surface remediation; live `draft_only` artifact and database readback from the 2026-05-08 second editorial cycle.
