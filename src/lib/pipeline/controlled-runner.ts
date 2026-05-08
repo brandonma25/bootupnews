@@ -17,6 +17,30 @@ import type { BriefingItem, SignalSelectionEligibilityTier } from "@/lib/types";
 
 type ReplayArtifact = ControlledPipelineReport;
 
+const CONTROLLED_PRODUCT_TARGET_CORE_COUNT = 5;
+const CONTROLLED_PRODUCT_TARGET_CONTEXT_COUNT = 2;
+const CONTROLLED_PRODUCT_TARGET_ROW_COUNT =
+  CONTROLLED_PRODUCT_TARGET_CORE_COUNT + CONTROLLED_PRODUCT_TARGET_CONTEXT_COUNT;
+
+function usesCoreContextProductTarget(config: ControlledPipelineConfig) {
+  return (
+    config.draftMaxRows === CONTROLLED_PRODUCT_TARGET_ROW_COUNT &&
+    config.draftTierAllowlist?.includes("core_signal_eligible") &&
+    config.draftTierAllowlist.includes("context_signal_eligible")
+  );
+}
+
+function selectCoreContextProductTargetItems(candidates: BriefingItem[]) {
+  const coreItems = candidates
+    .filter((item) => item.selectionEligibility?.tier === "core_signal_eligible")
+    .slice(0, CONTROLLED_PRODUCT_TARGET_CORE_COUNT);
+  const contextItems = candidates
+    .filter((item) => item.selectionEligibility?.tier === "context_signal_eligible")
+    .slice(0, CONTROLLED_PRODUCT_TARGET_CONTEXT_COUNT);
+
+  return [...coreItems, ...contextItems];
+}
+
 function selectDraftOnlyItems(input: {
   briefingItems: BriefingItem[];
   publicRankedItems: BriefingItem[];
@@ -30,6 +54,10 @@ function selectDraftOnlyItems(input: {
 
   const allowedTiers = new Set(config.draftTierAllowlist ?? ["core_signal_eligible"]);
   const candidates = publicRankedItems.length > 0 ? publicRankedItems : briefingItems;
+  if (usesCoreContextProductTarget(config)) {
+    return selectCoreContextProductTargetItems(candidates);
+  }
+
   const selected = candidates.filter((item) => {
     const tier = item.selectionEligibility?.tier;
 
