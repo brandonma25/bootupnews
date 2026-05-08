@@ -1481,6 +1481,41 @@ describe("signals editorial workflow", () => {
     expect(rows[1].why_it_matters_validation_status).toBe("passed");
   });
 
+  it("draft_only mode recomputes WITM validation with Core/Context context before persistence", async () => {
+    const rows: SignalPostRow[] = [];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-05-08",
+      mode: "draft_only",
+      items: [
+        {
+          ...createBriefingItem(1),
+          title: "Economic Letter Countdown: Most Read Topics from 2025",
+          aiWhyItMatters:
+            "Economic Letter Countdown: Most Read Topics from 2025, which matters because it shows which inflation, labor, and growth questions dominated institutional attention.",
+          selectionEligibility: {
+            tier: "core_signal_eligible" as const,
+            reasons: [],
+            warnings: [],
+            contentAccessibility: "full_text_available" as const,
+            accessibleTextLength: 1200,
+            eventType: "macro_data_release",
+          },
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].why_it_matters_validation_status).toBe("requires_human_rewrite");
+    expect(rows[0].why_it_matters_validation_failures).toEqual(["unsupported_structural_claim"]);
+    expect(rows[0].why_it_matters_validation_details).toContain(
+      "unsupported_structural_claim: Core WITM is attached to a retrospective or meta-story that needs selection review before publication.",
+    );
+  });
+
   it("draft_only mode preserves supplied WITM validation metadata instead of recomputing it", async () => {
     const rows: SignalPostRow[] = [];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
