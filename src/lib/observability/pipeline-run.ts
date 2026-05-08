@@ -60,10 +60,35 @@ export type ClusterScoreLog = {
   ranking_explanation: string;
 };
 
+export type ArticleFilterRunEntry = {
+  article_id: string;
+  title: string;
+  source_name: string;
+  source_url: string;
+  source_tier: string;
+  source_role?: string;
+  content_accessibility?: string;
+  accessible_text_length?: number;
+  summary_length?: number;
+  content_length?: number;
+  extraction_method?: string;
+  fetch_status?: string;
+  parse_status?: string;
+  failure_reason?: string | null;
+  supplied_by_manifest?: boolean;
+  public_eligible?: boolean;
+  headline_quality: string;
+  event_type: string;
+  filter_decision: string;
+  filter_severity: string;
+  filter_reasons: string[];
+};
+
 export type PipelineRun = {
   run_id: string;
   timestamp: string;
   num_raw_items: number;
+  num_after_filter: number;
   num_after_dedup: number;
   num_clusters: number;
   avg_cluster_size: number;
@@ -89,10 +114,19 @@ export type PipelineRun = {
     recent_merge_reasons: string[];
   }>;
   feed_failures: Array<{
+    source_id?: string;
     source: string;
     feedUrl: string;
+    failure_type?: string;
     error: string;
   }>;
+  article_filter_evaluations: ArticleFilterRunEntry[];
+  article_filter_summary: {
+    pass_count: number;
+    suppress_count: number;
+    reject_count: number;
+    excluded_candidate_count: number;
+  };
   source_resolution: RuntimeSourceResolutionSnapshot | null;
   active_sources: Array<{
     source_id: string;
@@ -100,13 +134,31 @@ export type PipelineRun = {
     donor: string;
     source_class: string;
     trust_tier: string;
+    source_role?: string;
+    public_eligible?: boolean;
+    supplied_by_manifest?: boolean;
   }>;
   source_contributions: Array<{
     source_id: string;
     source: string;
     donor: string;
+    topic?: string;
     source_class: string;
     trust_tier: string;
+    source_tier?: string;
+    source_role?: string;
+    public_eligible?: boolean;
+    content_accessibility?: string;
+    accessible_text_length_max?: number;
+    extraction_method?: string;
+    fetch_status?: string;
+    parse_status?: string;
+    failure_reason?: string | null;
+    functional_for_core?: boolean;
+    functional_for_context?: boolean;
+    functional_for_depth?: boolean;
+    accessibility_warnings?: string[];
+    core_blocking_reasons?: string[];
     item_count: number;
   }>;
   used_seed_fallback: boolean;
@@ -117,6 +169,7 @@ export function createEmptyPipelineRun(runId: string): PipelineRun {
     run_id: runId,
     timestamp: new Date().toISOString(),
     num_raw_items: 0,
+    num_after_filter: 0,
     num_after_dedup: 0,
     num_clusters: 0,
     avg_cluster_size: 0,
@@ -129,6 +182,13 @@ export function createEmptyPipelineRun(runId: string): PipelineRun {
     suppressed_ranked_clusters: [],
     sample_cluster_rationale: [],
     feed_failures: [],
+    article_filter_evaluations: [],
+    article_filter_summary: {
+      pass_count: 0,
+      suppress_count: 0,
+      reject_count: 0,
+      excluded_candidate_count: 0,
+    },
     source_resolution: null,
     active_sources: [],
     source_contributions: [],

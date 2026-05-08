@@ -90,6 +90,8 @@ class GovernanceContext:
     relevant_doc_updates: list[str]
     doc_lanes_updated: list[str]
     hotspot_files_touched: list[str]
+    prd_exception: bool
+    prd_exception_reasons: list[str]
     fix_signal: bool
     fix_signal_reasons: list[str]
 
@@ -307,7 +309,35 @@ def detect_fix_signal(branch: str, pr_title: str, changed_paths: list[str]) -> t
     return bool(deduped_reasons), deduped_reasons
 
 
-def classify_changes(changes: dict[str, Change], branch: str, pr_title: str) -> GovernanceContext:
+def detect_prd_exception(repo_root: Path | None, changed_paths: list[str]) -> tuple[bool, list[str]]:
+    if repo_root is None:
+        return False, []
+
+    reasons: list[str] = []
+    for path in changed_paths:
+        if not path.startswith("docs/engineering/change-records/"):
+            continue
+
+        target = repo_root / path
+        if not target.is_file():
+            continue
+
+        text = target.read_text(encoding="utf-8").lower()
+        has_no_prd_marker = re.search(r"canonical prd required:\s*`?no`?", text) is not None
+        has_remediation_marker = "remediation" in text or "audit" in text
+
+        if has_no_prd_marker and has_remediation_marker:
+            reasons.append(f"{path} declares an audit/remediation-backed no-PRD exception")
+
+    return bool(reasons), reasons
+
+
+def classify_changes(
+    changes: dict[str, Change],
+    branch: str,
+    pr_title: str,
+    repo_root: Path | None = None,
+) -> GovernanceContext:
     changed_paths = sorted(changes)
     monitored_changes = [change for change in changes.values() if is_monitored_file(change.path)]
     non_test_monitored = [change for change in monitored_changes if not is_test_file(change.path)]
@@ -325,12 +355,13 @@ def classify_changes(changes: dict[str, Change], branch: str, pr_title: str) -> 
         }
     )
     hotspot_files_touched = [path for path in HOTSPOT_FILES if path in changed_paths]
+    prd_exception, prd_exception_reasons = detect_prd_exception(repo_root, changed_paths)
     fix_signal, fix_signal_reasons = detect_fix_signal(branch, pr_title, changed_paths)
 
     if changed_paths and all(is_docs_file(path) for path in changed_paths):
         classification = "docs-only"
     elif new_prd_files or added_new_feature_files:
-        classification = "new-feature-or-system"
+        classification = "material-feature-change" if prd_exception and not new_prd_files else "new-feature-or-system"
     elif not monitored_changes:
         classification = "trivial-code-change"
     else:
@@ -373,6 +404,8 @@ def classify_changes(changes: dict[str, Change], branch: str, pr_title: str) -> 
         relevant_doc_updates=relevant_doc_updates,
         doc_lanes_updated=doc_lanes_updated,
         hotspot_files_touched=hotspot_files_touched,
+        prd_exception=prd_exception,
+        prd_exception_reasons=prd_exception_reasons,
         fix_signal=fix_signal,
         fix_signal_reasons=fix_signal_reasons,
     )

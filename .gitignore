@@ -39,6 +39,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase local link metadata
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -54,3 +57,6 @@ project.md
 
 # local remediation evidence
 /recovery-audit-*/
+
+# controlled pipeline run artifacts
+/.pipeline-runs/

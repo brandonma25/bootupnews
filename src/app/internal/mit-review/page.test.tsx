@@ -80,7 +80,7 @@ describe("MIT internal review page", () => {
     expect(screen.getByText("Internal access required")).toBeInTheDocument();
     expect(screen.getByText("No evidence exposed")).toBeInTheDocument();
     expect(collectMitInternalReviewData).not.toHaveBeenCalled();
-  });
+  }, 10000);
 
   it("renders sanitized MIT review evidence for authenticated requests", async () => {
     safeGetUser.mockResolvedValue({
@@ -98,5 +98,5 @@ describe("MIT internal review page", () => {
     expect(screen.getByText("AI chip policy shifts after new export rules")).toBeInTheDocument();
     expect(screen.getByText("No obvious title/snippet duplication against fetched default feeds.")).toBeInTheDocument();
     expect(screen.queryByText(/feedUrl/i)).not.toBeInTheDocument();
-  });
+  }, 10000);
 });

@@ -2,6 +2,16 @@ function normalizeEnv(value: string | undefined) {
   return value?.trim() ?? "";
 }
 
+function normalizePositiveIntegerEnv(value: string | undefined) {
+  const normalized = normalizeEnv(value);
+  if (!normalized) {
+    return "";
+  }
+
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : "";
+}
+
 export function resolvePublicSupabaseConfig({
   supabaseUrl,
   supabaseAnonKey,
@@ -65,6 +75,7 @@ export function getSupabasePublicEnvDiagnostics() {
 
 export const env = {
   appUrl: publicSupabaseConfig.appUrl,
+  adminEmails: normalizeEnv(process.env.ADMIN_EMAILS),
   homepageDebug,
   supabaseUrl: publicSupabaseConfig.url,
   supabaseAnonKey: publicSupabaseConfig.key,
@@ -75,6 +86,8 @@ export const env = {
   theNewsApiKey:
     normalizeEnv(process.env.THE_NEWS_API_KEY) || normalizeEnv(process.env.NEWS_API_KEY),
   newsApiKey: normalizeEnv(process.env.NEWS_API_KEY),
+  tldrMaxItemsPerRun: normalizePositiveIntegerEnv(process.env.TLDR_MAX_ITEMS_PER_RUN),
+  tldrLookbackDays: normalizePositiveIntegerEnv(process.env.TLDR_LOOKBACK_DAYS),
 };
 
 export const isSupabaseConfigured = Boolean(env.supabaseUrl && env.supabaseAnonKey);

@@ -44,9 +44,6 @@ export function BriefingDetailView({
             <h1 className="text-2xl font-semibold tracking-normal text-[var(--text-primary)] md:text-[32px] md:leading-[1.25]">
               {data.briefing.title}
             </h1>
-            <p className="max-w-2xl text-base text-[var(--text-secondary)]">
-              {data.briefing.intro}
-            </p>
             <div className="flex flex-wrap gap-2">
               <Badge>{topEvents.length} {topEvents.length === 1 ? "top event" : "top events"}</Badge>
               <Badge>{data.briefing.readingWindow}</Badge>
@@ -116,8 +113,13 @@ function BriefingEventDetailCard({
   rank: number;
   featured: boolean;
 }) {
+  const showWhatHappened = hasDistinctReaderCopy(event.whatHappened, event.summary);
+
   return (
-    <Panel className={cn("p-5", featured && "p-6")}>
+    <div
+      className={cn("rounded-card border border-transparent bg-[var(--card)] p-5", featured && "p-6")}
+      data-testid="briefing-detail-card"
+    >
       <article className="space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -125,7 +127,7 @@ function BriefingEventDetailCard({
               #{rank}
             </span>
             <div className="space-y-2">
-              <p className="section-label">Top Event</p>
+              <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">Core Signal</p>
               <div className="flex flex-wrap gap-2">
                 <Badge>{event.topicName}</Badge>
                 <Badge>{event.intelligence.sourceLabel}</Badge>
@@ -142,16 +144,16 @@ function BriefingEventDetailCard({
           <p className="mt-3 text-base text-[var(--text-secondary)]">{event.summary}</p>
         </div>
 
-        <section className="space-y-2">
-          <p className="section-label">What happened</p>
-          <p className="text-base text-[var(--text-primary)]">{event.whatHappened}</p>
-        </section>
+        {showWhatHappened ? (
+          <section className="space-y-2">
+            <p className="section-label">What happened</p>
+            <p className="text-base text-[var(--text-primary)]">{event.whatHappened}</p>
+          </section>
+        ) : null}
 
         <section className="rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
           <p className="section-label">Why it matters</p>
           <p className="mt-2 text-base text-[var(--text-primary)]">{event.whyItMatters}</p>
-          <p className="mt-3 section-label">Why this ranks here</p>
-          <p className="mt-2 text-base text-[var(--text-secondary)]">{event.whyThisIsHere}</p>
         </section>
 
         {event.rankingSignals.length ? (
@@ -193,8 +195,19 @@ function BriefingEventDetailCard({
           </section>
         ) : null}
       </article>
-    </Panel>
+    </div>
   );
+}
+
+function hasDistinctReaderCopy(value: string, comparison: string) {
+  const normalizedValue = normalizeReaderCopy(value);
+  const normalizedComparison = normalizeReaderCopy(comparison);
+
+  return Boolean(normalizedValue) && normalizedValue !== normalizedComparison;
+}
+
+function normalizeReaderCopy(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function CategorySoftGate({ redirectTo }: { redirectTo: string }) {

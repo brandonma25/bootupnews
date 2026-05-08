@@ -7,6 +7,18 @@
 - Product source of truth: approved UX artifacts 0, 1, 2, 3, 4, 5, 7, and 10, plus the signed-out QA report.
 - Scope: signed-out Home page failures only.
 
+## GitHub Source-of-Truth Metadata
+
+- Affected object level: Card and Surface Placement.
+- PR: #96, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/96`.
+- Branch: `fix/signed-out-homepage-qa-remediation`.
+- Head SHA: `d55007acfd89531e0f4a2d5378c2207ea9231c4b`.
+- Merge SHA: `482a6f9994b55f71d23271067f18c189362bdb22`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #96 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the branch recovery details; no branch deletion was performed in this metadata enrichment branch.
+
 ## Artifact Binding
 
 | Fix area | Source used |

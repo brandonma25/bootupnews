@@ -5,11 +5,11 @@ import {
   classifyEventType,
   classifyHeadlineQuality,
   classifySourceTier,
-  evaluateSignalCandidate,
-  type SignalFilterCandidate,
+  evaluateArticleFilterCandidate,
+  type ArticleFilterCandidate,
 } from "@/lib/signal-filtering";
 
-function createCandidate(overrides: Partial<SignalFilterCandidate> = {}): SignalFilterCandidate {
+function createCandidate(overrides: Partial<ArticleFilterCandidate> = {}): ArticleFilterCandidate {
   return {
     id: overrides.id ?? "article-1",
     title: overrides.title ?? "Reuters reports Fed signals new tariff policy on chip imports",
@@ -85,8 +85,46 @@ describe("signal filtering", () => {
     ).toBe("repetitive_followup_no_new_info");
   });
 
+  it("recognizes institutional and public-interest event types", () => {
+    expect(
+      classifyEventType(
+        createCandidate({
+          title: "Over 1,000 TSA officers have quit amid shutdown",
+          summaryText: "The shutdown is straining agency capacity.",
+        }),
+      ),
+    ).toBe("government_capacity");
+
+    expect(
+      classifyEventType(
+        createCandidate({
+          title: "Purdue settlement victims face legal accountability deadline",
+          summaryText: "The settlement affects victims after years of court review.",
+        }),
+      ),
+    ).toBe("public_interest_legal_accountability");
+
+    expect(
+      classifyEventType(
+        createCandidate({
+          title: "EU tells Google to open up AI on Android",
+          summaryText: "The intervention affects platform regulation and market access.",
+        }),
+      ),
+    ).toBe("platform_regulation");
+
+    expect(
+      classifyEventType(
+        createCandidate({
+          title: "Payroll employment increases by 178,000 in March",
+          summaryText: "The unemployment rate changed little in the BLS employment situation release.",
+        }),
+      ),
+    ).toBe("macro_data_release");
+  });
+
   it("passes a tier1 strong allowed event with explicit reasons", () => {
-    const evaluation = evaluateSignalCandidate(
+    const evaluation = evaluateArticleFilterCandidate(
       createCandidate({
         title: "Reuters says White House orders new chip export restrictions",
       }),
@@ -98,7 +136,7 @@ describe("signal filtering", () => {
   });
 
   it("rejects low-tier weak filler", () => {
-    const evaluation = evaluateSignalCandidate(
+    const evaluation = evaluateArticleFilterCandidate(
       createCandidate({
         sourceName: "GDELT Finance Monitor",
         url: "https://www.gdeltproject.org/story",

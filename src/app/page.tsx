@@ -1,6 +1,7 @@
 import LandingHomepage from "@/components/landing/homepage";
-import { getDashboardPageState } from "@/lib/data";
+import { getHomepagePageState } from "@/lib/data";
 import { isHomepageDebugConfigured } from "@/lib/env";
+import { applyHomepageEditorialOverridesToDashboardData } from "@/lib/homepage-editorial-overrides";
 import { buildHomepageViewModel } from "@/lib/homepage-model";
 import { formatHomeBriefingDateLabel } from "@/lib/utils";
 
@@ -13,10 +14,13 @@ function readSingleParam(value: string | string[] | undefined) {
 }
 
 export default async function Page({ searchParams }: PageProps) {
-  const [{ data, viewer }, resolvedSearchParams] = await Promise.all([
-    getDashboardPageState("/"),
+  // Keep homepage SSR on persisted read models only. Do not route this page
+  // through the ingestion pipeline or feed parser import chain.
+  const [pageState, resolvedSearchParams] = await Promise.all([
+    getHomepagePageState("/"),
     searchParams ? searchParams : Promise.resolve(undefined),
   ]);
+  const data = await applyHomepageEditorialOverridesToDashboardData(pageState.data);
   const authState = readSingleParam(resolvedSearchParams?.auth);
   const debugParam = readSingleParam(resolvedSearchParams?.debug);
   const debugEnabled = isHomepageDebugConfigured || /^(1|true|yes|on)$/i.test(debugParam ?? "");
@@ -26,7 +30,7 @@ export default async function Page({ searchParams }: PageProps) {
   return (
     <LandingHomepage
       data={data}
-      viewer={viewer}
+      viewer={pageState.viewer}
       authState={authState}
       debugEnabled={debugEnabled}
       briefingDateLabel={briefingDateLabel}

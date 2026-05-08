@@ -15,6 +15,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
 import { buildMatchedBriefing, persistRawArticles, syncEventClusters, syncTopicMatches } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
+import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 import { parseKeywordList } from "@/lib/topic-matching";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -801,6 +802,22 @@ export async function generateBriefingAction() {
       });
       redirect("/dashboard?error=1");
     }
+  }
+
+  const signalSnapshotResult = await persistSignalPostsForBriefing({
+    briefingDate,
+    items: briefing.items,
+  });
+
+  if (!signalSnapshotResult.ok) {
+    logServerEvent("error", "Signal snapshot persistence failed during briefing generation", {
+      route: "/dashboard",
+      userId: user.id,
+      briefingDate,
+      insertedCount: signalSnapshotResult.insertedCount,
+      errorMessage: signalSnapshotResult.message,
+    });
+    redirect("/dashboard?error=1");
   }
 
   revalidatePath("/dashboard");

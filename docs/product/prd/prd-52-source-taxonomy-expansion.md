@@ -15,13 +15,13 @@ Readers need broader, higher-quality coverage across technology, politics/geopol
 ## Scope
 
 - Register the 11 requested source identities in a source taxonomy profile.
-- Activate validated feeds in public ingestion defaults.
+- Activate validated feeds through the current public source manifest and donor runtime metadata.
 - Preserve The Verge and Ars Technica as existing active strict technology sources.
 - Register Brookings Research and CSIS Analysis as mixed-domain/O3 but disabled because the supplied URLs failed live RSS validation.
 - Route strict technology sources to `tech`.
 - Route strict politics/geopolitics sources to `politics`.
 - Route mixed-domain/O3 sources through item-level homepage classification instead of source-name flattening.
-- Update source catalog, donor registry, public source defaults, and focused regression tests.
+- Update donor registry metadata, public source manifest coverage, source taxonomy, homepage classification, and focused regression tests.
 
 ## Non-Goals
 
@@ -34,7 +34,8 @@ Readers need broader, higher-quality coverage across technology, politics/geopol
 ## Implementation Shape / System Impact
 
 - `src/lib/source-taxonomy.ts` defines source profiles with strict versus mixed-domain scope, default category where applicable, validation status, and runtime enablement.
-- `src/lib/demo-data.ts` expands the public default source list to include the validated activation set.
+- `src/lib/demo-data.ts` registers the validated source identities needed by the public source manifest while preserving the legacy MVP default helper as a compatibility fallback.
+- `src/lib/source-manifest.ts` includes the validated PRD-52 public sources in the governed `public.home` manifest; Brookings Research and CSIS Analysis remain excluded because their supplied feeds failed validation.
 - `src/adapters/donors/openclaw/index.ts` registers donor-backed source metadata for the requested sources; Brookings Research and CSIS Analysis are inactive.
 - `src/lib/homepage-taxonomy.ts` uses strict source profiles as category signals and ignores mixed-domain source names as category signals.
 - `src/lib/data.ts` carries pipeline homepage classification onto generated briefing items so mixed-domain items do not inherit category placement from fallback topic labels.
@@ -44,7 +45,7 @@ Readers need broader, higher-quality coverage across technology, politics/geopol
 - Depends on PRD-1 ingestion, PRD-37 pipeline, PRD-42 source governance, and PRD-17 homepage taxonomy contracts.
 - Live RSS availability can change independently of code.
 - The repo does not have first-class mixed-domain/O3 category keys; this PR preserves mixed-domain scope through source profiles and item-level routing instead.
-- MIT Technology Review remains in the existing probationary donor runtime path for compatibility with the internal MIT review route, while public supplied-source ingestion now includes it as a strict technology source.
+- MIT Technology Review remains in the existing probationary donor runtime path for compatibility with the internal MIT review route, while public manifest-supplied ingestion includes it as a strict technology source.
 
 ## Acceptance Criteria
 
@@ -54,7 +55,7 @@ Readers need broader, higher-quality coverage across technology, politics/geopol
 - Brookings Research is not hardcoded into economics/finance and is not actively fetched while the supplied URL fails RSS parsing.
 - Foreign Policy, The Guardian World, Brookings Research, and CSIS Analysis are marked mixed-domain/O3 and do not force category placement by source name alone.
 - Failed Brookings and CSIS feed validation is documented.
-- Existing sources remain compatible with public defaults, donor defaults, and homepage rendering.
+- Existing sources remain compatible with the public manifest, donor defaults, legacy MVP fallback helper, and homepage rendering.
 - Focused source catalog, source default, ingestion, and homepage taxonomy tests pass.
 
 ## Evidence and Confidence

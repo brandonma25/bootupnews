@@ -34,7 +34,7 @@ def main() -> int:
         print(f"PR governance audit failed to inspect repo state.\n{exc}")
         return 0
 
-    context = classify_changes(changes, branch, args.pr_title)
+    context = classify_changes(changes, branch, args.pr_title, repo_root)
     missing_groups = find_missing_doc_groups(context)
 
     print("## PR Governance Audit")

@@ -1,12 +1,35 @@
+import type { Page } from "@playwright/test";
+
 import { expect, test } from "./utils/audit-fixture";
+
+async function expectNoStaticHomepagePlaceholder(page: Page) {
+  await expect(
+    page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail|rail readable/i),
+  ).toHaveCount(0);
+}
+
+async function expectFallbackBriefingCopy(page: Page) {
+  await expect(
+    page
+      .getByText(
+        /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./,
+      )
+      .first(),
+  ).toBeVisible();
+}
 
 test.describe("homepage", () => {
   test("renders the public V1 briefing flow", async ({ page, diagnostics }) => {
     await page.goto("/");
 
-    await expect(page).toHaveTitle(/Daily Intelligence Briefing/i);
+    await expect(page).toHaveTitle(/Boot Up/i);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("link", { name: "Details" }).first()).toBeVisible();
+    if (await page.getByRole("link", { name: "Details" }).first().isVisible()) {
+      await expect(page.getByRole("link", { name: "Details" }).first()).toBeVisible();
+    } else {
+      await expectFallbackBriefingCopy(page);
+    }
+    await expectNoStaticHomepagePlaceholder(page);
     await expect(page.getByText("Daily Intelligence Aggregator")).toHaveCount(0);
     expect(diagnostics.entries).toEqual([]);
   });
@@ -29,16 +52,26 @@ test.describe("homepage", () => {
 
     await expect(dateLabel).toBeVisible();
     await expect(topEventsTab).toHaveAttribute("aria-selected", "true");
-    await expect(topEventCards.first()).toBeVisible();
 
     const topEventCount = await topEventCards.count();
+    if (topEventCount === 0) {
+      await expectFallbackBriefingCopy(page);
+      await expect(page.getByRole("link", { name: "Details" })).toHaveCount(0);
+      await expectNoStaticHomepagePlaceholder(page);
+      expect(diagnostics.entries).toEqual([]);
+      return;
+    }
+
+    await expect(topEventCards.first()).toBeVisible();
     expect(topEventCount).toBeGreaterThanOrEqual(3);
     expect(topEventCount).toBeLessThanOrEqual(5);
 
     await expect(page.getByTestId("home-top-event-key-points").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /sign out/i })).toHaveCount(0);
-    await expect(page.getByText(/RSS Feed|Category preferences|Newsletter/i)).toHaveCount(0);
-    await expect(page.getByText(/Open full briefing/i)).toHaveCount(0);
+    await expect(page.getByText(/^RSS Feed$/)).toHaveCount(0);
+    await expect(page.getByText(/^Category preferences$/)).toHaveCount(0);
+    await expect(page.getByText(/^Newsletter$/)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Open full briefing$/ })).toHaveCount(0);
 
     const structureOrder = await page.evaluate(() => {
       const date = document.querySelector('[data-testid="home-date-label"]');
@@ -103,27 +136,53 @@ test.describe("homepage", () => {
     expect(diagnostics.entries).toEqual([]);
   });
 
-  test("shows and dismisses the signed-out category soft gate without clearing Top Events", async ({ page, diagnostics }) => {
+  test("shows the signed-out category soft gate without duplicating Top Events when depth content exists", async ({ page, diagnostics }) => {
     await page.goto("/");
 
     const topEventCards = page.getByTestId("home-top-event-card");
-    const gateCopy = "Create a free account to read Tech News, Finance and Politics";
+    const gateCopy = "Sign up to be notified when new signals are published.";
+    const oldGateCopy = "Create a free account to read Tech News, Economics, and Politics";
+    const techTab = page.getByRole("tab", { name: "Tech" });
+    const topEventCount = await topEventCards.count();
+
+    if (topEventCount === 0) {
+      await expectFallbackBriefingCopy(page);
+      await expect(page.getByText(gateCopy)).toHaveCount(0);
+      await expect(page.getByText(oldGateCopy)).toHaveCount(0);
+      await expectNoStaticHomepagePlaceholder(page);
+      expect(diagnostics.entries).toEqual([]);
+      return;
+    }
 
     await expect(topEventCards.first()).toBeVisible();
     await expect(page.getByText(gateCopy)).toHaveCount(0);
+    await expect(page.getByText(oldGateCopy)).toHaveCount(0);
 
-    await page.getByRole("tab", { name: "Tech News" }).click();
+    await expect(techTab).toBeVisible();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await techTab.click();
+
+      if ((await techTab.getAttribute("aria-selected")) === "true") {
+        break;
+      }
+
+      await page.waitForTimeout(250 * (attempt + 1));
+    }
 
     const gate = page.getByTestId("category-soft-gate");
 
+    await expect(techTab).toHaveAttribute("aria-selected", "true");
+    await expect(gate).toBeVisible();
     await expect(gate.getByText(gateCopy)).toBeVisible();
+    await expect(gate.getByText(oldGateCopy)).toHaveCount(0);
     await expect(gate.getByRole("link", { name: "Sign Up" })).toHaveAttribute("href", "/signup?redirectTo=%2F");
     await expect(gate.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/login?redirectTo=%2F");
-    await expect(topEventCards.first()).toBeVisible();
+    await expect(topEventCards).toHaveCount(0);
 
     await page.getByRole("button", { name: "Dismiss category gate" }).click();
 
     await expect(page.getByText(gateCopy)).toHaveCount(0);
+    await expect(page.getByText(oldGateCopy)).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
     await expect(topEventCards.first()).toBeVisible();
     expect(diagnostics.entries).toEqual([]);

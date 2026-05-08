@@ -1,6 +1,7 @@
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
 import type { FeedArticle } from "@/lib/rss";
+import type { SourceRole } from "@/lib/source-accessibility-types";
 
 export type CanonicalTopic = "Tech" | "Finance" | "World";
 
@@ -49,6 +50,9 @@ export interface CanonicalSourceMetadata {
   provenance: SourceProvenance;
   status: SourceStatus;
   availability: SourceAvailability;
+  sourceRole?: SourceRole;
+  publicEligible?: boolean;
+  suppliedByManifest?: boolean;
 }
 
 export interface SourceFetchConfig {
@@ -79,6 +83,7 @@ export interface IngestionFetchContext {
       timeoutMs?: number;
       retryCount?: number;
       headers?: HeadersInit;
+      feedId?: string;
     },
   ): Promise<FeedArticle[]>;
   timeoutMs: number;
@@ -158,7 +163,7 @@ export interface RankingFeatureProvider {
     trustSignals: string[];
   };
   getKnownSources(): CanonicalSourceMetadata[];
-  mapClusterToRankingFeatures(cluster: SignalCluster, allClusters: SignalCluster[]): Partial<RankingFeatureSet>;
+  mapClusterToRankingFeatures(cluster: StoryCluster, allClusters: StoryCluster[]): Partial<RankingFeatureSet>;
 }
 
 export interface DiversitySupport {
@@ -166,7 +171,7 @@ export interface DiversitySupport {
   describeRole(): string;
   evaluateDiversityAdjustment(
     rankedClusters: Array<{
-      cluster: SignalCluster;
+      cluster: StoryCluster;
       features: RankingFeatureSet;
       baseScore: number;
     }>,
@@ -329,7 +334,7 @@ export interface EnrichmentSupport {
     output_fields: Array<keyof Pick<ExplanationPacket, "why_it_matters" | "what_to_watch" | "unknowns" | "connection_layer">>;
   };
   prepareEnrichmentPacket(input: {
-    cluster: SignalCluster;
+    cluster: StoryCluster;
     rankingDebug: RankingDebug;
     deterministicExplanation: ExplanationPacket;
   }): EnrichmentRequest | null;

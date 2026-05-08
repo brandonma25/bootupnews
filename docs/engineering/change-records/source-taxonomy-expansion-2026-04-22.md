@@ -8,11 +8,12 @@ Governed feature: `PRD-52` (`docs/product/prd/prd-52-source-taxonomy-expansion.m
 
 - Primary request: expand ingestion with the 11 supplied RSS source identities.
 - Existing repo fact: PRD-42 and `docs/engineering/change-records/source-onboarding-batch-1.md` previously treated several of these as catalog-only or probationary and explicitly did not activate them.
-- This branch treats the new request as feature work, not remediation, because it changes active product scope by expanding public ingestion defaults.
+- This branch treats the new request as feature work, not remediation, because it changes active product scope by expanding public source-manifest and donor runtime coverage.
+- 2026-05-08 merge refresh note: PRD-54 introduced the governed `public.home` manifest after this PR was opened. The refreshed implementation routes public activation through that manifest and keeps the legacy MVP default helper as a compatibility fallback.
 
 ## Source Additions
 
-Validated and active in public ingestion defaults:
+Validated and active in the governed public source manifest and/or donor runtime metadata:
 
 - MIT Technology Review — strict `tech`
 - The Verge — existing strict `tech`
@@ -70,7 +71,13 @@ Validation used direct HTTP fetch plus `rss-parser` parsing with the same parser
 Completed:
 
 - `npm install` — passed with one reported high-severity npm audit finding.
-- `npm run test -- src/lib/source-taxonomy.test.ts src/lib/source-catalog.test.ts src/lib/source-defaults.test.ts src/lib/pipeline/ingestion/index.test.ts src/lib/pipeline/index.test.ts src/lib/data.dashboard-fallback.test.ts` — passed, 6 files / 27 tests.
+- `npm run test -- src/lib/source-policy.test.ts src/lib/source-manifest.test.ts src/lib/source-taxonomy.test.ts src/lib/source-defaults.test.ts src/lib/pipeline/ingestion/index.test.ts src/lib/pipeline/index.test.ts src/lib/data.dashboard-fallback.test.ts` — passed on 2026-05-08 after merging current `origin/main`, 7 files / 44 tests.
+- `npm install` — passed on 2026-05-08; npm reported 2 audit findings (1 moderate, 1 high).
+- `npm run lint` — passed on 2026-05-08.
+- `npm run test` — passed on 2026-05-08, 81 files / 609 tests.
+- `npm run build` — passed on 2026-05-08. Warnings remained limited to the known multiple-lockfile workspace-root inference and Tailwind module-type warning.
+- `PLAYWRIGHT_MANAGED_WEBSERVER=1 npm run test:e2e:chromium` — passed on 2026-05-08, 33 tests. The managed dev server logged a transient `ECONNRESET` aborted connection during shutdown after tests passed.
+- `PLAYWRIGHT_MANAGED_WEBSERVER=1 npm run test:e2e:webkit` — passed on 2026-05-08, 33 tests.
 - `npm run lint` — passed.
 - `npm run test` — passed, 49 files / 262 tests after adding the Hacker News boilerplate duplicate-regression test.
 - `npm run build` — passed. Warnings: Next inferred `/Users/bm/package-lock.json` as workspace root because multiple lockfiles exist; Tailwind config reparsed as ESM because `package.json` has no `type`.

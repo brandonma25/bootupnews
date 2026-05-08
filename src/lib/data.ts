@@ -15,21 +15,27 @@ import {
   countSourcesByHomepageCategory,
 } from "@/lib/homepage-taxonomy";
 import { logServerEvent } from "@/lib/observability";
-import { runClusterFirstPipeline } from "@/lib/pipeline";
-import { resolveNoArgumentRuntimeSourceResolutionSnapshot } from "@/lib/pipeline/ingestion";
 import { selectRelatedCoverage } from "@/lib/related-coverage";
 import {
   compareBriefingItemsByRanking,
   rankNewsClusters,
 } from "@/lib/ranking";
-import { fetchFeedArticles, type FeedArticle } from "@/lib/rss";
+import type { ClusterFirstPipelineResult } from "@/lib/pipeline";
+import type { FeedArticle } from "@/lib/rss";
+import { getSourcesForPublicSurface } from "@/lib/source-manifest";
+import { evaluateSourceAccessibilitySupport } from "@/lib/source-accessibility";
 import {
   applySignalFiltering,
+  type ArticleFilterEvaluation,
   type EventType,
   type FilterDecision,
   type HeadlineQuality,
   type SourceTier,
 } from "@/lib/signal-filtering";
+import {
+  evaluateSignalSelectionEligibility,
+  isCoreSignalEligible,
+} from "@/lib/signal-selection-eligibility";
 import { summarizeCluster } from "@/lib/summarizer";
 import { withServerFallback } from "@/lib/server-safety";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
@@ -52,6 +58,29 @@ import {
 } from "@/lib/why-it-matters";
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+
+async function runClusterFirstPipelineSafely(options: {
+  sources?: Source[];
+  suppliedByManifest?: boolean;
+  persistArticleCandidates?: boolean;
+} = {}): Promise<ClusterFirstPipelineResult> {
+  const { runClusterFirstPipeline } = await import("@/lib/pipeline");
+  return runClusterFirstPipeline(options);
+}
+
+async function fetchFeedArticlesSafely(
+  feedUrl: string,
+  sourceName: string,
+  options: {
+    timeoutMs?: number;
+    retryCount?: number;
+    headers?: HeadersInit;
+    feedId?: string;
+  } = {},
+): Promise<FeedArticle[]> {
+  const { fetchFeedArticles } = await import("@/lib/rss");
+  return fetchFeedArticles(feedUrl, sourceName, options);
+}
 
 type StoredArticle = {
   id: string;
@@ -102,6 +131,52 @@ type EventCluster = {
   sources: EventSeedArticle[];
 };
 
+type StoredBriefingItemRow = {
+  id: string;
+  topic_id: string | null;
+  topic_name: string | null;
+  title: string;
+  what_happened: string;
+  key_points: string[] | null;
+  why_it_matters: string;
+  sources: Array<{ title: string; url: string }> | null;
+  estimated_minutes: number | null;
+  priority: BriefingItem["priority"] | null;
+  is_read: boolean | null;
+};
+
+type StoredBriefingRow = {
+  id: string;
+  briefing_date: string;
+  title: string;
+  intro: string;
+  reading_window: string | null;
+  briefing_items: StoredBriefingItemRow[] | null;
+};
+
+type TopicRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  color: string;
+  keywords: string[] | null;
+  exclude_keywords: string[] | null;
+  created_at: string;
+};
+
+type SourceRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  feed_url: string;
+  homepage_url: string | null;
+  topic_id: string | null;
+  status: Source["status"];
+  created_at: string;
+  topics: Array<{ name: string | null }> | null;
+};
+
 type SourceFetchAttempt = {
   label: string;
   feedUrl: string;
@@ -147,6 +222,9 @@ const PIPELINE_TOPIC_ALIASES: Record<"tech" | "finance" | "politics", string[]> 
   politics: ["politics", "policy", "government", "geopolitics", "world"],
 };
 
+const BRIEFING_SELECT =
+  "id, briefing_date, title, intro, reading_window, briefing_items(id, topic_id, topic_name, title, what_happened, key_points, why_it_matters, sources, estimated_minutes, priority, is_read)";
+
 type BriefingSummaryFields = Pick<
   BriefingItem,
   "title" | "whatHappened" | "keyPoints" | "whyItMatters" | "estimatedMinutes"
@@ -154,6 +232,8 @@ type BriefingSummaryFields = Pick<
 
 const LLM_SUMMARY_TIMEOUT_MS = 7000;
 const DEFAULT_ACCOUNT_CATEGORIES: AccountCategoryPreference[] = ["tech", "finance", "politics"];
+const PUBLIC_BRIEFING_TEMPORARILY_UNAVAILABLE_MESSAGE =
+  "The published briefing is temporarily unavailable while the latest edition is verified.";
 
 function createEmptyBriefing(): DailyBriefing {
   return {
@@ -164,6 +244,11 @@ function createEmptyBriefing(): DailyBriefing {
     readingWindow: "0 minutes",
     items: [],
   };
+}
+
+async function loadHomepageSignalSnapshotSafely() {
+  const { getHomepageSignalSnapshot } = await import("@/lib/signals-editorial");
+  return getHomepageSignalSnapshot();
 }
 
 type RequestAuthState = {
@@ -210,6 +295,392 @@ function buildViewerAccount(user: Awaited<ReturnType<typeof safeGetUser>>["user"
   };
 }
 
+function mapStoredBriefingItem(row: StoredBriefingItemRow): BriefingItem {
+  const normalizedKeyPoints = Array.isArray(row.key_points)
+    ? row.key_points.filter((point): point is string => typeof point === "string").slice(0, 3)
+    : [];
+  const normalizedSources = Array.isArray(row.sources)
+    ? row.sources.filter((source): source is { title: string; url: string } => Boolean(source?.title && source?.url))
+    : [];
+  while (normalizedKeyPoints.length < 3) {
+    normalizedKeyPoints.push("");
+  }
+
+  return {
+    id: row.id,
+    topicId: row.topic_id ?? "topic-tech",
+    topicName: row.topic_name ?? "Tech",
+    title: row.title,
+    whatHappened: row.what_happened,
+    keyPoints: [normalizedKeyPoints[0], normalizedKeyPoints[1], normalizedKeyPoints[2]],
+    whyItMatters: row.why_it_matters,
+    sources: normalizedSources,
+    sourceCount: normalizedSources.length,
+    estimatedMinutes: row.estimated_minutes ?? 3,
+    read: Boolean(row.is_read),
+    priority: row.priority === "top" ? "top" : "normal",
+    matchedKeywords: [],
+    rankingSignals: [],
+  };
+}
+
+function mapStoredBriefing(row: StoredBriefingRow): DailyBriefing {
+  const items = (row.briefing_items ?? [])
+    .map(mapStoredBriefingItem)
+    .sort((left, right) => {
+      if (left.priority !== right.priority) {
+        return left.priority === "top" ? -1 : 1;
+      }
+
+      return left.title.localeCompare(right.title);
+    });
+
+  return {
+    id: row.id,
+    briefingDate: row.briefing_date,
+    title: row.title,
+    intro: row.intro,
+    readingWindow: deriveReadingWindow(
+      items.map((item) => item.estimatedMinutes),
+      row.reading_window ?? "",
+    ),
+    items,
+  };
+}
+
+function inferTopicName(tags: string[]) {
+  const normalizedTags = tags.map((tag) => tag.trim().toLowerCase());
+
+  if (
+    normalizedTags.some((tag) =>
+      ["finance", "economics", "economy", "markets", "macro", "business"].includes(tag),
+    )
+  ) {
+    return "Finance";
+  }
+
+  if (
+    normalizedTags.some((tag) =>
+      ["politics", "policy", "world", "geopolitics", "government"].includes(tag),
+    )
+  ) {
+    return "Politics";
+  }
+
+  return "Tech";
+}
+
+function getTopicId(topicName: string) {
+  switch (topicName) {
+    case "Finance":
+      return "topic-finance";
+    case "Politics":
+      return "topic-politics";
+    default:
+      return "topic-tech";
+  }
+}
+
+type HomepageSignalPost = Awaited<ReturnType<typeof loadHomepageSignalSnapshotSafely>>["posts"][number];
+type HomepageSignalSnapshotSource = Awaited<ReturnType<typeof loadHomepageSignalSnapshotSafely>>["source"];
+
+function selectHomepageSignalWhyItMatters(
+  post: HomepageSignalPost,
+  source: HomepageSignalSnapshotSource,
+) {
+  const preferredLiveText = post.publishedWhyItMatters?.trim();
+
+  if (source === "published_live") {
+    return preferredLiveText || "";
+  }
+
+  return preferredLiveText || "";
+}
+
+function buildHomepageSignalKeyPoints(
+  post: HomepageSignalPost,
+  source: HomepageSignalSnapshotSource,
+): [string, string, string] {
+  const summaryPoint = post.summary || post.selectionReason || selectHomepageSignalWhyItMatters(post, source);
+  const titleNormalized = post.title.trim();
+  const summaryTrimmed = summaryPoint.trim();
+  const dedupedSummary = summaryTrimmed && summaryTrimmed !== titleNormalized ? summaryTrimmed : "";
+
+  return [dedupedSummary, "", ""];
+}
+
+function mapHomepageSignalPostToBriefingItem(
+  post: HomepageSignalPost,
+  source: HomepageSignalSnapshotSource,
+): BriefingItem {
+  const topicName = inferTopicName(post.tags);
+  const whyItMatters = selectHomepageSignalWhyItMatters(post, source);
+  const structuredWhyItMatters =
+    source === "published_live" || source === "recent_published"
+      ? post.publishedWhyItMattersStructured
+      : post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
+
+  return {
+    id: post.id,
+    topicId: getTopicId(topicName),
+    topicName,
+    title: post.title,
+    whatHappened: post.summary || post.selectionReason || whyItMatters,
+    keyPoints: buildHomepageSignalKeyPoints(post, source),
+    whyItMatters,
+    aiWhyItMatters: post.aiWhyItMatters || "",
+    editedWhyItMatters: post.editedWhyItMatters,
+    publishedWhyItMatters: post.publishedWhyItMatters || "",
+    editedWhyItMattersStructured:
+      source === "published_live" || source === "recent_published" ? null : structuredWhyItMatters,
+    editorialWhyItMatters:
+      source === "published_live" || source === "recent_published" ? structuredWhyItMatters : null,
+    publishedWhyItMattersStructured:
+      source === "published_live" || source === "recent_published" ? structuredWhyItMatters : null,
+    editorialStatus: source === "published_live" || source === "recent_published" ? "published" : post.editorialStatus,
+    sources: post.sourceUrl ? [{ title: post.sourceName || "Source", url: post.sourceUrl }] : [],
+    sourceCount: post.sourceUrl ? 1 : 0,
+    estimatedMinutes: 4,
+    read: false,
+    priority: post.rank <= 5 ? "top" : "normal",
+    matchedKeywords: post.tags,
+    importanceScore: post.signalScore ?? undefined,
+    importanceLabel: getImportanceLabel(post.signalScore ?? undefined),
+    rankingSignals: [post.selectionReason].filter(Boolean),
+  };
+}
+
+function buildReadOnlyHomepageDiagnostics(
+  sources: Source[],
+  itemCount: number,
+): DashboardData["homepageDiagnostics"] {
+  return {
+    totalArticlesFetched: null,
+    totalCandidateEvents: itemCount,
+    failedSourceCount: 0,
+    fallbackSourceCount: 0,
+    degradedSourceNames: [],
+    sourceCountsByCategory: countSourcesByHomepageCategory(sources),
+  };
+}
+
+function normalizeCalendarSafeBriefingDate(dateKey: string) {
+  return `${dateKey}T12:00:00`;
+}
+
+function formatHomepageFreshnessDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function buildEmptyPublicHomepageData(message = "The latest briefing is not yet available. Please check back soon."): DashboardData {
+  const sources = getSourcesForPublicSurface("public.home");
+  const briefingDate = normalizeCalendarSafeBriefingDate(getBriefingDateKey(formatISO(new Date())));
+
+  return {
+    mode: "public",
+    briefing: {
+      id: `empty-homepage-${getBriefingDateKey(briefingDate)}`,
+      briefingDate,
+      title: "Daily Executive Briefing",
+      intro: message,
+      readingWindow: "0 minutes",
+      items: [],
+    },
+    topics: demoTopics,
+    sources,
+    publicRankedItems: [],
+    homepageFreshnessNotice: {
+      kind: "empty",
+      text: message,
+      briefingDate: null,
+    },
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, 0),
+  };
+}
+
+async function buildPublicHomepageData(): Promise<DashboardData> {
+  const homepageSignalSnapshot = await loadHomepageSignalSnapshotSafely();
+  const sources = getSourcesForPublicSurface("public.home");
+
+  if (homepageSignalSnapshot.posts.length === 0) {
+    return buildEmptyPublicHomepageData(
+      homepageSignalSnapshot.errorMessage ? PUBLIC_BRIEFING_TEMPORARILY_UNAVAILABLE_MESSAGE : undefined,
+    );
+  }
+
+  const firstBriefingDate = homepageSignalSnapshot.briefingDate ?? homepageSignalSnapshot.posts[0]?.briefingDate;
+  const briefingDateKey =
+    firstBriefingDate && /^\d{4}-\d{2}-\d{2}$/.test(firstBriefingDate)
+      ? firstBriefingDate
+      : getBriefingDateKey(formatISO(new Date()));
+  const briefingDate = normalizeCalendarSafeBriefingDate(briefingDateKey);
+  const items = homepageSignalSnapshot.posts.map((post) =>
+    mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source),
+  );
+  const depthItems = (homepageSignalSnapshot.depthPosts?.length
+    ? homepageSignalSnapshot.depthPosts
+    : homepageSignalSnapshot.posts
+  ).map((post) => mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source));
+  const intro =
+    homepageSignalSnapshot.source === "published_live"
+      ? "The homepage renders from today's published signal set instead of triggering feed ingestion during SSR."
+      : "Showing the most recently published briefing.";
+  const homepageFreshnessNotice =
+    homepageSignalSnapshot.source === "recent_published" && homepageSignalSnapshot.briefingDate
+      ? {
+          kind: "stale" as const,
+          text: `Showing the latest published briefing from ${formatHomepageFreshnessDate(homepageSignalSnapshot.briefingDate)}.`,
+          briefingDate: homepageSignalSnapshot.briefingDate,
+        }
+      : undefined;
+
+  return {
+    mode: "public",
+    briefing: {
+      id: `published-homepage-${getBriefingDateKey(briefingDate)}`,
+      briefingDate,
+      title: "Daily Executive Briefing",
+      intro,
+      readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
+      items,
+    },
+    topics: demoTopics,
+    sources,
+    publicRankedItems: depthItems,
+    homepageFreshnessNotice,
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, depthItems.length),
+  };
+}
+
+async function loadUserTopics(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  userId: string,
+) {
+  const result = await supabase
+    .from("topics")
+    .select("id, user_id, name, description, color, keywords, exclude_keywords, created_at")
+    .eq("user_id", userId)
+    .order("name");
+
+  if (result.error) {
+    logServerEvent("warn", "Homepage topic query failed", {
+      route: "/",
+      userId,
+      errorMessage: result.error.message,
+    });
+    return [] as Topic[];
+  }
+
+  return ((result.data ?? []) as unknown as TopicRow[]).map((topic) => ({
+    id: topic.id,
+    userId: topic.user_id,
+    name: topic.name,
+    description: topic.description,
+    color: topic.color,
+    keywords: topic.keywords ?? [],
+    excludeKeywords: topic.exclude_keywords ?? [],
+    createdAt: topic.created_at,
+  }));
+}
+
+async function loadUserSources(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  userId: string,
+) {
+  const result = await supabase
+    .from("sources")
+    .select("id, user_id, name, feed_url, homepage_url, topic_id, status, created_at, topics(name)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (result.error) {
+    logServerEvent("warn", "Homepage source query failed", {
+      route: "/",
+      userId,
+      errorMessage: result.error.message,
+    });
+    return [] as Source[];
+  }
+
+  return ((result.data ?? []) as unknown as SourceRow[]).map((source) => ({
+    id: source.id,
+    userId: source.user_id,
+    name: source.name,
+    feedUrl: source.feed_url,
+    homepageUrl: source.homepage_url ?? undefined,
+    topicId: source.topic_id ?? undefined,
+    topicName: Array.isArray(source.topics) ? source.topics[0]?.name ?? undefined : undefined,
+    status: source.status,
+    createdAt: source.created_at,
+  }));
+}
+
+async function loadStoredBriefings(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  userId: string,
+  limit: number,
+  route: string,
+) {
+  const result = await supabase
+    .from("daily_briefings")
+    .select(BRIEFING_SELECT)
+    .eq("user_id", userId)
+    .order("briefing_date", { ascending: false })
+    .limit(limit);
+
+  if (result.error) {
+    logServerEvent("warn", "Stored briefing query failed", {
+      route,
+      userId,
+      errorMessage: result.error.message,
+    });
+    return [] as DailyBriefing[];
+  }
+
+  return ((result.data ?? []) as unknown as StoredBriefingRow[]).map(mapStoredBriefing);
+}
+
+async function buildSignedInHomepageData(authState: RequestAuthState): Promise<DashboardData> {
+  if (!authState.supabase || !authState.user) {
+    return buildPublicHomepageData();
+  }
+
+  const [topics, sources, briefings] = await Promise.all([
+    loadUserTopics(authState.supabase, authState.user.id),
+    loadUserSources(authState.supabase, authState.user.id),
+    loadStoredBriefings(authState.supabase, authState.user.id, 1, authState.route),
+  ]);
+  const latestBriefing = briefings[0];
+
+  if (!latestBriefing) {
+    const publicData = await buildPublicHomepageData();
+    return {
+      ...publicData,
+      mode: "live",
+      topics,
+      sources,
+      homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, publicData.briefing.items.length),
+    };
+  }
+
+  return {
+    mode: "live",
+    briefing: latestBriefing,
+    topics,
+    sources,
+    publicRankedItems: latestBriefing.items,
+    homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, latestBriefing.items.length),
+  };
+}
+
 export async function getRequestAuthState(route: string): Promise<RequestAuthState> {
   const authState = await safeGetUser(route);
 
@@ -240,8 +711,9 @@ export async function getViewerAccount(
   return viewer;
 }
 
-function buildNoArgumentRuntimeSourceResolutionAuditContext() {
+async function buildNoArgumentRuntimeSourceResolutionAuditContext() {
   try {
+    const { resolveNoArgumentRuntimeSourceResolutionSnapshot } = await import("@/lib/pipeline/ingestion");
     return resolveNoArgumentRuntimeSourceResolutionSnapshot();
   } catch (error) {
     return {
@@ -262,7 +734,7 @@ export async function getDashboardData(
     route: resolvedAuthState.route,
     sessionExists: Boolean(user),
     sessionCookiePresent,
-    no_argument_runtime_source_resolution_audit: buildNoArgumentRuntimeSourceResolutionAuditContext(),
+    no_argument_runtime_source_resolution_audit: await buildNoArgumentRuntimeSourceResolutionAuditContext(),
   });
 
   if (!supabase || !user) {
@@ -433,6 +905,24 @@ export async function getDashboardData(
   };
 }
 
+export async function getHomepagePageState(route = "/"): Promise<{
+  data: DashboardData;
+  viewer: ViewerAccount | null;
+}> {
+  const authState = await getRequestAuthState(route);
+
+  // Keep homepage SSR on persisted read models only. Do not route this page
+  // through the ingestion pipeline or feed parser import chain.
+  const data = authState.user
+    ? await buildSignedInHomepageData(authState)
+    : await buildPublicHomepageData();
+
+  return {
+    data,
+    viewer: authState.viewer,
+  };
+}
+
 export async function getDashboardPageState(route: string): Promise<{
   data: DashboardData;
   viewer: ViewerAccount | null;
@@ -464,21 +954,17 @@ function normalizeAccountCategories(value: unknown): AccountCategoryPreference[]
 }
 
 export async function getAccountPageState(route = "/account"): Promise<{
-  data: DashboardData;
   viewer: ViewerAccount | null;
   sources: Source[];
   preferences: AccountPreferenceSnapshot;
 }> {
   const authState = await getRequestAuthState(route);
+  const { supabase, user, viewer } = authState;
 
-  const [data, viewer] = await Promise.all([
-    getDashboardData(route, authState),
-    getViewerAccount(route, authState),
-  ]);
-
-  if (!authState.supabase || !authState.user) {
+  // Keep /account on read-only auth/profile/source queries. Do not route this
+  // page through dashboard generation, ingestion, or feed parsing during SSR.
+  if (!supabase || !user) {
     return {
-      data,
       viewer,
       sources: [],
       preferences: {
@@ -490,8 +976,6 @@ export async function getAccountPageState(route = "/account"): Promise<{
     };
   }
 
-  const supabase = authState.supabase;
-  const user = authState.user;
   const [profileResult, sourcesResult] = await Promise.all([
     withServerFallback(
       "account profile preferences",
@@ -540,7 +1024,6 @@ export async function getAccountPageState(route = "/account"): Promise<{
     });
 
     return {
-      data,
       viewer,
       sources: accountSources,
       preferences: {
@@ -554,7 +1037,6 @@ export async function getAccountPageState(route = "/account"): Promise<{
   }
 
   return {
-    data,
     viewer,
     sources: accountSources,
     preferences: {
@@ -576,8 +1058,11 @@ async function getPipelineBackedDashboardData(input: {
   fallbackReason?: string;
 }): Promise<DashboardData> {
   const fallbackTopics = input.topics?.length ? input.topics : demoTopics;
-  const fallbackSources = input.sources?.length ? input.sources : getMvpDefaultPublicSources();
-  const { briefing, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources);
+  const suppliedByManifest = !input.sources?.length;
+  const fallbackSources = input.sources?.length ? input.sources : getSourcesForPublicSurface("public.home");
+  const { briefing, publicRankedItems, pipelineRun } = await generateDailyBriefing(fallbackTopics, fallbackSources, {
+    suppliedByManifest,
+  });
   const explanationModes = briefing.items.reduce<Record<string, number>>((counts, item) => {
     const mode = item.explanationPacket?.explanation_mode ?? "missing";
     counts[mode] = (counts[mode] ?? 0) + 1;
@@ -620,6 +1105,7 @@ async function getPipelineBackedDashboardData(input: {
     briefing,
     topics: fallbackTopics,
     sources: fallbackSources,
+    publicRankedItems,
     homepageDiagnostics: {
       totalArticlesFetched: pipelineRun.num_raw_items,
       totalCandidateEvents: pipelineRun.num_clusters,
@@ -649,63 +1135,7 @@ export async function getHistory(
     return [];
   }
 
-  const historyResult = await withServerFallback(
-    "history query",
-    async () =>
-      supabase
-        .from("daily_briefings")
-        .select("id, briefing_date, title, intro, reading_window, briefing_items(id, topic_id, topic_name, title, what_happened, key_points, why_it_matters, sources, estimated_minutes, priority, is_read)")
-        .eq("user_id", user.id)
-        .order("briefing_date", { ascending: false })
-        .limit(14),
-    null,
-    { route: resolvedAuthState.route, userId: user.id },
-  );
-
-  if (!historyResult || historyResult.error) {
-    logServerEvent("warn", "History data unavailable", {
-      route: resolvedAuthState.route,
-      userId: user.id,
-      errorMessage: historyResult?.error?.message ?? "history query failed",
-    });
-    return [];
-  }
-
-  const { data } = historyResult;
-
-  if (!data?.length) return [];
-
-  return data.map(
-    (briefing): DailyBriefing => ({
-      id: briefing.id,
-      briefingDate: briefing.briefing_date,
-      title: briefing.title,
-      intro: briefing.intro,
-      items:
-        briefing.briefing_items?.map((item) => ({
-          id: item.id,
-          topicId: item.topic_id,
-          topicName: item.topic_name,
-          title: item.title,
-          whatHappened: item.what_happened,
-          keyPoints: item.key_points as [string, string, string],
-          whyItMatters: item.why_it_matters,
-          sources: (item.sources as Array<{ title: string; url: string }>) ?? [],
-          sourceCount: ((item.sources as Array<{ title: string; url: string }>) ?? []).length,
-          estimatedMinutes: item.estimated_minutes,
-          read: item.is_read,
-          priority: item.priority,
-          matchedKeywords: extractMatchedKeywords(item.key_points as string[]),
-          importanceScore: undefined,
-          importanceLabel: undefined,
-          rankingSignals: [],
-        })) ?? [],
-      readingWindow: deriveReadingWindow(
-        briefing.briefing_items?.map((item) => item.estimated_minutes) ?? [],
-        briefing.reading_window,
-      ),
-    }),
-  );
+  return loadStoredBriefings(supabase, user.id, 14, resolvedAuthState.route);
 }
 
 export async function getHistoryPageState(route = "/history") {
@@ -729,34 +1159,67 @@ export async function getBriefingDetailPageState(dateKey: string, route = `/brie
 }> {
   const authState = await getRequestAuthState(route);
 
-  const [data, viewer] = await Promise.all([
-    getDashboardData(route, authState),
-    getViewerAccount(route, authState),
-  ]);
-
-  const currentBriefingMatches = getBriefingDateKey(data.briefing.briefingDate) === dateKey;
-  let briefing: DailyBriefing | null = currentBriefingMatches ? data.briefing : null;
+  const data = authState.user
+    ? await buildSignedInHomepageData(authState)
+    : await buildPublicHomepageData();
+  let briefing: DailyBriefing | null =
+    getBriefingDateKey(data.briefing.briefingDate) === dateKey ? data.briefing : null;
 
   if (authState.supabase && authState.user) {
-    const history = await getHistory(route, authState);
-    briefing =
-      history.find((candidate) => getBriefingDateKey(candidate.briefingDate) === dateKey) ??
-      briefing;
+    const history = await loadStoredBriefings(authState.supabase, authState.user.id, 14, route);
+    const historicalMatch = history.find(
+      (candidate) => getBriefingDateKey(candidate.briefingDate) === dateKey,
+    );
+    if (historicalMatch) {
+      briefing = historicalMatch;
+    }
+  }
+
+  if (!briefing) {
+    const publicData = authState.user ? await buildPublicHomepageData() : data;
+    if (getBriefingDateKey(publicData.briefing.briefingDate) === dateKey) {
+      briefing = publicData.briefing;
+    }
   }
 
   return {
     data: briefing ? { ...data, briefing } : data,
     briefing,
-    viewer,
+    viewer: authState.viewer,
   };
 }
 
 export async function generateDailyBriefing(
   topics: Topic[] = demoTopics,
   sources: Source[] = getMvpDefaultPublicSources(),
-): Promise<{ briefing: DailyBriefing; pipelineRun: Awaited<ReturnType<typeof runClusterFirstPipeline>>["run"] }> {
-  const { run, ranked_clusters } = await runClusterFirstPipeline({ sources });
+  options: { suppliedByManifest?: boolean; persistPipelineCandidates?: boolean } = {},
+): Promise<{
+  briefing: DailyBriefing;
+  publicRankedItems: BriefingItem[];
+  pipelineRun: ClusterFirstPipelineResult["run"];
+}> {
+  const pipelineOptions: Parameters<typeof runClusterFirstPipelineSafely>[0] = {
+    sources,
+    suppliedByManifest: options.suppliedByManifest,
+    persistArticleCandidates: options.persistPipelineCandidates,
+  };
+  const { run, ranked_clusters } = await runClusterFirstPipelineSafely(pipelineOptions);
   const topicFallback = topics[0] ?? demoTopics[0];
+  const articleFilterDiagnostics = run.article_filter_evaluations ?? [];
+  const hasArticleFilterDiagnostics = "article_filter_evaluations" in run;
+  const articleFilterEvaluationById = new Map(
+    articleFilterDiagnostics.map((evaluation) => [
+      evaluation.article_id,
+      {
+        id: evaluation.article_id,
+        sourceTier: evaluation.source_tier,
+        headlineQuality: evaluation.headline_quality,
+        eventType: evaluation.event_type,
+        filterDecision: evaluation.filter_decision,
+        filterReasons: evaluation.filter_reasons,
+      } as ArticleFilterEvaluation,
+    ]),
+  );
 
   const candidateItems: BriefingItem[] = ranked_clusters.map(({ cluster, ranked }) => {
     const feedArticles = cluster.articles.map((article) => ({
@@ -777,11 +1240,17 @@ export async function generateDailyBriefing(
     const sourceCount = new Set(cluster.articles.map((article) => article.source)).size;
     const rankingSignals = [intelligence.rankingReason];
     const homepageClassification = classifyPipelineClusterHomepageCategory(cluster, intelligence);
+    const sourceAccessibility = evaluateSourceAccessibilitySupport(cluster.articles);
+    const representativeFilterEvaluation = articleFilterEvaluationById.get(cluster.representative_article.id);
     const trustLayer = buildTrustLayerPresentation(intelligence, {
       title: intelligence.title,
       topicName: topic.name,
       sourceCount,
       rankingSignals,
+      eventTypeOverride: representativeFilterEvaluation?.eventType,
+      contentAccessibility: sourceAccessibility.representative.content_accessibility,
+      accessibleTextLength: sourceAccessibility.accessibleTextLength,
+      sourceAccessibilityWarnings: sourceAccessibility.warnings,
     });
     const { packet, trustDebug } = assembleExplanationPacket({
       title: intelligence.title,
@@ -803,7 +1272,7 @@ export async function generateDailyBriefing(
     }));
     const corroborationWindow = getClusterCorroborationWindow(cluster.articles.map((article) => article.published_at));
 
-    return {
+    const item: BriefingItem = {
       id: `generated-${cluster.cluster_id}`,
       topicId: topic.id,
       topicName: topic.name,
@@ -841,6 +1310,18 @@ export async function generateDailyBriefing(
       homepageClassification,
       signalRole: packet.signal_role,
     };
+
+    return {
+      ...item,
+      selectionEligibility: hasArticleFilterDiagnostics
+        ? evaluateSignalSelectionEligibility({
+            item,
+            cluster,
+            ranked,
+            articleFilterEvaluation: representativeFilterEvaluation,
+          })
+        : undefined,
+    };
   });
   const items = selectPublicBriefingItems(candidateItems).map((item, index) => ({
     ...item,
@@ -857,19 +1338,20 @@ export async function generateDailyBriefing(
           readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
           items,
         }
-      : topics === demoTopics && areMvpDefaultPublicSources(sources)
+      : candidateItems.length === 0 && run.num_raw_items === 0 && topics === demoTopics && areMvpDefaultPublicSources(sources)
         ? demoDashboardData.briefing
         : createEmptyBriefing();
 
   return {
     briefing,
+    publicRankedItems: candidateItems,
     pipelineRun: run,
   };
 }
 
 function resolvePipelineTopic(
   topics: Topic[],
-  cluster: Awaited<ReturnType<typeof runClusterFirstPipeline>>["ranked_clusters"][number]["cluster"],
+  cluster: ClusterFirstPipelineResult["ranked_clusters"][number]["cluster"],
   fallbackTopic: Topic,
   intelligence?: ReturnType<typeof buildEventIntelligence>,
 ) {
@@ -911,7 +1393,7 @@ function resolvePipelineTopic(
 }
 
 function classifyPipelineClusterHomepageCategory(
-  cluster: Awaited<ReturnType<typeof runClusterFirstPipeline>>["ranked_clusters"][number]["cluster"],
+  cluster: ClusterFirstPipelineResult["ranked_clusters"][number]["cluster"],
   intelligence?: ReturnType<typeof buildEventIntelligence>,
 ) {
   const strictSourceCategories = [
@@ -933,19 +1415,8 @@ function classifyPipelineClusterHomepageCategory(
   });
 }
 
-function selectPublicBriefingItems(items: BriefingItem[], limit = 5) {
-  const sorted = items
-    .slice()
-    .sort((left, right) => {
-      const highSignalDelta =
-        Number(Boolean(right.eventIntelligence?.isHighSignal)) -
-        Number(Boolean(left.eventIntelligence?.isHighSignal));
-      if (highSignalDelta !== 0) {
-        return highSignalDelta;
-      }
-
-      return compareBriefingItemsByRanking(left, right);
-    });
+export function selectPublicBriefingItems(items: BriefingItem[], limit = 5) {
+  const sorted = items.slice().sort(compareBriefingItemsByRanking);
   const selected: BriefingItem[] = [];
   const topicCounts = new Map<string, number>();
   const skippedForSecondPass: BriefingItem[] = [];
@@ -954,6 +1425,11 @@ function selectPublicBriefingItems(items: BriefingItem[], limit = 5) {
     const topicKey = item.topicName.toLowerCase();
     const topicCount = topicCounts.get(topicKey) ?? 0;
     const isNonSignal = item.eventIntelligence?.eventType === "non_signal";
+    const isEligible = isCoreSignalEligible(item);
+
+    if (!isEligible) {
+      continue;
+    }
 
     if (isNonSignal && selected.length < limit) {
       skippedForSecondPass.push(item);
@@ -2148,9 +2624,10 @@ async function fetchSourceArticlesWithFallback(source: Source): Promise<SourceFe
   for (const attempt of attempts) {
     try {
       const articles = filterAttemptArticles(
-        await fetchFeedArticles(attempt.feedUrl, source.name, {
+        await fetchFeedArticlesSafely(attempt.feedUrl, source.name, {
           timeoutMs: attempt.timeoutMs,
           retryCount: attempt.retryCount,
+          feedId: source.id,
         }),
         attempt,
       );
@@ -2312,16 +2789,6 @@ function jaccardSimilarity(left: string[], right: string[]) {
   const overlap = [...leftSet].filter((word) => rightSet.has(word)).length;
   const union = new Set([...leftSet, ...rightSet]).size;
   return union === 0 ? 0 : overlap / union;
-}
-
-function extractMatchedKeywords(keyPoints: string[]) {
-  const matchedOn = keyPoints.find((point) => point.startsWith("Matched on:"));
-  if (!matchedOn) return [];
-  return matchedOn
-    .replace(/^Matched on:\s*/i, "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
 }
 
 function formatPublishedLabel(value: string | null) {

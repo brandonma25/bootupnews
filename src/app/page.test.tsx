@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const getDashboardPageState = vi.fn();
+const getHomepagePageState = vi.fn();
 const landingHomepage = vi.fn(() => <div>landing-homepage</div>);
 const homepageViewModel = {
   featured: null,
@@ -30,13 +30,18 @@ const homepageViewModel = {
   },
 };
 const buildHomepageViewModel = vi.fn(() => homepageViewModel);
+const applyHomepageEditorialOverridesToDashboardData = vi.fn(async (data: unknown) => data);
 
 vi.mock("@/lib/data", () => ({
-  getDashboardPageState,
+  getHomepagePageState,
 }));
 
 vi.mock("@/lib/homepage-model", () => ({
   buildHomepageViewModel,
+}));
+
+vi.mock("@/lib/homepage-editorial-overrides", () => ({
+  applyHomepageEditorialOverridesToDashboardData,
 }));
 
 vi.mock("@/components/landing/homepage", () => ({
@@ -60,7 +65,7 @@ describe("homepage SSR auth snapshot", () => {
       homepageDiagnostics: {},
     };
 
-    getDashboardPageState.mockResolvedValue({
+    getHomepagePageState.mockResolvedValue({
       data: dashboardData,
       viewer: {
         id: "viewer-1",
@@ -70,18 +75,36 @@ describe("homepage SSR auth snapshot", () => {
       },
     });
 
+    const editorialData = {
+      ...dashboardData,
+      briefing: {
+        ...dashboardData.briefing,
+        items: [
+          {
+            id: "signal-1",
+            title: "Edited signal",
+            whyItMatters: "Published editorial override",
+          },
+        ],
+      },
+    };
+    applyHomepageEditorialOverridesToDashboardData.mockResolvedValue(editorialData);
+
     const Page = (await import("@/app/page")).default;
     const element = await Page({
       searchParams: Promise.resolve({ auth: "1" }),
     });
     render(element);
 
-    expect(getDashboardPageState).toHaveBeenCalledTimes(1);
-    expect(getDashboardPageState).toHaveBeenCalledWith("/");
+    expect(getHomepagePageState).toHaveBeenCalledTimes(1);
+    expect(getHomepagePageState).toHaveBeenCalledWith("/");
+    expect(applyHomepageEditorialOverridesToDashboardData).toHaveBeenCalledTimes(1);
+    expect(applyHomepageEditorialOverridesToDashboardData).toHaveBeenCalledWith(dashboardData);
     expect(buildHomepageViewModel).toHaveBeenCalledTimes(1);
-    expect(buildHomepageViewModel).toHaveBeenCalledWith(dashboardData);
+    expect(buildHomepageViewModel).toHaveBeenCalledWith(editorialData);
     expect(landingHomepage).toHaveBeenCalledWith(
       expect.objectContaining({
+        data: editorialData,
         briefingDateLabel: "Thursday, January 2, 2020",
         homepageViewModel,
         viewer: expect.objectContaining({
@@ -89,5 +112,5 @@ describe("homepage SSR auth snapshot", () => {
         }),
       }),
     );
-  });
+  }, 10000);
 });

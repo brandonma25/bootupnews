@@ -12,7 +12,10 @@ export function deduplicateArticles(articles: NormalizedArticle[]) {
         new Date(right.published_at).getTime() - new Date(left.published_at).getTime(),
     )
     .forEach((article) => {
-      const normalizedUrl = normalizeUrl(article.url).toLowerCase();
+      const normalizedUrl = (
+        article.discovery_metadata?.normalizedUrl
+        ?? normalizeUrl(article.url)
+      ).toLowerCase();
       if (seenUrls.has(normalizedUrl)) {
         return;
       }

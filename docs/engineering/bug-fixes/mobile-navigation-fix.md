@@ -3,7 +3,18 @@
 ## Release Metadata
 - Date: 2026-04-19
 - Branch: `fix/mobile-navigation`
-- PR: Not opened yet
+- PR: #55, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/55`
+
+## GitHub Source-of-Truth Metadata
+- Affected object level: Surface Placement.
+- PR: #55, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/55`.
+- Branch: `fix/mobile-navigation`.
+- Head SHA: `e026ecf8ee49ae55f7a7cb68c06e61a4c3a22f17`.
+- Merge SHA: `967247c1c89124a390673971725dfdc140610f53`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #55 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the branch recovery details; no branch deletion was performed in this metadata enrichment branch.
 
 ## Issue Summary
 - Problem addressed: mobile users needed a dependable navigation drawer in the shared shell so they could open the menu, dismiss it cleanly, and move between the primary routes on phone-sized viewports.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
-import type { SignalCluster } from "@/lib/models/signal-cluster";
-import { rankSignalClusters } from "@/lib/scoring/scoring-engine";
+import type { StoryCluster } from "@/lib/models/signal-cluster";
+import { rankStoryClusters } from "@/lib/scoring/scoring-engine";
 
 function createArticle(id: string, overrides: Partial<NormalizedArticle> = {}): NormalizedArticle {
   return {
@@ -35,7 +35,7 @@ function createArticle(id: string, overrides: Partial<NormalizedArticle> = {}): 
   };
 }
 
-function createCluster(clusterId: string, title: string, keywords: string[], entities: string[]): SignalCluster {
+function createCluster(clusterId: string, title: string, keywords: string[], entities: string[]): StoryCluster {
   const article = createArticle(`${clusterId}-1`, {
     title,
     entities,
@@ -63,10 +63,26 @@ function createCluster(clusterId: string, title: string, keywords: string[], ent
   };
 }
 
-describe("rankSignalClusters", () => {
+function withArticleOverrides(
+  cluster: StoryCluster,
+  overrides: Partial<NormalizedArticle>,
+): StoryCluster {
+  const article = {
+    ...cluster.representative_article,
+    ...overrides,
+  };
+
+  return {
+    ...cluster,
+    representative_article: article,
+    articles: [article],
+  };
+}
+
+describe("rankStoryClusters", () => {
   it("builds canonical ranking feature sets with FNS ownership", () => {
     const clusters = [createCluster("cluster-1", "Fed signals rates will stay elevated", ["finance", "rates", "market"], ["Federal Reserve"])];
-    const ranked = rankSignalClusters(clusters)[0];
+    const ranked = rankStoryClusters(clusters)[0];
 
     expect(ranked?.ranked.ranking_debug.provider).toBe("fns");
     expect(ranked?.ranked.ranking_debug.features.source_credibility).toBeGreaterThan(0);
@@ -84,7 +100,7 @@ describe("rankSignalClusters", () => {
       createCluster("cluster-2", "Banks reprice after Fed guidance", ["finance", "rates", "market"], ["Federal Reserve"]),
     ];
 
-    const ranked = rankSignalClusters(clusters);
+    const ranked = rankStoryClusters(clusters);
 
     expect(ranked).toHaveLength(2);
     expect(ranked[1]?.ranked.ranking_debug.diversity.action).toBe("penalize");
@@ -114,12 +130,65 @@ describe("rankSignalClusters", () => {
     };
     trivialFreshCluster.articles = [trivialFreshCluster.representative_article];
 
-    const ranked = rankSignalClusters([trivialFreshCluster, criticalCluster]);
+    const ranked = rankStoryClusters([trivialFreshCluster, criticalCluster]);
 
     expect(ranked[0]?.cluster.cluster_id).toBe("cluster-critical");
     expect(ranked[0]?.ranked.ranking_debug.grouped_scores.event_importance).toBeGreaterThan(
       ranked[1]?.ranked.ranking_debug.grouped_scores.event_importance ?? 0,
     );
+  });
+
+  it("feeds source authority and trust tier into the strategic score used downstream", () => {
+    const baseCluster = createCluster(
+      "cluster-authority",
+      "Central bank review changes liquidity assumptions for major banks",
+      ["policy", "liquidity", "banks", "market", "rates", "guidance"],
+      ["Federal Reserve"],
+    );
+    const tierOneCluster = withArticleOverrides(baseCluster, {
+      id: "cluster-authority-tier-one",
+      source: "Associated Press",
+      source_metadata: {
+        sourceId: "fns-associated-press",
+        donor: "fns",
+        source: "Associated Press",
+        homepageUrl: "https://apnews.com",
+        topic: "World",
+        credibility: 88,
+        reliability: 0.88,
+        sourceClass: "general_newswire",
+        trustTier: "tier_1",
+        provenance: "aggregated_wire",
+        status: "active",
+        availability: "default",
+      },
+    });
+    const tierTwoCluster = withArticleOverrides(baseCluster, {
+      id: "cluster-authority-tier-two",
+      source: "Unknown Blog",
+      source_metadata: {
+        sourceId: "unknown-blog",
+        donor: "openclaw",
+        source: "Unknown Blog",
+        homepageUrl: "https://example-blog.test",
+        topic: "Tech",
+        credibility: 74,
+        reliability: 0.74,
+        sourceClass: "specialist_press",
+        trustTier: "tier_2",
+        provenance: "specialist_analysis",
+        status: "active",
+        availability: "default",
+      },
+    });
+
+    const [tierOne] = rankStoryClusters([tierOneCluster]);
+    const [tierTwo] = rankStoryClusters([tierTwoCluster]);
+
+    expect(tierOne?.ranked.ranking_debug.features.trust_tier).toBeGreaterThan(
+      tierTwo?.ranked.ranking_debug.features.trust_tier ?? 0,
+    );
+    expect(tierOne?.ranked.score).toBeGreaterThan(tierTwo?.ranked.score ?? 0);
   });
 
   it("keeps a critical overlapping story visible with only a light diversity penalty", () => {
@@ -136,7 +205,7 @@ describe("rankSignalClusters", () => {
       ["United States", "China"],
     );
 
-    const ranked = rankSignalClusters([primary, adjacentCritical]);
+    const ranked = rankStoryClusters([primary, adjacentCritical]);
     const penalized = ranked.find((entry) => entry.cluster.cluster_id === "cluster-adjacent");
 
     expect(penalized?.ranked.ranking_debug.diversity.action).toBe("penalize");

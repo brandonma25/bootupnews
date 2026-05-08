@@ -14,11 +14,12 @@ Direct Google Sheets verification was not available in this local Codex session.
 - Dependency: `Daily news ingestion foundation, Source governance and defaults, Homepage intelligence surface`
 - Build Order: `52`
 - Decision: `build`
-- Last Updated: `2026-04-22`
+- Last Updated: `2026-05-08`
 - PRD File: `docs/product/prd/prd-52-source-taxonomy-expansion.md`
 
 ## Notes
 
 - This is feature work, not remediation.
+- 2026-05-08 merge refresh: public activation now uses the governed `public.home` source manifest introduced after this PR was opened; the legacy MVP default helper remains a compatibility fallback.
 - Brookings Research and CSIS Analysis are registered as mixed-domain/O3 but disabled because the supplied feed URLs failed live RSS validation.
 - The repo uses `finance` as the existing economics category key; no schema or category-key migration was made.

@@ -15,6 +15,7 @@ import type {
   SourceStatus,
   TrustTier,
 } from "@/lib/integration/subsystem-contracts";
+import type { SourceRole } from "@/lib/source-accessibility-types";
 
 export type DonorId = "openclaw" | "after_market_agent" | "fns" | "horizon";
 
@@ -33,6 +34,9 @@ export type DonorFeed = {
   provenance: SourceProvenance;
   status: SourceStatus;
   availability: SourceAvailability;
+  sourceRole?: SourceRole;
+  publicEligible?: boolean;
+  suppliedByManifest?: boolean;
   fetch: {
     feedUrl: string;
     timeoutMs?: number;

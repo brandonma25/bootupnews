@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateDailyBriefing, getDashboardData } from "@/lib/data";
 import { logServerEvent } from "@/lib/observability";
 import { runClusterFirstPipeline } from "@/lib/pipeline";
+import { PUBLIC_SURFACE_SOURCE_MANIFEST } from "@/lib/source-manifest";
 
 vi.mock("@/lib/pipeline", () => ({
   runClusterFirstPipeline: vi.fn(),
@@ -348,6 +349,14 @@ describe("getDashboardData fallback behavior", () => {
     });
   });
 
+  it("preserves the broader ranked candidate pool alongside the capped public briefing items", async () => {
+    const { briefing, publicRankedItems } = await generateDailyBriefing();
+
+    expect(briefing.items).toHaveLength(1);
+    expect(publicRankedItems.length).toBeGreaterThanOrEqual(briefing.items.length);
+    expect(publicRankedItems[0]?.id).toBe(briefing.items[0]?.id);
+  });
+
   it("uses the public pipeline as a live fallback for signed-in users without bootstrap rows", async () => {
     const supabase = createSupabaseMock({});
 
@@ -371,6 +380,7 @@ describe("getDashboardData fallback behavior", () => {
     expect(data.briefing.items).toHaveLength(1);
     expect(data.topics.length).toBeGreaterThan(0);
     expect(data.sources.length).toBeGreaterThan(0);
+    expect(data.sources.map((source) => source.id)).toEqual([...PUBLIC_SURFACE_SOURCE_MANIFEST["public.home"]]);
     expect(runClusterFirstPipeline).toHaveBeenCalledTimes(1);
     expect(logServerEvent).toHaveBeenCalledWith(
       "info",

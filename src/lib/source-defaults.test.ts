@@ -18,38 +18,68 @@ import { recommendedSources } from "@/lib/source-catalog";
 describe("MVP default source governance", () => {
   const guardedBatchOneSourceIds = [
     "financial-times-global-economy",
-    "brookings-research",
-    "csis-analysis",
+    "foreign-affairs",
+    "the-diplomat",
+    "npr-business",
+    "npr-economy",
+    "federal-reserve-press-all",
+    "federal-reserve-monetary-policy",
+    "bls-principal-federal-economic-indicators",
+    "bls-consumer-price-index",
+    "bls-employment-situation",
+    "cnbc-business",
+    "cnbc-economy",
+    "cnbc-finance",
+    "marketwatch-top-stories",
+    "npr-world",
+    "npr-politics",
+    "propublica-main",
+    "cnbc-politics",
+    "foreign-policy",
+    "guardian-world",
+    "hacker-news-best",
+  ];
+  const guardedBatchTwoASourceIds = [
+    "semafor",
+    "axios",
+    "404-media",
+    "heatmap",
+    "guardian-world",
+    "pbs-newshour",
+    "sec-press-releases",
+    "france24",
+  ];
+  const guardedBatchTwoBFinanceSourceIds = [
+    "liberty-street-economics",
+    "fred-blog",
+    "fed-feds-notes",
+    "sf-fed-research-insights",
+    "stlouisfed-on-the-economy",
+  ];
+  const pausedTldrSourceIds = [
+    "source-tldr-tech",
+    "source-tldr-ai",
+    "source-tldr-product",
+    "source-tldr-founders",
+    "source-tldr-design",
+    "source-tldr-fintech",
+    "source-tldr-it",
+    "source-tldr-crypto",
+    "source-tldr-marketing",
   ];
 
   it("declares the public MVP default source set explicitly", () => {
     expect(MVP_DEFAULT_PUBLIC_SOURCE_IDS).toEqual([
       "source-verge",
       "source-ars",
-      "source-mit-technology-review",
-      "source-hacker-news-best",
-      "source-tldr-tech",
       "source-techcrunch",
       "source-ft",
-      "source-foreign-affairs",
-      "source-the-diplomat",
-      "source-npr-world",
-      "source-foreign-policy",
-      "source-guardian-world",
     ]);
     expect(getMvpDefaultPublicSources().map((source) => source.name)).toEqual([
       "The Verge",
       "Ars Technica",
-      "MIT Technology Review",
-      "Hacker News Best",
-      "TLDR",
       "TechCrunch",
       "Financial Times",
-      "Foreign Affairs",
-      "The Diplomat",
-      "NPR World",
-      "Foreign Policy",
-      "The Guardian World",
     ]);
   });
 
@@ -58,25 +88,44 @@ describe("MVP default source governance", () => {
     const nonDefaultDemoSources = demoSources.filter((source) => !defaultSourceIds.has(source.id));
 
     expect(nonDefaultDemoSources.map((source) => source.name)).toEqual(
-      expect.arrayContaining(["MarketWatch", "ZeroHedge", "AP Top News", "Brookings Research", "CSIS Analysis"]),
-    );
-    expect(areMvpDefaultPublicSources(demoSources)).toBe(false);
-    expect(
-      recommendedSources
-        .filter((source) => source.lifecycleStatus === "active_default")
-        .map((source) => source.id),
-    ).toEqual(
       expect.arrayContaining([
-        "ars-technica",
-        "mit-technology-review",
-        "foreign-affairs",
-        "the-diplomat",
-        "npr-world",
-        "foreign-policy",
-        "guardian-world",
-        "hacker-news-best",
+        "BBC World News",
+        "Hacker News Best",
+        "The Diplomat",
+        "Foreign Policy",
+        "MarketWatch",
+        "ZeroHedge",
+        "AP Top News",
       ]),
     );
+    expect(defaultSourceIds.has("source-bbc-world")).toBe(false);
+    expect(defaultSourceIds.has("source-semafor")).toBe(false);
+    expect(defaultSourceIds.has("source-axios")).toBe(false);
+    expect(defaultSourceIds.has("source-404-media")).toBe(false);
+    expect(defaultSourceIds.has("source-sec-press-releases")).toBe(false);
+    expect(defaultSourceIds.has("source-liberty-street-economics")).toBe(false);
+    expect(defaultSourceIds.has("source-fred-blog")).toBe(false);
+    expect(defaultSourceIds.has("source-fed-feds-notes")).toBe(false);
+    expect(defaultSourceIds.has("source-sf-fed-research-insights")).toBe(false);
+    expect(defaultSourceIds.has("source-stlouisfed-on-the-economy")).toBe(false);
+    expect(areMvpDefaultPublicSources(demoSources)).toBe(false);
+    expect(recommendedSources.some((source) => source.lifecycleStatus === "active_default")).toBe(false);
+
+    for (const sourceId of pausedTldrSourceIds) {
+      expect(defaultSourceIds.has(sourceId)).toBe(false);
+    }
+  });
+
+  it("keeps all TLDR category sources paused and outside the public default set", () => {
+    const sourcesById = new Map(demoSources.map((source) => [source.id, source]));
+
+    for (const sourceId of pausedTldrSourceIds) {
+      const source = sourcesById.get(sourceId);
+
+      expect(source).toBeDefined();
+      expect(source?.status).toBe("paused");
+      expect(MVP_DEFAULT_PUBLIC_SOURCE_IDS).not.toContain(sourceId);
+    }
   });
 
   it("declares the donor fallback defaults explicitly", () => {
@@ -154,6 +203,12 @@ describe("MVP default source governance", () => {
     const probationaryRuntimeSourceIds = new Set(PROBATIONARY_RUNTIME_FEED_IDS);
 
     for (const sourceId of guardedBatchOneSourceIds) {
+      expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
+    }
+    for (const sourceId of guardedBatchTwoASourceIds) {
+      expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
+    }
+    for (const sourceId of guardedBatchTwoBFinanceSourceIds) {
       expect(probationaryRuntimeSourceIds.has(sourceId)).toBe(false);
     }
     expect(probationaryRuntimeSourceIds.has("bbc")).toBe(false);

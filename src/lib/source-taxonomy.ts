@@ -46,7 +46,7 @@ export const SOURCE_TAXONOMY_PROFILES: SourceTaxonomyProfile[] = [
   },
   {
     profileId: "mit-technology-review",
-    sourceIds: ["source-mit-technology-review", "mit-technology-review"],
+    sourceIds: ["source-mit-tech-review", "source-mit-technology-review", "mit-technology-review"],
     canonicalName: "MIT Technology Review",
     feedUrl: "https://www.technologyreview.com/feed/",
     domainScope: "strict",

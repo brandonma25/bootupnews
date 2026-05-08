@@ -6,6 +6,18 @@
 - Canonical PRD required: no.
 - Scope: release validation route-probe markers for the signed-out Home remediation branch.
 
+## GitHub Source-of-Truth Metadata
+
+- Affected object level: Surface Placement.
+- PR: #97, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/97`.
+- Branch: `fix/signed-out-homepage-qa-remediation`.
+- Head SHA: `00ffcd3ce51d86460ef51ee54fb81b00742e81d8`.
+- Merge SHA: `cd3f8a740196e1df031bb5c4989bb524f8efb6d0`.
+- GitHub source-of-truth status: canonical pre-template bug-fix record enriched with source-of-truth metadata on 2026-05-04.
+- External references reviewed, if any: GitHub PR #97 metadata and the existing canonical bug-fix record.
+- Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
+- Branch cleanup status: PR metadata and this record preserve the branch recovery details; no branch deletion was performed in this metadata enrichment branch.
+
 ## Root Cause
 
 The local release gate still checked older signed-out Home and `/dashboard` copy:

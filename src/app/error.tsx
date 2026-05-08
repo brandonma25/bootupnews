@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -11,6 +12,7 @@ type Props = {
 
 export default function Error({ error, reset }: Props) {
   useEffect(() => {
+    captureRouteError(error);
     console.error("Route error boundary triggered.", error);
   }, [error]);
 
@@ -55,4 +57,19 @@ export default function Error({ error, reset }: Props) {
       </div>
     </div>
   );
+}
+
+function captureRouteError(error: Error) {
+  Sentry.withScope((scope) => {
+    if (isRssRelatedRenderError(error)) {
+      scope.setTag("component", "rss");
+      scope.setTag("rss.phase", "render");
+    }
+
+    Sentry.captureException(error);
+  });
+}
+
+function isRssRelatedRenderError(error: Error) {
+  return /rss|feed|source|ingestion|briefing|signal_posts/i.test(error.message);
 }

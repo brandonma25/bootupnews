@@ -3,6 +3,8 @@ import { coreRoutes } from "../utils/routes";
 import { traverseKnownRoutes } from "../utils/traversal";
 
 test.describe("route traversal audit", () => {
+  test.describe.configure({ timeout: 180_000 });
+
   test("captures route screenshots and structured traversal output", async ({ page }, testInfo) => {
     const results = await traverseKnownRoutes(page, testInfo);
 

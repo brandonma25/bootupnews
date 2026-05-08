@@ -5,6 +5,8 @@ import {
   ingestRawItems,
   resolveNoArgumentRuntimeSourceResolutionSnapshot,
 } from "@/lib/pipeline/ingestion";
+import { getSourcesForPublicSurface } from "@/lib/source-manifest";
+import type { Source } from "@/lib/types";
 
 vi.mock("@/lib/rss", () => ({
   fetchFeedArticles: vi.fn(async (feedUrl: string, sourceName: string) => [
@@ -18,6 +20,50 @@ vi.mock("@/lib/rss", () => ({
     },
   ]),
 }));
+
+function createUserSuppliedSources(count: number): Source[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sourceNumber = index + 1;
+
+    return {
+      id: `user-source-${sourceNumber}`,
+      name: `User Source ${sourceNumber}`,
+      feedUrl: `https://example.com/source-${sourceNumber}.xml`,
+      homepageUrl: `https://example.com/source-${sourceNumber}`,
+      topicName: sourceNumber % 2 === 0 ? "Finance" : "Tech",
+      status: "active",
+    };
+  });
+}
+
+function createPoliticsSources(): Source[] {
+  return [
+    {
+      id: "source-politico-politics",
+      name: "Politico Politics News",
+      feedUrl: "https://rss.politico.com/politics-news.xml",
+      homepageUrl: "https://www.politico.com/news/politics-policy",
+      topicName: "Politics",
+      status: "active",
+    },
+    {
+      id: "source-politico-congress",
+      name: "Politico Congress",
+      feedUrl: "https://rss.politico.com/congress.xml",
+      homepageUrl: "https://www.politico.com/congress",
+      topicName: "Politics",
+      status: "active",
+    },
+    {
+      id: "source-politico-defense",
+      name: "Politico Defense",
+      feedUrl: "https://rss.politico.com/defense.xml",
+      homepageUrl: "https://www.politico.com/defense",
+      topicName: "Politics",
+      status: "active",
+    },
+  ];
+}
 
 describe("ingestRawItems", () => {
   it("preserves canonical source metadata for donor-backed sources", async () => {
@@ -49,16 +95,8 @@ describe("ingestRawItems", () => {
       mvp_default_public_source_ids: [
         "source-verge",
         "source-ars",
-        "source-mit-technology-review",
-        "source-hacker-news-best",
-        "source-tldr-tech",
         "source-techcrunch",
         "source-ft",
-        "source-foreign-affairs",
-        "source-the-diplomat",
-        "source-npr-world",
-        "source-foreign-policy",
-        "source-guardian-world",
       ],
       donor_fallback_default_ids: [
         "openclaw-the-verge",
@@ -95,6 +133,14 @@ describe("ingestRawItems", () => {
     expect(firstItem?.source_metadata?.sourceClass).toBeTruthy();
     expect(firstItem?.source_metadata?.trustTier).toBeTruthy();
     expect(firstItem?.source_metadata?.provenance).toBeTruthy();
+    expect(result.sources.find((source) => source.sourceId === "foreign-affairs")).toMatchObject({
+      domainScope: "strict",
+      defaultCategory: "politics",
+    });
+    expect(result.sources.find((source) => source.sourceId === "foreign-policy")).toMatchObject({
+      domainScope: "mixed_domain",
+      defaultCategory: undefined,
+    });
   });
 
   it("ingests only the explicit public MVP defaults when public sources are supplied", async () => {
@@ -104,46 +150,22 @@ describe("ingestRawItems", () => {
     expect(result.source_resolution.resolved_runtime_source_ids).toEqual([
       "custom-source-verge",
       "custom-source-ars",
-      "custom-source-mit-technology-review",
-      "custom-source-hacker-news-best",
-      "custom-source-tldr-tech",
       "custom-source-techcrunch",
       "custom-source-ft",
-      "custom-source-foreign-affairs",
-      "custom-source-the-diplomat",
-      "custom-source-npr-world",
-      "custom-source-foreign-policy",
-      "custom-source-guardian-world",
     ]);
     expect(result.source_resolution.resolved_default_donor_source_ids).toEqual([]);
     expect(result.source_resolution.resolved_probationary_source_ids).toEqual([]);
     expect(result.sources.map((source) => source.sourceId)).toEqual([
       "custom-source-verge",
       "custom-source-ars",
-      "custom-source-mit-technology-review",
-      "custom-source-hacker-news-best",
-      "custom-source-tldr-tech",
       "custom-source-techcrunch",
       "custom-source-ft",
-      "custom-source-foreign-affairs",
-      "custom-source-the-diplomat",
-      "custom-source-npr-world",
-      "custom-source-foreign-policy",
-      "custom-source-guardian-world",
     ]);
     expect(result.sources.map((source) => source.source)).toEqual([
       "The Verge",
       "Ars Technica",
-      "MIT Technology Review",
-      "Hacker News Best",
-      "TLDR",
       "TechCrunch",
       "Financial Times",
-      "Foreign Affairs",
-      "The Diplomat",
-      "NPR World",
-      "Foreign Policy",
-      "The Guardian World",
     ]);
   });
 
@@ -151,11 +173,111 @@ describe("ingestRawItems", () => {
     const result = await ingestRawItems({ sources: getMvpDefaultPublicSources() });
 
     expect(result.sources.map((source) => source.sourceId)).not.toContain("mit-technology-review");
-    expect(result.sources.map((source) => source.sourceId)).toContain("custom-source-mit-technology-review");
-    expect(result.sources.find((source) => source.source === "MIT Technology Review")).toMatchObject({
+    expect(result.sources.map((source) => source.source)).not.toContain("MIT Technology Review");
+  });
+
+  it("resolves the full manifest-supplied source list when manifest provenance is set", async () => {
+    const sources = getSourcesForPublicSurface("public.home");
+    const result = await ingestRawItems({ sources, suppliedByManifest: true });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual(
+      sources.map((source) => `custom-${source.id}`),
+    );
+  });
+
+  it("uses source-policy tier metadata for supplied manifest sources", async () => {
+    const sources = getSourcesForPublicSurface("public.home");
+    const result = await ingestRawItems({ sources, suppliedByManifest: true });
+    const sourceById = new Map(result.sources.map((source) => [source.sourceId, source]));
+
+    expect(sourceById.get("custom-source-ft")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-reuters-business")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-bbc-world")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-foreign-affairs")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-the-diplomat")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-foreign-policy")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-hacker-news-best")?.trustTier).toBe("tier_3");
+    expect(sourceById.get("custom-source-politico-congress")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-semafor")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-axios")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-404-media")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-heatmap")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-guardian-world")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-pbs-newshour")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-france24")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-npr-economy")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-cnbc-finance")?.trustTier).toBe("tier_2");
+    expect(sourceById.get("custom-source-propublica-main")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-fed-press-all")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-sec-press-releases")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-bls-cpi")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-liberty-street-economics")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-fred-blog")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-fed-feds-notes")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-sf-fed-research-insights")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-stlouisfed-on-the-economy")?.trustTier).toBe("tier_1");
+    expect(sourceById.get("custom-source-fed-press-all")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-sec-press-releases")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-bls-employment-situation")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-liberty-street-economics")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-fred-blog")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-fed-feds-notes")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-sf-fed-research-insights")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-stlouisfed-on-the-economy")?.sourceRole).toBe("primary_institutional");
+    expect(sourceById.get("custom-source-marketwatch")?.sourceRole).toBe("corroboration_only");
+    expect(sourceById.get("custom-source-hacker-news-best")?.sourceRole).toBe("corroboration_only");
+    expect(sourceById.get("custom-source-cnbc-finance")?.sourceRole).toBe("secondary_authoritative");
+    expect(sourceById.get("custom-source-the-diplomat")).toMatchObject({
       domainScope: "strict",
-      defaultCategory: "tech",
+      defaultCategory: "politics",
     });
+    expect(sourceById.get("custom-source-foreign-policy")).toMatchObject({
+      domainScope: "mixed_domain",
+      defaultCategory: undefined,
+    });
+  });
+
+  it("preserves the five-source cap for six non-manifest supplied sources", async () => {
+    const result = await ingestRawItems({ sources: createUserSuppliedSources(6) });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-user-source-1",
+      "custom-user-source-2",
+      "custom-user-source-3",
+      "custom-user-source-4",
+      "custom-user-source-5",
+    ]);
+  });
+
+  it("resolves all three manifest-supplied sources when count is below the cap", async () => {
+    const sources = getSourcesForPublicSurface("public.home").slice(0, 3);
+    const result = await ingestRawItems({ sources, suppliedByManifest: true });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual(
+      sources.map((source) => `custom-${source.id}`),
+    );
+  });
+
+  it("resolves all three non-manifest supplied sources when count is below the cap", async () => {
+    const result = await ingestRawItems({ sources: createUserSuppliedSources(3) });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-user-source-1",
+      "custom-user-source-2",
+      "custom-user-source-3",
+    ]);
+  });
+
+  it("maps supplied politics sources into the World canonical topic metadata", async () => {
+    const result = await ingestRawItems({ sources: createPoliticsSources() });
+
+    expect(result.sources.map((source) => source.sourceId)).toEqual([
+      "custom-source-politico-politics",
+      "custom-source-politico-congress",
+      "custom-source-politico-defense",
+    ]);
+    expect(result.sources.map((source) => source.topic)).toEqual(["World", "World", "World"]);
+    expect(result.sources.map((source) => source.sourceClass)).toEqual(["general_newswire", "general_newswire", "general_newswire"]);
   });
 
   it("exposes an ID-only no-argument source-resolution audit snapshot without fetching feeds", () => {
@@ -166,16 +288,8 @@ describe("ingestRawItems", () => {
       mvp_default_public_source_ids: [
         "source-verge",
         "source-ars",
-        "source-mit-technology-review",
-        "source-hacker-news-best",
-        "source-tldr-tech",
         "source-techcrunch",
         "source-ft",
-        "source-foreign-affairs",
-        "source-the-diplomat",
-        "source-npr-world",
-        "source-foreign-policy",
-        "source-guardian-world",
       ],
       donor_fallback_default_ids: [
         "openclaw-the-verge",

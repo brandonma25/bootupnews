@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -19,6 +20,7 @@ import { RSSFeedInput } from "@/components/account/RSSFeedInput";
 import { RSSFeedRow } from "@/components/account/RSSFeedRow";
 import { SavePreferencesButton } from "@/components/account/SavePreferencesButton";
 import { UserProfileBlock } from "@/components/account/UserProfileBlock";
+import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import type { AccountPreferenceSnapshot } from "@/lib/data";
 import type { Source, ViewerAccount } from "@/lib/types";
@@ -33,6 +35,7 @@ type AccountPageClientProps = {
   viewer: ViewerAccount;
   sources: Source[];
   preferences: AccountPreferenceSnapshot;
+  isAdmin?: boolean;
 };
 
 function toAccountFeeds(sources: Source[]): AccountFeed[] {
@@ -47,6 +50,7 @@ export function AccountPageClient({
   viewer,
   sources,
   preferences,
+  isAdmin = false,
 }: AccountPageClientProps) {
   const [feeds, setFeeds] = useState(() => toAccountFeeds(sources));
   const [savedCategories, setSavedCategories] = useState<AccountCategoryKey[]>(
@@ -124,6 +128,23 @@ export function AccountPageClient({
           void signOutAction();
         }}
       />
+
+      {isAdmin ? (
+        <Panel className="p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <p className="section-label">Admin</p>
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Editorial Review</h2>
+              <p className="max-w-2xl text-sm text-[var(--text-secondary)]">
+                Review, approve, and publish the Top 5 Signals editorial layer.
+              </p>
+            </div>
+            <Button asChild variant="secondary" className="w-full sm:w-auto">
+              <Link href="/dashboard/signals/editorial-review">Editorial Review</Link>
+            </Button>
+          </div>
+        </Panel>
+      ) : null}
 
       <Panel className="p-5">
         <div className="space-y-2">

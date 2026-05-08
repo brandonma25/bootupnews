@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { getSourceRegistrySnapshot } from "@/adapters/donors";
-import { getMvpDefaultPublicSources } from "@/lib/demo-data";
 import {
   classifyHomepageCategory,
   countSourcesByHomepageCategory,
 } from "@/lib/homepage-taxonomy";
+import { getSourcesForPublicSurface } from "@/lib/source-manifest";
 import {
   getSourceTaxonomyProfile,
   isMixedDomainSource,
@@ -62,11 +62,26 @@ describe("source taxonomy expansion", () => {
     ).toBe("tech");
   });
 
-  it("keeps disabled mixed-domain endpoints out of public default source counts", () => {
-    const counts = countSourcesByHomepageCategory(getMvpDefaultPublicSources());
+  it("keeps disabled mixed-domain endpoints out of public source counts", () => {
+    const publicSources = getSourcesForPublicSurface("public.home");
+    const expansionSources = publicSources.filter((source) =>
+      [
+        "source-mit-tech-review",
+        "source-hacker-news-best",
+        "source-foreign-affairs",
+        "source-the-diplomat",
+        "source-npr-world",
+        "source-foreign-policy",
+        "source-guardian-world",
+      ].includes(source.id),
+    );
+    const counts = countSourcesByHomepageCategory(expansionSources);
+    const publicSourceIds = new Set(publicSources.map((source) => source.id));
 
-    expect(counts.tech).toBeGreaterThanOrEqual(5);
+    expect(counts.tech).toBe(2);
     expect(counts.politics).toBe(3);
+    expect(publicSourceIds.has("source-brookings-research")).toBe(false);
+    expect(publicSourceIds.has("source-csis-analysis")).toBe(false);
     expect(isMixedDomainSource({ sourceName: "Foreign Policy" })).toBe(true);
   });
 

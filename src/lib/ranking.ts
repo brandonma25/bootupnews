@@ -7,24 +7,31 @@ type ArticleCluster = {
   sources: FeedArticle[];
 };
 
-export type RankedCluster = ArticleCluster & {
+export type RankedArticleCluster = ArticleCluster & {
   importanceScore: number;
   importanceLabel: "Critical" | "High" | "Watch";
+  // Legacy display evidence labels for BriefingItem cards, not canonical Signal objects.
   rankingSignals: string[];
   eventIntelligence: EventIntelligence;
 };
 
+/**
+ * @deprecated Use RankedArticleCluster. This legacy path ranks Article Cluster
+ * evidence for BriefingItem display and does not create canonical Signal identity.
+ */
+export type RankedCluster = RankedArticleCluster;
+
 export function rankNewsClusters(
   topicName: string,
   clusters: ArticleCluster[],
-): RankedCluster[] {
+): RankedArticleCluster[] {
   return clusters
     .map((cluster) => rankCluster(topicName, cluster))
     .filter((cluster) => cluster.eventIntelligence.isHighSignal)
     .sort(compareRankedClusters);
 }
 
-function rankCluster(topicName: string, cluster: ArticleCluster): RankedCluster {
+function rankCluster(topicName: string, cluster: ArticleCluster): RankedArticleCluster {
   const eventIntelligence = buildEventIntelligence(cluster.sources, {
     topicName,
     createdAt: cluster.representative.publishedAt,
@@ -52,7 +59,7 @@ function rankCluster(topicName: string, cluster: ArticleCluster): RankedCluster 
   };
 }
 
-export function compareRankedClusters(left: RankedCluster, right: RankedCluster) {
+export function compareRankedClusters(left: RankedArticleCluster, right: RankedArticleCluster) {
   const scoreDelta = right.eventIntelligence.rankingScore - left.eventIntelligence.rankingScore;
   if (scoreDelta !== 0) {
     return scoreDelta;
@@ -76,6 +83,7 @@ export function compareRankedClusters(left: RankedCluster, right: RankedCluster)
 type BriefingRankSnapshot = {
   isHighSignal: boolean;
   rankingScore: number;
+  scoreSource: "strategic" | "legacy_event_intelligence" | "none";
   confidenceScore: number;
   freshestTimestamp: number;
   sourceDiversity: number;
@@ -85,13 +93,13 @@ export function compareBriefingItemsByRanking(left: BriefingItem, right: Briefin
   const leftSnapshot = getBriefingRankSnapshot(left);
   const rightSnapshot = getBriefingRankSnapshot(right);
 
-  if (leftSnapshot.isHighSignal !== rightSnapshot.isHighSignal) {
-    return Number(rightSnapshot.isHighSignal) - Number(leftSnapshot.isHighSignal);
-  }
-
   const scoreDelta = rightSnapshot.rankingScore - leftSnapshot.rankingScore;
   if (scoreDelta !== 0) {
     return scoreDelta;
+  }
+
+  if (leftSnapshot.isHighSignal !== rightSnapshot.isHighSignal) {
+    return Number(rightSnapshot.isHighSignal) - Number(leftSnapshot.isHighSignal);
   }
 
   const confidenceDelta = rightSnapshot.confidenceScore - leftSnapshot.confidenceScore;
@@ -99,14 +107,14 @@ export function compareBriefingItemsByRanking(left: BriefingItem, right: Briefin
     return confidenceDelta;
   }
 
-  const freshnessDelta = rightSnapshot.freshestTimestamp - leftSnapshot.freshestTimestamp;
-  if (freshnessDelta !== 0) {
-    return freshnessDelta;
-  }
-
   const sourceDelta = rightSnapshot.sourceDiversity - leftSnapshot.sourceDiversity;
   if (sourceDelta !== 0) {
     return sourceDelta;
+  }
+
+  const freshnessDelta = rightSnapshot.freshestTimestamp - leftSnapshot.freshestTimestamp;
+  if (freshnessDelta !== 0) {
+    return freshnessDelta;
   }
 
   return left.title.localeCompare(right.title);
@@ -118,7 +126,12 @@ export function sortBriefingItemsByRanking(items: BriefingItem[]) {
 
 export function getBriefingRankSnapshot(item: BriefingItem): BriefingRankSnapshot {
   const intelligence = item.eventIntelligence;
-  const rankingScore = intelligence?.rankingScore ?? item.importanceScore ?? 0;
+  const strategicScore = getStrategicImportanceScore(item);
+  // `importanceScore`/`matchScore` carries the active importance-first
+  // `ranked.score` from rankStoryClusters(). The legacy
+  // eventIntelligence.rankingScore remains only for older/demo BriefingItems
+  // that predate the strategic score.
+  const rankingScore = strategicScore.score ?? intelligence?.rankingScore ?? 0;
   const confidenceScore = intelligence?.confidenceScore ?? 0;
   const sourceDiversity =
     intelligence?.signals.sourceDiversity ??
@@ -130,12 +143,27 @@ export function getBriefingRankSnapshot(item: BriefingItem): BriefingRankSnapsho
       intelligence?.isHighSignal ??
       (rankingScore >= 45 && (sourceDiversity >= 2 || (item.relatedArticles?.length ?? 0) >= 2)),
     rankingScore,
+    scoreSource: strategicScore.source ?? (intelligence?.rankingScore !== undefined ? "legacy_event_intelligence" : "none"),
     confidenceScore,
     freshestTimestamp: getTimestamp(item.publishedAt ?? intelligence?.createdAt),
     sourceDiversity,
   };
 }
 
+function getStrategicImportanceScore(item: BriefingItem) {
+  if (Number.isFinite(item.importanceScore)) {
+    return { score: item.importanceScore, source: "strategic" as const };
+  }
+
+  if (Number.isFinite(item.matchScore)) {
+    return { score: item.matchScore, source: "strategic" as const };
+  }
+
+  return { score: null, source: null };
+}
+
+// Returns Card display labels derived from ranking evidence, not canonical
+// Signal objects.
 export function buildRankingDisplaySignals(item: BriefingItem) {
   const intelligence = item.eventIntelligence;
   const articleCount =

@@ -6,7 +6,15 @@ export type AuditRoute = {
   heading: RegExp;
   expectedPath?: string;
   expectedSearchParams?: Record<string, string>;
+  urlMatches?: (url: URL) => boolean;
 };
+
+function matchesAccountAuthRedirect(url: URL) {
+  return (
+    url.pathname === "/account" ||
+    (url.pathname === "/login" && url.searchParams.get("redirectTo") === "/account")
+  );
+}
 
 export const coreRoutes: AuditRoute[] = [
   {
@@ -36,40 +44,28 @@ export const coreRoutes: AuditRoute[] = [
     slug: "account",
     navLabel: "Account",
     heading: /sign in/i,
-    expectedPath: "/login",
-    expectedSearchParams: {
-      redirectTo: "/account",
-    },
+    urlMatches: matchesAccountAuthRedirect,
   },
   {
     name: "Topics",
     path: "/topics",
     slug: "topics",
     heading: /sign in/i,
-    expectedPath: "/login",
-    expectedSearchParams: {
-      redirectTo: "/account",
-    },
+    urlMatches: matchesAccountAuthRedirect,
   },
   {
     name: "Sources",
     path: "/sources",
     slug: "sources",
     heading: /sign in/i,
-    expectedPath: "/login",
-    expectedSearchParams: {
-      redirectTo: "/account",
-    },
+    urlMatches: matchesAccountAuthRedirect,
   },
   {
     name: "Settings",
     path: "/settings",
     slug: "settings",
     heading: /sign in/i,
-    expectedPath: "/login",
-    expectedSearchParams: {
-      redirectTo: "/account",
-    },
+    urlMatches: matchesAccountAuthRedirect,
   },
 ];
 

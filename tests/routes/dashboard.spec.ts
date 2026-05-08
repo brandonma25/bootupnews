@@ -16,4 +16,17 @@ test.describe("dashboard route", () => {
     await expectNamedVisibleButtons(page);
     await expectSafeInternalLinks(page);
   });
+
+  for (const path of ["/technology", "/economics", "/politics"]) {
+    test(`${path} redirects to Home so category browsing stays in homepage tabs`, async ({ page }) => {
+      await page.goto(path);
+
+      await expectNoAppCrash(page);
+      await expect(page).toHaveURL(/\/$/);
+      await expect(page.getByRole("tab", { name: "Top Events" })).toBeVisible();
+
+      await expectNamedVisibleButtons(page);
+      await expectSafeInternalLinks(page);
+    });
+  }
 });

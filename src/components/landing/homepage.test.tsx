@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ErrorBoundaryPage from "@/app/error";
@@ -18,6 +18,10 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
       ? overrides.keyPoints as BriefingItem["keyPoints"]
       : ["Point one", "Point two", "Point three"],
     whyItMatters: overrides.whyItMatters ?? "Capacity changes platform plans.",
+    publishedWhyItMatters: overrides.publishedWhyItMatters,
+    publishedWhyItMattersStructured: overrides.publishedWhyItMattersStructured,
+    editorialWhyItMatters: overrides.editorialWhyItMatters,
+    editorialStatus: overrides.editorialStatus,
     sources:
       overrides.sources ?? [
         { title: "Reuters", url: "https://www.reuters.com/example" },
@@ -39,9 +43,16 @@ function createItem(overrides: Partial<BriefingItem>): BriefingItem {
   };
 }
 
-function createData(items: BriefingItem[]): DashboardData {
+function createData(
+  items: BriefingItem[],
+  options: {
+    publicRankedItems?: BriefingItem[] | null;
+    homepageFreshnessNotice?: DashboardData["homepageFreshnessNotice"];
+    mode?: DashboardData["mode"];
+  } = {},
+): DashboardData {
   return {
-    mode: "live",
+    mode: options.mode ?? "live",
     briefing: {
       id: "briefing-1",
       briefingDate: "2026-04-15T09:00:00.000Z",
@@ -50,6 +61,9 @@ function createData(items: BriefingItem[]): DashboardData {
       readingWindow: "10 minutes",
       items,
     },
+    publicRankedItems:
+      options.publicRankedItems === null ? undefined : (options.publicRankedItems ?? items),
+    homepageFreshnessNotice: options.homepageFreshnessNotice,
     topics: [
       { id: "tech", name: "Tech", description: "Tech coverage", color: "#294f86" },
       { id: "finance", name: "Finance", description: "Finance coverage", color: "#1f4f46" },
@@ -92,11 +106,42 @@ describe("LandingHomepage", () => {
     expect(screen.getByText("Point two")).toBeInTheDocument();
     expect(screen.getByText("Point three")).toBeInTheDocument();
     expect(screen.getAllByText("Reuters").length).toBeGreaterThan(0);
+    const card = screen.getByTestId("home-top-event-card");
+    expect(within(card).getByText("Core Signal")).toBeInTheDocument();
+    expect(within(card).getByText("Why this ranks")).toBeInTheDocument();
+    expect(within(card).queryByText("Top Event")).not.toBeInTheDocument();
+    expect(within(card).queryByText("WHY IT MATTERS")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Why it matters")).not.toBeInTheDocument();
     expect(screen.queryByText(/Open full briefing/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Details" })).toHaveAttribute(
       "href",
       "/briefing/2026-04-15",
     );
+  });
+
+  it("does not repeat the lead summary as a homepage card bullet", () => {
+    const duplicateSummary = "Cloud AI capacity expanded across three hyperscalers.";
+    const data = createData([
+      createItem({
+        id: "duplicate-summary-card",
+        title: "Hyperscalers expand AI capacity",
+        whatHappened: duplicateSummary,
+        keyPoints: [duplicateSummary],
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const card = screen.getByTestId("home-top-event-card");
+    expect(within(card).getAllByText(duplicateSummary)).toHaveLength(1);
+    expect(within(card).queryByTestId("home-top-event-key-points")).not.toBeInTheDocument();
   });
 
   it("renders Top Events from the supplied homepage model instead of raw briefing items", () => {
@@ -126,6 +171,360 @@ describe("LandingHomepage", () => {
     expect(screen.getByText("Model-selected Top Event")).toBeInTheDocument();
     expect(screen.getByText("Model key point")).toBeInTheDocument();
     expect(screen.queryByText("Raw briefing item should not render directly")).not.toBeInTheDocument();
+  });
+
+  it("shows long published editorial Why it matters as a collapsed UI preview by default", () => {
+    const longEditorialText =
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth. This third sentence gives the editor enough space to explain the real-world consequence. This fourth sentence makes the note long enough to require a preview control on the homepage.";
+    const data = createData([
+      createItem({
+        id: "published-editorial-card",
+        whyItMatters: longEditorialText,
+        publishedWhyItMatters: longEditorialText,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const whyItMatters = screen.getByTestId("home-why-it-matters-text");
+    expect(whyItMatters).toHaveTextContent(
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
+    );
+    expect(whyItMatters).toHaveClass("line-clamp-2");
+    expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("uses a complete sentence for collapsed editorial copy even when the first sentence exceeds the preview budget", () => {
+    const longSentence =
+      "Full Self-Driving improvements are gaining attention because the update reframes investor expectations around autonomy economics and forces operators to reconsider how quickly deployment assumptions can change across the fleet.";
+    const data = createData([
+      createItem({
+        id: "word-boundary-editorial-card",
+        whyItMatters: longSentence,
+        publishedWhyItMatters: longSentence,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const collapsedText = screen.getByTestId("home-why-it-matters-text").textContent ?? "";
+    expect(collapsedText).toBe(longSentence);
+    expect(collapsedText).toMatch(/[.!?]$/);
+    expect(collapsedText).not.toContain("...");
+  });
+
+  it("cleans pre-truncated generated previews so collapsed editorial cards do not end mid-word", () => {
+    const truncatedPreview =
+      "Tesla resets the corporate baseline because Full Self-Driving wa...";
+    const data = createData([
+      createItem({
+        id: "pre-truncated-editorial-card",
+        whyItMatters: truncatedPreview,
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const collapsedText = screen.getByTestId("home-why-it-matters-text").textContent ?? "";
+    expect(collapsedText).toBe("Tesla resets the corporate baseline because Full Self-Driving.");
+    expect(collapsedText).toMatch(/[.!?]$/);
+    expect(collapsedText).not.toContain("...");
+    expect(collapsedText).not.toMatch(/\bwa[.!?]$/);
+  });
+
+  it("drops cut-off trailing clauses from pre-truncated collapsed editorial previews", () => {
+    const truncatedPreview =
+      "Tesla resets the corporate baseline because this changes revenue expectations, so it could move...";
+    const data = createData([
+      createItem({
+        id: "cut-off-clause-editorial-card",
+        whyItMatters: truncatedPreview,
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const collapsedText = screen.getByTestId("home-why-it-matters-text").textContent ?? "";
+    expect(collapsedText).toBe(
+      "Tesla resets the corporate baseline because this changes revenue expectations.",
+    );
+    expect(collapsedText).not.toContain("...");
+    expect(collapsedText).not.toMatch(/\bso it could[.!?]$/);
+  });
+
+  it("uses structured editorial preview for the collapsed homepage state", () => {
+    const structuredContent = {
+      preview: "Short editor-authored homepage teaser.",
+      thesis: "Expanded thesis should not replace collapsed preview.",
+      sections: [{ title: "First implication", body: "Expanded body copy." }],
+    };
+    const data = createData([
+      createItem({
+        id: "structured-editorial-card",
+        whyItMatters: "Legacy combined fallback.",
+        publishedWhyItMatters: "Legacy combined fallback.",
+        publishedWhyItMattersStructured: structuredContent,
+        editorialWhyItMatters: structuredContent,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveTextContent(
+      "Short editor-authored homepage teaser.",
+    );
+    expect(screen.getByRole("button", { name: "Read more" })).toBeInTheDocument();
+  });
+
+  it("renders structured thesis and sections in the expanded homepage state", () => {
+    const structuredContent = {
+      preview: "Short editor-authored homepage teaser.",
+      thesis: "This is the executive thesis.",
+      sections: [
+        { title: "Investor read", body: "Markets get a cleaner signal about durability." },
+        { title: "Operating impact", body: "Teams can adjust planning assumptions." },
+      ],
+    };
+    const data = createData([
+      createItem({
+        id: "structured-editorial-card",
+        whyItMatters: "Legacy combined fallback.",
+        publishedWhyItMatters: "Legacy combined fallback.",
+        publishedWhyItMattersStructured: structuredContent,
+        editorialWhyItMatters: structuredContent,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Read more" }));
+
+    expect(screen.getByText("This is the executive thesis.")).toBeInTheDocument();
+    expect(screen.getByText("Investor read")).toBeInTheDocument();
+    expect(screen.getByText("Markets get a cleaner signal about durability.")).toBeInTheDocument();
+    expect(screen.getByText("Operating impact")).toBeInTheDocument();
+    expect(screen.getByText("Teams can adjust planning assumptions.")).toBeInTheDocument();
+  });
+
+  it("expands and collapses long published editorial Why it matters inline", () => {
+    const longEditorialText =
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth. This third sentence gives the editor enough space to explain the real-world consequence. This fourth sentence makes the note long enough to require a preview control on the homepage.";
+    const data = createData([
+      createItem({
+        id: "published-editorial-card",
+        whyItMatters: longEditorialText,
+        publishedWhyItMatters: longEditorialText,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Read more" }));
+    const expandedBody = screen.getByTestId("home-why-it-matters-text");
+    expect(expandedBody).not.toHaveClass("line-clamp-2");
+    expect(
+      Array.from(expandedBody.querySelectorAll("p"))
+        .map((paragraph) => paragraph.textContent)
+        .join(" "),
+    ).toBe(longEditorialText);
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-2");
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveTextContent(
+      "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
+    );
+    expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("renders expanded long-form editorial copy as readable paragraph sections", () => {
+    const longEditorialText =
+      "First, the company changed its capacity plan. Second, suppliers now have a clearer demand signal to plan against. Third, competitors may need to adjust their own capital spending. Finally, investors get a cleaner read on whether the growth story is durable.";
+    const data = createData([
+      createItem({
+        id: "structured-editorial-card",
+        whyItMatters: longEditorialText,
+        publishedWhyItMatters: longEditorialText,
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Read more" }));
+
+    const expandedBody = screen.getByTestId("home-why-it-matters-text");
+    const paragraphs = expandedBody.querySelectorAll("p");
+    expect(Array.from(paragraphs).map((paragraph) => paragraph.textContent).join(" ")).toBe(longEditorialText);
+    expect(expandedBody).toHaveClass("space-y-3");
+    expect(paragraphs).toHaveLength(4);
+    expect(paragraphs[0]).toHaveTextContent("First, the company changed its capacity plan.");
+    expect(paragraphs[3]).toHaveTextContent("Finally, investors get a cleaner read on whether the growth story is durable.");
+  });
+
+  it("does not show a Read more control for short Why it matters text", () => {
+    const data = createData([
+      createItem({
+        id: "short-editorial-card",
+        whyItMatters: "Short published editorial note.",
+        publishedWhyItMatters: "Short published editorial note.",
+        editorialStatus: "published",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-2");
+    expect(screen.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
+  });
+
+  it("does not render a Why it matters section when no approved copy is available", () => {
+    const data = createData([
+      createItem({
+        id: "no-approved-why",
+        whyItMatters: "",
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.queryByText("Why this ranks")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("home-why-it-matters-text")).not.toBeInTheDocument();
+  });
+
+  it("renders the Tier 2 freshness notice as a distinct homepage indicator", () => {
+    const data = createData(
+      [
+        createItem({
+          id: "recent-published-card",
+          title: "Previously published signal",
+          whyItMatters: "Human-approved context from the prior published set.",
+          publishedWhyItMatters: "Human-approved context from the prior published set.",
+          editorialStatus: "published",
+        }),
+      ],
+      {
+        homepageFreshnessNotice: {
+          kind: "stale",
+          text: "Showing the latest published briefing from Sunday, April 26.",
+          briefingDate: "2026-04-26",
+        },
+      },
+    );
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Monday, April 27, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-freshness-notice")).toHaveTextContent(
+      "Showing the latest published briefing from Sunday, April 26.",
+    );
+    expect(screen.getByText("Previously published signal")).toBeInTheDocument();
+  });
+
+  it("renders the Tier 3 empty state without static placeholder copy", () => {
+    const data = createData([], {
+      homepageFreshnessNotice: {
+        kind: "empty",
+        text: "The latest briefing is not yet available. Please check back soon.",
+        briefingDate: null,
+      },
+    });
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Monday, April 27, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByTestId("home-freshness-notice")).toHaveTextContent(
+      "The latest briefing is not yet available. Please check back soon.",
+    );
+    expect(screen.getAllByText("The latest briefing is not yet available. Please check back soon.").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/placeholder|stored public signal snapshot|rail readable|sample slot/i)).not.toBeInTheDocument();
   });
 
   it("renders keyPoints from BriefingItem.keyPoints without substituting internal fields", () => {
@@ -246,8 +645,117 @@ describe("LandingHomepage", () => {
     expect(screen.getAllByTestId("home-top-event-card")).toHaveLength(5);
   });
 
-  it("lets signed-in users read populated category tabs without showing the signed-out gate", () => {
+  it("hides the signup gate when a signed-out category tab is empty", () => {
     const data = createData([
+      createItem({
+        id: "top-finance",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Treasury yields climb after inflation surprise",
+        matchedKeywords: ["treasury", "inflation", "rates"],
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
+
+    const techPanel = document.getElementById("tech-panel");
+    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
+    expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("No major tech signals in today's briefing.");
+  });
+
+  it("routes Finance and Tech cards into matching category tabs when the published set has no depth pool", () => {
+    const financeItem = createItem({
+      id: "published-finance-1",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Treasury yields climb after inflation surprise",
+      matchedKeywords: ["Finance", "watch"],
+      homepageClassification: {
+        primaryCategory: "finance",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 0, finance: 12, politics: 0 },
+        matchedSignals: { tech: [], finance: ["treasury"], politics: [] },
+      },
+    });
+    const secondFinanceItem = createItem({
+      id: "published-finance-2",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Trade flows reroute through Asia suppliers",
+      matchedKeywords: ["Finance", "watch"],
+      homepageClassification: {
+        primaryCategory: "finance",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 0, finance: 12, politics: 0 },
+        matchedSignals: { tech: [], finance: ["trade"], politics: [] },
+      },
+    });
+    const techItem = createItem({
+      id: "published-tech-1",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "AI infrastructure deal expands",
+      matchedKeywords: ["Tech", "watch"],
+      homepageClassification: {
+        primaryCategory: "tech",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 12, finance: 0, politics: 0 },
+        matchedSignals: { tech: ["ai"], finance: [], politics: [] },
+      },
+    });
+    const data = createData([financeItem, secondFinanceItem, techItem], { mode: "public" });
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Tech News" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Economics" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Finance" }));
+    const financePanel = document.getElementById("finance-panel");
+    expect(financePanel).not.toBeNull();
+    expect(financePanel).toHaveTextContent("Treasury yields climb after inflation surprise");
+    expect(financePanel).toHaveTextContent("Trade flows reroute through Asia suppliers");
+    expect(financePanel).not.toHaveTextContent("AI infrastructure deal expands");
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
+    const techPanel = document.getElementById("tech-panel");
+    expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("AI infrastructure deal expands");
+    expect(techPanel).not.toHaveTextContent("Treasury yields climb after inflation surprise");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Politics" }));
+    const politicsPanel = document.getElementById("politics-panel");
+    expect(politicsPanel).not.toBeNull();
+    expect(politicsPanel).toHaveTextContent("No major politics signals in today's briefing.");
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
+  });
+
+  it("lets signed-in users read populated category tabs without showing the signed-out gate", () => {
+    const topItems = [
       createItem({
         id: "top-finance",
         topicId: "finance",
@@ -328,24 +836,29 @@ describe("LandingHomepage", () => {
           matchedSignals: { tech: ["chips"], finance: [], politics: [] },
         },
       }),
-      createItem({
-        id: "category-tech",
-        topicId: "tech",
-        topicName: "Tech",
-        title: "Open source database maintainers ship a query planner update",
-        whatHappened: "Database maintainers shipped a query planner update for production workloads.",
-        matchedKeywords: ["database", "query planner", "open source"],
-        importanceScore: 64,
-        sourceCount: 2,
-        homepageClassification: {
-          primaryCategory: "tech",
-          secondaryCategories: [],
-          confidence: 0.92,
-          scores: { tech: 10, finance: 0, politics: 0 },
-          matchedSignals: { tech: ["database"], finance: [], politics: [] },
-        },
-      }),
-    ]);
+    ];
+    const data = createData(topItems, {
+      publicRankedItems: [
+        ...topItems,
+        createItem({
+          id: "category-tech",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "Open source database maintainers ship a query planner update",
+          whatHappened: "Database maintainers shipped a query planner update for production workloads.",
+          matchedKeywords: ["database", "query planner", "open source"],
+          importanceScore: 64,
+          sourceCount: 2,
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.92,
+            scores: { tech: 10, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["database"], finance: [], politics: [] },
+          },
+        }),
+      ],
+    });
 
     render(
       <LandingHomepage
@@ -363,15 +876,158 @@ describe("LandingHomepage", () => {
     );
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
-    expect(screen.queryByText("Create a free account to read Tech News, Finance and Politics")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
-    expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Tech" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryAllByTestId("home-top-event-card")).toHaveLength(0);
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Create a free account to read Tech News, Finance and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
+  });
+
+  it("shows signed-out category stories when publicRankedItems has eligible depth", () => {
+    const topItems = [
+      createItem({
+        id: "top-tech",
+        topicId: "tech",
+        topicName: "Tech",
+        title: "Cloud providers expand AI capacity plans",
+        matchedKeywords: ["cloud", "ai", "capacity"],
+        homepageClassification: {
+          primaryCategory: "tech",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 12, finance: 0, politics: 0 },
+          matchedSignals: { tech: ["ai"], finance: [], politics: [] },
+        },
+      }),
+    ];
+    const fillerTitles = [
+      "Bank funding costs rise after treasury volatility",
+      "Private equity deal pacing slows in Europe",
+      "Corporate bond issuance rebounds after a pause",
+      "Insurers revise catastrophe pricing assumptions",
+      "Regional lenders tighten commercial real estate terms",
+      "Asset managers prepare for a stronger dollar regime",
+      "Treasury clearing reform changes dealer planning",
+      "Consumer lenders cut promotional balance-transfer offers",
+      "Commodities desks hedge against freight disruptions",
+      "Mortgage originators reset refinance expectations",
+    ];
+    const fillerItems = fillerTitles.map((title, index) =>
+      createItem({
+        id: `depth-finance-${index + 1}`,
+        topicId: "finance",
+        topicName: "Finance",
+        title,
+        matchedKeywords: [`finance-${index + 1}`, `market-${index + 1}`],
+        publishedAt: `2026-04-15T${String(12 + index).padStart(2, "0")}:00:00.000Z`,
+        homepageClassification: {
+          primaryCategory: "finance",
+          secondaryCategories: [],
+          confidence: 0.95,
+          scores: { tech: 0, finance: 12, politics: 0 },
+          matchedSignals: { tech: [], finance: ["credit"], politics: [] },
+        },
+        priority: "normal",
+      }),
+    );
+    const data = createData(topItems, {
+      publicRankedItems: [
+        ...topItems,
+        ...fillerItems,
+        createItem({
+          id: "depth-tech",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "Open source database maintainers ship a query planner update",
+          whatHappened: "Database maintainers shipped a query planner update for production workloads.",
+          matchedKeywords: ["database", "query planner", "open source"],
+          publishedAt: "2026-04-15T08:30:00.000Z",
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.92,
+            scores: { tech: 10, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["database"], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
+        createItem({
+          id: "depth-tech-2",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "API observability vendors add real-time anomaly tracing",
+          whatHappened: "Observability vendors shipped a tracing update for engineering teams.",
+          matchedKeywords: ["observability", "tracing", "anomaly"],
+          publishedAt: "2026-04-15T08:10:00.000Z",
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.92,
+            scores: { tech: 10, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["observability"], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
+        createItem({
+          id: "depth-tech-3",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "Developer platform teams standardize rollout telemetry dashboards",
+          whatHappened: "Platform teams standardized rollout telemetry dashboards for incident response.",
+          matchedKeywords: ["platform", "telemetry", "dashboards"],
+          publishedAt: "2026-04-15T07:50:00.000Z",
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.91,
+            scores: { tech: 9, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["platform"], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
+        createItem({
+          id: "depth-tech-4",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "Cloud security teams automate secrets rotation across edge workloads",
+          whatHappened: "Cloud security teams automated secrets rotation for edge workloads.",
+          matchedKeywords: ["security", "secrets", "edge"],
+          publishedAt: "2026-04-15T07:30:00.000Z",
+          homepageClassification: {
+            primaryCategory: "tech",
+            secondaryCategories: [],
+            confidence: 0.91,
+            scores: { tech: 9, finance: 0, politics: 0 },
+            matchedSignals: { tech: ["security"], finance: [], politics: [] },
+          },
+          priority: "normal",
+        }),
+      ],
+    });
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
+
+    const techPanel = document.getElementById("tech-panel");
+
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
+    expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("Open source database maintainers ship a query planner update");
+    expect(techPanel).toHaveTextContent("Cloud security teams automate secrets rotation across edge workloads");
+    expect(screen.queryByText("Cloud providers expand AI capacity plans")).not.toBeInTheDocument();
+    expect(techPanel).not.toHaveTextContent("No major tech signals in today's briefing.");
   });
 
   it("renders debug diagnostics for QA when enabled", () => {
