@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ErrorBoundaryPage from "@/app/error";
@@ -48,10 +48,11 @@ function createData(
   options: {
     publicRankedItems?: BriefingItem[] | null;
     homepageFreshnessNotice?: DashboardData["homepageFreshnessNotice"];
+    mode?: DashboardData["mode"];
   } = {},
 ): DashboardData {
   return {
-    mode: "live",
+    mode: options.mode ?? "live",
     briefing: {
       id: "briefing-1",
       briefingDate: "2026-04-15T09:00:00.000Z",
@@ -105,11 +106,42 @@ describe("LandingHomepage", () => {
     expect(screen.getByText("Point two")).toBeInTheDocument();
     expect(screen.getByText("Point three")).toBeInTheDocument();
     expect(screen.getAllByText("Reuters").length).toBeGreaterThan(0);
+    const card = screen.getByTestId("home-top-event-card");
+    expect(within(card).getByText("Core Signal")).toBeInTheDocument();
+    expect(within(card).getByText("Why this ranks")).toBeInTheDocument();
+    expect(within(card).queryByText("Top Event")).not.toBeInTheDocument();
+    expect(within(card).queryByText("WHY IT MATTERS")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Why it matters")).not.toBeInTheDocument();
     expect(screen.queryByText(/Open full briefing/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Details" })).toHaveAttribute(
       "href",
       "/briefing/2026-04-15",
     );
+  });
+
+  it("does not repeat the lead summary as a homepage card bullet", () => {
+    const duplicateSummary = "Cloud AI capacity expanded across three hyperscalers.";
+    const data = createData([
+      createItem({
+        id: "duplicate-summary-card",
+        title: "Hyperscalers expand AI capacity",
+        whatHappened: duplicateSummary,
+        keyPoints: [duplicateSummary],
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    const card = screen.getByTestId("home-top-event-card");
+    expect(within(card).getAllByText(duplicateSummary)).toHaveLength(1);
+    expect(within(card).queryByTestId("home-top-event-key-points")).not.toBeInTheDocument();
   });
 
   it("renders Top Events from the supplied homepage model instead of raw briefing items", () => {
@@ -166,7 +198,7 @@ describe("LandingHomepage", () => {
     expect(whyItMatters).toHaveTextContent(
       "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
     );
-    expect(whyItMatters).not.toHaveClass("line-clamp-3");
+    expect(whyItMatters).toHaveClass("line-clamp-2");
     expect(screen.getByRole("button", { name: "Read more" })).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -343,7 +375,7 @@ describe("LandingHomepage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Read more" }));
     const expandedBody = screen.getByTestId("home-why-it-matters-text");
-    expect(expandedBody).not.toHaveClass("line-clamp-3");
+    expect(expandedBody).not.toHaveClass("line-clamp-2");
     expect(
       Array.from(expandedBody.querySelectorAll("p"))
         .map((paragraph) => paragraph.textContent)
@@ -352,7 +384,7 @@ describe("LandingHomepage", () => {
     expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(screen.getByRole("button", { name: "Show less" }));
-    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-2");
     expect(screen.getByTestId("home-why-it-matters-text")).toHaveTextContent(
       "This is the first published editorial sentence. This second sentence should still be present as the full source of truth.",
     );
@@ -410,7 +442,7 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    expect(screen.getByTestId("home-why-it-matters-text")).not.toHaveClass("line-clamp-3");
+    expect(screen.getByTestId("home-why-it-matters-text")).toHaveClass("line-clamp-2");
     expect(screen.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
   });
 
@@ -431,7 +463,7 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    expect(screen.queryByText("Why it matters")).not.toBeInTheDocument();
+    expect(screen.queryByText("Why this ranks")).not.toBeInTheDocument();
     expect(screen.queryByTestId("home-why-it-matters-text")).not.toBeInTheDocument();
   });
 
@@ -613,6 +645,115 @@ describe("LandingHomepage", () => {
     expect(screen.getAllByTestId("home-top-event-card")).toHaveLength(5);
   });
 
+  it("hides the signup gate when a signed-out category tab is empty", () => {
+    const data = createData([
+      createItem({
+        id: "top-finance",
+        topicId: "finance",
+        topicName: "Finance",
+        title: "Treasury yields climb after inflation surprise",
+        matchedKeywords: ["treasury", "inflation", "rates"],
+      }),
+    ]);
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
+
+    const techPanel = document.getElementById("tech-panel");
+    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
+    expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("No major tech signals in today's briefing.");
+  });
+
+  it("routes Finance and Tech cards into matching category tabs when the published set has no depth pool", () => {
+    const financeItem = createItem({
+      id: "published-finance-1",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Treasury yields climb after inflation surprise",
+      matchedKeywords: ["Finance", "watch"],
+      homepageClassification: {
+        primaryCategory: "finance",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 0, finance: 12, politics: 0 },
+        matchedSignals: { tech: [], finance: ["treasury"], politics: [] },
+      },
+    });
+    const secondFinanceItem = createItem({
+      id: "published-finance-2",
+      topicId: "finance",
+      topicName: "Finance",
+      title: "Trade flows reroute through Asia suppliers",
+      matchedKeywords: ["Finance", "watch"],
+      homepageClassification: {
+        primaryCategory: "finance",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 0, finance: 12, politics: 0 },
+        matchedSignals: { tech: [], finance: ["trade"], politics: [] },
+      },
+    });
+    const techItem = createItem({
+      id: "published-tech-1",
+      topicId: "tech",
+      topicName: "Tech",
+      title: "AI infrastructure deal expands",
+      matchedKeywords: ["Tech", "watch"],
+      homepageClassification: {
+        primaryCategory: "tech",
+        secondaryCategories: [],
+        confidence: 0.95,
+        scores: { tech: 12, finance: 0, politics: 0 },
+        matchedSignals: { tech: ["ai"], finance: [], politics: [] },
+      },
+    });
+    const data = createData([financeItem, secondFinanceItem, techItem], { mode: "public" });
+
+    render(
+      <LandingHomepage
+        data={data}
+        viewer={null}
+        briefingDateLabel="Wednesday, April 15, 2026"
+        homepageViewModel={buildHomepageViewModel(data)}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Tech News" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Economics" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Finance" }));
+    const financePanel = document.getElementById("finance-panel");
+    expect(financePanel).not.toBeNull();
+    expect(financePanel).toHaveTextContent("Treasury yields climb after inflation surprise");
+    expect(financePanel).toHaveTextContent("Trade flows reroute through Asia suppliers");
+    expect(financePanel).not.toHaveTextContent("AI infrastructure deal expands");
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
+    const techPanel = document.getElementById("tech-panel");
+    expect(techPanel).not.toBeNull();
+    expect(techPanel).toHaveTextContent("AI infrastructure deal expands");
+    expect(techPanel).not.toHaveTextContent("Treasury yields climb after inflation surprise");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Politics" }));
+    const politicsPanel = document.getElementById("politics-panel");
+    expect(politicsPanel).not.toBeNull();
+    expect(politicsPanel).toHaveTextContent("No major politics signals in today's briefing.");
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
+  });
+
   it("lets signed-in users read populated category tabs without showing the signed-out gate", () => {
     const topItems = [
       createItem({
@@ -735,15 +876,15 @@ describe("LandingHomepage", () => {
     );
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
-    expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Tech" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryAllByTestId("home-top-event-card")).toHaveLength(0);
     expect(screen.getAllByRole("heading", { level: 3 }).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
   });
 
   it("shows signed-out category stories when publicRankedItems has eligible depth", () => {
@@ -877,16 +1018,16 @@ describe("LandingHomepage", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
     const techPanel = document.getElementById("tech-panel");
 
-    expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
     expect(techPanel).not.toBeNull();
     expect(techPanel).toHaveTextContent("Open source database maintainers ship a query planner update");
     expect(techPanel).toHaveTextContent("Cloud security teams automate secrets rotation across edge workloads");
     expect(screen.queryByText("Cloud providers expand AI capacity plans")).not.toBeInTheDocument();
-    expect(techPanel).not.toHaveTextContent("No major technology signals in today's briefing.");
+    expect(techPanel).not.toHaveTextContent("No major tech signals in today's briefing.");
   });
 
   it("renders debug diagnostics for QA when enabled", () => {

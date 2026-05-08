@@ -15,8 +15,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Published Signals",
+  title: "Boot Up — Today's Signals",
 };
+
+const INTERNAL_PUBLIC_SIGNAL_TAGS = new Set(["critical", "high", "watch"]);
 
 export default async function PublicSignalsPage() {
   const state = await getPublicSignalsPageState();
@@ -46,7 +48,7 @@ export default async function PublicSignalsPage() {
       <div className="space-y-5">
         <header className="space-y-4 border-b border-[var(--border)] pb-5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge>Published editorial layer</Badge>
+            <Badge>Signals</Badge>
             {hasPublishedPosts ? <Badge>{posts.length} signals</Badge> : <Badge>Briefing pending</Badge>}
           </div>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -137,7 +139,7 @@ function SignalSection({
                 <div className="min-w-0 space-y-3">
                   <div>
                     <div className="flex flex-wrap gap-2">
-                      {post.tags.map((tag) => (
+                      {getPublicSignalTags(post).map((tag) => (
                         <Badge key={tag}>{tag}</Badge>
                       ))}
                     </div>
@@ -169,8 +171,13 @@ function SignalSection({
                   </div>
                   <p className="text-sm leading-6 text-[var(--text-secondary)]">{post.summary}</p>
                   <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] p-4">
-                    <p className="section-label">Why it matters</p>
-                    <p className="mt-2 text-base leading-7 text-[var(--text-primary)]">
+                    <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">
+                      Why this ranks
+                    </p>
+                    <p
+                      className="mt-2 line-clamp-2 text-base leading-7 text-[var(--text-primary)]"
+                      data-testid="signals-why-it-matters-preview"
+                    >
                       {post.publishedWhyItMatters}
                     </p>
                   </div>
@@ -186,6 +193,10 @@ function SignalSection({
 
 function getPublicSignalDisplayRank(post: EditorialSignalPost) {
   return post.finalSlateRank ?? post.rank;
+}
+
+function getPublicSignalTags(post: EditorialSignalPost) {
+  return post.tags.filter((tag) => !INTERNAL_PUBLIC_SIGNAL_TAGS.has(tag.trim().toLowerCase()));
 }
 
 function isCorePublicSignal(post: EditorialSignalPost) {

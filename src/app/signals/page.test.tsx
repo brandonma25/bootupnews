@@ -78,6 +78,23 @@ describe("public signals page", () => {
     expect(screen.queryByText("Raw AI draft should not be public")).not.toBeInTheDocument();
   }, 10000);
 
+  it("renders public card-face labels and clamps the why-this-ranks preview", async () => {
+    getPublicSignalsPageState.mockResolvedValue({
+      kind: "published",
+      posts: [createPublishedPost(1)],
+    });
+
+    const Page = (await import("@/app/signals/page")).default;
+    render(await Page());
+
+    expect(screen.getByText("Why this ranks")).toBeInTheDocument();
+    expect(screen.queryByText("Why it matters")).not.toBeInTheDocument();
+    expect(screen.queryByText("WHY IT MATTERS")).not.toBeInTheDocument();
+    expect(screen.queryByText("Top Event")).not.toBeInTheDocument();
+    expect(screen.queryByText("TOP EVENT")).not.toBeInTheDocument();
+    expect(screen.getByTestId("signals-why-it-matters-preview")).toHaveClass("line-clamp-2");
+  }, 10000);
+
   it("renders Core and Context sections for the published slate", async () => {
     getPublicSignalsPageState.mockResolvedValue({
       kind: "published",
@@ -123,6 +140,38 @@ describe("public signals page", () => {
     expect(screen.queryByText("Published signal 4")).not.toBeInTheDocument();
     expect(screen.queryByText("Published signal 5")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Context Signals" })).not.toBeInTheDocument();
+  }, 10000);
+
+  it("renders reader-facing breadcrumb copy instead of internal editorial layer language", async () => {
+    getPublicSignalsPageState.mockResolvedValue({
+      kind: "published",
+      posts: Array.from({ length: 3 }, (_, index) => createPublishedPost(index + 1)),
+    });
+
+    const Page = (await import("@/app/signals/page")).default;
+    render(await Page());
+
+    expect(screen.getByText("Signals")).toBeInTheDocument();
+    expect(screen.getByText("3 signals")).toBeInTheDocument();
+    expect(screen.queryByText("Published editorial layer")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("removes internal editorial tag labels while keeping the public category", async () => {
+    getPublicSignalsPageState.mockResolvedValue({
+      kind: "published",
+      posts: [
+        createPublishedPost(1, {
+          tags: ["Finance", "watch", "High"],
+        }),
+      ],
+    });
+
+    const Page = (await import("@/app/signals/page")).default;
+    render(await Page());
+
+    expect(screen.getByText("Finance")).toBeInTheDocument();
+    expect(screen.queryByText("watch")).not.toBeInTheDocument();
+    expect(screen.queryByText("High")).not.toBeInTheDocument();
   }, 10000);
 
   it("shows a public-safe unavailable state without internal schema details", async () => {

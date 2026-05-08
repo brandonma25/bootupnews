@@ -172,9 +172,7 @@ function HomeTopEventCard({
 }) {
   const titleNormalized = event.title.trim();
   const keyPoints = Array.isArray(event.keyPoints)
-    ? event.keyPoints
-        .map((point) => point.trim())
-        .filter((point) => Boolean(point) && point !== titleNormalized)
+    ? getDistinctKeyPoints(event.keyPoints, [event.title, event.summary, event.whatHappened])
     : [];
   const sourceNames = event.relatedArticles
     .map((article) => article.sourceName.trim())
@@ -196,7 +194,7 @@ function HomeTopEventCard({
               #{rank}
             </span>
             <div className="space-y-2">
-              <p className="section-label">Top Event</p>
+              <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">Core Signal</p>
               <div className="flex flex-wrap gap-2">
                 <Badge>{event.topicName}</Badge>
               </div>
@@ -237,8 +235,8 @@ function HomeTopEventCard({
 
         {whyItMatters ? (
           <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-4">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
-              Why it matters
+            <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">
+              Why this ranks
             </p>
             <WhyItMattersPreview
               text={whyItMatters}
@@ -309,6 +307,48 @@ function HomeTopEventCard({
   );
 }
 
+function getDistinctKeyPoints(points: string[], comparisons: string[]) {
+  const seen = new Set<string>();
+
+  return points
+    .map((point) => point.trim())
+    .filter((point) => {
+      const normalizedPoint = normalizeReaderCopy(point);
+
+      if (!normalizedPoint || seen.has(normalizedPoint)) {
+        return false;
+      }
+
+      seen.add(normalizedPoint);
+      return comparisons.every((comparison) => isMateriallyDistinctReaderCopy(normalizedPoint, comparison));
+    });
+}
+
+function isMateriallyDistinctReaderCopy(normalizedPoint: string, comparison: string) {
+  const normalizedComparison = normalizeReaderCopy(comparison);
+
+  if (!normalizedComparison || normalizedPoint === normalizedComparison) {
+    return !normalizedComparison;
+  }
+
+  const shorter = normalizedPoint.length < normalizedComparison.length ? normalizedPoint : normalizedComparison;
+  const longer = shorter === normalizedPoint ? normalizedComparison : normalizedPoint;
+
+  if (shorter.length < 40) {
+    return true;
+  }
+
+  return !(longer.startsWith(shorter) && shorter.length / longer.length >= 0.85);
+}
+
+function normalizeReaderCopy(value: string) {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/[.…]+$/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 const WHY_IT_MATTERS_PREVIEW_THRESHOLD = 220;
 
 function WhyItMattersPreview({
@@ -354,7 +394,7 @@ function WhyItMattersPreview({
         </div>
       ) : (
         <p
-          className="text-base leading-7 text-[var(--text-primary)]"
+          className="line-clamp-2 text-base leading-7 text-[var(--text-primary)]"
           data-testid="home-why-it-matters-text"
         >
           {shouldCollapse ? collapsedPreview : displayedPreview}
@@ -456,7 +496,7 @@ function CategorySoftGate({
       <div className="flex items-start justify-between gap-4">
         <div className="max-w-xl">
           <p className="text-base font-semibold text-[var(--text-primary)]">
-            Create a free account to read Tech News, Economics, and Politics
+            Sign up to be notified when new signals are published.
           </p>
         </div>
         <Button
