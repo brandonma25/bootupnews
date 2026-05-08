@@ -835,5 +835,5 @@ This checklist records the original PRD-53 implementation closeout. The 2026-04-
 - Production sanity check complete, only after preview is good: not applicable before merge
 - PRD summary stored in repo: yes
 - Bug-fix report stored in repo, if applicable: yes, `docs/engineering/bug-fixes/homepage-editorial-preview-truncation.md`
-- Google Sheets tracker updated and verified: no direct Sheets update performed
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual update payload: yes
+- GitHub documentation closeout completed in the canonical lane: yes
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes

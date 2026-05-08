@@ -20,8 +20,9 @@ const enableVercelAnalytics = process.env.VERCEL === "1";
 const enableVercelSpeedInsights = process.env.VERCEL === "1";
 
 export const metadata: Metadata = {
-  title: "Daily Intelligence Briefing",
-  description: "A premium daily intelligence dashboard for high-signal briefings.",
+  title: "Boot Up",
+  description:
+    "Curated daily intelligence for ambitious readers. Ranked signals with structured reasoning to understand the world, not just follow it.",
 };
 
 export default function RootLayout({

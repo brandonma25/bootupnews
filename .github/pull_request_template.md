@@ -4,7 +4,7 @@
 - [ ] Correct branch used
 - [ ] No unrelated changes included
 - [ ] PR title or branch includes canonical `PRD-XX` when this work maps to a governed feature
-- [ ] If this work is intentionally unmapped, expect Intake Queue review instead of direct `Sheet1` insertion
+- [ ] If this work is intentionally unmapped, document it in the correct GitHub repo lane instead of creating external tracker rows
 
 ## Terminology
 - [ ] Read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
@@ -40,7 +40,8 @@
 - [ ] `docs/product/briefs/` updated if applicable
 - [ ] `docs/product/prd/` updated if applicable
 - [ ] relevant `docs/engineering/` bucket updated if applicable
-- [ ] Google Sheets governance rules preserved: `Sheet1` for mapped work, `Intake Queue` for unmapped or ambiguous work
+- [ ] GitHub repo documentation closeout completed in the canonical lane
+- [ ] No Google Sheet update or routine tracker-sync fallback claimed
 - [ ] No sensitive information included
 
 ## Security Check

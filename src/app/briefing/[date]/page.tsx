@@ -9,9 +9,17 @@ import { Panel } from "@/components/ui/panel";
 import { getBriefingDetailPageState } from "@/lib/data";
 import { isValidBriefingDateKey } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Briefing Detail — Daily Intelligence",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ date: string }>;
+}): Promise<Metadata> {
+  const { date } = await params;
+
+  return {
+    title: `Boot Up — Briefing ${formatBriefingDateTitle(date)}`,
+  };
+}
 
 export default async function BriefingDetailPage({
   params,
@@ -59,4 +67,17 @@ export default async function BriefingDetailPage({
       <BriefingDetailView data={{ ...data, briefing }} viewer={viewer} />
     </AppShell>
   );
+}
+
+function formatBriefingDateTitle(date: string) {
+  if (!isValidBriefingDateKey(date)) {
+    return date;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00.000Z`));
 }

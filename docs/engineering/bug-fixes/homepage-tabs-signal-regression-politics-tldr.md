@@ -3,6 +3,7 @@
 ## Summary
 - Problem addressed: homepage Top Events under-rendered the published editorial signal set, and category tabs appeared empty after the politics/TLDR ingestion and SSR remediation sequence.
 - Root cause: homepage semantic duplicate checks treated generic category/status tags as story identity, while the read-only homepage data path no longer had a broader `publicRankedItems` pool beyond the published Top 5.
+- Affected object level: Signal, Card, and Surface Placement.
 
 ## Fix
 - Exact change:
@@ -15,6 +16,14 @@
   - Second follow-up correction: widen `signal_posts` rank storage to a bounded public depth pool and publish non-Top rows as category-depth rows when the approved Top 5 set is published. This preserves the Top 5 editorial contract while giving homepage tabs real non-Top public depth.
 - Related PRD: existing homepage category/depth behavior is governed by `docs/product/prd/prd-46-home-category-tabs.md` and `docs/product/prd/prd-57-homepage-volume-layers.md`; no new canonical PRD is required.
 - Migration/change record: `docs/engineering/change-records/2026-04-26-signal-post-public-depth-migration.md`
+- PR: #114, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/114`
+- Branch: `bugfix/homepage-tabs-signal-regression`
+- Head SHA: `f3d4448c8078be9fef374d762420e2cafd71e3fb`
+- Merge SHA: `c6e0fb6f745f6a19e2a18e2fa40f4e38d0b02d45`
+- GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; deprecated legacy redirect was removed on 2026-05-04.
+- External references reviewed, if any: PR #114 metadata and the legacy bug report.
+- Google Sheet / Work Log reference, if historically relevant: historical tracker-sync reference only, `docs/operations/tracker-sync/2026-04-26-homepage-tabs-signal-regression-politics-tldr.md`.
+- Branch cleanup status: branch is still present locally at `/Users/bm/dev/worktrees/daily-intel-homepage-tabs-signal-regression`; no deletion was performed in this branch.
 
 ## Data-Flow Diagnosis
 | Stage | Result |
@@ -50,10 +59,6 @@
   - local browser check found 5 homepage top cards and no console errors
 - Human checks:
   - Preview signed-in/signed-out behavior remains required after PR deployment.
-
-## Tracker Closeout
-- Google Sheets tracker row updated and verified: not available in this local session.
-- Fallback tracker-sync file, if direct Sheets update was unavailable: `docs/operations/tracker-sync/2026-04-26-homepage-tabs-signal-regression-politics-tldr.md`
 
 ## Remaining Risks / Follow-up
 - If production needs separate non-Top-5 depth content, a future scoped change should read a real persisted broader candidate pool instead of running ingestion during homepage SSR or presenting fallback data as live intelligence.

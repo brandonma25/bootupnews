@@ -82,12 +82,29 @@ function createEvent(
 }
 
 describe("CategoryPreviewGrid", () => {
-  it("renders three category subsections with the correct labels", () => {
-    render(
+  it("hides the entire By Category grid when every category preview is empty", () => {
+    const { container } = render(
       <CategoryPreviewGrid
         categoryPreviews={{
           tech: [],
           finance: [],
+          politics: [],
+        }}
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("heading", { name: "Tech" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Finance" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Politics" })).not.toBeInTheDocument();
+  });
+
+  it("renders three category subsections with the correct labels when at least one category has events", () => {
+    render(
+      <CategoryPreviewGrid
+        categoryPreviews={{
+          tech: [],
+          finance: [createEvent("finance-1", "Finance event", "finance")],
           politics: [],
         }}
       />,
@@ -131,14 +148,17 @@ describe("CategoryPreviewGrid", () => {
     render(
       <CategoryPreviewGrid
         categoryPreviews={{
-          tech: [],
-          finance: [],
-          politics: [],
+          tech: [createEvent("tech-1", "Tech event", "tech")],
+          finance: [createEvent("finance-1", "Finance event", "finance")],
+          politics: [createEvent("politics-1", "Politics event", "politics")],
         }}
       />,
     );
 
-    const headings = screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+    const headings = screen
+      .getAllByRole("heading", { level: 3 })
+      .filter((heading) => heading.id.startsWith("category-preview-"))
+      .map((heading) => heading.textContent);
 
     expect(headings).toEqual(["Tech", "Finance", "Politics"]);
   });

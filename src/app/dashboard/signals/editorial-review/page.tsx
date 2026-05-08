@@ -20,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
+  FINAL_SLATE_MAX_PUBLIC_ROWS,
+  FINAL_SLATE_MIN_PUBLIC_ROWS,
   FINAL_SLATE_RANKS,
   formatSlotLabel,
   getFinalSlateTierForRank,
@@ -78,7 +80,7 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
     return (
       <AccessState
         title="Admin sign-in required"
-        detail="Sign in with an authorized Google account to review Top 5 Signals."
+        detail="Sign in with an authorized Google account to review Signals."
         badge="Unauthenticated"
         href={`/login?redirectTo=${encodeURIComponent(SIGNALS_EDITORIAL_ROUTE)}`}
         cta="Sign in"
@@ -90,7 +92,7 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
     return (
       <AccessState
         title="Not authorized"
-        detail={`${state.userEmail ?? "This account"} does not have admin/editor access for Top 5 Signals.`}
+        detail={`${state.userEmail ?? "This account"} does not have admin/editor access for Signals.`}
         badge="Unauthorized"
         href="/"
         cta="Return home"
@@ -139,7 +141,7 @@ export default async function SignalsEditorialReviewPage({ searchParams }: PageP
                 Signals Final-Slate Composer
               </h1>
               <p className="text-base leading-7 text-[var(--text-secondary)]">
-                Compose, publish, and audit the reviewed 5 Core + 2 Context slate.
+                Compose, publish, and audit the reviewed public slate.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[34rem]">
@@ -345,6 +347,12 @@ function FinalSlateComposer({
   const coreCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "core").length;
   const contextCount = readiness.selectedRows.filter((post) => post.finalSlateTier === "context").length;
   const publishDisabledReason = getComposerPublishDisabledReason(readiness, storageReady, auditStorageReady);
+  const assignableCandidateCount = candidates.filter((post) =>
+    isFinalSlateCandidateAssignable(post, storageReady)
+  ).length;
+  const allCandidatesLockedByPublishState =
+    candidates.length > 0 &&
+    candidates.every((post) => post.isLive || post.editorialStatus === "published" || Boolean(post.publishedAt));
 
   return (
     <section className="space-y-4" aria-labelledby="final-slate-composer-title">
@@ -354,16 +362,26 @@ function FinalSlateComposer({
             Final Slate Composer
           </h2>
           <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
-            Assign reviewed candidates into Core slots 1-5 and Context slots 6-7. Slot placement does not make a row public.
+            Assign reviewed candidates into Core slots 1-5 and optional Context slots 6-7. Publishing accepts 1-5 selected rows.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge>{selectedCount}/7 selected</Badge>
-          <Badge>{coreCount}/5 Core</Badge>
-          <Badge>{contextCount}/2 Context</Badge>
+          <Badge>{selectedCount}/{FINAL_SLATE_MAX_PUBLIC_ROWS} selected</Badge>
+          <Badge>{coreCount} Core</Badge>
+          <Badge>{contextCount} Context</Badge>
           <Badge>{readiness.ready ? "Slate ready" : "Slate not ready"}</Badge>
         </div>
       </div>
+
+      {candidates.length > 0 && assignableCandidateCount === 0 ? (
+        <Panel className="p-4">
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            {allCandidatesLockedByPublishState
+              ? "No editable draft final-slate candidates are available in the current set. Published rows are locked. Create or review draft candidates to change the final slate."
+              : "No editable draft final-slate candidates are available in the current set. Only persisted, non-live, unpublished rows can be assigned."}
+          </p>
+        </Panel>
+      ) : null}
 
       <Panel className="p-4">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -401,7 +419,7 @@ function FinalSlateComposer({
               {publishDisabledReason ?? getReadyToPublishMessage()}
             </p>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              Publishing archives the previous live slate and makes only these seven selected rows public.
+              Publishing archives the previous live slate and makes only the selected 1-5 rows public.
             </p>
             {readiness.failures.length > 0 ? (
               <ul className="space-y-1 text-sm leading-6 text-[var(--text-secondary)]">
@@ -417,9 +435,9 @@ function FinalSlateComposer({
                 Post-publish verification
               </h4>
               <ul className="space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
-                <li>Homepage returns 200 and shows Core slots 1-5.</li>
-                <li>/signals returns 200 and shows Core slots 1-5 plus Context slots 6-7.</li>
-                <li>Held, rejected, rewrite-requested, Depth, rank-8, and unpublished rows stay hidden.</li>
+                <li>Homepage returns 200 and shows only the newly published rows.</li>
+                <li>/signals returns 200 and shows only the newly published rows.</li>
+                <li>Held, rejected, rewrite-requested, Depth, and unselected rows stay hidden.</li>
                 <li>Cron remains disabled.</li>
               </ul>
             </div>
@@ -428,7 +446,7 @@ function FinalSlateComposer({
                 Rollback preparation
               </h4>
               <p className="text-xs leading-5 text-[var(--text-secondary)]">
-                If verification fails, identify the newly live seven rows, turn them non-live, and restore the archived previous live rows.
+                If verification fails, identify the newly live rows, turn them non-live, and restore the archived previous live rows.
               </p>
             </div>
           </div>
@@ -480,7 +498,7 @@ function PublishedSlateAuditSummary({
           Published Slate Audit
         </h2>
         <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
-          Internal record of the most recent published 5 Core + 2 Context slate. This is not a public archive surface.
+          Internal record of the most recent published public slate. This is not a public archive surface.
         </p>
       </div>
       <Panel className="p-4">
@@ -591,6 +609,8 @@ function FinalSlateSlot({
   const replacements = post ? getEligibleReplacementCandidates(candidates, post) : [];
   const previousRank = rank > 1 ? rank - 1 : null;
   const nextRank = rank < 7 ? rank + 1 : null;
+  const mutationBlockedReason = post ? getFinalSlateMutationBlockedReason(post, storageReady) : null;
+  const canMutateSlot = !mutationBlockedReason;
 
   return (
     <div className="min-h-56 rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
@@ -621,7 +641,7 @@ function FinalSlateSlot({
           ) : null}
           <form action={removeFromFinalSlateAction}>
             <input type="hidden" name="postId" value={post.id} />
-            <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+            <Button type="submit" variant="secondary" disabled={!canMutateSlot} className="w-full">
               Demote / Remove
             </Button>
           </form>
@@ -630,7 +650,7 @@ function FinalSlateSlot({
               <form action={assignFinalSlateSlotAction}>
                 <input type="hidden" name="postId" value={post.id} />
                 <input type="hidden" name="finalSlateRank" value={previousRank} />
-                <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+                <Button type="submit" variant="secondary" disabled={!canMutateSlot} className="w-full">
                   Move Up
                 </Button>
               </form>
@@ -639,13 +659,16 @@ function FinalSlateSlot({
               <form action={assignFinalSlateSlotAction}>
                 <input type="hidden" name="postId" value={post.id} />
                 <input type="hidden" name="finalSlateRank" value={nextRank} />
-                <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+                <Button type="submit" variant="secondary" disabled={!canMutateSlot} className="w-full">
                   Move Down
                 </Button>
               </form>
             ) : null}
           </div>
-          {replacements.length > 0 ? (
+          {mutationBlockedReason ? (
+            <p className="text-xs leading-5 text-[var(--text-secondary)]">{mutationBlockedReason}</p>
+          ) : null}
+          {replacements.length > 0 && canMutateSlot ? (
             <form action={replaceFinalSlateSlotAction} className="space-y-2 rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
               <input type="hidden" name="originalPostId" value={post.id} />
               <label className="section-label" htmlFor={`replacementPostId-${post.id}`}>Replace with</label>
@@ -697,13 +720,7 @@ function FinalSlateCandidateRow({
   rowFailures: string[];
   storageReady: boolean;
 }) {
-  const canAssign =
-    storageReady &&
-    post.persisted &&
-    !post.isLive &&
-    post.editorialStatus !== "published" &&
-    !post.publishedAt &&
-    !isBlockingDecision(post.editorialDecision);
+  const canAssign = isFinalSlateCandidateAssignable(post, storageReady);
   const placement = post.finalSlateRank ? formatSlotLabel(post.finalSlateRank) : "Not selected";
 
   return (
@@ -786,7 +803,7 @@ function FinalSlateCandidateRow({
         {post.finalSlateRank ? (
           <form action={removeFromFinalSlateAction}>
             <input type="hidden" name="postId" value={post.id} />
-            <Button type="submit" variant="secondary" disabled={!storageReady} className="w-full">
+            <Button type="submit" variant="secondary" disabled={!canAssign} className="w-full">
               Remove from slate
             </Button>
           </form>
@@ -798,6 +815,17 @@ function FinalSlateCandidateRow({
         </p>
       </div>
     </div>
+  );
+}
+
+function isFinalSlateCandidateAssignable(post: EditorialSignalPost, storageReady: boolean) {
+  return (
+    storageReady &&
+    post.persisted &&
+    !post.isLive &&
+    post.editorialStatus !== "published" &&
+    !post.publishedAt &&
+    !isBlockingDecision(post.editorialDecision)
   );
 }
 
@@ -828,6 +856,16 @@ function isBlockingDecision(decision: string | null) {
 }
 
 function getAssignmentBlockedReason(post: EditorialSignalPost, storageReady: boolean) {
+  const mutationBlockedReason = getFinalSlateMutationBlockedReason(post, storageReady);
+
+  if (mutationBlockedReason) {
+    return mutationBlockedReason;
+  }
+
+  return "Only persisted, non-live, unpublished rows can be assigned.";
+}
+
+function getFinalSlateMutationBlockedReason(post: EditorialSignalPost, storageReady: boolean) {
   if (!storageReady) {
     return "Editorial storage must be configured before placement can change.";
   }
@@ -837,18 +875,18 @@ function getAssignmentBlockedReason(post: EditorialSignalPost, storageReady: boo
   }
 
   if (post.isLive) {
-    return "Live rows cannot be assigned to the draft final slate.";
+    return "Live rows are locked in the final slate.";
   }
 
   if (post.editorialStatus === "published" || post.publishedAt) {
-    return "Already published rows cannot be assigned.";
+    return "Already published rows are locked in the final slate.";
   }
 
   if (isBlockingDecision(post.editorialDecision)) {
-    return "Rejected, held, rewrite-requested, or removed rows cannot be assigned.";
+    return "Rejected, held, rewrite-requested, or removed rows cannot be changed in the final slate.";
   }
 
-  return "Only persisted, non-live, unpublished rows can be assigned.";
+  return null;
 }
 
 function formatDecision(decision: string | null) {
@@ -1146,7 +1184,7 @@ function getComposerPublishDisabledReason(
 }
 
 function getReadyToPublishMessage() {
-  return "Ready to publish the validated 5 Core + 2 Context slate.";
+  return `Ready to publish the validated ${FINAL_SLATE_MIN_PUBLIC_ROWS}-${FINAL_SLATE_MAX_PUBLIC_ROWS} row slate.`;
 }
 
 function normalizeEditorialText(value: string | null | undefined) {

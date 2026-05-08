@@ -14,6 +14,8 @@ import {
 } from "@/lib/supabase/server";
 import { captureRssFailure, type RssFailureType, type RssPhase } from "@/lib/observability/rss";
 import {
+  FINAL_SLATE_MAX_PUBLIC_ROWS,
+  FINAL_SLATE_MIN_PUBLIC_ROWS,
   getFinalSlateTierForRank,
   isFinalSlateRank,
   validateFinalSlateReadiness,
@@ -1716,7 +1718,7 @@ function getEditorialStorageWarning(postCount: number, scope: EditorialScopeFilt
   if (postCount < 5) {
     return scope === "historical"
       ? `Editorial archive currently has ${postCount} matching historical signal posts.`
-      : `Editorial storage currently has ${postCount} matching signal posts. Publishing requires a validated 5 Core + 2 Context final slate.`;
+      : `Editorial storage currently has ${postCount} matching signal posts. Publishing requires a validated ${FINAL_SLATE_MIN_PUBLIC_ROWS}-${FINAL_SLATE_MAX_PUBLIC_ROWS} row final slate.`;
   }
 
   if (postCount > 5 && scope === "all") {
@@ -2483,6 +2485,20 @@ export async function removeSignalPostFromFinalSlate(input: {
     };
   }
 
+  const target = await loadDecisionTarget(context, input.postId);
+
+  if (!target.ok) {
+    return target;
+  }
+
+  if (blockPublishedDecisionTarget(target.post)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot be removed from the draft final slate.",
+    };
+  }
+
   const updateResult = await context.client
     .from("signal_posts")
     .update({
@@ -2741,7 +2757,7 @@ export async function publishApprovedSignals(input: {
     (row) => !selectedPosts.some((post) => post.id === row.id),
   );
 
-  if (selectedPosts.length !== PUBLIC_SIGNAL_SET_SIZE || missingSelectedPosts.length > 0) {
+  if (selectedPosts.length !== readiness.selectedRows.length || missingSelectedPosts.length > 0) {
     return {
       ok: false,
       code: "publish_blocked",
@@ -2847,7 +2863,6 @@ export async function publishApprovedSignals(input: {
       .from("signal_posts")
       .update({
         is_live: false,
-        updated_at: now,
       })
       .in("id", previousLiveIds);
 
@@ -2919,8 +2934,8 @@ export async function publishApprovedSignals(input: {
     publishedSlateId: auditResult.publishedSlateId,
     message:
       previousLiveIds.length > 0
-        ? `Published final slate: 5 Core + 2 Context rows are live. Archived ${previousLiveIds.length} previous live rows. Audit record ${auditResult.publishedSlateId}.`
-        : `Published final slate: 5 Core + 2 Context rows are live. No previous live slate was present to archive. Audit record ${auditResult.publishedSlateId}.`,
+        ? `Published final slate: ${publicationCandidates.length} rows are live. Archived ${previousLiveIds.length} previous live rows. Audit record ${auditResult.publishedSlateId}.`
+        : `Published final slate: ${publicationCandidates.length} rows are live. No previous live slate was present to archive. Audit record ${auditResult.publishedSlateId}.`,
   };
 }
 
@@ -2972,10 +2987,10 @@ function buildPublishedSlateVerificationChecklist(): PublishedSlateVerificationC
   return {
     status: "not_run",
     items: [
-      "Homepage returns 200 and shows Core slots 1-5.",
-      "/signals returns 200 and shows Core slots 1-5 plus Context slots 6-7.",
-      "Database has exactly 7 live rows for the new slate.",
-      "Held, rejected, rewrite-requested, Depth, rank-8, and unpublished rows stay hidden.",
+      "Homepage returns 200 and shows only the published rows for the new slate.",
+      "/signals returns 200 and shows only the published rows for the new slate.",
+      "Database live row count matches the approved public slate count.",
+      "Held, rejected, rewrite-requested, Depth, and unselected rows stay hidden.",
       "Cron remains disabled.",
     ],
   };
@@ -3115,7 +3130,7 @@ export async function publishSignalPost(input: {
   return {
     ok: false,
     code: "publish_blocked",
-    message: "Individual signal publishing is disabled. Use Publish Final Slate after the 5 Core + 2 Context slate passes validation.",
+    message: `Individual signal publishing is disabled. Use Publish Final Slate after a validated ${FINAL_SLATE_MIN_PUBLIC_ROWS}-${FINAL_SLATE_MAX_PUBLIC_ROWS} row slate passes validation.`,
   };
 }
 

@@ -136,5 +136,5 @@ The current source inventory has limited politics-specific coverage. That reduce
 - Production sanity check complete, only after preview is good:
 - PRD summary stored in repo:
 - Bug-fix report stored in repo, if applicable:
-- Google Sheets tracker updated and verified:
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual update payload:
+- GitHub documentation closeout completed in the canonical lane:
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout:

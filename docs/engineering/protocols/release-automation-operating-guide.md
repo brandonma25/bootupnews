@@ -35,25 +35,19 @@
 - Build failure is blocking.
 - Lint, unit-test, and Playwright failures are reported explicitly and still return a non-zero exit code.
 
-### 1a. Feature Tracking Sync Gate
-- Workflow: [github-sheets-status-sync.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/github-sheets-status-sync.yml)
-- Script entrypoint: `node scripts/github-sheets-sync.mjs --event pr-merge --payload-file <path>`
-- Permanent rules:
-  - Google Sheets workbook `Features Table` is the live feature-tracking system.
-  - Tracker update is part of Definition of Done for feature, fix, refactor, UX, and governance work.
-  - `Sheet1` is the governed table for approved mapped work.
-  - `Intake Queue` is the only destination for unmapped, spontaneous, or ambiguous merged work.
-  - `Record ID` in `Sheet1` is immutable and may only be used as the exact-match lookup key.
-  - The automation must validate the expected headers before writing and may update only approved automation-managed columns.
-  - A merge to `main` may update one exact `Record ID` match to `Merged`.
-  - A merge must never auto-create a new governed `Sheet1` row.
-  - Status values must stay normalized, concise tracker values; do not write prose sentences, PR commentary, or malformed variants into `Status`.
-  - If a canonical PRD file exists in the repo, the live `PRD File` value must contain the exact `docs/product/prd/...` path.
-  - Owner, dependency, notes, execution stage, and build-readiness fields must be reconciled against repo source-of-truth when they are stale, placeholder-only, or misleading.
-  - Codex closeout must reread and verify the exact live row after writing, or create a fallback tracker-sync markdown file in `docs/operations/tracker-sync/` with the exact manual update payload.
+### 1a. Retired Google Tracker Compatibility
+- Removed workflow: `.github/workflows/github-sheets-status-sync.yml`
+- Removed script entrypoint: `node scripts/github-sheets-sync.mjs --event pr-merge --payload-file <path>`
+- Current rule:
+  - GitHub repo documentation is canonical for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+  - `docs/product/feature-system.csv` is the repo-side feature/PRD control file.
+  - Google Sheet / Google Work Log records are retired as source-of-truth systems and may be used only as historical reference inputs.
+  - Codex must not update Google Sheets, claim tracker updates, or create routine tracker-sync fallback files for closeout.
+  - `docs/operations/tracker-sync/` remains historical compatibility only unless the user explicitly requests a Google-reference reconciliation artifact.
+  - The old sync script, tests, and workflow have been removed; this guide does not treat Google Sheets sync as a release gate or compatibility runner.
 
 ### 2. PR Gate
-- Workflow: [ci.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/ci.yml)
+- Workflow: `.github/workflows/ci.yml`
 - Required protected-branch checks:
   - `pr-lint`
   - `pr-unit-tests`
@@ -66,7 +60,7 @@
 - These jobs automate install, lint, build, unit/integration tests, Chromium plus WebKit Playwright smoke coverage, artifact upload, and PR summary generation.
 
 ### 2a. Release Governance Gate
-- Workflow: [release-governance-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/release-governance-gate.yml)
+- Workflow: `.github/workflows/release-governance-gate.yml`
 - Script entrypoint: `python scripts/release-governance-gate.py`
 - Shared classifier: `python scripts/governance_common.py` consumers
 - Audit companion: `python scripts/pr-governance-audit.py`
@@ -96,7 +90,7 @@
   - new scripts or workflow files are treated as material governance changes by default, not as new feature/system declarations by themselves
 
 ### 3. Preview Gate
-- Workflow: [preview-gate.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/preview-gate.yml)
+- Workflow: `.github/workflows/preview-gate.yml`
 - Script entrypoint: `npm run release:preview -- --base-url https://preview.example.com`
 - Standard wrapper: `node scripts/preview-check.js https://preview.example.com`
 - Verifies:
@@ -109,7 +103,7 @@
 - It remains required for merge readiness because PR CI cannot prove real preview cookies, SSR, redirects, or environment truth by itself.
 
 ### 4. Human Auth/Session Gate
-- Checklist: [human-auth-session-gate.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/protocols/human-auth-session-gate.md)
+- Checklist: `docs/engineering/protocols/human-auth-session-gate.md`
 - Human-only truth remains required for:
   - Google OAuth/provider login
   - real-provider callback redirect correctness
@@ -119,21 +113,19 @@
   - final product judgment on auth-sensitive behavior
 
 ### 5. Production Verification Gate
-- Workflow: [production-verification.yml](/Users/bm/Documents/daily-intelligence-aggregator-main/.github/workflows/production-verification.yml)
+- Workflow: `.github/workflows/production-verification.yml`
 - Script entrypoint: `npm run release:production -- --base-url https://app.example.com`
 - Standard wrapper: `node scripts/prod-check.js https://app.example.com`
 - Runs after merge to `main` or manually with a supplied production URL.
 - Confirms `/` and `/dashboard` return `200` and do not expose obvious deployment failure markers.
-- On success, the workflow may run `node scripts/github-sheets-sync.mjs --event production-verify ...` to promote a uniquely matched Google Sheets row from `Merged` to `Built`.
-- If production verification fails or no unique governed row exists, the status must remain `Merged`.
-- The promotion job prefers the merged PR whose `merge_commit_sha` exactly matches the verified `main` commit and falls back to the broader associated-PR lookup only if needed.
+- Prior Google Sheets promotion behavior has been removed from the workflow. Production verification results should be recorded in the relevant GitHub validation or release/governance record.
 
 ### 6. Release Documentation Gate
 - Template scaffolder: `npm run release:docs -- --slug your-release-slug --title "Your Release Title"`
 - Reusable templates live in:
-  - [docs/engineering/testing/templates/release-testing-report-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/testing/templates/release-testing-report-template.md)
-  - [docs/engineering/bug-fixes/templates/release-bug-fix-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/engineering/bug-fixes/templates/release-bug-fix-template.md)
-  - [docs/product/briefs/templates/release-brief-template.md](/Users/bm/Documents/daily-intelligence-aggregator-main/docs/product/briefs/templates/release-brief-template.md)
+  - `docs/engineering/testing/templates/release-testing-report-template.md`
+  - `docs/engineering/bug-fixes/templates/release-bug-fix-template.md`
+  - `docs/product/briefs/templates/release-brief-template.md`
 
 ### 7. Closeout Checklist
 - Scope completed.
@@ -147,9 +139,9 @@
 - Production sanity check run only after preview is good.
 - PRD summary stored in repo when applicable.
 - Bug-fix report stored in repo when applicable.
-- Google Sheets tracker updated and verified by rereading the exact live row.
-- Corrected tracker values use normalized status text and include the canonical PRD file path when one exists.
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with the exact manual payload.
+- GitHub documentation closeout completed in the canonical lane.
+- `docs/product/feature-system.csv` updated when PRD/feature metadata changed.
+- No Google Sheet update or routine tracker-sync fallback was claimed.
 
 ## Automated Versus Human
 ### Automated
@@ -186,8 +178,8 @@
 ## Required External Configuration
 - GitHub branch protection must require the PR checks listed above.
 - Vercel preview automation must provide a preview URL to the Preview Gate workflow.
-- GitHub repo variable `PRODUCTION_BASE_URL` is optional overall and should point at the canonical production URL only if automatic post-merge verification and `Merged -> Built` promotion are desired.
-- GitHub secrets `GOOGLE_SERVICE_ACCOUNT_JSON` and `GOOGLE_SHEET_ID` must be configured for Google Sheets status sync.
+- GitHub repo variable `PRODUCTION_BASE_URL` is optional overall and should point at the canonical production URL only if automatic post-merge verification is desired.
+- Google Sheets sync secrets are no longer part of the active source-of-truth closeout model.
 - No secrets are stored in repo scripts or workflows; placeholder env values are used for build-safe automation.
 
 ## Branch Protection Verification Checklist

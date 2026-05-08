@@ -97,7 +97,7 @@ describe("CategoryTabStrip", () => {
     );
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
     expect(screen.getByText("Top ranked event")).toBeInTheDocument();
   });
@@ -141,18 +141,18 @@ describe("CategoryTabStrip", () => {
           createSection({ key: "finance", label: "Finance", events: [] }),
         ]}
         isAuthenticated
-        gatedCategoryState={<div>Create a free account to read Tech News, Economics, and Politics</div>}
+        gatedCategoryState={<div>Sign up to be notified when new signals are published.</div>}
         renderTopEvent={(event) => <article>{event.title}</article>}
         renderCategoryEvent={(event) => <article>{event.title}</article>}
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
-    expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Tech" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Tech category event")).toBeInTheDocument();
     expect(screen.queryByText("Top ranked event")).not.toBeInTheDocument();
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
   });
 
@@ -172,7 +172,7 @@ describe("CategoryTabStrip", () => {
     );
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Politics" })).toBeInTheDocument();
     expect(screen.getByText("Top ranked event")).toBeInTheDocument();
@@ -188,7 +188,7 @@ describe("CategoryTabStrip", () => {
         isAuthenticated={false}
         gatedCategoryState={({ onDismiss }) => (
           <div>
-            <p>Create a free account to read Tech News, Economics, and Politics</p>
+            <p>Sign up to be notified when new signals are published.</p>
             <button type="button" onClick={onDismiss}>Dismiss</button>
           </div>
         )}
@@ -197,20 +197,20 @@ describe("CategoryTabStrip", () => {
       />,
     );
 
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tech News" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
-    expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Tech News" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Sign up to be notified when new signals are published.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tech" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText("Top ranked event")).not.toBeInTheDocument();
     expect(screen.getByText("Tech category event")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByText("Create a free account to read Tech News, Economics, and Politics")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(screen.getByText("Top ranked event")).toBeInTheDocument();
   });
 
@@ -219,25 +219,25 @@ describe("CategoryTabStrip", () => {
       <CategoryTabStrip
         topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
         categorySections={[
-          createSection({ key: "tech", label: "Technology", events: [], emptyReason: "No major technology signals in today's briefing." }),
-          createSection({ key: "finance", label: "Economics", events: [], emptyReason: "No major economics signals in today's briefing." }),
+          createSection({ key: "tech", label: "Tech", events: [], emptyReason: "No major tech signals in today's briefing." }),
+          createSection({ key: "finance", label: "Finance", events: [], emptyReason: "No major finance signals in today's briefing." }),
           createSection({ key: "politics", label: "Politics", events: [], emptyReason: "No major politics signals in today's briefing." }),
         ]}
         isAuthenticated={false}
-        gatedCategoryState={<div>Create a free account to read Tech News, Economics, and Politics</div>}
+        gatedCategoryState={<div>Sign up to be notified when new signals are published.</div>}
         renderTopEvent={(event) => <article>{event.title}</article>}
         renderCategoryEvent={(event) => <article>{event.title}</article>}
       />,
     );
 
-    expect(screen.getByRole("tab", { name: "Tech News" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Economics" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Politics" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Economics" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Finance" }));
 
-    expect(screen.getByText("Create a free account to read Tech News, Economics, and Politics")).toBeInTheDocument();
-    expect(screen.getByText("No major economics signals in today's briefing.")).toBeInTheDocument();
+    expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
+    expect(screen.getByText("No major finance signals in today's briefing.")).toBeInTheDocument();
     expect(screen.queryByText("Top ranked event")).not.toBeInTheDocument();
   });
 });

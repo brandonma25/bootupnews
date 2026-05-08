@@ -54,12 +54,12 @@ The components are standalone presentational React components. `RetryButton` fir
 
 ## Closeout Checklist
 
-- Scope completed: Yes. Added `HomeEmptyState`, `HomeErrorState`, reusable `RetryButton`, focused component tests, PRD registration, and fallback tracker-sync payload.
+- Scope completed: Yes. Added `HomeEmptyState`, `HomeErrorState`, reusable `RetryButton`, focused component tests, and PRD registration.
 - Tests run: `npm install`; `python3 scripts/validate-feature-system-csv.py`; `npm run test -- src/components/home/home-states.test.tsx`; `npm run lint || true`; `npm run test || true`; `npm run build`; `npm run dev`; `curl -I http://localhost:3000/`; `npx playwright test tests/homepage.spec.ts --project=chromium --workers=1`; `npx playwright test tests/homepage.spec.ts --project=webkit --workers=1`.
 - Local validation complete: Yes. Home page returned HTTP 200 at `http://localhost:3000/`; homepage Playwright smoke coverage passed in Chromium and WebKit.
 - Preview validation complete, if applicable: Not yet.
 - Production sanity check complete, only after preview is good: Not yet.
 - PRD summary stored in repo: Yes, this file.
 - Bug-fix report stored in repo, if applicable: Not applicable.
-- Google Sheets tracker updated and verified: Direct live Sheets update unavailable in this environment.
-- If direct Sheets update is unavailable, fallback tracker-sync file created in `docs/operations/tracker-sync/` with exact manual update payload: Yes, `docs/operations/tracker-sync/2026-04-20-home-state-components.md`.
+- GitHub documentation closeout completed in the canonical lane: yes.
+- Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.

@@ -23,13 +23,14 @@ type ButtonProps =
 export function Button(props: ButtonProps) {
   const { children, className, variant = "primary" } = props;
   const classes = cn(
-    "inline-flex items-center justify-center rounded-button px-4 py-2 text-sm font-medium leading-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+    "inline-flex items-center justify-center rounded-button px-4 py-2 text-sm font-medium leading-none transition-colors duration-150 disabled:cursor-not-allowed",
     variant === "primary" &&
       "bg-[var(--accent)] !text-[#FFFFFF] hover:bg-[var(--accent-hover)] hover:!text-[#FFFFFF] active:bg-[var(--accent-hover)] active:!text-[#FFFFFF]",
     variant === "secondary" &&
       "border border-[var(--text-primary)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg)] active:bg-[var(--sidebar)]",
     variant === "ghost" && "text-[var(--text-primary)] hover:bg-[var(--bg)] active:bg-[var(--sidebar)]",
     className,
+    "disabled:border disabled:border-[var(--border)] disabled:bg-[var(--sidebar)] disabled:!text-[var(--text-secondary)] disabled:opacity-100 disabled:hover:bg-[var(--sidebar)] disabled:hover:!text-[var(--text-secondary)] disabled:active:bg-[var(--sidebar)] disabled:active:!text-[var(--text-secondary)]",
   );
 
   if ("asChild" in props && props.asChild) {

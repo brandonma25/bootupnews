@@ -3,10 +3,19 @@
 ## Summary
 - Problem addressed:
 - Root cause:
+- Affected object level:
 
 ## Fix
 - Exact change:
 - Related PRD:
+- PR:
+- Branch:
+- Head SHA:
+- Merge SHA:
+- GitHub source-of-truth status:
+- External references reviewed, if any:
+- Google Sheet / Work Log reference, if historically relevant:
+- Branch cleanup status:
 
 ## Terminology Requirement
 - Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
@@ -17,10 +26,6 @@
 ## Validation
 - Automated checks:
 - Human checks:
-
-## Tracker Closeout
-- Google Sheets tracker row updated and verified:
-- Fallback tracker-sync file, if direct Sheets update was unavailable:
 
 ## Remaining Risks / Follow-up
 - 

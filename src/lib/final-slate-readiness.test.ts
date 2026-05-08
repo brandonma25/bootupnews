@@ -38,38 +38,41 @@ function validSlate(overrides: Record<number, Partial<FinalSlateValidationRow>> 
 }
 
 describe("final slate readiness", () => {
-  it("passes a valid 5 Core + 2 Context slate", () => {
-    const result = validateFinalSlateReadiness(validSlate());
+  it.each([1, 2, 3, 4, 5])("passes a valid partial public slate with %s selected rows", (count) => {
+    const result = validateFinalSlateReadiness(validSlate().slice(0, count));
 
     expect(result.ready).toBe(true);
     expect(result.failures).toEqual([]);
-    expect(result.selectedRows).toHaveLength(7);
+    expect(result.selectedRows).toHaveLength(count);
   });
 
-  it("fails when fewer than 7 rows are selected", () => {
+  it("fails when no rows are selected", () => {
+    const result = validateFinalSlateReadiness([]);
+
+    expect(result.ready).toBe(false);
+    expect(result.failures.map((failure) => failure.message)).toContain(
+      "Cannot publish an empty slate. Select 1-5 rows before publishing.",
+    );
+  });
+
+  it("fails when the slate exceeds the PRD-36 public cap", () => {
     const result = validateFinalSlateReadiness(validSlate().slice(0, 6));
 
     expect(result.ready).toBe(false);
     expect(result.failures.map((failure) => failure.message)).toContain(
-      "Final slate requires exactly 7 selected rows. Current count: 6.",
+      "PRD-36 caps the public slate at 5 rows. Current count: 6.",
     );
-    expect(result.slotFailures[7]).toContain("Context slot 7 is empty.");
   });
 
-  it("fails when the slate has 6 Core rows and 1 Context row", () => {
-    const result = validateFinalSlateReadiness(
-      validSlate({
-        6: { finalSlateTier: "core" },
-      }),
-    );
+  it("passes a partial slate that includes an optional Context row", () => {
+    const result = validateFinalSlateReadiness([
+      makeRow(1),
+      makeRow(2),
+      makeRow(6),
+    ]);
 
-    expect(result.ready).toBe(false);
-    expect(result.failures.map((failure) => failure.message)).toContain(
-      "6 Core rows selected; 5 required.",
-    );
-    expect(result.failures.map((failure) => failure.message)).toContain(
-      "Only 1 Context rows selected; 2 required.",
-    );
+    expect(result.ready).toBe(true);
+    expect(result.selectedRows.map((row) => row.finalSlateRank)).toEqual([1, 2, 6]);
   });
 
   it("fails on duplicate ranks", () => {
@@ -85,7 +88,7 @@ describe("final slate readiness", () => {
     expect(result.rowFailures["signal-5"]).toContain("Rank 4 is duplicated.");
   });
 
-  it("fails on rank gaps", () => {
+  it("does not treat unfilled slots as publish blockers for a partial slate", () => {
     const result = validateFinalSlateReadiness(
       validSlate({
         6: { finalSlateRank: null, finalSlateTier: null },
@@ -93,7 +96,10 @@ describe("final slate readiness", () => {
     );
 
     expect(result.ready).toBe(false);
-    expect(result.slotFailures[6]).toContain("Context slot 6 is empty.");
+    expect(result.failures.map((failure) => failure.message)).toContain(
+      "PRD-36 caps the public slate at 5 rows. Current count: 6.",
+    );
+    expect(result.slotFailures[6]).toBeUndefined();
   });
 
   it("fails when a selected row has WITM failure status", () => {
@@ -218,22 +224,30 @@ describe("final slate readiness", () => {
 
   it("fails a Depth row unless it is assigned into Core or Context", () => {
     const invalidResult = validateFinalSlateReadiness(
-      validSlate({
-        5: {
+      [
+        makeRow(1),
+        makeRow(2),
+        makeRow(3),
+        makeRow(4),
+        makeRow(5, {
           rank: 8,
           finalSlateRank: 8,
           finalSlateTier: "context",
-        },
-      }),
+        }),
+      ],
     );
     const validResult = validateFinalSlateReadiness(
-      validSlate({
-        5: {
+      [
+        makeRow(1),
+        makeRow(2),
+        makeRow(3),
+        makeRow(4),
+        makeRow(5, {
           rank: 8,
           finalSlateRank: 5,
           finalSlateTier: "core",
-        },
-      }),
+        }),
+      ],
     );
 
     expect(invalidResult.ready).toBe(false);

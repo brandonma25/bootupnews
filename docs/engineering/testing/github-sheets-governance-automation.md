@@ -4,10 +4,11 @@
 - Date: 2026-04-18
 - Branch: `feature/github-sheets-governance-automation`
 - Scope: schema-aware Google Sheets status sync hardening, Intake Queue capture, and guarded `Merged -> Built` promotion wiring
+- Current status: historical validation record only. The Google Sheets sync workflow, script, and targeted tests were decommissioned on 2026-05-04.
 
 ## Commands Run
 - `npm install`
-- `npm run test -- scripts/github-sheets-sync.test.ts`
+- Historical command: `npm run test -- scripts/github-sheets-sync.test.ts`
 - `npm run lint`
 - `npm run test`
 - `npm run build`
@@ -43,12 +44,8 @@
 - Failed production verification leaves the row at `Merged`
 
 ## Remaining Human Validation
-- Configure the GitHub secrets and share the workbook with the service account.
-- Run the workflow against the real `Features Table` workbook.
-- Confirm the production-verification workflow can resolve the merged PR for a real `main` commit and promote the row from `Merged` to `Built`.
-- Decide whether a future promotion workflow should populate Intake Queue `Promoted Record ID`, `Reviewed By`, and `Reviewed At`.
+- None for active Google Sheets sync. This workflow is no longer active and must not be run for routine closeout.
 
 ## Residual Risks
-- The `Merged -> Built` step depends on `PRODUCTION_BASE_URL` being configured and the push-to-PR association resolving correctly in GitHub Actions.
-- Workbook header or tab drift will fail safely, but it still requires human repair before the automation can resume.
-- `Sheet1` `Last Updated` and `Notes` are intentionally left human-managed to avoid overwriting governance or audit context.
+- Older historical records may still mention the former Google Sheet workbook, `Sheet1`, or `Intake Queue`.
+- Reintroducing sync would require a fresh governance decision and new implementation; it is not available as a compatibility runner.

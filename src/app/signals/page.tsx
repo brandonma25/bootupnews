@@ -15,14 +15,16 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Published Signals",
+  title: "Boot Up — Today's Signals",
 };
+
+const INTERNAL_PUBLIC_SIGNAL_TAGS = new Set(["critical", "high", "watch"]);
 
 export default async function PublicSignalsPage() {
   const state = await getPublicSignalsPageState();
   const posts = state.kind === "published" ? state.posts : [];
-  const corePosts = posts.filter((post) => post.rank >= 1 && post.rank <= 5);
-  const contextPosts = posts.filter((post) => post.rank >= 6 && post.rank <= 7);
+  const corePosts = posts.filter(isCorePublicSignal);
+  const contextPosts = posts.filter(isContextPublicSignal);
   const hasPublishedPosts = state.kind === "published";
   const briefingDate = posts[0]?.briefingDate ?? null;
 
@@ -46,7 +48,7 @@ export default async function PublicSignalsPage() {
       <div className="space-y-5">
         <header className="space-y-4 border-b border-[var(--border)] pb-5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge>Published editorial layer</Badge>
+            <Badge>Signals</Badge>
             {hasPublishedPosts ? <Badge>{posts.length} signals</Badge> : <Badge>Briefing pending</Badge>}
           </div>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -55,7 +57,7 @@ export default async function PublicSignalsPage() {
                 Published Signals
               </h1>
               <p className="text-base leading-7 text-[var(--text-secondary)]">
-                The current published briefing: Top 5 Core Signals plus the next 2 Context Signals.
+                The current editor-approved public briefing.
               </p>
             </div>
             <Button asChild variant="secondary">
@@ -67,14 +69,14 @@ export default async function PublicSignalsPage() {
         {hasPublishedPosts ? (
           <div className="space-y-7">
             <SignalSection
-                title="Top 5 Core Signals"
-                description="The five highest-priority published Signals for the current briefing."
-                posts={corePosts}
-                briefingDate={briefingDate}
-              />
+              title="Core Signals"
+              description="The highest-priority published Signals for the current briefing."
+              posts={corePosts}
+              briefingDate={briefingDate}
+            />
             {contextPosts.length > 0 ? (
               <SignalSection
-                title="Next 2 Context Signals"
+                title="Context Signals"
                 description="Published Context Signals that add useful adjacent explanation without displacing the Core slate."
                 posts={contextPosts}
                 briefingDate={briefingDate}
@@ -132,12 +134,12 @@ function SignalSection({
             <Panel className="p-5">
               <div className="grid gap-4 md:grid-cols-[3rem_1fr]">
                 <span className="flex h-10 w-10 items-center justify-center rounded-card bg-[var(--sidebar)] text-sm font-semibold text-[var(--text-primary)]">
-                  {post.rank}
+                  {getPublicSignalDisplayRank(post)}
                 </span>
                 <div className="min-w-0 space-y-3">
                   <div>
                     <div className="flex flex-wrap gap-2">
-                      {post.tags.map((tag) => (
+                      {getPublicSignalTags(post).map((tag) => (
                         <Badge key={tag}>{tag}</Badge>
                       ))}
                     </div>
@@ -157,7 +159,7 @@ function SignalSection({
                           data-mvp-surface="signals_published_slate"
                           data-mvp-signal-post-id={post.id}
                           data-mvp-signal-slug={post.title}
-                          data-mvp-signal-rank={post.rank}
+                          data-mvp-signal-rank={getPublicSignalDisplayRank(post)}
                           data-mvp-briefing-date={briefingDate ?? undefined}
                           data-mvp-source-name={post.sourceName || "Unknown source"}
                         >
@@ -169,8 +171,13 @@ function SignalSection({
                   </div>
                   <p className="text-sm leading-6 text-[var(--text-secondary)]">{post.summary}</p>
                   <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] p-4">
-                    <p className="section-label">Why it matters</p>
-                    <p className="mt-2 text-base leading-7 text-[var(--text-primary)]">
+                    <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">
+                      Why this ranks
+                    </p>
+                    <p
+                      className="mt-2 line-clamp-2 text-base leading-7 text-[var(--text-primary)]"
+                      data-testid="signals-why-it-matters-preview"
+                    >
                       {post.publishedWhyItMatters}
                     </p>
                   </div>
@@ -182,4 +189,30 @@ function SignalSection({
       </ol>
     </section>
   );
+}
+
+function getPublicSignalDisplayRank(post: EditorialSignalPost) {
+  return post.finalSlateRank ?? post.rank;
+}
+
+function getPublicSignalTags(post: EditorialSignalPost) {
+  return post.tags.filter((tag) => !INTERNAL_PUBLIC_SIGNAL_TAGS.has(tag.trim().toLowerCase()));
+}
+
+function isCorePublicSignal(post: EditorialSignalPost) {
+  if (post.finalSlateTier) {
+    return post.finalSlateTier === "core";
+  }
+
+  const rank = getPublicSignalDisplayRank(post);
+  return rank >= 1 && rank <= 5;
+}
+
+function isContextPublicSignal(post: EditorialSignalPost) {
+  if (post.finalSlateTier) {
+    return post.finalSlateTier === "context";
+  }
+
+  const rank = getPublicSignalDisplayRank(post);
+  return rank >= 6 && rank <= 7;
 }

@@ -3,11 +3,10 @@
 This repository uses a controlled documentation system. The goal is to keep docs useful, short, and non-duplicated.
 
 ## Core Rules
-- Google Sheets workbook `Features Table` is the live source of truth for feature-tracking status.
-- `Sheet1` is the governed approved feature table and `Intake Queue` is the quarantine lane for unmapped or ambiguous work.
-- `Record ID` in `Sheet1` is immutable and may only be used as the governed lookup key for automation.
-- Automation must never write formula/computed columns or silently overwrite human-managed fields in Google Sheets.
-- Tracker closeout is part of Definition of Done: update and verify the live Google Sheet, or create a fallback tracker-sync file in `docs/operations/tracker-sync/` with the exact manual update payload.
+- GitHub repo documentation is the canonical source of truth for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- Google Sheet / Google Work Log records are retired as live source-of-truth systems and may be used only as historical reference inputs.
+- Routine closeout must not update Google Sheets, claim tracker updates, or create tracker-sync fallback files.
+- `docs/operations/tracker-sync/` remains historical compatibility only unless the user explicitly asks for a Google-reference reconciliation artifact.
 - Terminology requirement: before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`. Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions. Do not use cluster, signal, story, or card interchangeably.
 - `docs/product/feature-system.csv` is the repo-side control layer for PRD mapping, build order, and durable governance metadata.
 - The CSV is the product control layer and its schema is locked to exactly 12 columns in this exact order:
@@ -33,6 +32,9 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - Incident records belong in `docs/engineering/incidents/` only when they capture a meaningful governance, process, release, or workflow failure.
 - Change records belong in `docs/engineering/change-records/` when the work is primarily an audit, migration, consolidation, normalization, or repo-structure change.
 - Rules, checklists, and templates belong in `docs/engineering/protocols/`.
+- Branch cleanup reconciliation belongs in `docs/operations/branch-cleanup/`.
+- `docs/bugs/` and `docs/changes/` are deprecated and non-canonical. Do not create new records there.
+- Existing `docs/bugs/` or `docs/changes/` files that contain durable history must be migrated, consolidated, or replaced with redirect notes pointing to the canonical GitHub doc path.
 - Governance tier ownership lives in `docs/engineering/protocols/governance-gate-map.md`.
 - Bug-fix requirement details live in `docs/engineering/protocols/bug-tracking-governance.md`.
 
@@ -48,6 +50,9 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - No bug-fix docs for repo audits or structural cleanup when a change record is the truthful home.
 - No testing reports in protocol folders.
 - No checklists stored as testing notes when they are actually operating standards.
+- No new `docs/bugs/` records.
+- No new `docs/changes/` records.
+- No routine tracker-sync fallback files for normal closeout.
 
 ## Required Workflow
 1. Check `docs/product/feature-system.csv` first.
@@ -55,12 +60,12 @@ This repository uses a controlled documentation system. The goal is to keep docs
 3. Respect dependencies before implementation.
 4. Complete the terminology check and state which object level the work modifies: Article, Story Cluster, Signal, Card, or Surface Placement.
 5. If the feature already has a PRD, update that file instead of creating a new one.
-6. Preserve the Google Sheets governance model: mapped work belongs in `Sheet1`, while unmapped or ambiguous work must go to `Intake Queue`.
-7. Do not create governed `Sheet1` rows automatically from GitHub merges or repo automation.
-8. During active branch work, set `status = In Progress`.
-9. When implementation is complete but awaiting merge or review, set `status = In Review`.
-10. After merge or explicit user acceptance, set `status = Built`, `decision = keep`, and update `last_updated`.
-11. Before closeout, verify the Google Sheets tracker row or create a fallback tracker-sync markdown file with the exact manual update payload.
+6. Update the relevant GitHub documentation lane for serious feature, bug-fix, remediation, validation, governance, or branch-cleanup history.
+7. Do not update Google Sheets or claim tracker updates.
+8. Do not create routine tracker-sync fallback files.
+9. During active branch work, set CSV `status = In Progress` when feature metadata changes are in scope.
+10. When implementation is complete but awaiting merge or review, set CSV `status = In Review` when feature metadata changes are in scope.
+11. After merge or explicit user acceptance, set CSV `status = Built`, `decision = keep`, and update `last_updated` when feature metadata changes are in scope.
 
 ## Change Control
 - Do not implement features marked `delay` or `kill`.
@@ -88,7 +93,13 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - `docs/engineering/protocols/`:
   Operating rules, templates, checklists, and governance standards
 - `docs/operations/tracker-sync/`:
-  Fallback tracker-sync payloads when direct Google Sheets updates are unavailable
+  Historical compatibility records only; not a routine closeout lane
+- `docs/operations/branch-cleanup/`:
+  Branch deletion and cleanup reconciliation records
+- `docs/bugs/`:
+  Deprecated legacy bug reports; migrate durable content into `docs/engineering/bug-fixes/`
+- `docs/changes/`:
+  Deprecated legacy PR/change notes; migrate durable content into the correct canonical lane
 
 ## Meaningful Documentation Threshold
 - Use the smallest truthful documentation set that preserves future understanding.
@@ -109,3 +120,4 @@ This repository uses a controlled documentation system. The goal is to keep docs
 5. If the work primarily records an audit, migration, normalization, taxonomy cleanup, or repo-structure repair, use `docs/engineering/change-records/`.
 6. If the work records meaningful validation performed, use `docs/engineering/testing/`.
 7. If the file is a standing rule, checklist, template, or standard, use `docs/engineering/protocols/`.
+8. If the work records branch deletion, branch-prune reconciliation, or deleted-branch recovery metadata, use `docs/operations/branch-cleanup/`.
