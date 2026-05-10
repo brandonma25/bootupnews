@@ -73,4 +73,31 @@ describe("MVP measurement event validation", () => {
     expect(Object.keys(metadata)[0]).toBe("key_0");
     expect(String(Object.values(metadata)[0])).toHaveLength(300);
   });
+
+  it("strips sensitive metadata and source URL query strings", () => {
+    const result = validateMvpMeasurementEvent({
+      ...validPayload,
+      route: "/signals?token=secret#fragment",
+      metadata: {
+        sourceName: "Example Source",
+        sourceUrl: "https://example.com/story?utm_source=newsletter#fragment",
+        email: "reader@example.com",
+        cookie: "session=secret",
+        whyItMatters: "Full explanatory copy must not be persisted as metadata.",
+        hasStructuredWhyItMatters: true,
+      },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        route: "/signals",
+        metadata: {
+          sourceName: "Example Source",
+          sourceUrl: "https://example.com/story",
+          hasStructuredWhyItMatters: true,
+        },
+      }),
+    });
+  });
 });

@@ -3,9 +3,11 @@
 import {
   isMvpMeasurementEventName,
   isUuid,
+  validateMvpMeasurementEvent,
   type MvpMeasurementEventInput,
   type MvpMeasurementEventName,
 } from "@/lib/mvp-measurement";
+import { capturePostHogMvpMeasurementEvent } from "@/lib/posthog-client";
 
 const VISITOR_STORAGE_KEY = "bootup:mvp-measurement:visitor-id";
 const SESSION_STORAGE_KEY = "bootup:mvp-measurement:session-id";
@@ -92,6 +94,12 @@ export async function trackMvpMeasurementEvent(
     visitorId: getOrCreateMvpVisitorId(),
     sessionId: getOrCreateMvpSessionId(),
   };
+  const validation = validateMvpMeasurementEvent(payload);
+  const requestPayload = validation.ok ? validation.value : payload;
+
+  if (validation.ok) {
+    capturePostHogMvpMeasurementEvent(validation.value);
+  }
 
   try {
     await fetch("/api/mvp-measurement/events", {
@@ -99,7 +107,7 @@ export async function trackMvpMeasurementEvent(
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
       keepalive: true,
     });
   } catch {

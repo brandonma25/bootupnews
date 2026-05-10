@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 
+import { initializePostHogClient } from "@/lib/posthog-client";
 import {
   readSentryDsn,
   readSentryEnvironment,
@@ -39,5 +40,7 @@ if (dsn) {
     },
   });
 }
+
+initializePostHogClient();
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

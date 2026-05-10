@@ -58,6 +58,11 @@ const SESSION_ID_PATTERN = /^mvp_session_[a-z0-9_-]{12,80}$/i;
 const MAX_METADATA_KEYS = 24;
 const MAX_METADATA_STRING_LENGTH = 300;
 const MAX_METADATA_ARRAY_LENGTH = 24;
+const SECRET_METADATA_KEY_PATTERN =
+  /(authorization|cookie|set-cookie|token|secret|password|passwd|api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|dsn|email)/i;
+const RICH_COPY_METADATA_KEY_PATTERN =
+  /(article[_-]?body|full[_-]?(article|body|copy)|published[_-]?why[_-]?it[_-]?matters|why[_-]?it[_-]?matters|witm|body|content)/i;
+const URL_METADATA_KEY_PATTERN = /(url|href|link)$/i;
 
 export function isMvpMeasurementEventName(value: unknown): value is MvpMeasurementEventName {
   return typeof value === "string" && MVP_MEASUREMENT_EVENT_NAMES.includes(value as MvpMeasurementEventName);
@@ -90,27 +95,70 @@ function normalizeOptionalString(value: unknown, maxLength: number) {
   return trimmed ? trimmed.slice(0, maxLength) : null;
 }
 
-function sanitizeMetadataValue(value: unknown, depth = 0): unknown {
+function sanitizeMetadataValue(key: string, value: unknown, depth = 0): unknown {
+  if (SECRET_METADATA_KEY_PATTERN.test(key)) {
+    return undefined;
+  }
+
   if (value === null || typeof value === "boolean" || typeof value === "number") {
     return value;
   }
 
   if (typeof value === "string") {
-    return value.slice(0, MAX_METADATA_STRING_LENGTH);
+    if (RICH_COPY_METADATA_KEY_PATTERN.test(key)) {
+      return undefined;
+    }
+
+    return sanitizeMetadataString(key, value).slice(0, MAX_METADATA_STRING_LENGTH);
   }
 
   if (Array.isArray(value)) {
     return value
       .slice(0, MAX_METADATA_ARRAY_LENGTH)
-      .map((entry) => sanitizeMetadataValue(entry, depth + 1))
+      .map((entry) => sanitizeMetadataValue(key, entry, depth + 1))
       .filter((entry) => entry !== undefined);
   }
 
   if (typeof value === "object" && depth < 2) {
+    if (RICH_COPY_METADATA_KEY_PATTERN.test(key)) {
+      return undefined;
+    }
+
     return sanitizeMetadata(value as Record<string, unknown>, depth + 1);
   }
 
   return undefined;
+}
+
+function sanitizeMetadataString(key: string, value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (URL_METADATA_KEY_PATTERN.test(key) || /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    return sanitizeMetadataUrl(trimmed);
+  }
+
+  return trimmed;
+}
+
+function sanitizeMetadataUrl(value: string) {
+  try {
+    const parsed = new URL(value, "https://bootup.local");
+    parsed.username = "";
+    parsed.password = "";
+    parsed.search = "";
+    parsed.hash = "";
+
+    if (parsed.origin === "https://bootup.local") {
+      return parsed.pathname;
+    }
+
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return value.split("?")[0]?.split("#")[0] ?? "";
+  }
 }
 
 export function sanitizeMetadata(
@@ -124,12 +172,25 @@ export function sanitizeMetadata(
   return Object.fromEntries(
     Object.entries(metadata)
       .slice(0, MAX_METADATA_KEYS)
-      .map(([key, value]) => [
-        key.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 64),
-        sanitizeMetadataValue(value, depth),
-      ])
+      .map(([key, value]) => {
+        const sanitizedKey = key.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 64);
+        return [sanitizedKey, sanitizeMetadataValue(sanitizedKey, value, depth)];
+      })
       .filter(([key, value]) => Boolean(key) && value !== undefined),
   );
+}
+
+function sanitizeRoute(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(value, "https://bootup.local");
+    return parsed.pathname || "/";
+  } catch {
+    return value.split("?")[0]?.split("#")[0] || null;
+  }
 }
 
 export function validateMvpMeasurementEvent(input: unknown): ValidationResult {
@@ -180,7 +241,7 @@ export function validateMvpMeasurementEvent(input: unknown): ValidationResult {
       eventName: event.eventName,
       visitorId,
       sessionId,
-      route: normalizeOptionalString(event.route, 120),
+      route: sanitizeRoute(normalizeOptionalString(event.route, 120)),
       surface: normalizeOptionalString(event.surface, 120),
       signalPostId,
       signalSlug: normalizeOptionalString(event.signalSlug, 160),
