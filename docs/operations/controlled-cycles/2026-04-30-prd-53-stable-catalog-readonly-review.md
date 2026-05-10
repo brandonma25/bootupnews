@@ -56,7 +56,7 @@ This run checked that prerequisite before running any Supabase read or dry-run c
 | Commit description | `Merge pull request #160 from brandonma25/codex/prd-53-catalog-level-database-owner-review` |
 | UTC capture time | `2026-04-30T18:59:32Z` |
 | Local capture time | `2026-05-01 02:59:32 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 The stale `/Users/bm/Documents/daily-intelligence-aggregator-main` checkout was not used for repo work because prior and current workspace checks showed it is not the safe canonical repo path for this lane. The branch was created in the canonical `/Users/bm/dev/worktrees` workspace family.
 

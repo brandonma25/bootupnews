@@ -222,7 +222,7 @@ Production summary readback was not run in this branch because the internal path
 Production URL:
 
 ```text
-https://daily-intelligence-aggregator-ybs9.vercel.app
+https://bootupnews.vercel.app
 ```
 
 Read-only checks run before code changes:
@@ -293,7 +293,7 @@ Commands run:
 npm install
 npx vitest run src/lib/mvp-measurement-summary.test.ts src/app/api/internal/mvp-measurement/summary/route.test.ts
 npx tsx scripts/mvp-measurement-summary.ts --days 1
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 node <read-only public route and cron probe>
 git diff --check
 python3 scripts/validate-feature-system-csv.py

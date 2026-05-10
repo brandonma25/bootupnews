@@ -15,6 +15,21 @@ describe("public page metadata", () => {
     expect(String(metadata.description).length).toBeLessThanOrEqual(160);
   });
 
+  it("exposes canonical and social URL metadata for the public homepage", async () => {
+    const { metadata } = await import("@/app/page");
+
+    expect(metadata.metadataBase?.toString()).toBe("https://bootupnews.vercel.app/");
+    expect(metadata.alternates).toEqual({
+      canonical: "https://bootupnews.vercel.app/",
+    });
+    expect(metadata.openGraph).toEqual({
+      url: "https://bootupnews.vercel.app/",
+    });
+    expect(metadata.other).toEqual({
+      "twitter:url": "https://bootupnews.vercel.app/",
+    });
+  });
+
   it("uses reader-facing public signals metadata", async () => {
     const { metadata } = await import("@/app/signals/page");
 

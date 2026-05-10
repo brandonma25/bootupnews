@@ -34,7 +34,7 @@ Secondary:
 
 Production URL:
 
-- `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- `https://bootupnews.vercel.app`
 
 Current branch and commit:
 
@@ -54,7 +54,7 @@ Deployment:
 - target: production
 - status: Ready
 - deployment URL: `https://bootup-bpp47bhus-brandonma25s-projects.vercel.app`
-- production alias: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- production alias: `https://bootupnews.vercel.app`
 - deployment created: 2026-05-02 16:18:03 CST
 
 Route checks:

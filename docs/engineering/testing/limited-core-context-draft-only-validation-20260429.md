@@ -24,7 +24,7 @@ block_admin_review_due_to_missing_witm_failure_metadata
 - PR #141: `chore(validation): align controlled draft cap with Core/Context slate`
 - PR #141 merge commit: `efb1eea94d0452863b487c5e5b796635380597b8`
 - Production deployment URL: `https://bootup-d58ldcsvq-brandonma25s-projects.vercel.app`
-- Production alias checked: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- Production alias checked: `https://bootupnews.vercel.app`
 - Prior post-PR139 dry-run run ID: `post-pr139-context-witm-remediation-dryrun-20260429T0546Z`
 - Prior artifact:
   `/Users/bm/dev/worktrees/daily-intelligence-aggregator-post-pr139-context-witm-post-deploy-validation/.pipeline-runs/controlled-pipeline-dry_run-post-pr139-context-witm-remediation-dryrun-20260429T0546Z-2026-04-29T05-47-11-859Z.json`

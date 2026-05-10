@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getSupabasePublicEnvDiagnostics, resolvePublicSupabaseConfig } from "@/lib/env";
+import {
+  buildPublicAppUrl,
+  getSupabasePublicEnvDiagnostics,
+  resolvePublicSupabaseConfig,
+} from "@/lib/env";
 
 describe("public Supabase env resolution", () => {
   it("prefers the anon key when both supported public key names are present", () => {
@@ -37,5 +41,9 @@ describe("public Supabase env resolution", () => {
           name === "NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       ),
     ).toBe(true);
+  });
+
+  it("builds public URLs from the canonical production origin by default", () => {
+    expect(buildPublicAppUrl("/sitemap.xml")).toBe("https://bootupnews.vercel.app/sitemap.xml");
   });
 });

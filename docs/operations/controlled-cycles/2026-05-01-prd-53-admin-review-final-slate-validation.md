@@ -54,7 +54,7 @@ It was not authorized to publish, set `is_live=true`, set `published_at`, archiv
 | Branch | `codex/prd-53-admin-review-final-slate-validation` |
 | Starting commit | `e2db691` |
 | Commit description | `Merge pull request #171 from brandonma25/codex/prd-53-authorized-controlled-draft-only-rerun` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 | Admin route | `/dashboard/signals/editorial-review` |
 | Current set shown in admin | `2026-05-01` |
 | Current candidate count | `7` |
@@ -126,16 +126,16 @@ Production public and cron safety verification:
 
 ```bash
 git rev-parse --short HEAD
-curl -sS -I https://daily-intelligence-aggregator-ybs9.vercel.app/ | sed -n '1,12p'
-curl -sS https://daily-intelligence-aggregator-ybs9.vercel.app/ | rg -n "signal_posts schema preflight failed|final_slate_rank|Today's briefing is being prepared|being prepared|Wednesday, April 29|April 29|Top 5 Core|Next 2 Context"
-curl -sS -I https://daily-intelligence-aggregator-ybs9.vercel.app/signals | sed -n '1,12p'
-curl -sS https://daily-intelligence-aggregator-ybs9.vercel.app/signals | rg -n "Published Signals|7 signals|Top 5 Core Signals|Next 2 Context Signals|signal_posts schema preflight failed|final_slate_rank|final_slate_tier|editorial_decision"
-curl -sS -i https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news | sed -n '1,20p'
+curl -sS -I https://bootupnews.vercel.app/ | sed -n '1,12p'
+curl -sS https://bootupnews.vercel.app/ | rg -n "signal_posts schema preflight failed|final_slate_rank|Today's briefing is being prepared|being prepared|Wednesday, April 29|April 29|Top 5 Core|Next 2 Context"
+curl -sS -I https://bootupnews.vercel.app/signals | sed -n '1,12p'
+curl -sS https://bootupnews.vercel.app/signals | rg -n "Published Signals|7 signals|Top 5 Core Signals|Next 2 Context Signals|signal_posts schema preflight failed|final_slate_rank|final_slate_tier|editorial_decision"
+curl -sS -i https://bootupnews.vercel.app/api/cron/fetch-news | sed -n '1,20p'
 ```
 
 Browser actions through authenticated Chrome session:
 
-- Opened `https://daily-intelligence-aggregator-ybs9.vercel.app/dashboard/signals/editorial-review?scope=current`.
+- Opened `https://bootupnews.vercel.app/dashboard/signals/editorial-review?scope=current`.
 - Confirmed admin route loaded as `newsweb2026@gmail.com`.
 - Confirmed current set `2026-05-01`, seven current candidates, and zero selected final-slate rows.
 - Approved five WITM-passed current candidates through the supported `Approve` buttons.

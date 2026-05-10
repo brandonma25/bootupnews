@@ -41,7 +41,7 @@ Secondary:
 
 | Field | Result |
 | --- | --- |
-| Production URL checked | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL checked | `https://bootupnews.vercel.app` |
 | Merge commit checked | `bde841ca941940665e62fe1a368d883e85e7f035` |
 | Vercel deployment ID | `dpl_51jU2mfosJsksFLHAw1pn9McNsTd` |
 | Production deployment URL | `https://bootup-69yreqc91-brandonma25s-projects.vercel.app` |
@@ -63,21 +63,21 @@ git worktree list
 gh pr merge 175 --merge --delete-branch
 gh pr view 175 --json number,state,mergedAt,mergeCommit,url
 git fetch origin main
-vercel inspect https://daily-intelligence-aggregator-ybs9.vercel.app --no-color
+vercel inspect https://bootupnews.vercel.app --no-color
 gh run view 25209406044 --json status,conclusion,jobs
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 ```
 
 Production route, content, browser, and measurement probes:
 
 ```bash
-curl -sS -o /tmp/bootup-home.html -w "%{http_code}\n" https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -sS -o /tmp/bootup-signals.html -w "%{http_code}\n" https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-curl -sS -o /tmp/bootup-admin.html -w "%{http_code}\n" https://daily-intelligence-aggregator-ybs9.vercel.app/dashboard/signals/editorial-review
-curl -sS -o /tmp/bootup-cron.json -w "%{http_code}\n" https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news
+curl -sS -o /tmp/bootup-home.html -w "%{http_code}\n" https://bootupnews.vercel.app/
+curl -sS -o /tmp/bootup-signals.html -w "%{http_code}\n" https://bootupnews.vercel.app/signals
+curl -sS -o /tmp/bootup-admin.html -w "%{http_code}\n" https://bootupnews.vercel.app/dashboard/signals/editorial-review
+curl -sS -o /tmp/bootup-cron.json -w "%{http_code}\n" https://bootupnews.vercel.app/api/cron/fetch-news
 node <production-content-marker-check>
 node <production-browser-qa-script>
-curl -sS -X POST https://daily-intelligence-aggregator-ybs9.vercel.app/api/mvp-measurement/events \
+curl -sS -X POST https://bootupnews.vercel.app/api/mvp-measurement/events \
   -H "content-type: application/json" \
   --data '<bounded QA homepage_view payload without secrets>'
 npx tsx scripts/mvp-measurement-summary.ts --days 1

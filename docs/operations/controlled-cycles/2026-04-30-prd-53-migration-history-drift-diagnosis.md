@@ -55,7 +55,7 @@ This diagnostic separates:
 | Commit description | `Merge pull request #157 from brandonma25/codex/prd-53-apply-production-schema-alignment` |
 | UTC capture time | `2026-04-30T06:53:42Z` |
 | Local capture time | `2026-04-30 14:53:42 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 ## Linked Supabase project confirmation
 
@@ -352,11 +352,11 @@ supabase projects list --output json
 supabase link --project-ref fwkqjeumreaznfhnlzev --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-migration-history-drift-diagnosis
 supabase migration list --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-migration-history-drift-diagnosis
 supabase db push --dry-run --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-migration-history-drift-diagnosis
-curl -L -sS -o /tmp/bootup-drift-home.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -L -sS -o /tmp/bootup-drift-signals.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-curl -L -sS -o /tmp/bootup-drift-cron.txt -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news
+curl -L -sS -o /tmp/bootup-drift-home.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/
+curl -L -sS -o /tmp/bootup-drift-signals.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/signals
+curl -L -sS -o /tmp/bootup-drift-cron.txt -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/api/cron/fetch-news
 rg -o 'sentry-release=[^,&"]+|signal_posts schema preflight failed\.[^<"]+|published_slate audit schema preflight failed\.[^<"]+|Missing expected columns: [^<"]+|0 signals|Published Signals are not available yet|Daily Executive Briefing|Today • [^<]+' /tmp/bootup-drift-home.html /tmp/bootup-drift-signals.html /tmp/bootup-drift-cron.txt
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 sed -n '1,140p' src/lib/signals-editorial.ts
 sed -n '340,570p' src/lib/signals-editorial.ts
 sed -n '1,220p' docs/engineering/change-records/2026-04-27-signal-posts-schema-preflight-remediation.md

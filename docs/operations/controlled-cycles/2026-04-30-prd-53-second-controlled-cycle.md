@@ -52,7 +52,7 @@ Production publish was not authorized.
 | Commit description | `Merge pull request #153 from brandonma25/codex/prd-53-minimal-published-slate-audit-history` |
 | UTC capture time | `2026-04-30T04:25:28Z` |
 | Local capture time | `2026-04-30 12:25:28 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 ## Baseline production checks
 
@@ -290,10 +290,10 @@ sed -n '1,220p' docs/engineering/protocols/release-automation-operating-guide.md
 sed -n '1,180p' docs/product/prd/prd-53-signals-admin-editorial-layer.md
 rg -n "dry_run|draft_only|pipeline:controlled|CONTROLLED_PRODUCTION_PUBLISH_APPROVED|publish|cron" .
 gh variable list --repo brandonma25/daily-intelligence-aggregator
-curl -L -sS -o /tmp/bootup-home.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -L -sS -o /tmp/bootup-signals.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-curl -L -sS -o /tmp/bootup-cron.txt -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+curl -L -sS -o /tmp/bootup-home.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/
+curl -L -sS -o /tmp/bootup-signals.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/signals
+curl -L -sS -o /tmp/bootup-cron.txt -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/api/cron/fetch-news
+node scripts/prod-check.js https://bootupnews.vercel.app
 npm install
 PIPELINE_RUN_MODE=dry_run PIPELINE_TARGET_ENV=production PIPELINE_CRON_DISABLED_CONFIRMED=true BRIEFING_DATE_OVERRIDE=2026-04-30 PIPELINE_TEST_RUN_ID=prd53-second-controlled-cycle-dryrun-20260430T0429Z npm run pipeline:controlled-test
 npx tsx -e "<local dry-run artifact parser and final-slate readiness validator invocation>"

@@ -51,7 +51,7 @@ Current execution state:
 
 Production URL:
 
-- `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- `https://bootupnews.vercel.app`
 
 Current branch and commit:
 
@@ -65,12 +65,12 @@ Deployment:
 - target: production
 - status: Ready
 - deployment URL: `https://bootup-d9qcqdq2j-brandonma25s-projects.vercel.app`
-- production alias: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- production alias: `https://bootupnews.vercel.app`
 
 Production verification:
 
 - GitHub Production Verification passed for `c3fab6fc3d0e1a0c0e9ba8d9d0ac5896f2ce6322`.
-- `node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app` passed for `/` and `/dashboard`.
+- `node scripts/prod-check.js https://bootupnews.vercel.app` passed for `/` and `/dashboard`.
 
 Route checks:
 
@@ -176,7 +176,7 @@ Would you try it for a week? Use it like a morning briefing: scan what matters, 
 
 It is early, so I am mainly looking for whether it feels useful, clear, and worth coming back to. No need to use it in any artificial way.
 
-Link: https://daily-intelligence-aggregator-ybs9.vercel.app
+Link: https://bootupnews.vercel.app
 ```
 
 Longer email:
@@ -194,7 +194,7 @@ Would you try it for one week? The ideal use is simple: open it the way you migh
 
 It is still early, so I am mostly looking for whether it feels useful, clear, and worth returning to. Please use it naturally. If something feels confusing, stale, too shallow, or surprisingly useful, I would appreciate hearing that.
 
-Link: https://daily-intelligence-aggregator-ybs9.vercel.app
+Link: https://bootupnews.vercel.app
 
 Thanks.
 ```
@@ -425,7 +425,7 @@ Additional validation evidence captured before packet creation:
 - `npm run test` passed: 78 test files and 591 tests.
 - `npm run build` passed.
 - GitHub Production Verification passed for `c3fab6fc3d0e1a0c0e9ba8d9d0ac5896f2ce6322`.
-- `node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app` passed.
+- `node scripts/prod-check.js https://bootupnews.vercel.app` passed.
 - Production route probes for `/`, `/signals`, `/briefing/2026-05-01`, `/api/cron/fetch-news`, `/api/internal/mvp-measurement/summary?days=7`, and `/dashboard/signals/editorial-review` matched expected public/protected behavior.
 - Authenticated browser summary readback returned `ok:true` with aggregate production event counts.
 - Vercel error-log and HTTP 500-log checks returned no logs in the checked 30-minute window.

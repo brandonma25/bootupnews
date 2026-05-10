@@ -53,7 +53,7 @@ This run was authorized only for the supported PRD-53 production publish action 
 | Branch | `codex/prd-53-authorized-second-controlled-publish` |
 | Starting commit | `ae67225` |
 | Commit description | `Merge pull request #173 from brandonma25/codex/prd-53-admin-rewrite-replacement-pass` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 | Admin route | `/dashboard/signals/editorial-review` |
 | Current set shown in admin | `2026-05-01` |
 | Current candidate count before publish | `7` |
@@ -137,7 +137,7 @@ Production public, admin, and cron verification:
 
 ```bash
 node <<'NODE'
-const base = 'https://daily-intelligence-aggregator-ybs9.vercel.app';
+const base = 'https://bootupnews.vercel.app';
 const titles = [
   'Trump signs DHS legislation, ending record-breaking shutdown',
   'Economic Letter Countdown: Most Read Topics from 2025',
@@ -170,12 +170,12 @@ for (const path of ['/', '/signals', '/api/cron/fetch-news']) {
   for (const title of titles) console.log(`${path} title ${JSON.stringify(title)}=${text.includes(title)}`);
 }
 NODE
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 ```
 
 Browser actions through authenticated Chrome session:
 
-- Opened `https://daily-intelligence-aggregator-ybs9.vercel.app/dashboard/signals/editorial-review?scope=current`.
+- Opened `https://bootupnews.vercel.app/dashboard/signals/editorial-review?scope=current`.
 - Confirmed admin route loaded as `newsweb2026@gmail.com`.
 - Revalidated current set `2026-05-01`, seven current candidates, `7/7 selected`, `5/5 Core`, `2/2 Context`, and `Slate ready`.
 - Confirmed `Publish Final Slate` was enabled.
@@ -387,7 +387,7 @@ git diff --check
 python3 scripts/validate-feature-system-csv.py
 python3 scripts/validate-documentation-coverage.py --diff-mode local --branch-name codex/prd-53-authorized-second-controlled-publish --pr-title "PRD-53 authorized second controlled publish"
 python3 scripts/release-governance-gate.py --diff-mode local --branch-name codex/prd-53-authorized-second-controlled-publish --pr-title "PRD-53 authorized second controlled publish"
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 npm run lint
 npm run test
 npm run build
@@ -399,7 +399,7 @@ Results:
 - `python3 scripts/validate-feature-system-csv.py`: passed with pre-existing PRD slug warnings for PRD-32, PRD-37, and PRD-38.
 - `python3 scripts/validate-documentation-coverage.py --diff-mode local --branch-name codex/prd-53-authorized-second-controlled-publish --pr-title "PRD-53 authorized second controlled publish"`: passed.
 - `python3 scripts/release-governance-gate.py --diff-mode local --branch-name codex/prd-53-authorized-second-controlled-publish --pr-title "PRD-53 authorized second controlled publish"`: passed.
-- `node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app`: passed; `/` and `/dashboard` returned HTTP 200.
+- `node scripts/prod-check.js https://bootupnews.vercel.app`: passed; `/` and `/dashboard` returned HTTP 200.
 - Initial `npm run lint`: blocked because dependencies were not installed in the fresh worktree.
 - `npm install`: completed; reported two npm audit findings.
 - Post-install `npm run lint`: passed.

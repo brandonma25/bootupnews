@@ -49,7 +49,7 @@ Secondary:
 
 | Field | Result |
 | --- | --- |
-| Production URL checked | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL checked | `https://bootupnews.vercel.app` |
 | Starting commit | `a212dd552daea72e2416bb64ce8b1b2e4b700880` |
 | Starting commit summary | `Merge pull request #177 from brandonma25/codex/mvp-measurement-storage-alignment` |
 | Vercel deployment ID | `dpl_6GEaxxLVp4DZpLMHqEdzDTiYYFVU` |
@@ -93,9 +93,9 @@ sed -n '1,160p' scripts/mvp-measurement-summary.ts
 Production deployment and route checks:
 
 ```bash
-vercel inspect https://daily-intelligence-aggregator-ybs9.vercel.app --no-color
+vercel inspect https://bootupnews.vercel.app --no-color
 gh run list --branch main --limit 5 --json databaseId,displayTitle,headSha,status,conclusion,createdAt,url
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 node <production route and content marker probe>
 node <production Playwright browser QA probe>
 ```

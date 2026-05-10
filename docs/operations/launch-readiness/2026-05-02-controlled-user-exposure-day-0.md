@@ -58,7 +58,7 @@ Known merged baseline:
 
 Production URL:
 
-- `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- `https://bootupnews.vercel.app`
 
 Current branch and commit:
 
@@ -70,7 +70,7 @@ Deployment:
 - Vercel deployment ID: `dpl_AWqcyHeHAa4ie3E43dBZuiLx8P4b`
 - target: production
 - status: Ready
-- production alias: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- production alias: `https://bootupnews.vercel.app`
 
 Production route checks:
 
@@ -81,7 +81,7 @@ Production route checks:
 | `/briefing/2026-05-01` | HTTP 200 |
 | `/api/cron/fetch-news` without auth | HTTP 401 |
 | `/api/internal/mvp-measurement/summary?days=7` without auth | HTTP 401 |
-| `node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app` | PASS: `/` and `/dashboard` returned HTTP 200 |
+| `node scripts/prod-check.js https://bootupnews.vercel.app` | PASS: `/` and `/dashboard` returned HTTP 200 |
 
 Public safety:
 
@@ -199,7 +199,7 @@ Would you try it for a week? Use it like a morning briefing: scan what matters, 
 
 It is early, so I am mainly looking for whether it feels useful, clear, and worth coming back to. No need to use it in any artificial way.
 
-Link: https://daily-intelligence-aggregator-ybs9.vercel.app
+Link: https://bootupnews.vercel.app
 ```
 
 Longer email:
@@ -217,7 +217,7 @@ Would you try it for one week? The ideal use is simple: open it the way you migh
 
 It is still early, so I am mostly looking for whether it feels useful, clear, and worth returning to. Please use it naturally. If something feels confusing, stale, too shallow, or surprisingly useful, I would appreciate hearing that.
 
-Link: https://daily-intelligence-aggregator-ybs9.vercel.app
+Link: https://bootupnews.vercel.app
 
 Thanks.
 ```
@@ -553,7 +553,7 @@ Results:
 
 Additional validation and evidence:
 
-- `node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app` passed for `/` and `/dashboard`.
+- `node scripts/prod-check.js https://bootupnews.vercel.app` passed for `/` and `/dashboard`.
 - Production route probes for `/`, `/signals`, `/briefing/2026-05-01`, `/api/cron/fetch-news`, and `/api/internal/mvp-measurement/summary?days=7` matched expected status codes.
 - Authenticated browser summary readback returned `ok:true` with aggregate production event counts.
 - Vercel error-log and HTTP 500-log checks for deployment `dpl_AWqcyHeHAa4ie3E43dBZuiLx8P4b` returned no logs in the checked 30-minute window.

@@ -96,7 +96,7 @@ Production target:
 
 | Field | Result |
 | --- | --- |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 | Production deployment ID | `dpl_Ckb4UwAuaH1njCxEByXDhDgwXxoE` |
 | Production deployment URL | `https://bootup-ns1plzgq0-brandonma25s-projects.vercel.app` |
 | Production deploy status | Ready |
@@ -166,8 +166,8 @@ supabase db push --dry-run --linked --workdir <worktree>
 Production verification:
 
 ```bash
-vercel inspect https://daily-intelligence-aggregator-ybs9.vercel.app --no-color
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+vercel inspect https://bootupnews.vercel.app --no-color
+node scripts/prod-check.js https://bootupnews.vercel.app
 node <baseline measurement event API probe>
 node <post-apply measurement event API probe>
 node <public route and cron safety probe>

@@ -12,6 +12,33 @@ function normalizePositiveIntegerEnv(value: string | undefined) {
   return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : "";
 }
 
+export const CANONICAL_PRODUCTION_APP_URL = "https://bootupnews.vercel.app";
+
+function normalizeUrlOrigin(value: string | undefined) {
+  const normalized = normalizeEnv(value);
+  if (!normalized) {
+    return "";
+  }
+
+  try {
+    const url = new URL(normalized);
+    url.pathname = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+export function getPublicAppOrigin() {
+  return normalizeUrlOrigin(process.env.NEXT_PUBLIC_APP_URL) || CANONICAL_PRODUCTION_APP_URL;
+}
+
+export function buildPublicAppUrl(path = "/") {
+  return new URL(path, `${getPublicAppOrigin()}/`).toString();
+}
+
 export function resolvePublicSupabaseConfig({
   supabaseUrl,
   supabaseAnonKey,

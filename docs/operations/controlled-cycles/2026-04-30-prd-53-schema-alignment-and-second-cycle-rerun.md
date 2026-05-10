@@ -50,7 +50,7 @@ The prompt alone was not treated as migration or publish authorization.
 | Commit description | `Merge pull request #154 from brandonma25/codex/prd-53-second-controlled-cycle-validation` |
 | UTC capture time | `2026-04-30T04:52:10Z` |
 | Local capture time | `2026-04-30 12:52:10 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 ## Baseline production schema preflight
 
@@ -263,10 +263,10 @@ sed -n '1,240p' supabase/migrations/20260430110000_signal_posts_editorial_card_c
 sed -n '1,260p' supabase/migrations/20260430120000_published_slates_minimal_audit_history.sql
 printenv | rg 'CONTROLLED_PRODUCTION_SCHEMA_MIGRATION_APPROVED|CONTROLLED_PRODUCTION_PUBLISH_APPROVED|SUPABASE|VERCEL|PRODUCTION_BASE_URL|PIPELINE' || true
 gh variable list --repo brandonma25/daily-intelligence-aggregator
-curl -L -sS -o /tmp/bootup-schema-align-home.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -L -sS -o /tmp/bootup-schema-align-signals.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-curl -L -sS -o /tmp/bootup-schema-align-cron.txt -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+curl -L -sS -o /tmp/bootup-schema-align-home.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/
+curl -L -sS -o /tmp/bootup-schema-align-signals.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/signals
+curl -L -sS -o /tmp/bootup-schema-align-cron.txt -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/api/cron/fetch-news
+node scripts/prod-check.js https://bootupnews.vercel.app
 supabase migration list --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-production-schema-migration-alignment
 supabase db push --dry-run --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-production-schema-migration-alignment
 supabase migration list --help

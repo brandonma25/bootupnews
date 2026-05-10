@@ -49,7 +49,7 @@ This run was authorized for dry-run and read-only validation only. It was not au
 | UTC capture time | `2026-05-01T03:45:34Z` |
 | Local capture time | `2026-05-01 11:45:34 CST` |
 | Production project ref | `fwkqjeumreaznfhnlzev` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 | Production deployment SHA | `b7c20594b0fea70870146e0c3d184ad9ed0df94c` |
 | Supabase CLI version | `2.90.0` |
 
@@ -110,7 +110,7 @@ supabase db push --dry-run --linked --workdir /Users/bm/dev/worktrees/daily-inte
 supabase db query "<read-only PRD-53 catalog verification select>" --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-second-controlled-cycle-rerun --output table
 supabase db query "<read-only aggregate public/audit count select>" --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-second-controlled-cycle-rerun --output table
 python3 <public route smoke script>
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 gh api repos/brandonma25/daily-intelligence-aggregator/deployments --jq "<latest production deployment jq>"
 ```
 

@@ -55,7 +55,7 @@ This run attempted catalog-level production inspection under read-only authoriza
 | Commit description | `Merge pull request #159 from brandonma25/codex/prd-53-database-owner-migration-history-review` |
 | UTC capture time | `2026-04-30T18:32:01Z` |
 | Local capture time | `2026-05-01 02:32:01 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 The stale `/Users/bm/Documents/daily-intelligence-aggregator-main` checkout was not used for repo work because `git status --short --branch` failed with `error: bad tree object HEAD`.
 
@@ -324,12 +324,12 @@ supabase migration list --linked --workdir /Users/bm/dev/worktrees/daily-intelli
 supabase db push --dry-run --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-catalog-level-database-owner-review
 supabase db query --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-catalog-level-database-owner-review --output json "select version from supabase_migrations.schema_migrations order by version;"
 supabase db query --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-catalog-level-database-owner-review --output json "<combined read-only catalog query>"
-curl -sS -I https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -sS -I https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-curl -sS -I https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news
-curl -L -sS -o /tmp/bootup-catalog-review-home.html -w 'home %{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -L -sS -o /tmp/bootup-catalog-review-signals.html -w 'signals %{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+curl -sS -I https://bootupnews.vercel.app/
+curl -sS -I https://bootupnews.vercel.app/signals
+curl -sS -I https://bootupnews.vercel.app/api/cron/fetch-news
+curl -L -sS -o /tmp/bootup-catalog-review-home.html -w 'home %{http_code} %{url_effective}\n' https://bootupnews.vercel.app/
+curl -L -sS -o /tmp/bootup-catalog-review-signals.html -w 'signals %{http_code} %{url_effective}\n' https://bootupnews.vercel.app/signals
+node scripts/prod-check.js https://bootupnews.vercel.app
 rg -o 'sentry-release=[^,&"]+|signal_posts schema preflight failed\.[^<"]+|published_slate audit schema preflight failed\.[^<"]+|Missing expected columns: [^<"]+|0 signals|Published Signals are not available yet|Daily Executive Briefing|Today • [^<]+' /tmp/bootup-catalog-review-home.html /tmp/bootup-catalog-review-signals.html
 git diff --check
 npm run lint
@@ -354,7 +354,7 @@ python3 scripts/release-governance-gate.py --diff-mode local --branch-name codex
 | Combined read-only catalog query | Blocked by `ECIRCUITBREAKER` on Supabase temp-login role. No mutation occurred. |
 | Homepage and `/signals` HEAD checks | Both HTTP 200. |
 | Cron endpoint HEAD check | HTTP 401 unauthorized. |
-| `node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app` | Failed because `/` was HTTP 200 but missing expected public briefing markers. |
+| `node scripts/prod-check.js https://bootupnews.vercel.app` | Failed because `/` was HTTP 200 but missing expected public briefing markers. |
 | `git diff --check` | Passed. |
 | `npm run lint` | Passed using a matching dependency tree symlinked from a sibling worktree with identical `package.json` and `package-lock.json`. |
 | `npm run test` | Passed: 73 test files and 572 tests. |

@@ -54,7 +54,7 @@ The inspection is still blocked. The fresh worktree does not have linked Supabas
 | PR #164 merged at | `2026-04-30T21:26:21Z` |
 | UTC capture time | `2026-04-30T21:29:16Z` |
 | Local capture time | `2026-05-01 05:29:16 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on `feature/tldr-url-ingestion` and was not disturbed. A dedicated worktree was created from `origin/main` for this branch after PR #164 merged.
 

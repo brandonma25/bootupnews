@@ -51,7 +51,7 @@ Current state:
 
 Production URL:
 
-- `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- `https://bootupnews.vercel.app`
 
 Current branch and commit:
 
@@ -65,12 +65,12 @@ Deployment:
 - target: production
 - status: Ready
 - deployment URL: `https://bootup-dka9lij8m-brandonma25s-projects.vercel.app`
-- production alias: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- production alias: `https://bootupnews.vercel.app`
 
 Production verification:
 
 - GitHub Production Verification passed for `9fec0c7a6889b8a419a34ce2252c856acf954263`.
-- `vercel inspect https://daily-intelligence-aggregator-ybs9.vercel.app` showed production Ready.
+- `vercel inspect https://bootupnews.vercel.app` showed production Ready.
 
 Route checks:
 

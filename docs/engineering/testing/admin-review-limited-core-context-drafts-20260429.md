@@ -50,7 +50,7 @@ This is remediation / controlled validation under the existing Boot Up product s
 - Production deployment status: READY.
 - Deployment URL: `https://bootup-jcwesbvxp-brandonma25s-projects.vercel.app`
 - Deployment ID: `dpl_7uz2kZftfvWrERV4jRBkfp5ybKMX`
-- Production alias checked: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- Production alias checked: `https://bootupnews.vercel.app`
 - `/` returned HTTP `200`.
 - `/signals` returned HTTP `200`.
 - `/dashboard/signals/editorial-review` returned HTTP `200` when unauthenticated, but did not render private draft rows.

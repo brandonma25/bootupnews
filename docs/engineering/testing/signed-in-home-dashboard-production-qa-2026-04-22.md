@@ -5,7 +5,7 @@
 - Change type: remediation QA follow-up / alignment evidence.
 - Canonical PRD required: no.
 - Branch: `fix/signed-out-homepage-qa-remediation`.
-- Production target: `https://daily-intelligence-aggregator-ybs9.vercel.app/`.
+- Production target: `https://bootupnews.vercel.app/`.
 - Account: dummy QA account provided by the PM; password and session details are intentionally omitted.
 
 ## Source Of Truth

@@ -23,7 +23,7 @@
 - PR #203: GitHub initially blocked merge because the branch was behind `main`; the PR branch was updated, then the refreshed gate passed `feature-system-csv-validation`, `release-governance-gate`, `pr-lint`, `pr-unit-tests`, `pr-build`, `pr-e2e-chromium`, `pr-e2e-webkit`, `pr-summary`, Vercel, and Vercel Preview Comments.
 
 ## Production Verification
-- Production alias: `https://daily-intelligence-aggregator-ybs9.vercel.app`.
+- Production alias: `https://bootupnews.vercel.app`.
 - Final production deploy after both merges: `dpl_6ueScqM69hWQbvkZNCkdnvvkDMbX`.
 - Production route checks after PR #203 deployment reached `Ready`:
   - `/`: HTTP 200.

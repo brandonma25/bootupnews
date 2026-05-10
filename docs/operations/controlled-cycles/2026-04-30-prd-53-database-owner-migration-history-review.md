@@ -54,7 +54,7 @@ This run adds authorized read-only schema evidence. It confirms the same broad s
 | Commit description | `Merge pull request #158 from brandonma25/codex/prd-53-migration-history-drift-diagnosis` |
 | UTC capture time | `2026-04-30T18:01:23Z` |
 | Local capture time | `2026-05-01 02:01:23 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 The stale `/Users/bm/Documents/daily-intelligence-aggregator-main` checkout was not used for repo work because `git status --short --branch` failed with `error: bad tree object HEAD`.
 
@@ -341,9 +341,9 @@ supabase migration list --linked --workdir /Users/bm/dev/worktrees/daily-intelli
 supabase db push --dry-run --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-database-owner-migration-history-review
 supabase projects api-keys --project-ref fwkqjeumreaznfhnlzev --output json
 node - <<'NODE' ...sanitized read-only REST schema probe...
-curl -L -sS -o /tmp/bootup-db-owner-home.html -w 'home %{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -L -sS -o /tmp/bootup-db-owner-signals.html -w 'signals %{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-curl -L -sS -o /tmp/bootup-db-owner-cron.txt -w 'cron %{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news
+curl -L -sS -o /tmp/bootup-db-owner-home.html -w 'home %{http_code} %{url_effective}\n' https://bootupnews.vercel.app/
+curl -L -sS -o /tmp/bootup-db-owner-signals.html -w 'signals %{http_code} %{url_effective}\n' https://bootupnews.vercel.app/signals
+curl -L -sS -o /tmp/bootup-db-owner-cron.txt -w 'cron %{http_code} %{url_effective}\n' https://bootupnews.vercel.app/api/cron/fetch-news
 node - <<'NODE' ...sanitized route marker extraction...
 date -u '+%Y-%m-%dT%H:%M:%SZ'
 date '+%Y-%m-%d %H:%M:%S %Z'

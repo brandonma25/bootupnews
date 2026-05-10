@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
+
 import LandingHomepage from "@/components/landing/homepage";
 import { getHomepagePageState } from "@/lib/data";
-import { isHomepageDebugConfigured } from "@/lib/env";
+import { buildPublicAppUrl, getPublicAppOrigin, isHomepageDebugConfigured } from "@/lib/env";
 import { applyHomepageEditorialOverridesToDashboardData } from "@/lib/homepage-editorial-overrides";
 import { buildHomepageViewModel } from "@/lib/homepage-model";
 import { formatHomeBriefingDateLabel } from "@/lib/utils";
@@ -12,6 +14,21 @@ type PageProps = {
 function readSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
+
+const homepageUrl = buildPublicAppUrl("/");
+
+export const metadata: Metadata = {
+  metadataBase: new URL(getPublicAppOrigin()),
+  alternates: {
+    canonical: homepageUrl,
+  },
+  openGraph: {
+    url: homepageUrl,
+  },
+  other: {
+    "twitter:url": homepageUrl,
+  },
+};
 
 export default async function Page({ searchParams }: PageProps) {
   // Keep homepage SSR on persisted read models only. Do not route this page

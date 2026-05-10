@@ -59,7 +59,7 @@ PR #160 and PR #161 narrowed the blocker to stable read-only production catalog 
 | Commit description | `Merge pull request #162 from brandonma25/codex/hotfix-public-schema-preflight-fallback` |
 | UTC capture time | `2026-04-30T20:47:27Z` |
 | Local capture time | `2026-05-01 04:47:27 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on `feature/tldr-url-ingestion` and was not disturbed. A dedicated worktree was created from `origin/main` for this branch.
 

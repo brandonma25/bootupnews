@@ -35,7 +35,7 @@ PR #139 was retitled from a `fix(...)` prefix to a remediation prefix before mer
 | Deployment target | production |
 | Deployment status | READY |
 | Deployment commit | `f0251f02743640a073535c288093496c05bc0908` |
-| Production alias checked | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production alias checked | `https://bootupnews.vercel.app` |
 | Homepage HTTP status | 200 |
 | `/signals` HTTP status | 200 |
 
