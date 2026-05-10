@@ -6,7 +6,7 @@
 - Affected object level: Card and Surface Placement.
 
 ## Source Of Truth
-- Live production audit of `daily-intelligence-aggregator-ybs9.vercel.app` on 2026-05-02.
+- Live production audit of `bootupnews.vercel.app` on 2026-05-02.
 - PR #180, #181, #187, and #189 metadata and PR bodies.
 - Prior Phase 1 change record: `docs/engineering/change-records/2026-05-02-public-card-cleanup-phase-1.md`.
 - GitHub source-of-truth status: canonical consolidated remediation record created on 2026-05-04.

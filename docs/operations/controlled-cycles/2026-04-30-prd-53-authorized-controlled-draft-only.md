@@ -47,7 +47,7 @@ This run was authorized only for controlled production `draft_only` / non-live c
 | UTC capture time | `2026-05-01T04:13:20Z` |
 | Local capture time | `2026-05-01 12:13:20 CST` |
 | Production deployment SHA | `37a0d4cf8de98a5171e38a8486618a48e0ca7916` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 | Supabase project ref | `fwkqjeumreaznfhnlzev` |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on its existing branch and was not disturbed. This validation used the dedicated worktree above.
@@ -115,7 +115,7 @@ Baseline read-only checks:
 
 ```bash
 python3 <public route baseline smoke script>
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 supabase projects list --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-authorized-controlled-draft-only
 supabase link --project-ref fwkqjeumreaznfhnlzev --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-authorized-controlled-draft-only
 supabase db query "<read-only live/audit/count select>" --linked --workdir /Users/bm/dev/worktrees/daily-intelligence-aggregator-prd-53-authorized-controlled-draft-only --output table

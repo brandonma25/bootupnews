@@ -41,7 +41,7 @@
 - Result: preview routes loaded, removed internal strings were absent, and unchanged public content remained visible.
 
 ## Production Deployment
-- Production alias: `https://daily-intelligence-aggregator-ybs9.vercel.app`.
+- Production alias: `https://bootupnews.vercel.app`.
 - Immutable deploy URL: `https://bootup-l9r4iysw2-brandonma25s-projects.vercel.app`.
 - Deploy ID: `dpl_5vYVQSc3ak8Wi39B6E42xUsDSsva`.
 - Deploy timestamp: `2026-05-07T04:58:31Z`.
@@ -53,7 +53,7 @@
 
 ## Chrome Incognito Click-Level QA
 - Tool: Codex Computer Use in Google Chrome incognito.
-- Target: `https://daily-intelligence-aggregator-ybs9.vercel.app`.
+- Target: `https://bootupnews.vercel.app`.
 - Session state: logged out; no signed-in account UI or Vercel toolbar observed.
 - Click path verified:
   - Homepage loaded.

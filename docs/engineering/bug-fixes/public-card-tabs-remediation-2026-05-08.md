@@ -8,7 +8,7 @@
 ## Source Of Truth
 - Cowork eliminate-only analysis 2026-05-08 subtraction-lens shortlist.
 - Cowork frontend UX analysis 2026-05-06 taxonomy mismatch diagnosis.
-- Production homepage HTML/RSC payload fetched 2026-05-08 from `https://daily-intelligence-aggregator-ybs9.vercel.app/`.
+- Production homepage HTML/RSC payload fetched 2026-05-08 from `https://bootupnews.vercel.app/`.
 - Product Position fail-closed empty-state principle, no false freshness, and Signal Card structure guidance supplied by PM.
 - PR #202 and PR #204 GitHub diffs.
 - Canonical PRD required: No.

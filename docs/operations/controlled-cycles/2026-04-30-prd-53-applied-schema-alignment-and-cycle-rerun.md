@@ -54,7 +54,7 @@ The production schema migration was not applied because the dry-run pending set 
 | Commit description | `Merge pull request #156 from brandonma25/codex/prd-53-authorized-production-schema-alignment` |
 | UTC capture time | `2026-04-30T06:05:46Z` |
 | Local capture time | `2026-04-30 14:05:46 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 ## Baseline production schema preflight
 
@@ -225,11 +225,11 @@ sed -n '360,530p' src/lib/signals-editorial.ts
 date -u '+%Y-%m-%dT%H:%M:%SZ'
 date '+%Y-%m-%d %H:%M:%S %Z'
 gh variable list --repo brandonma25/daily-intelligence-aggregator
-curl -L -sS -o /tmp/bootup-apply-schema-home-before.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/
-curl -L -sS -o /tmp/bootup-apply-schema-signals-before.html -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/signals
-curl -L -sS -o /tmp/bootup-apply-schema-cron-before.txt -w '%{http_code} %{url_effective}\n' https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news
+curl -L -sS -o /tmp/bootup-apply-schema-home-before.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/
+curl -L -sS -o /tmp/bootup-apply-schema-signals-before.html -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/signals
+curl -L -sS -o /tmp/bootup-apply-schema-cron-before.txt -w '%{http_code} %{url_effective}\n' https://bootupnews.vercel.app/api/cron/fetch-news
 rg -o 'sentry-release=[^,&"]+|signal_posts schema preflight failed\.[^<"]+|published_slate audit schema preflight failed\.[^<"]+|Missing expected columns: [^<"]+|0 signals|Published Signals are not available yet|Daily Executive Briefing|Today • [^<]+' /tmp/bootup-apply-schema-home-before.html /tmp/bootup-apply-schema-signals-before.html /tmp/bootup-apply-schema-cron-before.txt
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app
+node scripts/prod-check.js https://bootupnews.vercel.app
 supabase --version
 find supabase -maxdepth 3 -type f | sort
 find supabase/.temp -maxdepth 1 -type f -print 2>/dev/null | sort || true

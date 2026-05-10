@@ -3,7 +3,7 @@
 Date: 2026-05-02
 Branch: `feature/public-card-cleanup-phase-1`
 Change type: remediation / display-layer cleanup
-Source of truth: live production audit of `daily-intelligence-aggregator-ybs9.vercel.app` on 2026-05-02
+Source of truth: live production audit of `bootupnews.vercel.app` on 2026-05-02
 
 ## Problem
 

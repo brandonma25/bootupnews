@@ -57,7 +57,7 @@ Results:
 
 Additional validation:
 
-- `node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app` passed for `/` and `/dashboard`.
+- `node scripts/prod-check.js https://bootupnews.vercel.app` passed for `/` and `/dashboard`.
 - Production route probes for `/`, `/signals`, `/briefing/2026-05-01`, `/api/cron/fetch-news`, and `/api/internal/mvp-measurement/summary?days=7` matched expected status codes.
 - Authenticated browser summary readback returned `ok:true` with aggregate production event counts.
 - Vercel error-log and HTTP 500-log checks for deployment `dpl_AWqcyHeHAa4ie3E43dBZuiLx8P4b` returned no logs in the checked 30-minute window.

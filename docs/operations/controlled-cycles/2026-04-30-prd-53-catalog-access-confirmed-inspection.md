@@ -57,7 +57,7 @@ The run used only read-only/dry-run Supabase commands and read-only catalog quer
 | Local capture time | `2026-05-01 09:56:40 CST` |
 | Production project ref | `fwkqjeumreaznfhnlzev` |
 | Production project URL | `https://fwkqjeumreaznfhnlzev.supabase.co` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on its existing branch and was not disturbed. This inspection used the dedicated worktree above.
 

@@ -55,7 +55,7 @@ This is remediation / editorial validation against the existing Boot Up product 
 - Production deployment status: READY.
 - Deployment URL: `https://bootup-8f9iazuke-brandonma25s-projects.vercel.app`
 - Deployment ID: `dpl_3qNVyAnzTo9Eerx7zBF68YxB41WR`
-- Production alias checked: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- Production alias checked: `https://bootupnews.vercel.app`
 - `/` returned HTTP `200`.
 - `/signals` returned HTTP `200`.
 - Public live briefing date remained `2026-04-26` by live-row readback from the prior validation state.

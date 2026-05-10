@@ -43,7 +43,7 @@ The approved next action was therefore to repair migration history for only the 
 | UTC capture time | `2026-05-01T02:36:17Z` |
 | Local capture time | `2026-05-01 10:36:17 CST` |
 | Production project ref | `fwkqjeumreaznfhnlzev` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on its existing branch and was not disturbed. This repair used the dedicated worktree above.
 
@@ -146,7 +146,7 @@ Public safety verification:
 python3 - <<'PY'
 from urllib.request import Request, urlopen
 routes = ['/', '/signals']
-base = 'https://daily-intelligence-aggregator-ybs9.vercel.app'
+base = 'https://bootupnews.vercel.app'
 for route in routes:
     req = Request(base + route, headers={'User-Agent': 'codex-public-safety-smoke/1.0'})
     with urlopen(req, timeout=20) as resp:
@@ -251,7 +251,7 @@ The earlier DML/backfill migrations no longer appear in dry-run output. No unexp
 
 ## Public Safety Verification
 
-Production app URL: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+Production app URL: `https://bootupnews.vercel.app`
 
 | Route | HTTP status | Public raw schema error exposed | Missing PRD-53 column names exposed | Public expected markers |
 | --- | --- | --- | --- | --- |

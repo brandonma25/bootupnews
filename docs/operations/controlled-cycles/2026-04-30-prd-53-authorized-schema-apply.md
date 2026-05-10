@@ -51,7 +51,7 @@ After that repair, `supabase db push --dry-run --linked` showed only the three e
 | UTC capture time | `2026-05-01T03:10:19Z` |
 | Local capture time | `2026-05-01 11:10:19 CST` |
 | Production project ref | `fwkqjeumreaznfhnlzev` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 | Supabase CLI version | `2.90.0` |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on its existing branch and was not disturbed. This apply used the dedicated worktree above.
@@ -158,7 +158,7 @@ Public and admin safety checks:
 ```bash
 python3 - <<'PY'
 from urllib.request import Request, urlopen
-base = 'https://daily-intelligence-aggregator-ybs9.vercel.app'
+base = 'https://bootupnews.vercel.app'
 routes = ['/', '/signals', '/dashboard/signals/editorial-review']
 needles = ['signal_posts schema preflight failed', 'published_slate audit schema preflight failed', 'final_slate_rank', 'final_slate_tier', 'editorial_decision', 'reviewed_at']
 for route in routes:
@@ -180,7 +180,7 @@ PY
 python3 - <<'PY'
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
-url = 'https://daily-intelligence-aggregator-ybs9.vercel.app/api/cron/fetch-news'
+url = 'https://bootupnews.vercel.app/api/cron/fetch-news'
 req = Request(url, headers={'User-Agent': 'codex-cron-disabled-smoke/1.0'})
 try:
     with urlopen(req, timeout=20) as resp:
@@ -288,7 +288,7 @@ This establishes schema-layer readiness for the PRD-53 final-slate/admin workflo
 
 ## Public Safety Verification
 
-Production app URL: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+Production app URL: `https://bootupnews.vercel.app`
 
 | Route | HTTP status | Public raw schema error exposed | Missing PRD-53 column names exposed | Expected public markers |
 | --- | --- | --- | --- | --- |

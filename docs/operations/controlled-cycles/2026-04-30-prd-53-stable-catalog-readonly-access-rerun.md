@@ -58,7 +58,7 @@ The access still is not visible to this process, so this run stopped before:
 | PR #163 merged at | `2026-04-30T20:59:38Z` |
 | UTC capture time | `2026-04-30T21:01:05Z` |
 | Local capture time | `2026-05-01 05:01:05 CST` |
-| Production URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production URL | `https://bootupnews.vercel.app` |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on `feature/tldr-url-ingestion` and was not disturbed. A dedicated worktree was created from `origin/main` for this branch after PR #163 merged.
 

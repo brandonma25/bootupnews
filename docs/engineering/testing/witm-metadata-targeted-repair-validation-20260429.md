@@ -41,7 +41,7 @@ This was remediation / controlled validation. It repaired existing review metada
 - Merge commit: `a25328a8378f73082e0e10cc35989c11c1c7c0c8`
 - Production deployment status: READY.
 - Deployment URL: `https://bootup-3edo9xd4n-brandonma25s-projects.vercel.app`
-- Production alias checked: `https://daily-intelligence-aggregator-ybs9.vercel.app`
+- Production alias checked: `https://bootupnews.vercel.app`
 - Deployment ID: `dpl_GcfxvqMioen2pjVra3hpB2k5kb4A`
 - The PR #143 source branch was not deleted because the local branch is still attached to a worktree.
 

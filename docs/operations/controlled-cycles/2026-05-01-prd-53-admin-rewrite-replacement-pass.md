@@ -54,7 +54,7 @@ It was not authorized to publish, set `is_live=true`, set `published_at`, archiv
 | Branch | `codex/prd-53-admin-rewrite-replacement-pass` |
 | Starting commit | `17be23b` |
 | Commit description | `Merge pull request #172 from brandonma25/codex/prd-53-admin-review-final-slate-validation` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 | Admin route | `/dashboard/signals/editorial-review` |
 | Current set shown in admin | `2026-05-01` |
 | Current candidate count | `7` |
@@ -143,7 +143,7 @@ Production public and cron safety verification after admin actions:
 
 ```bash
 node <<'NODE'
-const base = 'https://daily-intelligence-aggregator-ybs9.vercel.app';
+const base = 'https://bootupnews.vercel.app';
 const checks = [
   ['/', ['Today\\'s briefing is being prepared', 'Wednesday, April 29', 'signal_posts schema preflight failed', 'final_slate_rank', '2026-05-01']],
   ['/signals', ['Published Signals', 'Top 5 Core Signals', 'Next 2 Context Signals', 'signal_posts schema preflight failed', 'final_slate_rank', '2026-05-01']],
@@ -160,7 +160,7 @@ NODE
 
 Browser actions through authenticated Chrome session:
 
-- Opened `https://daily-intelligence-aggregator-ybs9.vercel.app/dashboard/signals/editorial-review`.
+- Opened `https://bootupnews.vercel.app/dashboard/signals/editorial-review`.
 - Confirmed admin route loaded as `newsweb2026@gmail.com`.
 - Confirmed current set `2026-05-01`, seven current candidates, and the PR #172 review state.
 - Rewrote the two WITM-blocked rows through the supported admin edit controls.

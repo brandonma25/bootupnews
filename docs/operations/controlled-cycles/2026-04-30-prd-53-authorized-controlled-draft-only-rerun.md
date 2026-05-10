@@ -45,7 +45,7 @@ This rerun was authorized only for controlled production `draft_only` / non-live
 | Branch | `codex/prd-53-authorized-controlled-draft-only-rerun` |
 | Starting commit | `548ffdfb6e5845d0a0a2e3dccaa01d50ac0cba2c` |
 | Commit description | `Merge pull request #170 from brandonma25/codex/prd-53-authorized-controlled-draft-only` |
-| Production app URL | `https://daily-intelligence-aggregator-ybs9.vercel.app` |
+| Production app URL | `https://bootupnews.vercel.app` |
 | Production deployment | `dpl_ESSRCej2jGfgNdjKFUCwtfY72iCz`, status Ready |
 
 The canonical checkout at `/Users/bm/dev/daily-intelligence-aggregator` remained on its existing branch and was not disturbed. This validation used the dedicated worktree above.
@@ -110,8 +110,8 @@ Setup and baseline checks:
 ```bash
 npm install
 vercel link --yes --project bootup --scope brandonma25s-projects --no-color
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app/
-vercel inspect https://daily-intelligence-aggregator-ybs9.vercel.app --no-color
+node scripts/prod-check.js https://bootupnews.vercel.app/
+vercel inspect https://bootupnews.vercel.app --no-color
 node <public route baseline check>
 node <read-only Supabase aggregate baseline check>
 ```
@@ -148,7 +148,7 @@ Post-run verification:
 
 ```bash
 node <read-only Supabase verification for inserted review row IDs>
-node scripts/prod-check.js https://daily-intelligence-aggregator-ybs9.vercel.app/
+node scripts/prod-check.js https://bootupnews.vercel.app/
 node <public route post-check>
 node <read-only live row ID overlap check>
 npx tsx -e "<final-slate readiness validation against created rows>"
@@ -306,7 +306,7 @@ Public page text contains two article/source-title strings that also belong to p
 Chrome Computer Use inspected:
 
 ```text
-https://daily-intelligence-aggregator-ybs9.vercel.app/dashboard/signals/editorial-review
+https://bootupnews.vercel.app/dashboard/signals/editorial-review
 ```
 
 Observed admin state:
