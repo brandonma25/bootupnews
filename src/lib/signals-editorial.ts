@@ -18,6 +18,8 @@ import {
   FINAL_SLATE_MIN_PUBLIC_ROWS,
   getFinalSlateTierForRank,
   isFinalSlateRank,
+  isValidPublicSourceUrl,
+  MISSING_PUBLIC_SOURCE_URL_REASON,
   validateFinalSlateReadiness,
   type FinalSlateTier,
   type FinalSlateValidationFailure,
@@ -373,6 +375,7 @@ export type EditorialMutationResult = {
     | "decision_updated"
     | "draft_saved"
     | "empty_editorial_text"
+    | "missing_public_source_url"
     | "not_admin"
     | "not_authenticated"
     | "not_found"
@@ -385,11 +388,19 @@ export type EditorialMutationResult = {
     | "storage_error";
 };
 
+export type SkippedSignalPostCandidate = {
+  title: string;
+  candidateOrigin: string;
+  pipelineRank: number;
+  reason: typeof MISSING_PUBLIC_SOURCE_URL_REASON;
+};
+
 export type SignalSnapshotPersistenceResult = {
   ok: boolean;
   briefingDate: string;
   insertedCount: number;
   insertedPostIds?: string[];
+  skippedCandidates?: SkippedSignalPostCandidate[];
   mode?: SignalPostPersistenceMode;
   message: string;
 };
@@ -429,6 +440,16 @@ type SignalPostsSchemaPreflightResult =
       missingColumns: string[];
       message: string;
     };
+
+type SignalPostCandidateSource = {
+  sourceName: string;
+  sourceUrl: string;
+};
+
+type BuiltSignalPostCandidates = {
+  candidates: EditorialSignalPost[];
+  skippedCandidates: SkippedSignalPostCandidate[];
+};
 
 let signalPostsSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
 let publicSignalPostsSchemaPreflightPromise: Promise<SignalPostsSchemaPreflightResult> | null = null;
@@ -649,6 +670,15 @@ function getPublishedSlateAuditSchemaPreflight(
 
 function normalizeEditorialText(value: string | null | undefined) {
   return value?.trim() ?? "";
+}
+
+function normalizePublicSourceUrl(value: string | null | undefined) {
+  const normalized = normalizeEditorialText(value);
+  return isValidPublicSourceUrl(normalized) ? normalized : "";
+}
+
+function buildMissingPublicSourceUrlMessage(action: string) {
+  return `${MISSING_PUBLIC_SOURCE_URL_REASON}: Add a valid public source URL before ${action}.`;
 }
 
 function normalizeDateValue(value: string | null | undefined) {
@@ -877,8 +907,11 @@ function mapStoredPublishedSlate(
 // Converts MVP BriefingItem view-models into signal_posts placement candidates.
 // The persisted rows are editorial/public placement rows, not durable Signal
 // history or Phase 2 progression identity.
-function mapBriefingItemToSignalPost(item: BriefingItem, index: number): EditorialSignalPost {
-  const leadSource = item.sources[0] ?? item.relatedArticles?.[0];
+function mapBriefingItemToSignalPost(
+  item: BriefingItem,
+  index: number,
+  source: SignalPostCandidateSource,
+): EditorialSignalPost {
   const tags = [
     item.topicName,
     item.signalRole,
@@ -898,8 +931,8 @@ function mapBriefingItemToSignalPost(item: BriefingItem, index: number): Editori
     briefingDate: null,
     rank: index + 1,
     title: item.title,
-    sourceName: leadSource?.title ?? "Unknown source",
-    sourceUrl: leadSource?.url ?? "",
+    sourceName: source.sourceName,
+    sourceUrl: source.sourceUrl,
     summary: item.whatHappened,
     tags,
     signalScore: item.importanceScore ?? item.matchScore ?? null,
@@ -955,8 +988,76 @@ function getValidationFailureMessage(validation: WhyItMattersValidationResult) {
     : "Why it matters requires a human rewrite before publishing.";
 }
 
-function buildSignalPostCandidates(items: BriefingItem[]) {
-  return items.slice(0, SIGNAL_POST_CANDIDATE_DEPTH_LIMIT).map(mapBriefingItemToSignalPost);
+function getBriefingItemSourceCandidates(item: BriefingItem): SignalPostCandidateSource[] {
+  return [
+    ...item.sources.map((source) => ({
+      sourceName: normalizeEditorialText(source.title) || "Unknown source",
+      sourceUrl: normalizeEditorialText(source.url),
+    })),
+    ...(item.relatedArticles ?? []).map((article) => ({
+      sourceName: normalizeEditorialText(article.sourceName || article.title) || "Unknown source",
+      sourceUrl: normalizeEditorialText(article.url),
+    })),
+  ];
+}
+
+function selectPublicSourceForBriefingItem(item: BriefingItem): SignalPostCandidateSource | null {
+  const source = getBriefingItemSourceCandidates(item).find((candidate) =>
+    isValidPublicSourceUrl(candidate.sourceUrl),
+  );
+
+  if (!source) {
+    return null;
+  }
+
+  return {
+    sourceName: source.sourceName,
+    sourceUrl: normalizePublicSourceUrl(source.sourceUrl),
+  };
+}
+
+function buildSkippedCandidateForBriefingItem(
+  item: BriefingItem,
+  pipelineRank: number,
+): SkippedSignalPostCandidate {
+  const origin = getBriefingItemSourceCandidates(item)[0]?.sourceName ?? item.topicName ?? "unknown";
+
+  return {
+    title: item.title,
+    candidateOrigin: origin,
+    pipelineRank,
+    reason: MISSING_PUBLIC_SOURCE_URL_REASON,
+  };
+}
+
+function buildSkippedCandidateForSignalPost(post: EditorialSignalPost): SkippedSignalPostCandidate {
+  return {
+    title: post.title,
+    candidateOrigin: post.sourceName || "unknown",
+    pipelineRank: post.rank,
+    reason: MISSING_PUBLIC_SOURCE_URL_REASON,
+  };
+}
+
+function buildSignalPostCandidates(items: BriefingItem[]): BuiltSignalPostCandidates {
+  const candidates: EditorialSignalPost[] = [];
+  const skippedCandidates: SkippedSignalPostCandidate[] = [];
+
+  items.slice(0, SIGNAL_POST_CANDIDATE_DEPTH_LIMIT).forEach((item, index) => {
+    const source = selectPublicSourceForBriefingItem(item);
+
+    if (!source) {
+      skippedCandidates.push(buildSkippedCandidateForBriefingItem(item, index + 1));
+      return;
+    }
+
+    candidates.push(mapBriefingItemToSignalPost(item, index, source));
+  });
+
+  return {
+    candidates,
+    skippedCandidates,
+  };
 }
 
 function parseEditorialSortTime(value: string | null | undefined) {
@@ -1107,28 +1208,43 @@ async function persistSignalPostCandidates(
   input: {
     briefingDate: string;
     candidates: EditorialSignalPost[];
+    skippedCandidates?: SkippedSignalPostCandidate[];
     mode?: SignalPostPersistenceMode;
   },
 ): Promise<SignalSnapshotPersistenceResult> {
   const briefingDate = normalizeDateValue(input.briefingDate) ?? new Date().toISOString().slice(0, 10);
   const mode = input.mode ?? "normal";
+  const preSkippedCandidates = input.skippedCandidates ?? [];
+  const sourceReadyCandidates = input.candidates.filter((post) =>
+    isValidPublicSourceUrl(post.sourceUrl),
+  );
+  const skippedCandidates = [
+    ...preSkippedCandidates,
+    ...input.candidates
+      .filter((post) => !isValidPublicSourceUrl(post.sourceUrl))
+      .map(buildSkippedCandidateForSignalPost),
+  ];
 
-  if (input.candidates.length === 0) {
+  if (sourceReadyCandidates.length === 0) {
     return {
       ok: false,
       briefingDate,
       insertedCount: 0,
       mode,
-      message: "The current signal pipeline returned no structurally eligible signal posts for editorial review.",
+      skippedCandidates,
+      message: skippedCandidates.length > 0
+        ? `No signal posts were persisted because ${skippedCandidates.length} candidate(s) were missing a valid public source URL.`
+        : "The current signal pipeline returned no structurally eligible signal posts for editorial review.",
     };
   }
 
-  if (mode !== "draft_only" && input.candidates.length < TOP_SIGNAL_SET_SIZE) {
+  if (mode !== "draft_only" && sourceReadyCandidates.length < TOP_SIGNAL_SET_SIZE) {
     return {
       ok: false,
       briefingDate,
       insertedCount: 0,
-      message: `The current signal pipeline returned ${input.candidates.length} signal posts. Persisting the daily snapshot requires at least five.`,
+      skippedCandidates,
+      message: `The current signal pipeline returned ${sourceReadyCandidates.length} source-ready signal posts. Persisting the daily snapshot requires at least five.`,
     };
   }
 
@@ -1150,6 +1266,7 @@ async function persistSignalPostCandidates(
       ok: false,
       briefingDate,
       insertedCount: 0,
+      skippedCandidates,
       message: `The current signal snapshot could not be checked: ${existingResult.error.message}`,
     };
   }
@@ -1160,7 +1277,7 @@ async function persistSignalPostCandidates(
       .map((row) => row.rank)
       .filter((rank): rank is number => typeof rank === "number"),
   );
-  const missingCandidates = input.candidates.filter((post) => !existingRanks.has(post.rank));
+  const missingCandidates = sourceReadyCandidates.filter((post) => !existingRanks.has(post.rank));
 
   if (missingCandidates.length === 0) {
     return {
@@ -1168,6 +1285,7 @@ async function persistSignalPostCandidates(
       briefingDate,
       insertedCount: 0,
       insertedPostIds: [],
+      skippedCandidates,
       mode,
       message: "The daily signal snapshot already exists for this briefing date.",
     };
@@ -1222,6 +1340,7 @@ async function persistSignalPostCandidates(
       ok: false,
       briefingDate,
       insertedCount: 0,
+      skippedCandidates,
       message: `The current Top 5 could not be persisted for editing: ${insertResult.error.message}`,
     };
   }
@@ -1233,6 +1352,7 @@ async function persistSignalPostCandidates(
     insertedPostIds: ((insertResult.data ?? []) as Array<{ id: string | null }>)
       .map((row) => row.id)
       .filter((id): id is string => Boolean(id)),
+    skippedCandidates,
     mode,
     message:
       missingCandidates.length === TOP_SIGNAL_SET_SIZE
@@ -1269,9 +1389,12 @@ export async function persistSignalPostsForBriefing(input: {
     };
   }
 
+  const builtCandidates = buildSignalPostCandidates(input.items);
+
   return persistSignalPostCandidates(client, {
     briefingDate: input.briefingDate,
-    candidates: buildSignalPostCandidates(input.items),
+    candidates: builtCandidates.candidates,
+    skippedCandidates: builtCandidates.skippedCandidates,
     mode: input.mode,
   });
 }
@@ -1852,6 +1975,38 @@ async function approveSignalPostWithContext(
     };
   }
 
+  const sourceLookup = await context.client
+    .from("signal_posts")
+    .select("id, source_url")
+    .eq("id", input.postId)
+    .maybeSingle();
+
+  if (sourceLookup.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: "The signal post could not be loaded for approval.",
+    };
+  }
+
+  if (!sourceLookup.data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "The signal post could not be found.",
+    };
+  }
+
+  const sourceReadyPost = sourceLookup.data as Pick<StoredSignalPost, "id" | "source_url">;
+
+  if (!isValidPublicSourceUrl(sourceReadyPost.source_url)) {
+    return {
+      ok: false,
+      code: "missing_public_source_url",
+      message: buildMissingPublicSourceUrlMessage("approval"),
+    };
+  }
+
   const now = new Date().toISOString();
   const validation = validateWhyItMatters(editorialText);
 
@@ -2019,7 +2174,9 @@ export async function approveSignalPosts(input: {
 
   if (failedResults.length > 0) {
     const nonStorageFailure = failedResults.every((result) =>
-      result.code === "publish_blocked" || result.code === "empty_editorial_text",
+      result.code === "publish_blocked" ||
+      result.code === "empty_editorial_text" ||
+      result.code === "missing_public_source_url",
     );
 
     return {
@@ -2113,7 +2270,7 @@ async function loadDecisionTarget(
 ) {
   const lookup = await context.client
     .from("signal_posts")
-    .select("id, briefing_date, editorial_status, editorial_decision, final_slate_rank, final_slate_tier, is_live, published_at")
+    .select("id, briefing_date, source_url, editorial_status, editorial_decision, final_slate_rank, final_slate_tier, is_live, published_at")
     .eq("id", postId)
     .maybeSingle();
 
@@ -2129,6 +2286,7 @@ async function loadDecisionTarget(
     StoredSignalPost,
     | "id"
     | "briefing_date"
+    | "source_url"
     | "editorial_status"
     | "editorial_decision"
     | "final_slate_rank"
@@ -2381,7 +2539,7 @@ export async function assignSignalPostToFinalSlateSlot(input: {
 
   const lookup = await context.client
     .from("signal_posts")
-    .select("id, briefing_date, editorial_status, editorial_decision, is_live, published_at")
+    .select("id, briefing_date, source_url, editorial_status, editorial_decision, is_live, published_at")
     .eq("id", input.postId)
     .maybeSingle();
 
@@ -2395,7 +2553,7 @@ export async function assignSignalPostToFinalSlateSlot(input: {
 
   const post = lookup.data as Pick<
     StoredSignalPost,
-    "id" | "briefing_date" | "editorial_status" | "editorial_decision" | "is_live" | "published_at"
+    "id" | "briefing_date" | "source_url" | "editorial_status" | "editorial_decision" | "is_live" | "published_at"
   >;
   const briefingDate = normalizeDateValue(post.briefing_date);
 
@@ -2420,6 +2578,14 @@ export async function assignSignalPostToFinalSlateSlot(input: {
       ok: false,
       code: "publish_blocked",
       message: "Rejected, held, rewrite-requested, or removed rows cannot be assigned to the final slate.",
+    };
+  }
+
+  if (!isValidPublicSourceUrl(post.source_url)) {
+    return {
+      ok: false,
+      code: "missing_public_source_url",
+      message: buildMissingPublicSourceUrlMessage("final-slate assignment"),
     };
   }
 
@@ -2621,6 +2787,14 @@ export async function replaceSignalPostInFinalSlate(input: {
       ok: false,
       code: "publish_blocked",
       message: "Rejected, held, rewrite-requested, or removed rows cannot be used as replacements.",
+    };
+  }
+
+  if (!isValidPublicSourceUrl(replacement.source_url)) {
+    return {
+      ok: false,
+      code: "missing_public_source_url",
+      message: buildMissingPublicSourceUrlMessage("final-slate replacement"),
     };
   }
 
