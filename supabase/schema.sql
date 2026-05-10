@@ -124,6 +124,76 @@ create table if not exists public.briefing_items (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.newsletter_emails (
+  id uuid primary key default gen_random_uuid(),
+  gmail_thread_id text not null,
+  gmail_message_id text not null,
+  sender text not null,
+  subject text,
+  received_at timestamptz not null,
+  processed_at timestamptz,
+  label text not null default 'boot-up-benchmark',
+  raw_content text,
+  content_sha256 text,
+  extraction_status text not null default 'pending',
+  extraction_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint newsletter_emails_gmail_message_id_key unique (gmail_message_id),
+  constraint newsletter_emails_extraction_status_check
+    check (extraction_status in ('pending', 'extracted', 'failed'))
+);
+
+create index if not exists newsletter_emails_gmail_thread_id_idx
+on public.newsletter_emails (gmail_thread_id);
+
+create index if not exists newsletter_emails_label_idx
+on public.newsletter_emails (label);
+
+create index if not exists newsletter_emails_extraction_status_idx
+on public.newsletter_emails (extraction_status);
+
+create index if not exists newsletter_emails_received_at_idx
+on public.newsletter_emails (received_at desc);
+
+create index if not exists newsletter_emails_processed_at_idx
+on public.newsletter_emails (processed_at desc);
+
+create index if not exists newsletter_emails_content_sha256_idx
+on public.newsletter_emails (content_sha256);
+
+create table if not exists public.story_clusters (
+  id uuid primary key default gen_random_uuid(),
+  canonical_title text not null,
+  event_type text,
+  first_seen_at timestamptz not null default now(),
+  last_updated_at timestamptz not null default now(),
+  briefing_date date,
+  member_count integer not null default 0,
+  cluster_status text not null default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint story_clusters_member_count_check
+    check (member_count >= 0),
+  constraint story_clusters_cluster_status_check
+    check (cluster_status in ('active', 'resolved', 'dismissed'))
+);
+
+create index if not exists story_clusters_briefing_date_idx
+on public.story_clusters (briefing_date);
+
+create index if not exists story_clusters_cluster_status_idx
+on public.story_clusters (cluster_status);
+
+create index if not exists story_clusters_last_updated_at_idx
+on public.story_clusters (last_updated_at desc);
+
+create index if not exists story_clusters_first_seen_at_idx
+on public.story_clusters (first_seen_at desc);
+
+create index if not exists story_clusters_event_type_idx
+on public.story_clusters (event_type);
+
 create table if not exists public.signal_posts (
   id uuid primary key default gen_random_uuid(),
   briefing_date date not null default current_date,
@@ -174,6 +244,15 @@ create table if not exists public.signal_posts (
   approved_at timestamptz,
   published_at timestamptz,
   is_live boolean not null default false,
+  context_material text,
+  source_cluster_id uuid references public.story_clusters(id) on delete set null,
+  witm_draft_generated_by text
+    check (
+      witm_draft_generated_by is null
+      or witm_draft_generated_by in ('llm', 'deterministic_template', 'human')
+    ),
+  witm_draft_generated_at timestamptz,
+  witm_draft_model text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint signal_posts_public_source_url_check
@@ -194,16 +273,32 @@ create unique index if not exists signal_posts_briefing_date_final_slate_rank_ke
 on public.signal_posts (briefing_date, final_slate_rank)
 where final_slate_rank is not null;
 
+create index if not exists signal_posts_source_cluster_id_idx
+on public.signal_posts (source_cluster_id);
+
+create index if not exists signal_posts_witm_draft_generated_by_idx
+on public.signal_posts (witm_draft_generated_by);
+
+create index if not exists signal_posts_witm_draft_generated_at_idx
+on public.signal_posts (witm_draft_generated_at desc);
+
 create table if not exists public.published_slates (
   id uuid primary key default gen_random_uuid(),
   published_at timestamptz not null,
   published_by text,
+  snapshot_status text not null default 'published'
+    check (snapshot_status in ('draft', 'published', 'archived', 'rolled_back')),
+  publish_batch_id text,
+  source_briefing_date date,
+  archived_from_live_set boolean,
+  public_surface_verified_at timestamptz,
   row_count integer not null check (row_count >= 0),
   core_count integer not null check (core_count >= 0),
   context_count integer not null check (context_count >= 0),
   previous_live_row_ids jsonb not null default '[]'::jsonb,
   published_row_ids jsonb not null default '[]'::jsonb,
   rollback_note text,
+  rollback_snapshot jsonb not null default '{}'::jsonb,
   verification_checklist_json jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
@@ -212,6 +307,7 @@ create table if not exists public.published_slate_items (
   id uuid primary key default gen_random_uuid(),
   published_slate_id uuid not null references public.published_slates(id) on delete cascade,
   signal_post_id uuid not null references public.signal_posts(id) on delete restrict,
+  source_cluster_id uuid references public.story_clusters(id) on delete set null,
   final_slate_rank integer not null check (final_slate_rank between 1 and 7),
   final_slate_tier text not null check (final_slate_tier in ('core', 'context')),
   title_snapshot text not null,
@@ -219,8 +315,10 @@ create table if not exists public.published_slate_items (
   summary_snapshot text,
   source_name_snapshot text,
   source_url_snapshot text,
+  tags_snapshot text[] not null default '{}'::text[],
   editorial_decision_snapshot text,
-  replacement_of_row_id_snapshot uuid,
+  replacement_of_row_id_snapshot uuid references public.signal_posts(id) on delete set null,
+  promoted_from_artifact_id text,
   decision_note_snapshot text,
   held_reason_snapshot text,
   rejected_reason_snapshot text,
@@ -235,8 +333,29 @@ on public.published_slate_items (published_slate_id, final_slate_rank);
 create index if not exists published_slate_items_signal_post_id_idx
 on public.published_slate_items (signal_post_id);
 
+create index if not exists published_slate_items_source_cluster_id_idx
+on public.published_slate_items (source_cluster_id);
+
+create index if not exists published_slate_items_replacement_of_row_id_snapshot_idx
+on public.published_slate_items (replacement_of_row_id_snapshot);
+
+create index if not exists published_slate_items_promoted_from_artifact_id_idx
+on public.published_slate_items (promoted_from_artifact_id);
+
 create index if not exists published_slates_published_at_idx
 on public.published_slates (published_at desc);
+
+create index if not exists published_slates_snapshot_status_idx
+on public.published_slates (snapshot_status);
+
+create index if not exists published_slates_publish_batch_id_idx
+on public.published_slates (publish_batch_id);
+
+create index if not exists published_slates_source_briefing_date_idx
+on public.published_slates (source_briefing_date);
+
+create index if not exists published_slates_public_surface_verified_at_idx
+on public.published_slates (public_surface_verified_at desc);
 
 create table if not exists public.mvp_measurement_events (
   id uuid primary key default gen_random_uuid(),
@@ -322,6 +441,245 @@ on public.pipeline_article_candidates (run_id, surfaced);
 create index if not exists pipeline_article_candidates_ingested_at_idx
 on public.pipeline_article_candidates (ingested_at);
 
+create table if not exists public.newsletter_story_extractions (
+  id uuid primary key default gen_random_uuid(),
+  newsletter_email_id uuid not null references public.newsletter_emails(id) on delete cascade,
+  headline text not null,
+  snippet text,
+  source_url text,
+  source_domain text,
+  category text,
+  extracted_at timestamptz not null default now(),
+  extraction_confidence numeric,
+  pipeline_candidate_id uuid references public.pipeline_article_candidates(id) on delete set null,
+  signal_post_id uuid references public.signal_posts(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint newsletter_story_extractions_category_check
+    check (category is null or category in ('Finance', 'Tech', 'Politics')),
+  constraint newsletter_story_extractions_confidence_check
+    check (
+      extraction_confidence is null
+      or (extraction_confidence >= 0 and extraction_confidence <= 1)
+    )
+);
+
+create index if not exists newsletter_story_extractions_newsletter_email_id_idx
+on public.newsletter_story_extractions (newsletter_email_id);
+
+create index if not exists newsletter_story_extractions_category_idx
+on public.newsletter_story_extractions (category);
+
+create index if not exists newsletter_story_extractions_source_domain_idx
+on public.newsletter_story_extractions (source_domain);
+
+create index if not exists newsletter_story_extractions_source_url_idx
+on public.newsletter_story_extractions (source_url);
+
+create index if not exists newsletter_story_extractions_pipeline_candidate_id_idx
+on public.newsletter_story_extractions (pipeline_candidate_id);
+
+create index if not exists newsletter_story_extractions_signal_post_id_idx
+on public.newsletter_story_extractions (signal_post_id);
+
+create index if not exists newsletter_story_extractions_extracted_at_idx
+on public.newsletter_story_extractions (extracted_at desc);
+
+create table if not exists public.story_cluster_members (
+  id uuid primary key default gen_random_uuid(),
+  cluster_id uuid not null references public.story_clusters(id) on delete cascade,
+  source_type text not null,
+  pipeline_candidate_id uuid references public.pipeline_article_candidates(id) on delete cascade,
+  newsletter_extraction_id uuid references public.newsletter_story_extractions(id) on delete cascade,
+  relevance_score numeric,
+  added_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  constraint story_cluster_members_source_type_check
+    check (source_type in ('rss', 'newsletter')),
+  constraint story_cluster_members_relevance_score_check
+    check (
+      relevance_score is null
+      or (relevance_score >= 0 and relevance_score <= 1)
+    ),
+  constraint story_cluster_members_exactly_one_source_check
+    check (num_nonnulls(pipeline_candidate_id, newsletter_extraction_id) = 1),
+  constraint story_cluster_members_source_type_reference_check
+    check (
+      (
+        source_type = 'rss'
+        and pipeline_candidate_id is not null
+        and newsletter_extraction_id is null
+      )
+      or (
+        source_type = 'newsletter'
+        and newsletter_extraction_id is not null
+        and pipeline_candidate_id is null
+      )
+    )
+);
+
+create index if not exists story_cluster_members_cluster_id_idx
+on public.story_cluster_members (cluster_id);
+
+create index if not exists story_cluster_members_source_type_idx
+on public.story_cluster_members (source_type);
+
+create index if not exists story_cluster_members_pipeline_candidate_id_idx
+on public.story_cluster_members (pipeline_candidate_id);
+
+create index if not exists story_cluster_members_newsletter_extraction_id_idx
+on public.story_cluster_members (newsletter_extraction_id);
+
+create index if not exists story_cluster_members_relevance_score_idx
+on public.story_cluster_members (relevance_score desc);
+
+create index if not exists story_cluster_members_added_at_idx
+on public.story_cluster_members (added_at desc);
+
+create unique index if not exists story_cluster_members_cluster_pipeline_candidate_key
+on public.story_cluster_members (cluster_id, pipeline_candidate_id)
+where pipeline_candidate_id is not null;
+
+create unique index if not exists story_cluster_members_cluster_newsletter_extraction_key
+on public.story_cluster_members (cluster_id, newsletter_extraction_id)
+where newsletter_extraction_id is not null;
+
+create table if not exists public.signal_evolution (
+  id uuid primary key default gen_random_uuid(),
+  story_cluster_id uuid references public.story_clusters(id) on delete cascade,
+  from_signal_post_id uuid references public.signal_posts(id) on delete set null,
+  to_signal_post_id uuid references public.signal_posts(id) on delete set null,
+  from_snapshot_signal_id uuid references public.published_slate_items(id) on delete set null,
+  to_snapshot_signal_id uuid references public.published_slate_items(id) on delete set null,
+  evolution_type text not null
+    check (
+      evolution_type in (
+        'continued',
+        'escalated',
+        'deescalated',
+        'reframed',
+        'resolved',
+        'superseded',
+        'follow_up',
+        'correction'
+      )
+    ),
+  evolution_summary text,
+  evidence text,
+  observed_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  check (
+    num_nonnulls(
+      story_cluster_id,
+      from_signal_post_id,
+      to_signal_post_id,
+      from_snapshot_signal_id,
+      to_snapshot_signal_id
+    ) >= 1
+  )
+);
+
+create index if not exists signal_evolution_story_cluster_id_idx
+on public.signal_evolution (story_cluster_id);
+
+create index if not exists signal_evolution_from_signal_post_id_idx
+on public.signal_evolution (from_signal_post_id);
+
+create index if not exists signal_evolution_to_signal_post_id_idx
+on public.signal_evolution (to_signal_post_id);
+
+create index if not exists signal_evolution_from_snapshot_signal_id_idx
+on public.signal_evolution (from_snapshot_signal_id);
+
+create index if not exists signal_evolution_to_snapshot_signal_id_idx
+on public.signal_evolution (to_snapshot_signal_id);
+
+create index if not exists signal_evolution_type_idx
+on public.signal_evolution (evolution_type);
+
+create index if not exists signal_evolution_observed_at_idx
+on public.signal_evolution (observed_at desc);
+
+create table if not exists public.cross_event_connections (
+  id uuid primary key default gen_random_uuid(),
+  from_story_cluster_id uuid references public.story_clusters(id) on delete cascade,
+  to_story_cluster_id uuid references public.story_clusters(id) on delete cascade,
+  from_signal_post_id uuid references public.signal_posts(id) on delete set null,
+  to_signal_post_id uuid references public.signal_posts(id) on delete set null,
+  from_snapshot_signal_id uuid references public.published_slate_items(id) on delete set null,
+  to_snapshot_signal_id uuid references public.published_slate_items(id) on delete set null,
+  connection_type text not null
+    check (
+      connection_type in (
+        'causal',
+        'policy_to_market',
+        'market_to_policy',
+        'same_actor',
+        'same_sector',
+        'supply_chain',
+        'regulatory',
+        'geopolitical',
+        'financial_contagion',
+        'thematic',
+        'contradiction',
+        'follow_up'
+      )
+    ),
+  connection_summary text not null,
+  evidence text,
+  is_public_candidate boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (
+    num_nonnulls(from_story_cluster_id, from_signal_post_id, from_snapshot_signal_id) >= 1
+  ),
+  check (
+    num_nonnulls(to_story_cluster_id, to_signal_post_id, to_snapshot_signal_id) >= 1
+  ),
+  check (
+    from_story_cluster_id is null
+    or to_story_cluster_id is null
+    or from_story_cluster_id <> to_story_cluster_id
+  ),
+  check (
+    from_signal_post_id is null
+    or to_signal_post_id is null
+    or from_signal_post_id <> to_signal_post_id
+  ),
+  check (
+    from_snapshot_signal_id is null
+    or to_snapshot_signal_id is null
+    or from_snapshot_signal_id <> to_snapshot_signal_id
+  )
+);
+
+create index if not exists cross_event_connections_from_story_cluster_id_idx
+on public.cross_event_connections (from_story_cluster_id);
+
+create index if not exists cross_event_connections_to_story_cluster_id_idx
+on public.cross_event_connections (to_story_cluster_id);
+
+create index if not exists cross_event_connections_from_signal_post_id_idx
+on public.cross_event_connections (from_signal_post_id);
+
+create index if not exists cross_event_connections_to_signal_post_id_idx
+on public.cross_event_connections (to_signal_post_id);
+
+create index if not exists cross_event_connections_from_snapshot_signal_id_idx
+on public.cross_event_connections (from_snapshot_signal_id);
+
+create index if not exists cross_event_connections_to_snapshot_signal_id_idx
+on public.cross_event_connections (to_snapshot_signal_id);
+
+create index if not exists cross_event_connections_type_idx
+on public.cross_event_connections (connection_type);
+
+create index if not exists cross_event_connections_public_candidate_idx
+on public.cross_event_connections (is_public_candidate);
+
+create index if not exists cross_event_connections_created_at_idx
+on public.cross_event_connections (created_at desc);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -335,6 +693,30 @@ $$;
 drop trigger if exists set_user_profiles_updated_at on public.user_profiles;
 create trigger set_user_profiles_updated_at
 before update on public.user_profiles
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_newsletter_emails_updated_at on public.newsletter_emails;
+create trigger set_newsletter_emails_updated_at
+before update on public.newsletter_emails
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_newsletter_story_extractions_updated_at on public.newsletter_story_extractions;
+create trigger set_newsletter_story_extractions_updated_at
+before update on public.newsletter_story_extractions
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_story_clusters_updated_at on public.story_clusters;
+create trigger set_story_clusters_updated_at
+before update on public.story_clusters
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_cross_event_connections_updated_at on public.cross_event_connections;
+create trigger set_cross_event_connections_updated_at
+before update on public.cross_event_connections
 for each row
 execute function public.set_updated_at();
 
@@ -352,6 +734,12 @@ alter table public.published_slates enable row level security;
 alter table public.published_slate_items enable row level security;
 alter table public.mvp_measurement_events enable row level security;
 alter table public.pipeline_article_candidates enable row level security;
+alter table public.newsletter_emails enable row level security;
+alter table public.newsletter_story_extractions enable row level security;
+alter table public.story_clusters enable row level security;
+alter table public.story_cluster_members enable row level security;
+alter table public.signal_evolution enable row level security;
+alter table public.cross_event_connections enable row level security;
 
 create policy "Users manage their own profile" on public.user_profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -416,11 +804,86 @@ create policy "Service role updates pipeline article candidates" on public.pipel
 create policy "Service role deletes pipeline article candidates" on public.pipeline_article_candidates
   for delete to service_role using (true);
 
+create policy "Service role reads newsletter emails" on public.newsletter_emails
+  for select to service_role using (true);
+
+create policy "Service role writes newsletter emails" on public.newsletter_emails
+  for insert to service_role with check (true);
+
+create policy "Service role updates newsletter emails" on public.newsletter_emails
+  for update to service_role using (true) with check (true);
+
+create policy "Service role deletes newsletter emails" on public.newsletter_emails
+  for delete to service_role using (true);
+
+create policy "Service role reads newsletter story extractions" on public.newsletter_story_extractions
+  for select to service_role using (true);
+
+create policy "Service role writes newsletter story extractions" on public.newsletter_story_extractions
+  for insert to service_role with check (true);
+
+create policy "Service role updates newsletter story extractions" on public.newsletter_story_extractions
+  for update to service_role using (true) with check (true);
+
+create policy "Service role deletes newsletter story extractions" on public.newsletter_story_extractions
+  for delete to service_role using (true);
+
+create policy "Service role reads story clusters" on public.story_clusters
+  for select to service_role using (true);
+
+create policy "Service role writes story clusters" on public.story_clusters
+  for insert to service_role with check (true);
+
+create policy "Service role updates story clusters" on public.story_clusters
+  for update to service_role using (true) with check (true);
+
+create policy "Service role deletes story clusters" on public.story_clusters
+  for delete to service_role using (true);
+
+create policy "Service role reads story cluster members" on public.story_cluster_members
+  for select to service_role using (true);
+
+create policy "Service role writes story cluster members" on public.story_cluster_members
+  for insert to service_role with check (true);
+
+create policy "Service role updates story cluster members" on public.story_cluster_members
+  for update to service_role using (true) with check (true);
+
+create policy "Service role deletes story cluster members" on public.story_cluster_members
+  for delete to service_role using (true);
+
+create policy "Service role reads signal evolution" on public.signal_evolution
+  for select to service_role using (true);
+
+create policy "Service role writes signal evolution" on public.signal_evolution
+  for insert to service_role with check (true);
+
+create policy "Service role updates signal evolution" on public.signal_evolution
+  for update to service_role using (true) with check (true);
+
+create policy "Service role deletes signal evolution" on public.signal_evolution
+  for delete to service_role using (true);
+
+create policy "Service role reads cross event connections" on public.cross_event_connections
+  for select to service_role using (true);
+
+create policy "Service role writes cross event connections" on public.cross_event_connections
+  for insert to service_role with check (true);
+
+create policy "Service role updates cross event connections" on public.cross_event_connections
+  for update to service_role using (true) with check (true);
+
+create policy "Service role deletes cross event connections" on public.cross_event_connections
+  for delete to service_role using (true);
+
 create policy "Service role reads published slates" on public.published_slates
   for select to service_role using (true);
 
 create policy "Service role writes published slates" on public.published_slates
   for insert to service_role with check (true);
+
+create policy "Service role updates published slates" on public.published_slates
+  for update to service_role using (true) with check (true);
 
 create policy "Service role deletes published slates" on public.published_slates
   for delete to service_role using (true);
@@ -430,6 +893,9 @@ create policy "Service role reads published slate items" on public.published_sla
 
 create policy "Service role writes published slate items" on public.published_slate_items
   for insert to service_role with check (true);
+
+create policy "Service role updates published slate items" on public.published_slate_items
+  for update to service_role using (true) with check (true);
 
 create policy "Service role deletes published slate items" on public.published_slate_items
   for delete to service_role using (true);
