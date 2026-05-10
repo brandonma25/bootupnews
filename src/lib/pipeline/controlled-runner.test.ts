@@ -477,6 +477,69 @@ describe("runControlledPipeline", () => {
     expect(getPersistedItemIds()).not.toContain("item-9");
   });
 
+  it("draft_only product-target cap keeps Context rows when more than five Core rows rank first", async () => {
+    const items = [
+      buildItem(1),
+      buildItem(2),
+      buildItem(3),
+      buildItem(4),
+      buildItem(5),
+      buildItem(6),
+      buildItem(7),
+      buildItem(8, "context_signal_eligible"),
+      buildItem(9, "context_signal_eligible"),
+      buildItem(10, "depth_only"),
+    ];
+    generateDailyBriefing.mockResolvedValueOnce({
+      briefing: {
+        id: "briefing-product-target-context-preserved",
+        briefingDate: "2026-04-27T12:00:00.000Z",
+        title: "Daily Executive Briefing",
+        intro: "Controlled test briefing.",
+        readingWindow: "20 minutes",
+        items: items.slice(0, 5),
+      },
+      publicRankedItems: items,
+      pipelineRun: {
+        run_id: "pipeline-product-target-context-preserved",
+        num_clusters: 10,
+      },
+    });
+
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    const report = await runControlledPipeline(buildConfig({
+      mode: "draft_only",
+      briefingDateOverride: "2026-04-29",
+      testRunId: "core-context-product-target-context-preserved",
+      draftTierAllowlist: ["core_signal_eligible", "context_signal_eligible"],
+      draftMaxRows: 7,
+    }));
+
+    expect(getPersistedItemIds()).toEqual([
+      "item-1",
+      "item-2",
+      "item-3",
+      "item-4",
+      "item-5",
+      "item-8",
+      "item-9",
+    ]);
+    expect(getPersistedItemIds()).not.toContain("item-6");
+    expect(getPersistedItemIds()).not.toContain("item-7");
+    expect(getPersistedItemIds()).not.toContain("item-10");
+    expect(report.proposedTopFive.map((row) => row.title)).toEqual([
+      "Generated signal 1",
+      "Generated signal 2",
+      "Generated signal 3",
+      "Generated signal 4",
+      "Generated signal 5",
+    ]);
+    expect(report.proposedContextRows.map((row) => row.title)).toEqual([
+      "Generated signal 8",
+      "Generated signal 9",
+    ]);
+  });
+
   it("draft_only product-target cap never selects more than seven Core and Context rows", async () => {
     const items = [
       buildItem(1),

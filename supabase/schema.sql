@@ -176,6 +176,8 @@ create table if not exists public.signal_posts (
   is_live boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint signal_posts_public_source_url_check
+    check (btrim(source_url) <> '' and source_url ~* '^https?://'),
   check (
     (final_slate_rank is null and final_slate_tier is null)
     or (final_slate_rank between 1 and 5 and final_slate_tier = 'core')

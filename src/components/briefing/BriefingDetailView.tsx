@@ -127,7 +127,7 @@ function BriefingEventDetailCard({
               #{rank}
             </span>
             <div className="space-y-2">
-              <p className="section-label">Top Event</p>
+              <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">Core Signal</p>
               <div className="flex flex-wrap gap-2">
                 <Badge>{event.topicName}</Badge>
                 <Badge>{event.intelligence.sourceLabel}</Badge>

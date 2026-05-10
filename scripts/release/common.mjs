@@ -11,8 +11,6 @@ export const DEFAULT_ROUTE_EXPECTATIONS = [
     expected: [
       "Daily Intelligence Briefing",
       "Top Events",
-      "Why it matters",
-      "Details",
     ],
     signedOutExpected: ["Public briefing", "Sign in to unlock History and Account."],
   },

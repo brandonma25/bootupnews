@@ -41,10 +41,11 @@ function createData(
   items: BriefingItem[],
   options: {
     publicRankedItems?: BriefingItem[] | null;
+    mode?: DashboardData["mode"];
   } = {},
 ): DashboardData {
   return {
-    mode: "live",
+    mode: options.mode ?? "live",
     briefing: {
       id: "briefing-1",
       briefingDate: "2026-04-15T09:00:00.000Z",
@@ -151,7 +152,7 @@ describe("buildHomepageViewModel", () => {
 
     expect(financeSection?.events).toHaveLength(0);
     expect(financeSection?.state).toBe("empty");
-    expect(financeSection?.emptyReason).toBe("No major economics signals in today's briefing.");
+    expect(financeSection?.emptyReason).toBe("No major finance signals in today's briefing.");
   });
 
   it("keeps Top 5 sourced from briefing items while depth layers use publicRankedItems", () => {
@@ -1167,7 +1168,7 @@ describe("buildHomepageViewModel", () => {
     expect(tabIds.some((id) => !topIds.has(id))).toBe(true);
   });
 
-  it("filters the editorial Top 5 into category tabs only when no broader ranked depth pool exists", () => {
+  it("filters the public editorial set into category tabs only when no broader ranked depth pool exists", () => {
     const items = [
       createItem({ id: "published-tech-1", topicId: "tech", topicName: "Tech", title: "AI infrastructure deal expands", matchedKeywords: ["Tech", "watch"], sourceCount: 1 }),
       createItem({ id: "published-tech-2", topicId: "tech", topicName: "Tech", title: "Enterprise AI merger closes", matchedKeywords: ["Tech", "context"], sourceCount: 1 }),
@@ -1176,7 +1177,7 @@ describe("buildHomepageViewModel", () => {
       createItem({ id: "published-politics-1", topicId: "politics", topicName: "Politics", title: "US Iran diplomacy narrows", matchedKeywords: ["Politics", "watch"], sourceCount: 1 }),
     ];
 
-    const model = buildHomepageViewModel(createData(items));
+    const model = buildHomepageViewModel(createData(items, { mode: "public" }));
 
     expect(model.categorySections.find((section) => section.key === "tech")?.events.map((event) => event.id)).toEqual([
       "published-tech-1",

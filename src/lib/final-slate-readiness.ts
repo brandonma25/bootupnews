@@ -44,9 +44,26 @@ export type FinalSlateReadinessResult = {
   selectedRows: FinalSlateValidationRow[];
 };
 
+export const MISSING_PUBLIC_SOURCE_URL_REASON = "missing_public_source_url";
+
 const CORE_RANK_SET = new Set<number>(FINAL_SLATE_CORE_RANKS);
 const CONTEXT_RANK_SET = new Set<number>(FINAL_SLATE_CONTEXT_RANKS);
 const FINAL_RANK_SET = new Set<number>(FINAL_SLATE_RANKS);
+
+export function isValidPublicSourceUrl(value: string | null | undefined) {
+  const normalized = value?.trim() ?? "";
+
+  if (!normalized) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 export function getFinalSlateTierForRank(rank: number): FinalSlateTier | null {
   if (CORE_RANK_SET.has(rank)) {
@@ -222,8 +239,13 @@ function addRowContentFailures(
     addRowFailure(row, "Selected row is missing source name.", "missing_source_name", rank);
   }
 
-  if (!row.sourceUrl?.trim()) {
-    addRowFailure(row, "Selected row is missing source URL.", "missing_source_url", rank);
+  if (!isValidPublicSourceUrl(row.sourceUrl)) {
+    addRowFailure(
+      row,
+      "Selected row is missing a valid public source URL.",
+      MISSING_PUBLIC_SOURCE_URL_REASON,
+      rank,
+    );
   }
 }
 

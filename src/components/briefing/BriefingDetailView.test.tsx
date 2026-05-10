@@ -88,6 +88,9 @@ describe("BriefingDetailView", () => {
     const [detailCard] = screen.getAllByTestId("briefing-detail-card");
     expect(detailCard).not.toHaveClass("glass-panel");
     expect(detailCard).toHaveClass("border-transparent");
+    expect(screen.getByText("Core Signal")).toBeInTheDocument();
+    expect(screen.queryByText("Top Event")).not.toBeInTheDocument();
+    expect(screen.queryByText("TOP EVENT")).not.toBeInTheDocument();
   });
 
   it("does not render internal ranking explanation copy on public detail cards", () => {

@@ -64,7 +64,7 @@ export function CategoryTabStrip({
       topEventsTab,
       ...visibleCategorySections.map((section) => ({
         key: section.key,
-        label: section.key === "tech" ? "Tech News" : section.label,
+        label: section.label,
       })),
     ],
     [visibleCategorySections],
@@ -128,48 +128,44 @@ export function CategoryTabStrip({
         {topEventsContent}
       </TabsContent>
 
-      {visibleCategorySections.map((section) => (
-        <TabsContent
-          key={section.key}
-          id={`${section.key}-panel`}
-          active={safeActiveTab === section.key}
-        >
-          {activeCategoryIsGated ? (
-            <div className="space-y-5">
-              {renderedGatedCategoryState}
-              <div className="grid gap-4">
-                {section.events.length ? (
-                  section.events.map((event, index) => (
-                    <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
-                  ))
-                ) : (
-                  <div
-                    className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-5 text-sm text-[var(--text-secondary)]"
-                    role="status"
-                  >
-                    {section.emptyReason}
-                  </div>
-                )}
+      {visibleCategorySections.map((section) => {
+        const sectionHasEvents = section.events.length > 0;
+        const shouldRenderGate =
+          activeCategoryIsGated && safeActiveTab === section.key && sectionHasEvents;
+        const sectionContent = (
+          <div className="grid gap-4">
+            {sectionHasEvents ? (
+              section.events.map((event, index) => (
+                <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
+              ))
+            ) : (
+              <div
+                className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-5 text-sm text-[var(--text-secondary)]"
+                role="status"
+              >
+                {section.emptyReason}
               </div>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {section.events.length ? (
-                section.events.map((event, index) => (
-                  <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
-                ))
-              ) : (
-                <div
-                  className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-5 text-sm text-[var(--text-secondary)]"
-                  role="status"
-                >
-                  {section.emptyReason}
-                </div>
-              )}
-            </div>
-          )}
-        </TabsContent>
-      ))}
+            )}
+          </div>
+        );
+
+        return (
+          <TabsContent
+            key={section.key}
+            id={`${section.key}-panel`}
+            active={safeActiveTab === section.key}
+          >
+            {shouldRenderGate ? (
+              <div className="space-y-5">
+                {renderedGatedCategoryState}
+                {sectionContent}
+              </div>
+            ) : (
+              sectionContent
+            )}
+          </TabsContent>
+        );
+      })}
     </Tabs>
   );
 }

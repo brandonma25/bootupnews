@@ -11,12 +11,12 @@
 - Related PRD: PRD-36 and Decisions D1/D2/D3/D5 in `BOOT_UP_WORK_LOG_v2.md`; no new canonical PRD required.
 - PR: #199, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/199`.
 - Branch: `codex/phase-x1-partial-slate-publish`.
-- Head SHA: TBD.
-- Merge SHA: TBD.
-- GitHub source-of-truth status: PR opened for Phase X.1 remediation validation.
+- Head SHA: `baea93c`.
+- Merge SHA: `ec587d03088037722dae3dc38c4d2f2c8b7ac15d`.
+- GitHub source-of-truth status: PR #199 merged on 2026-05-05 at 23:46:36 UTC. All GitHub PR checks completed successfully before merge, including feature-system CSV validation, release governance, lint, unit tests, build, Chromium E2E, WebKit E2E, PR summary, and Vercel preview.
 - External references reviewed, if any: PRs #119/#124/#126/#127/#190 and Phase X handoff context from 2026-05-06.
 - Google Sheet / Work Log reference, if historically relevant: Phase X handoff; no Sheet treated as canonical.
-- Branch cleanup status: pending after merge.
+- Branch cleanup status: pending after merge; local cleanup hit a worktree ownership guard, so no branch deletion was performed in the analyzed session.
 
 ## Terminology Requirement
 - [x] Confirmed object level before coding: Signal, Card, and Surface Placement.
@@ -37,7 +37,9 @@
   - `npm run governance:audit -- --diff-mode local --branch-name codex/phase-x1-partial-slate-publish --pr-title "Phase X.1: partial-slate publish (1-5 rows) — remediation/alignment to PRD-36 and Decision D1"`
 - Human checks:
   - Production publish, draft_only, and pipeline modes were not invoked during this remediation.
+  - Post-merge production static verification confirmed production built merge commit `ec587d0`, public homepage and `/signals` remained on the prior May 1 live set, and the three Phase X draft rows remained non-live.
 
 ## Remaining Risks / Follow-up
 - Phase X.2 must still perform the live publish only after BM provides explicit approved row IDs.
 - The existing Supabase client publish path performs ordered writes with rollback handling; no publish operation was executed in this phase.
+- Phase X.2 preflight later stopped with `blocked_missing_bm_approved_row_ids` because the chat did not include both the approved row ID list and BM editorial responsibility confirmation.

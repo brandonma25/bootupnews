@@ -75,6 +75,7 @@ async function main() {
     manifestCoverageWarnings: report.selectionSummary.manifestCoverageWarnings,
     insertedCount: persistence?.insertedCount ?? 0,
     insertedPostIds: persistence?.insertedPostIds ?? [],
+    skippedCandidates: persistence?.skippedCandidates ?? [],
     message: persistence?.message ?? "Dry run completed without Supabase writes.",
   }, null, 2));
 

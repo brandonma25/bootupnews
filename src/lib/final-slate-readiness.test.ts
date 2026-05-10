@@ -269,7 +269,35 @@ describe("final slate readiness", () => {
     expect(result.rowFailures["signal-7"]).toEqual(
       expect.arrayContaining([
         "Selected row must be approved before final slate readiness.",
-        "Selected row is missing source URL.",
+        "Selected row is missing a valid public source URL.",
+      ]),
+    );
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_public_source_url",
+          rowId: "signal-7",
+        }),
+      ]),
+    );
+  });
+
+  it("rejects non-http source URLs for selected final-slate rows", () => {
+    const result = validateFinalSlateReadiness(
+      validSlate({
+        1: {
+          sourceUrl: "ftp://example.com/source",
+        },
+      }),
+    );
+
+    expect(result.ready).toBe(false);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_public_source_url",
+          rowId: "signal-1",
+        }),
       ]),
     );
   });
