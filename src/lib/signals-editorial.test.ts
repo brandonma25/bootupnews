@@ -868,6 +868,36 @@ describe("signals editorial workflow", () => {
     expect(rows[0].published_at).toBeNull();
   });
 
+  it("blocks approval when a row is missing a valid public source URL", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        source_url: "",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { approveSignalPost } = await loadEditorialModule();
+    const result = await approveSignalPost({
+      postId: "signal-1",
+      editedWhyItMatters: createValidWhyItMatters(),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "missing_public_source_url",
+      message: "missing_public_source_url: Add a valid public source URL before approval.",
+    });
+    expect(rows[0].editorial_status).toBe("needs_review");
+    expect(rows[0].edited_why_it_matters).toBeNull();
+    expect(rows[0].approved_at).toBeNull();
+  });
+
   it("blocks approval when the human rewrite still fails validation", async () => {
     const rows = [
       createRow({
@@ -1028,6 +1058,28 @@ describe("signals editorial workflow", () => {
 
     expect(result.ok).toBe(false);
     expect(result.code).toBe("publish_blocked");
+    expect(rows.some((row) => row.editorial_status === "published")).toBe(false);
+  });
+
+  it("blocks publishing selected final-slate rows without a public source URL", async () => {
+    const rows = createPartialFinalSlate(3, {
+      2: {
+        source_url: "",
+      },
+    });
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishApprovedSignals } = await loadEditorialModule();
+    const result = await publishApprovedSignals();
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("publish_blocked");
+    expect(result.message).toContain("Selected row is missing a valid public source URL.");
     expect(rows.some((row) => row.editorial_status === "published")).toBe(false);
   });
 
@@ -1481,6 +1533,94 @@ describe("signals editorial workflow", () => {
     expect(rows[1].why_it_matters_validation_status).toBe("passed");
   });
 
+  it("draft_only mode skips candidates without a valid public source URL before insertion", async () => {
+    const rows: SignalPostRow[] = [];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-05-10",
+      mode: "draft_only",
+      items: [
+        {
+          ...createBriefingItem(1),
+          title: "Manual benchmark without URL",
+          sources: [{ title: "Morning Brew / BLS", url: "" }],
+          relatedArticles: [],
+        },
+        {
+          ...createBriefingItem(2),
+          title: "Valid public source candidate",
+          sources: [{ title: "Reuters", url: " https://example.com/source-2 " }],
+          relatedArticles: [],
+        },
+        {
+          ...createBriefingItem(3),
+          title: "Private newsletter source only",
+          sources: [{ title: "TLDR", url: "newsletter://private/issue" }],
+          relatedArticles: [],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.insertedCount).toBe(1);
+    expect(result.skippedCandidates).toEqual([
+      {
+        title: "Manual benchmark without URL",
+        candidateOrigin: "Morning Brew / BLS",
+        pipelineRank: 1,
+        reason: "missing_public_source_url",
+      },
+      {
+        title: "Private newsletter source only",
+        candidateOrigin: "TLDR",
+        pipelineRank: 3,
+        reason: "missing_public_source_url",
+      },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      rank: 2,
+      title: "Valid public source candidate",
+      source_name: "Reuters",
+      source_url: "https://example.com/source-2",
+      editorial_status: "needs_review",
+      is_live: false,
+      published_at: null,
+    });
+  });
+
+  it("draft_only mode fails visibly when every candidate is missing a public source URL", async () => {
+    const rows: SignalPostRow[] = [];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-05-10",
+      mode: "draft_only",
+      items: [
+        {
+          ...createBriefingItem(1),
+          sources: [{ title: "Private benchmark", url: "" }],
+          relatedArticles: [],
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.insertedCount).toBe(0);
+    expect(result.skippedCandidates).toEqual([
+      {
+        title: "Generated Signal 1",
+        candidateOrigin: "Private benchmark",
+        pipelineRank: 1,
+        reason: "missing_public_source_url",
+      },
+    ]);
+    expect(rows).toHaveLength(0);
+  });
+
   it("draft_only mode recomputes WITM validation with Core/Context context before persistence", async () => {
     const rows: SignalPostRow[] = [];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
@@ -1911,6 +2051,37 @@ describe("signals editorial workflow", () => {
     });
 
     expect(result.ok).toBe(false);
+    expect(rows[0].final_slate_rank).toBeNull();
+    expect(rows[0].final_slate_tier).toBeNull();
+  });
+
+  it("blocks rows without public source URLs from final-slate assignment", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "approved",
+        editorial_decision: "approved",
+        source_url: "",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { assignSignalPostToFinalSlateSlot } = await loadEditorialModule();
+    const result = await assignSignalPostToFinalSlateSlot({
+      postId: "signal-1",
+      finalSlateRank: 1,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "missing_public_source_url",
+      message: "missing_public_source_url: Add a valid public source URL before final-slate assignment.",
+    });
     expect(rows[0].final_slate_rank).toBeNull();
     expect(rows[0].final_slate_tier).toBeNull();
   });
