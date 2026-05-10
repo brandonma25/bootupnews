@@ -68,7 +68,10 @@ describe("public signals page", () => {
   it("renders published editorial copy instead of the raw AI draft", async () => {
     getPublicSignalsPageState.mockResolvedValue({
       kind: "published",
-      posts: Array.from({ length: 5 }, (_, index) => createPublishedPost(index + 1)),
+      posts: Array.from({ length: 5 }, (_, index) => ({
+        ...createPublishedPost(index + 1),
+        contextMaterial: "Private newsletter grounding snippet should never be public",
+      })),
     });
 
     const Page = (await import("@/app/signals/page")).default;
@@ -76,6 +79,7 @@ describe("public signals page", () => {
 
     expect(screen.getByText("Human final version 1")).toBeInTheDocument();
     expect(screen.queryByText("Raw AI draft should not be public")).not.toBeInTheDocument();
+    expect(screen.queryByText("Private newsletter grounding snippet should never be public")).not.toBeInTheDocument();
   }, 10000);
 
   it("renders public card-face labels and clamps the why-this-ranks preview", async () => {
