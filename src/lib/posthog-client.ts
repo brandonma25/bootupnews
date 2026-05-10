@@ -75,7 +75,6 @@ export function initializePostHogClient() {
         "$referrer",
         "$referring_domain",
         "email",
-        "token",
         "cookie",
       ],
       session_recording: {
@@ -158,7 +157,12 @@ function sanitizePostHogCapture(capture: CaptureResult | null) {
     return null;
   }
 
+  const sdkProjectToken = capture.properties?.token;
   capture.properties = sanitizePostHogProperties(capture.properties);
+  if (typeof sdkProjectToken === "string" && sdkProjectToken.trim()) {
+    capture.properties.token = sdkProjectToken;
+  }
+
   return capture;
 }
 

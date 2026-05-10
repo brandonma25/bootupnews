@@ -58,6 +58,34 @@ describe("PostHog client analytics bridge", () => {
     );
   });
 
+  it("keeps the SDK project token sendable while sanitizing captured properties", async () => {
+    process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+
+    const { initializePostHogClient } = await import("@/lib/posthog-client");
+    initializePostHogClient();
+
+    const [, config] = posthogMock.init.mock.calls[0]!;
+    const sanitizedCapture = config.before_send?.({
+      event: "source_click",
+      properties: {
+        token: "phc_project_token",
+        sourceUrl: "https://example.com/story?utm_source=email#fragment",
+        sourceToken: "source-secret",
+        whyItMatters: "Full explanatory copy must not leave the app.",
+        linkText: "Source",
+      },
+    });
+
+    expect(config.property_denylist).not.toContain("token");
+    expect(sanitizedCapture?.properties).toEqual({
+      token: "phc_project_token",
+      sourceUrl: "https://example.com/story",
+      linkText: "Source",
+    });
+  });
+
   it("sanitizes analytics properties before capture", async () => {
     const { sanitizePostHogProperties } = await import("@/lib/posthog-client");
 
