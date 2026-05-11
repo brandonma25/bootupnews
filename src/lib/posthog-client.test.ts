@@ -16,6 +16,10 @@ function clearPostHogEnv() {
   delete process.env.NEXT_PUBLIC_POSTHOG_TOKEN;
   delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
   delete process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY;
+  delete process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE;
+  delete process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS;
+  delete process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS;
+  delete process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE;
 }
 
 describe("PostHog client analytics bridge", () => {
@@ -51,11 +55,50 @@ describe("PostHog client analytics bridge", () => {
         autocapture: false,
         capture_pageview: false,
         capture_pageleave: false,
+        capture_dead_clicks: false,
+        capture_heatmaps: false,
         disable_session_recording: true,
+        enable_heatmaps: false,
         mask_all_element_attributes: true,
         mask_all_text: true,
       }),
     );
+  });
+
+  it("enables public UX diagnostics only when explicitly configured", async () => {
+    process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+    process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE = "1";
+
+    const { initializePostHogClient } = await import("@/lib/posthog-client");
+    initializePostHogClient();
+
+    const [, config] = posthogMock.init.mock.calls[0]!;
+    expect(config.autocapture).toEqual(
+      expect.objectContaining({
+        capture_copied_text: false,
+        dom_event_allowlist: ["click"],
+        element_allowlist: ["a", "button"],
+      }),
+    );
+    expect(config.capture_dead_clicks).toBe(true);
+    expect(config.capture_heatmaps).toBe(true);
+    expect(config.enable_heatmaps).toBe(true);
+    expect(config.session_recording).toEqual(
+      expect.objectContaining({
+        maskAllInputs: true,
+        maskTextSelector: "body",
+        recordBody: false,
+        recordHeaders: false,
+        sampleRate: 1,
+      }),
+    );
+    expect(posthogMock.startSessionRecording).toHaveBeenCalledWith({ sampling: true });
   });
 
   it("keeps the SDK project token sendable while sanitizing captured properties", async () => {
@@ -70,6 +113,8 @@ describe("PostHog client analytics bridge", () => {
     const sanitizedCapture = config.before_send?.({
       event: "source_click",
       properties: {
+        $current_url: "https://bootup.local/signals?token=secret#fragment",
+        $pathname: "/signals?token=secret",
         token: "phc_project_token",
         sourceUrl: "https://example.com/story?utm_source=email#fragment",
         sourceToken: "source-secret",
@@ -80,10 +125,41 @@ describe("PostHog client analytics bridge", () => {
 
     expect(config.property_denylist).not.toContain("token");
     expect(sanitizedCapture?.properties).toEqual({
+      $current_url: "/signals",
+      $pathname: "/signals",
       token: "phc_project_token",
       sourceUrl: "https://example.com/story",
       linkText: "Source",
     });
+  });
+
+  it("drops automatic captures on admin and auth routes", async () => {
+    process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+
+    const { initializePostHogClient } = await import("@/lib/posthog-client");
+    initializePostHogClient();
+
+    const [, config] = posthogMock.init.mock.calls[0]!;
+    expect(
+      config.before_send?.({
+        event: "$autocapture",
+        properties: {
+          $current_url: "https://bootup.local/admin/editorial-review?token=secret",
+          token: "phc_project_token",
+        },
+      }),
+    ).toBeNull();
+    expect(
+      config.before_send?.({
+        event: "$autocapture",
+        properties: {
+          $pathname: "/auth/callback?code=secret",
+          token: "phc_project_token",
+        },
+      }),
+    ).toBeNull();
   });
 
   it("sanitizes analytics properties before capture", async () => {
