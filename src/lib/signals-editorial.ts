@@ -154,6 +154,7 @@ const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
 const TOP_SIGNAL_SET_SIZE = 5;
 const CONTEXT_SIGNAL_SET_SIZE = 2;
 const PUBLIC_SIGNAL_SET_SIZE = TOP_SIGNAL_SET_SIZE + CONTEXT_SIGNAL_SET_SIZE;
+const NEWSLETTER_DISCOVERY_SELECTION_REASON = "Newsletter discovery candidate; BM review required.";
 
 type EditorialClient = NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
 
@@ -1250,7 +1251,7 @@ async function persistSignalPostCandidates(
 
   const existingResult = await client
     .from("signal_posts")
-    .select("id, rank")
+    .select("id, rank, selection_reason, editorial_status, final_slate_rank, is_live, published_at")
     .eq("briefing_date", briefingDate);
 
   if (existingResult.error) {
@@ -1271,13 +1272,32 @@ async function persistSignalPostCandidates(
     };
   }
 
-  const existingRows = ((existingResult.data ?? []) as Array<{ id: string; rank: number | null }>);
+  const existingRows = ((existingResult.data ?? []) as ExistingSignalSnapshotRow[]);
+  const newsletterRankReservation = await reserveNewsletterCandidateRanksForRssSnapshot(
+    client,
+    existingRows,
+  );
+
+  if (!newsletterRankReservation.ok) {
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      skippedCandidates,
+      mode,
+      message: newsletterRankReservation.message,
+    };
+  }
+
+  const candidatesForPersistence = sourceReadyCandidates.filter((post) =>
+    !newsletterRankReservation.reservedRanks.has(post.rank),
+  );
   const existingRanks = new Set(
-    existingRows
+    newsletterRankReservation.rows
       .map((row) => row.rank)
       .filter((rank): rank is number => typeof rank === "number"),
   );
-  const missingCandidates = sourceReadyCandidates.filter((post) => !existingRanks.has(post.rank));
+  const missingCandidates = candidatesForPersistence.filter((post) => !existingRanks.has(post.rank));
 
   if (missingCandidates.length === 0) {
     return {
@@ -1355,10 +1375,141 @@ async function persistSignalPostCandidates(
     skippedCandidates,
     mode,
     message:
-      missingCandidates.length === TOP_SIGNAL_SET_SIZE
-        ? "Persisted a new daily Top 5 snapshot for editorial review."
-        : `Persisted ${missingCandidates.length} missing signal snapshot rows for editorial review.`,
+      buildSignalPostPersistenceMessage(
+        missingCandidates.length,
+        newsletterRankReservation.reservedRanks.size,
+      ),
   };
+}
+
+type ExistingSignalSnapshotRow = {
+  id: string;
+  rank: number | null;
+  selection_reason: string | null;
+  editorial_status: string | null;
+  final_slate_rank: number | null;
+  is_live: boolean | null;
+  published_at: string | null;
+};
+
+type NewsletterRankReservationResult =
+  | {
+      ok: true;
+      rows: ExistingSignalSnapshotRow[];
+      reservedRanks: Set<number>;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+function isMovableNewsletterDiscoveryRow(row: ExistingSignalSnapshotRow) {
+  return (
+    row.selection_reason === NEWSLETTER_DISCOVERY_SELECTION_REASON &&
+    typeof row.rank === "number" &&
+    !row.is_live &&
+    row.editorial_status !== "published" &&
+    !row.published_at &&
+    row.final_slate_rank === null
+  );
+}
+
+async function reserveNewsletterCandidateRanksForRssSnapshot(
+  client: EditorialClient,
+  existingRows: ExistingSignalSnapshotRow[],
+): Promise<NewsletterRankReservationResult> {
+  const movableNewsletterRows = existingRows
+    .filter(isMovableNewsletterDiscoveryRow)
+    .sort((left, right) => (left.rank ?? 0) - (right.rank ?? 0));
+
+  if (movableNewsletterRows.length === 0) {
+    return {
+      ok: true,
+      rows: existingRows,
+      reservedRanks: new Set<number>(),
+    };
+  }
+
+  const movableNewsletterIds = new Set(movableNewsletterRows.map((row) => row.id));
+  const fixedRanks = new Set(
+    existingRows
+      .filter((row) => !movableNewsletterIds.has(row.id))
+      .map((row) => row.rank)
+      .filter((rank): rank is number => typeof rank === "number"),
+  );
+  const targetRanks: number[] = [];
+
+  for (let rank = SIGNAL_POST_CANDIDATE_DEPTH_LIMIT; rank >= 1; rank -= 1) {
+    if (!fixedRanks.has(rank)) {
+      targetRanks.push(rank);
+    }
+
+    if (targetRanks.length === movableNewsletterRows.length) {
+      break;
+    }
+  }
+
+  if (targetRanks.length < movableNewsletterRows.length) {
+    return {
+      ok: false,
+      message:
+        "RSS signal snapshot could not reserve rank space for existing newsletter candidates. No rows were changed.",
+    };
+  }
+
+  targetRanks.sort((left, right) => left - right);
+  const updatedRows = existingRows.map((row) => ({ ...row }));
+  const rowsById = new Map(updatedRows.map((row) => [row.id, row]));
+
+  const rankAssignments = movableNewsletterRows
+    .map((newsletterRow, index) => ({
+      newsletterRow,
+      targetRank: targetRanks[index],
+    }))
+    .filter((assignment): assignment is { newsletterRow: ExistingSignalSnapshotRow; targetRank: number } =>
+      typeof assignment.targetRank === "number"
+    )
+    .sort((left, right) => right.targetRank - left.targetRank);
+
+  for (const { newsletterRow, targetRank } of rankAssignments) {
+    const mutableRow = rowsById.get(newsletterRow.id);
+
+    if (!mutableRow || mutableRow.rank === targetRank) {
+      continue;
+    }
+
+    const updateResult = await client
+      .from("signal_posts")
+      .update({ rank: targetRank })
+      .eq("id", newsletterRow.id);
+
+    if (updateResult.error) {
+      return {
+        ok: false,
+        message: `RSS signal snapshot could not reserve newsletter candidate rank space: ${updateResult.error.message}`,
+      };
+    }
+
+    mutableRow.rank = targetRank;
+  }
+
+  return {
+    ok: true,
+    rows: updatedRows,
+    reservedRanks: new Set(targetRanks),
+  };
+}
+
+function buildSignalPostPersistenceMessage(insertedCount: number, reservedNewsletterRankCount: number) {
+  const baseMessage = insertedCount === TOP_SIGNAL_SET_SIZE
+    ? "Persisted a new daily Top 5 snapshot for editorial review."
+    : `Persisted ${insertedCount} missing signal snapshot rows for editorial review.`;
+
+  if (reservedNewsletterRankCount === 0) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} Reserved ${reservedNewsletterRankCount} newsletter discovery candidate rank(s) outside the RSS snapshot range.`;
 }
 
 export async function persistSignalPostsForBriefing(input: {

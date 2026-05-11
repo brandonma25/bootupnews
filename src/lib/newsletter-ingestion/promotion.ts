@@ -157,7 +157,7 @@ async function getNextCandidateRank(input: {
       .filter((rank): rank is number => typeof rank === "number"),
   );
 
-  for (let rank = 1; rank <= 20; rank += 1) {
+  for (let rank = 20; rank >= 1; rank -= 1) {
     if (!usedRanks.has(rank)) {
       return rank;
     }
@@ -197,7 +197,7 @@ function nextAvailablePreviewRank(
     usedRanks.add(rank);
   }
 
-  for (let rank = 1; rank <= 20; rank += 1) {
+  for (let rank = 20; rank >= 1; rank -= 1) {
     if (!usedRanks.has(rank)) {
       allocatedRanks.add(rank);
       return rank;
