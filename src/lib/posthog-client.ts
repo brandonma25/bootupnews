@@ -39,20 +39,20 @@ type PostHogClientConfig = {
 };
 
 export function readPostHogClientConfig(): PostHogClientConfig {
-  const enabled = readEnabledEnv("NEXT_PUBLIC_ENABLE_POSTHOG");
+  const enabled = readEnabledValue(process.env.NEXT_PUBLIC_ENABLE_POSTHOG);
   const token = process.env.NEXT_PUBLIC_POSTHOG_TOKEN?.trim() ?? "";
   const host = normalizePostHogHost(process.env.NEXT_PUBLIC_POSTHOG_HOST);
-  const sessionReplayEnabled = readEnabledEnv("NEXT_PUBLIC_POSTHOG_SESSION_REPLAY");
+  const sessionReplayEnabled = readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY);
 
   return {
     enabled: enabled && Boolean(token && host),
     token,
     host,
     sessionReplayEnabled,
-    autocaptureEnabled: readEnabledEnv("NEXT_PUBLIC_POSTHOG_AUTOCAPTURE"),
-    heatmapsEnabled: readEnabledEnv("NEXT_PUBLIC_POSTHOG_HEATMAPS"),
-    deadClicksEnabled: readEnabledEnv("NEXT_PUBLIC_POSTHOG_DEAD_CLICKS"),
-    replaySampleRate: readRatioEnv("NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE", 1),
+    autocaptureEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE),
+    heatmapsEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS),
+    deadClicksEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS),
+    replaySampleRate: readRatioValue(process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE, 1),
   };
 }
 
@@ -240,12 +240,12 @@ function sanitizePropertyKey(key: string) {
   return key.replace(/[^a-zA-Z0-9_$.-]/g, "_").slice(0, 64);
 }
 
-function readEnabledEnv(name: string) {
-  return ENABLED_VALUES.has(process.env[name]?.trim().toLowerCase() ?? "");
+function readEnabledValue(value: string | undefined) {
+  return ENABLED_VALUES.has(value?.trim().toLowerCase() ?? "");
 }
 
-function readRatioEnv(name: string, fallback: number) {
-  const rawValue = process.env[name]?.trim();
+function readRatioValue(value: string | undefined, fallback: number) {
+  const rawValue = value?.trim();
   if (!rawValue) {
     return fallback;
   }
