@@ -109,6 +109,10 @@ describe("trackMvpMeasurementEvent", () => {
         sourceName: "Example Source",
         sourceUrl: "https://example.com/story",
       }),
+      {
+        send_instantly: true,
+        transport: "fetch",
+      },
     );
     const [, properties] = posthogMock.capture.mock.calls[0]!;
     expect(properties).not.toHaveProperty("email");

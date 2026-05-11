@@ -123,7 +123,10 @@ export function capturePostHogMvpMeasurementEvent(event: ValidatedMvpMeasurement
       return;
     }
 
-    client.capture(event.eventName, buildPostHogMvpProperties(event));
+    client.capture(event.eventName, buildPostHogMvpProperties(event), {
+      send_instantly: true,
+      transport: "fetch",
+    });
   } catch {
     // Product analytics is best effort and must never affect reading or navigation.
   }
