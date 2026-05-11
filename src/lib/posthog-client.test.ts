@@ -16,6 +16,7 @@ function clearPostHogEnv() {
   delete process.env.NEXT_PUBLIC_POSTHOG_TOKEN;
   delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
   delete process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY;
+  delete process.env.NEXT_PUBLIC_POSTHOG_PAGEVIEWS;
   delete process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE;
   delete process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS;
   delete process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS;
@@ -27,6 +28,10 @@ describe("PostHog client analytics bridge", () => {
     vi.resetModules();
     vi.clearAllMocks();
     clearPostHogEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ status: 1 }), { status: 200 })),
+    );
     posthogMock.init.mockImplementation((_token, config) => {
       config?.loaded?.(posthogMock);
       return posthogMock;
@@ -69,6 +74,7 @@ describe("PostHog client analytics bridge", () => {
     process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
     process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
     process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+    process.env.NEXT_PUBLIC_POSTHOG_PAGEVIEWS = "1";
     process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE = "1";
     process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS = "1";
     process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS = "1";
@@ -79,6 +85,7 @@ describe("PostHog client analytics bridge", () => {
     initializePostHogClient();
 
     const [, config] = posthogMock.init.mock.calls[0]!;
+    expect(config.capture_pageview).toBe(false);
     expect(config.autocapture).toEqual(
       expect.objectContaining({
         capture_copied_text: false,
@@ -89,6 +96,14 @@ describe("PostHog client analytics bridge", () => {
     expect(config.capture_dead_clicks).toBe(true);
     expect(config.capture_heatmaps).toBe(true);
     expect(config.enable_heatmaps).toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://us.i.posthog.com/capture/",
+      expect.objectContaining({
+        body: expect.stringContaining("\"event\":\"$pageview\""),
+        keepalive: true,
+        method: "POST",
+      }),
+    );
     expect(config.session_recording).toEqual(
       expect.objectContaining({
         maskAllInputs: true,

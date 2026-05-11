@@ -29,6 +29,7 @@ function clearPostHogEnv() {
   delete process.env.NEXT_PUBLIC_POSTHOG_TOKEN;
   delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
   delete process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY;
+  delete process.env.NEXT_PUBLIC_POSTHOG_PAGEVIEWS;
   delete process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE;
   delete process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS;
   delete process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS;
