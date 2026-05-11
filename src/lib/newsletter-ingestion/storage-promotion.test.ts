@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { GmailApiClient } from "@/lib/newsletter-ingestion/gmail";
-import { promoteNewsletterStoryToCandidate } from "@/lib/newsletter-ingestion/promotion";
+import {
+  previewNewsletterStoryPromotions,
+  promoteNewsletterStoryToCandidate,
+} from "@/lib/newsletter-ingestion/promotion";
 import {
   createContentSha256,
   extractStoriesFromEmail,
@@ -114,6 +117,14 @@ function createDb(initial: Partial<Record<TableName, Row[]>> = {}) {
 
 function createGmailClient(raw: string): GmailApiClient {
   return {
+    async getLabelByName() {
+      return {
+        id: "Label_1",
+        name: "boot-up-benchmark",
+        messagesTotal: 1,
+        messagesUnread: 0,
+      };
+    },
     async listNewsletterMessages() {
       return [{ id: "gmail-1", threadId: "thread-1" }];
     },
@@ -346,5 +357,172 @@ describe("newsletter candidate promotion", () => {
     });
     expect(tables.signal_posts).toHaveLength(1);
     expect(tables.newsletter_story_extractions[0]?.signal_post_id).toBe("signal-existing");
+  });
+
+  it("previews eligible candidate creation without writing signal_posts rows", async () => {
+    const { db, tables } = createDb();
+
+    const result = await previewNewsletterStoryPromotions({
+      db,
+      briefingDate: "2026-05-10",
+      stories: [{
+        headline: "Microsoft expands data center capacity",
+        sourceUrl: "https://example.com/cloud",
+        sourceDomain: "example.com",
+        category: "Tech",
+      }],
+    });
+
+    expect(result).toEqual([{
+      status: "eligible",
+      previewAction: "create_candidate",
+      title: "Microsoft expands data center capacity",
+      sourceUrl: "https://example.com/cloud",
+      sourceDomain: "example.com",
+      category: "Tech",
+      rank: 1,
+      existingSignalPostId: null,
+      matchedBy: null,
+      reason: "Newsletter story would create a non-live needs_review candidate.",
+    }]);
+    expect(tables.signal_posts).toHaveLength(0);
+  });
+
+  it("previews duplicate public rows as skipped without writing", async () => {
+    const { db, tables } = createDb({
+      signal_posts: [{
+        id: "signal-live",
+        briefing_date: "2026-05-10",
+        rank: 4,
+        title: "Microsoft expands data center capacity",
+        source_url: "https://example.com/cloud",
+        editorial_status: "published",
+        is_live: true,
+        published_at: "2026-05-10T10:00:00.000Z",
+      }],
+    });
+
+    const result = await previewNewsletterStoryPromotions({
+      db,
+      briefingDate: "2026-05-10",
+      stories: [{
+        headline: "Microsoft expands data center capacity",
+        sourceUrl: "https://example.com/cloud",
+        sourceDomain: "example.com",
+        category: "Tech",
+      }],
+    });
+
+    expect(result[0]).toMatchObject({
+      status: "duplicate_public_row",
+      previewAction: "skip",
+      existingSignalPostId: "signal-live",
+      matchedBy: "source_url",
+      rank: null,
+    });
+    expect(tables.signal_posts).toHaveLength(1);
+  });
+
+  it("previews non-live duplicates as linkable review candidates", async () => {
+    const { db, tables } = createDb({
+      signal_posts: [{
+        id: "signal-existing",
+        briefing_date: "2026-05-10",
+        rank: 2,
+        title: "Existing cloud candidate",
+        source_url: "https://example.com/cloud",
+        editorial_status: "needs_review",
+        is_live: false,
+        published_at: null,
+      }],
+    });
+
+    const result = await previewNewsletterStoryPromotions({
+      db,
+      briefingDate: "2026-05-10",
+      stories: [{
+        headline: "Microsoft expands data center capacity",
+        sourceUrl: "https://example.com/cloud",
+        sourceDomain: "example.com",
+        category: "Tech",
+      }],
+    });
+
+    expect(result[0]).toMatchObject({
+      status: "eligible",
+      previewAction: "link_existing_candidate",
+      existingSignalPostId: "signal-existing",
+      matchedBy: "source_url",
+      rank: 2,
+    });
+    expect(tables.signal_posts).toHaveLength(1);
+  });
+
+  it("previews exhausted candidate ranks without writing", async () => {
+    const { db, tables } = createDb({
+      signal_posts: Array.from({ length: 20 }, (_value, index) => ({
+        id: `signal-${index + 1}`,
+        briefing_date: "2026-05-10",
+        rank: index + 1,
+        title: `Existing candidate ${index + 1}`,
+        source_url: `https://example.com/story-${index + 1}`,
+        editorial_status: "needs_review",
+        is_live: false,
+        published_at: null,
+      })),
+    });
+
+    const result = await previewNewsletterStoryPromotions({
+      db,
+      briefingDate: "2026-05-10",
+      stories: [{
+        headline: "New candidate without rank",
+        sourceUrl: "https://example.com/new-story",
+        sourceDomain: "example.com",
+        category: "Finance",
+      }],
+    });
+
+    expect(result[0]).toMatchObject({
+      status: "no_available_candidate_rank",
+      previewAction: "skip",
+      rank: null,
+      existingSignalPostId: null,
+      matchedBy: null,
+    });
+    expect(tables.signal_posts).toHaveLength(20);
+  });
+
+  it("previews title overlaps when source URLs differ", async () => {
+    const { db } = createDb({
+      signal_posts: [{
+        id: "signal-title-match",
+        briefing_date: "2026-05-10",
+        rank: 7,
+        title: "Microsoft expands data center capacity",
+        source_url: "https://example.com/original-cloud",
+        editorial_status: "published",
+        is_live: true,
+        published_at: "2026-05-10T10:00:00.000Z",
+      }],
+    });
+
+    const result = await previewNewsletterStoryPromotions({
+      db,
+      briefingDate: "2026-05-10",
+      stories: [{
+        headline: "Microsoft expands data center capacity",
+        sourceUrl: "https://example.com/alternate-cloud",
+        sourceDomain: "example.com",
+        category: "Tech",
+      }],
+    });
+
+    expect(result[0]).toMatchObject({
+      status: "duplicate_public_row",
+      previewAction: "skip",
+      existingSignalPostId: "signal-title-match",
+      matchedBy: "title",
+    });
   });
 });

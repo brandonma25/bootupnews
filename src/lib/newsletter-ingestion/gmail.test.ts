@@ -5,6 +5,7 @@ import {
   createGmailApiClient,
   fetchBootUpBenchmarkEmails,
   GmailApiError,
+  verifyGmailNewsletterLabelVisible,
 } from "@/lib/newsletter-ingestion/gmail";
 
 describe("Gmail newsletter API client", () => {
@@ -81,5 +82,81 @@ describe("Gmail newsletter API client", () => {
       status: 429,
       retryable: true,
     } satisfies Partial<GmailApiError>);
+  });
+
+  it("confirms the exact newsletter label is visible without exposing secrets", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ access_token: "access-token" });
+      }
+
+      expect(url).toBe("https://gmail.googleapis.com/gmail/v1/users/me/labels");
+      return Response.json({
+        labels: [
+          { id: "Label_1", name: "boot-up-benchmark", messagesTotal: 7, messagesUnread: 2 },
+          { id: "Label_2", name: "Boot Up Benchmark", messagesTotal: 1, messagesUnread: 0 },
+        ],
+      });
+    });
+    const gmailClient = createGmailApiClient({
+      credentials: {
+        clientId: "client-id",
+        clientSecret: "client-secret",
+        refreshToken: "refresh-token",
+      },
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    const result = await verifyGmailNewsletterLabelVisible(gmailClient, "boot-up-benchmark");
+
+    expect(result).toEqual({
+      ok: true,
+      label: {
+        id: "Label_1",
+        name: "boot-up-benchmark",
+        messagesTotal: 7,
+        messagesUnread: 2,
+      },
+    });
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("refresh-token");
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("client-secret");
+  });
+
+  it("fails closed with a sanitized account mismatch message when the label is missing", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ access_token: "access-token" });
+      }
+
+      return Response.json({
+        labels: [
+          { id: "Label_1", name: "other-label", messagesTotal: 7, messagesUnread: 2 },
+        ],
+      });
+    });
+    const gmailClient = createGmailApiClient({
+      credentials: {
+        clientId: "client-id",
+        clientSecret: "client-secret",
+        refreshToken: "refresh-token",
+      },
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    const result = await verifyGmailNewsletterLabelVisible(gmailClient, "boot-up-benchmark");
+
+    expect(result).toEqual({
+      ok: false,
+      label: "boot-up-benchmark",
+      message: expect.stringMatching(/label missing\/account mismatch/i),
+    });
+    if (!result.ok) {
+      expect(result.message).not.toContain("refresh-token");
+      expect(result.message).not.toContain("client-secret");
+    }
   });
 });

@@ -41,6 +41,8 @@ npx tsx scripts/newsletter-ingestion-controlled-run.ts
 ```
 
 Expected:
+- Gmail OAuth refresh succeeds.
+- Exact Gmail label `boot-up-benchmark` is visible to the same token used by the runner.
 - Gmail messages are fetched from the label.
 - Candidate story count is reported.
 - No `newsletter_emails` rows are inserted.
@@ -48,6 +50,34 @@ Expected:
 - No `signal_posts` rows are inserted.
 - No WITM is generated.
 - Nothing is published.
+
+## Run Label-Verified Dry-Run Report Locally
+
+Use this report before authorizing writes. It reuses the PRD-61 REST OAuth backend path and does not depend on Gmail MCP, Chrome, or browser state.
+
+If credentials are stored in a local env file, load them without printing values:
+
+```bash
+set -a
+source .env.newsletter.local
+set +a
+NEWSLETTER_INGESTION_ENABLED=true \
+NEWSLETTER_INGESTION_DRY_RUN=true \
+NEWSLETTER_INGESTION_SINCE_HOURS=48 \
+GMAIL_NEWSLETTER_LABEL=boot-up-benchmark \
+npx tsx scripts/newsletter-ingestion-dry-run-report.ts
+```
+
+Expected report sections:
+- Gmail OAuth and exact-label preflight status.
+- Sanitized email inventory: sender, subject, and received timestamp only.
+- Story extraction totals and 3-5 sample headlines per newsletter.
+- Source URL quality counts.
+- Finance / Tech / Politics category distribution.
+- Read-only promotion preview with eligible candidate titles and source URLs.
+- Dedup skips for invalid URLs, duplicate public rows, and exhausted candidate ranks.
+
+The report must not include Gmail message IDs, thread IDs, raw email content, snippets, credentials, refresh tokens, or client secrets. It must not insert or update `newsletter_emails`, `newsletter_story_extractions`, or `signal_posts`.
 
 ## Run Controlled Non-Production Ingestion
 
@@ -73,6 +103,60 @@ Expected candidate state:
 - `final_slate_rank is null`
 - `final_slate_tier is null`
 - WITM fields remain blank or human-required
+
+## Run Controlled Production Write Validation After Approval
+
+Use only after BM explicitly approves a controlled write validation. This is not the cron path and must not run RSS, `draft_only`, publish, or public-surface publication workflows.
+
+Required pre-flight:
+- Confirm `NEWSLETTER_INGESTION_DRY_RUN=false` is intentional for this one run.
+- Confirm `NEWSLETTER_INGESTION_ENABLED=true`.
+- Confirm `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true`.
+- Confirm Gmail env vars are present without printing values.
+- Confirm pre-counts for `newsletter_emails`, `newsletter_story_extractions`, and `signal_posts`.
+- Confirm the exact Gmail label `boot-up-benchmark` is visible in dry-run mode first.
+
+Command shape:
+
+```bash
+set -a
+source .env.newsletter.local
+set +a
+NEWSLETTER_INGESTION_ENABLED=true \
+NEWSLETTER_INGESTION_DRY_RUN=false \
+NEWSLETTER_INGESTION_TARGET_ENV=production \
+ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true \
+NEWSLETTER_INGESTION_SINCE_HOURS=48 \
+GMAIL_NEWSLETTER_LABEL=boot-up-benchmark \
+npx tsx scripts/newsletter-ingestion-controlled-run.ts
+```
+
+Expected write behavior:
+- Stores new `newsletter_emails` rows idempotently by Gmail message id.
+- Stores conservative `newsletter_story_extractions` Article candidates.
+- Creates only non-live `signal_posts` review candidates.
+- Leaves `editorial_status = 'needs_review'`.
+- Leaves `is_live = false`.
+- Leaves `published_at is null`.
+- Does not assign final slate placement.
+- Does not publish anything.
+
+Required post-flight:
+- Confirm row-count changes match the runner summary.
+- Confirm `/` still returns HTTP 200 and shows the existing public slate.
+- Confirm `/signals` still returns HTTP 200 and excludes non-live newsletter candidates.
+- Delete `.env.newsletter.local`.
+- Delete any local OAuth capture file.
+- Stop any local OAuth callback listener.
+- Remove temporary local OAuth redirect URIs from the Google Cloud OAuth client when no longer needed.
+
+2026-05-11 controlled validation result:
+- Dry-run pre-counts: `newsletter_emails = 0`, `newsletter_story_extractions = 0`, `signal_posts = 68`.
+- Dry-run fetched `3` labeled emails, extracted `24` Article candidates, identified `5` eligible promotion candidates, and performed zero writes.
+- BM-authorized controlled write stored `3` newsletter emails, stored `24` story extractions, and created `5` non-live review candidates.
+- Post-write counts: `newsletter_emails = 3`, `newsletter_story_extractions = 24`, `signal_posts = 73`.
+- Public surface remained gated: `/` HTTP 200 with the May 6 slate, `/signals` HTTP 200, latest public renderable Signal count `3`.
+- Local secret files and OAuth capture files were deleted after validation.
 
 ## Enable Production Cron After Approval
 
@@ -144,6 +228,11 @@ Runtime checks:
 Gmail auth failure:
 - Expected response: fail closed before writes.
 - Check Gmail OAuth env values in deployment secrets.
+
+Gmail label missing/account mismatch:
+- Expected response: fail closed before message search and before writes.
+- Regenerate the refresh token from the Gmail account that contains the exact `boot-up-benchmark` label.
+- Do not diagnose by printing account email, tokens, message IDs, raw content, or snippets.
 
 Gmail rate limit:
 - Expected response: retry safely, then fail closed if still rate-limited.
