@@ -274,7 +274,7 @@ describe("newsletter candidate promotion", () => {
     expect(result).toMatchObject({
       status: "created",
       signalPostId: expect.any(String),
-      rank: 1,
+      rank: 20,
     });
     expect(tables.signal_posts[0]).toMatchObject({
       editorial_status: "needs_review",
@@ -380,7 +380,7 @@ describe("newsletter candidate promotion", () => {
       sourceUrl: "https://example.com/cloud",
       sourceDomain: "example.com",
       category: "Tech",
-      rank: 1,
+      rank: 20,
       existingSignalPostId: null,
       matchedBy: null,
       reason: "Newsletter story would create a non-live needs_review candidate.",
