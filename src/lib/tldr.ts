@@ -1,4 +1,3 @@
-import { JSDOM } from "jsdom";
 import Parser from "rss-parser";
 
 import { env } from "@/lib/env";
@@ -193,14 +192,14 @@ export async function ingestTldrCandidates(
 // MIT attribution: this keeps the same high-level extraction shape as Bullrich/tldr-rss
 // (digest RSS -> digest HTML -> linked headlines) while using Boot Up's own pipeline contracts.
 export function extractLinksFromDigest(digestHtml: string): TldrDigestLink[] {
-  const document = new JSDOM(digestHtml).window.document;
   const seenNormalizedUrls = new Set<string>();
   const links: TldrDigestLink[] = [];
+  const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
 
-  for (const heading of Array.from(document.querySelectorAll("h3"))) {
-    const title = heading.textContent?.trim();
-    const anchor = heading.closest("a");
-    const href = anchor?.href?.trim();
+  for (const match of digestHtml.matchAll(anchorPattern)) {
+    const [, attributes, body] = match;
+    const title = extractFirstHeadingText(body);
+    const href = extractHref(attributes);
 
     if (!title || !href || shouldIgnoreTldrLink(href, title)) {
       continue;
@@ -226,6 +225,56 @@ export function extractLinksFromDigest(digestHtml: string): TldrDigestLink[] {
   }
 
   return links;
+}
+
+function extractHref(attributes: string) {
+  const hrefMatch = attributes.match(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+  const rawHref = hrefMatch?.[1] ?? hrefMatch?.[2] ?? hrefMatch?.[3] ?? "";
+  return decodeHtmlEntities(rawHref.trim());
+}
+
+function extractFirstHeadingText(html: string) {
+  const headingMatch = html.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i);
+  if (!headingMatch) {
+    return "";
+  }
+
+  return decodeHtmlEntities(stripHtmlTags(headingMatch[1])).replace(/\s+/g, " ").trim();
+}
+
+function stripHtmlTags(value: string) {
+  return value.replace(/<[^>]*>/g, " ");
+}
+
+function decodeHtmlEntities(value: string) {
+  const namedEntities: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    nbsp: " ",
+    quot: "\"",
+  };
+
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, code: string) => {
+    const normalizedCode = code.toLowerCase();
+
+    if (normalizedCode.startsWith("#x")) {
+      const parsed = Number.parseInt(normalizedCode.slice(2), 16);
+      return isValidCodePoint(parsed) ? String.fromCodePoint(parsed) : entity;
+    }
+
+    if (normalizedCode.startsWith("#")) {
+      const parsed = Number.parseInt(normalizedCode.slice(1), 10);
+      return isValidCodePoint(parsed) ? String.fromCodePoint(parsed) : entity;
+    }
+
+    return namedEntities[normalizedCode] ?? entity;
+  });
+}
+
+function isValidCodePoint(value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= 0x10ffff;
 }
 
 export function normalizeUrl(url: string) {

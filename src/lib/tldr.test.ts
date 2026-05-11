@@ -73,6 +73,23 @@ describe("TLDR discovery adapter", () => {
     ).toBe("https://example.com/story-a");
   });
 
+  it("extracts encoded headings and hrefs without loading a DOM runtime", () => {
+    expect(
+      extractLinksFromDigest(`
+        <a href="https://example.com/story?utm_source=tldrnewsletter&amp;ref=side">
+          <h3>AT&amp;T buys &quot;fiber&quot; startup</h3>
+        </a>
+      `),
+    ).toEqual([
+      {
+        title: "AT&T buys \"fiber\" startup",
+        originalUrl: "https://example.com/story?utm_source=tldrnewsletter&ref=side",
+        normalizedUrl: "https://example.com/story",
+        sourceDomain: "example.com",
+      },
+    ]);
+  });
+
   it("recognizes every validated official TLDR category feed as a discovery input", () => {
     expect(TLDR_FEED_KEYS).toEqual([
       "tech",
