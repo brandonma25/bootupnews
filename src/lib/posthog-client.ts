@@ -447,7 +447,7 @@ function syncSessionRecordingForRoute(
 
   try {
     if (config.sessionReplayEnabled && isPostHogSessionReplayEligible(window.location.pathname)) {
-      client.startSessionRecording(config.replaySampleRate >= 1 ? { sampling: true } : undefined);
+      client.startSessionRecording(config.replaySampleRate >= 1 ? true : undefined);
     } else {
       client.stopSessionRecording();
     }

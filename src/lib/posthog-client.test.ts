@@ -98,7 +98,7 @@ describe("PostHog client analytics bridge", () => {
         sampleRate: 1,
       }),
     );
-    expect(posthogMock.startSessionRecording).toHaveBeenCalledWith({ sampling: true });
+    expect(posthogMock.startSessionRecording).toHaveBeenCalledWith(true);
   });
 
   it("keeps the SDK project token sendable while sanitizing captured properties", async () => {
