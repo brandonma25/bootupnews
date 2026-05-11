@@ -10,7 +10,7 @@
 - Related PRD: `PRD-60`, `PRD-61`
 - PR: `#222`
 - Branch: `fix/prd-60-rss-cron-esm-packaging`
-- Head SHA: `97d7df3c40dd3e5a650079b7aee67c2acef28542`
+- Head SHA: Tracked by PR `#222`; final merge details recorded by GitHub.
 - Merge SHA: Pending
 - GitHub source-of-truth status: PR open.
 - External references reviewed, if any: Sanitized production log evidence only; no secrets, raw email content, snippets, or message IDs recorded.
