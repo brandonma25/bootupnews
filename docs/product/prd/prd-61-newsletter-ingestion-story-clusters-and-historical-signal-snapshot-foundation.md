@@ -76,7 +76,7 @@ This amendment supersedes the original runtime non-goals only for the controlled
 - No WITM threshold change.
 - No production migration execution.
 - No production newsletter ingestion write-mode execution without explicit BM authorization.
-- No production cron execution during implementation.
+- No production cron execution before BM authorization.
 
 ## Implementation Shape / System Impact
 
@@ -156,9 +156,14 @@ BM-authorized write validation:
 - Public checks confirmed `/` HTTP `200` with the existing May 6 slate, `/signals` HTTP `200`, and latest public renderable Signal count `3`.
 - Local credential and OAuth capture files were deleted after the run.
 
+Cron enablement follow-up:
+- BM approved production cron scheduling on `2026-05-12`.
+- The scheduled path is `/api/cron/fetch-editorial-inputs`, which runs RSS first and then the PRD-61 newsletter ingestion path.
+- Approved schedules are `15 10 * * *` and `45 11 * * *`, equivalent to 6:15 PM and 7:45 PM Taipei time.
+- Production newsletter writes still require `NEWSLETTER_INGESTION_ENABLED=true`, `NEWSLETTER_INGESTION_DRY_RUN=false`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true` in Vercel Production env.
+
 Remaining operational follow-up:
 - Remove temporary local OAuth redirect URI `http://127.0.0.1:53682/oauth2callback` from the `Boot Up Newsletter Ingestion OAuth Playground` Web client after no further local token generation is needed.
-- Production cron remains out of scope until separate BM approval.
 
 ## Evidence and Confidence
 
