@@ -118,15 +118,18 @@ export function initializePostHogClient() {
 
 export function capturePostHogMvpMeasurementEvent(event: ValidatedMvpMeasurementEvent) {
   try {
-    const client = initializePostHogClient();
-    if (!client) {
+    const config = readPostHogClientConfig();
+    if (!config.enabled || typeof window === "undefined") {
       return;
     }
 
-    client.capture(event.eventName, buildPostHogMvpProperties(event), {
-      send_instantly: true,
-      transport: "fetch",
-    });
+    initializePostHogClient();
+    const properties = buildPostHogMvpProperties(event);
+    if (!isPostHogCaptureEligible(properties)) {
+      return;
+    }
+
+    void sendPostHogBrowserCapture(config, event.eventName, properties);
   } catch {
     // Product analytics is best effort and must never affect reading or navigation.
   }
@@ -169,6 +172,36 @@ function buildPostHogMvpProperties(event: ValidatedMvpMeasurementEvent): Propert
     mvpSessionId: event.sessionId,
     ...(event.metadata ?? {}),
   });
+}
+
+async function sendPostHogBrowserCapture(
+  config: Pick<PostHogClientConfig, "host" | "token">,
+  eventName: ValidatedMvpMeasurementEvent["eventName"],
+  properties: Properties,
+) {
+  try {
+    const endpoint = `${config.host}/capture/`;
+    await fetch(endpoint, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      keepalive: true,
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        api_key: config.token,
+        event: eventName,
+        properties: {
+          ...properties,
+          distinct_id: properties.mvpVisitorId,
+          $session_id: properties.mvpSessionId,
+        },
+      }),
+    });
+  } catch {
+    // Direct PostHog capture is best effort and must never block reading.
+  }
 }
 
 function sanitizePostHogCapture(capture: CaptureResult | null) {

@@ -97,33 +97,38 @@ describe("trackMvpMeasurementEvent", () => {
       },
     });
 
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(posthogMock.capture).toHaveBeenCalledWith(
-      "source_click",
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const posthogCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).startsWith("https://us.i.posthog.com/capture/"));
+    expect(posthogCall).toBeDefined();
+    const posthogBody = JSON.parse(String(posthogCall?.[1]?.body));
+
+    expect(posthogBody).toEqual(
       expect.objectContaining({
-        route: "/signals",
-        surface: "signals_published_slate",
-        signalPostId: "3156ce1e-d052-4f88-af1b-4630f78e1104",
-        signalRank: 2,
-        briefingDate: "2026-05-01",
-        sourceName: "Example Source",
-        sourceUrl: "https://example.com/story",
+        api_key: "phc_project_token",
+        event: "source_click",
+        properties: expect.objectContaining({
+          route: "/signals",
+          surface: "signals_published_slate",
+          signalPostId: "3156ce1e-d052-4f88-af1b-4630f78e1104",
+          signalRank: 2,
+          briefingDate: "2026-05-01",
+          sourceName: "Example Source",
+          sourceUrl: "https://example.com/story",
+          distinct_id: expect.stringMatching(/^mvp_/),
+          $session_id: expect.stringMatching(/^mvp_session_/),
+        }),
       }),
-      {
-        send_instantly: true,
-        transport: "fetch",
-      },
     );
-    const [, properties] = posthogMock.capture.mock.calls[0]!;
-    expect(properties).not.toHaveProperty("email");
-    expect(properties).not.toHaveProperty("whyItMatters");
+    expect(posthogBody.properties).not.toHaveProperty("email");
+    expect(posthogBody.properties).not.toHaveProperty("whyItMatters");
+    expect(posthogMock.capture).not.toHaveBeenCalled();
   });
 
   it("does not throw or block the Supabase post when analytics capture fails", async () => {
     enablePostHog();
-    posthogMock.capture.mockImplementationOnce(() => {
-      throw new Error("posthog unavailable");
-    });
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("posthog unavailable"));
     const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
 
     await expect(
