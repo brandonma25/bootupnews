@@ -6,7 +6,7 @@
 
 ## Objective
 
-Add the Phase 2 database foundation for newsletter ingestion tracking, Story Cluster persistence, historical Signal Card snapshots, Signal evolution, and cross-event connection mapping without implementing ingestion, clustering, browsing, or publishing behavior.
+Add the Phase 2 database foundation for newsletter ingestion tracking, Story Cluster persistence, historical Signal Card snapshots, Signal evolution, and cross-event connection mapping, then implement the approved Phase 1 runtime amendment for controlled Gmail newsletter ingestion into non-live editorial review candidates.
 
 ## User Problem
 
@@ -14,7 +14,7 @@ Boot Up is a curated 7-story briefing: Top 5 Core plus Next 2 Context, with expl
 
 ## Corrected Scope
 
-This PRD covers six database foundation areas:
+This PRD covers six database foundation areas plus one approved runtime amendment:
 
 1. Newsletter ingestion tracking via `newsletter_emails`.
 2. Newsletter story extraction storage via `newsletter_story_extractions`.
@@ -22,6 +22,7 @@ This PRD covers six database foundation areas:
 4. Historical published Signal Card snapshot tracking by extending `published_slates` and `published_slate_items`.
 5. Signal evolution tracking via `signal_evolution`.
 6. Cross-event connection mapping via `cross_event_connections`.
+7. Phase 1 runtime amendment: Gmail newsletter ingestion from the `boot-up-benchmark` label into internal newsletter records, conservative Article extraction records, and non-live `signal_posts` Surface Placement candidates for BM review.
 
 ## Snapshot Schema Decision
 
@@ -32,14 +33,36 @@ This PRD does not add duplicate `briefing_snapshots` or `briefing_snapshot_signa
 - `published_slates`: `snapshot_status`, `publish_batch_id`, `source_briefing_date`, `archived_from_live_set`, `public_surface_verified_at`, `rollback_snapshot`.
 - `published_slate_items`: `source_cluster_id`, `tags_snapshot`, `promoted_from_artifact_id`, plus a foreign-key constraint and index for the existing `replacement_of_row_id_snapshot`.
 
+## Runtime Amendment - Phase 1 Newsletter Ingestion
+
+This amendment supersedes the original runtime non-goals only for the controlled Phase 1 ingestion path below.
+
+- Gmail label: `boot-up-benchmark`.
+- Known newsletter sources in that label: Morning Brew, Semafor Flagship, TLDR, AP Wire, and 1440.
+- Backend integration uses the server-side Gmail API directly with OAuth2 refresh-token credentials supplied by environment variables.
+- Gmail MCP, Chrome, and personal browser state are not backend dependencies.
+- Newsletters are discovery and context sources, not final editorial judgment.
+- Newsletter-derived items are internal Article evidence candidates.
+- BM remains the editorial layer and writes all WITM manually.
+- The controlled runner and guarded cron route may store `newsletter_emails` rows, create `newsletter_story_extractions` rows, and promote usable extractions into non-live `signal_posts` review candidates.
+- Candidate rows must use `editorial_status = 'needs_review'`, `is_live = false`, and `published_at = null`.
+- Candidate rows must not auto-assign Core or Context placement, final slate rank, live state, or published state.
+- `signal_posts.context_material` stores internal newsletter excerpt or framing for editorial grounding only.
+- `newsletter_emails.raw_content` is internal-only raw source material.
+- Dry-run mode is required and defaults on. Dry-run fetches and parses only in memory and performs no database writes.
+- Runtime writes are fail-closed. Missing Gmail credentials, disabled ingestion, dry-run mode, production guard failure, Gmail auth failure, Gmail rate limits, or database errors must not publish or create live rows.
+- Production writes require all three runtime write gates: `NEWSLETTER_INGESTION_ENABLED=true`, `NEWSLETTER_INGESTION_DRY_RUN=false`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true`.
+- The Phase 1 parser is heuristic and conservative. It should prefer fewer higher-confidence newsletter Article candidates over noisy over-extraction.
+
 ## Non-Goals
 
-- No Gmail API integration.
-- No Gmail label scanning.
-- No newsletter ingestion cron job.
-- No email parsing or LLM extraction logic.
+- No Gmail MCP backend integration.
+- No broad Gmail inbox search outside the `boot-up-benchmark` label.
+- No LLM extraction logic.
+- No AI-generated WITM.
 - No source matching implementation.
 - No clustering algorithm.
+- No population of `story_clusters`, `story_cluster_members`, `signal_evolution`, or `cross_event_connections` from the runtime path.
 - No historical browsing UI.
 - No public UI.
 - No admin UI.
@@ -47,11 +70,19 @@ This PRD does not add duplicate `briefing_snapshots` or `briefing_snapshot_signa
 - No source governance change.
 - No ranking threshold change.
 - No WITM threshold change.
-- No production migration execution and no production data writes.
+- No production migration execution.
+- No production newsletter ingestion write-mode execution during implementation.
+- No production cron execution during implementation.
 
 ## Implementation Shape / System Impact
 
-- Data Layer only: additive Supabase migration plus current `supabase/schema.sql` snapshot update.
+- Data Layer plus controlled backend runtime:
+  - additive Supabase migration plus current `supabase/schema.sql` snapshot update
+  - server-side Gmail REST client
+  - internal MIME/newsletter parser
+  - storage/extraction helpers
+  - controlled runner
+  - guarded cron route, disabled by default through environment gates
 - RLS v1: service-role-only access for all new internal Phase 2 tables. No anon or authenticated policies are created for newsletter, Story Cluster, Signal evolution, or cross-event connection tables.
 - `published_slates` and `published_slate_items` remain internal service-role tables and become the historical snapshot foundation.
 - `signal_posts` remains the legacy runtime Surface Placement plus Card copy read model, not canonical Signal identity.
@@ -75,6 +106,8 @@ This PRD does not add duplicate `briefing_snapshots` or `briefing_snapshot_signa
 - `content_sha256` is indexed but not unique because duplicate or resend-equivalent newsletter bodies should not block separate Gmail messages.
 - Adding the replacement-row foreign key to `published_slate_items.replacement_of_row_id_snapshot` assumes existing non-null replacement ids point at valid `signal_posts` rows. If production contains orphan replacement ids, a production migration dry-run should stop before apply.
 - Signal evolution and cross-event connections are storage foundations only; no algorithm infers or publishes them in this PRD.
+- The runtime path creates `signal_posts` rows only because the current admin queue uses that legacy Surface Placement plus Card copy table for review candidates. It does not create canonical Signal identity.
+- The current `signal_posts.rank` constraint requires a review-order rank for candidate insertion. The newsletter runtime uses the next available rank for the briefing date as an admin queue compatibility value only; Core/Context and final slate placement remain unassigned.
 
 ## Acceptance Criteria
 
@@ -85,6 +118,14 @@ This PRD does not add duplicate `briefing_snapshots` or `briefing_snapshot_signa
 - `context_material` and `raw_content` are documented as internal-only and are not selected by public routes.
 - Existing public homepage and `/signals` query shapes remain unchanged and still require live published rows through app-controlled service-role queries.
 - Local validation passes or any failure is documented with exact scope.
+- Gmail search query uses `label:boot-up-benchmark` plus the configured since date.
+- Gmail credentials come only from environment variables and are never logged.
+- Newsletter ingestion is idempotent by `newsletter_emails.gmail_message_id`; `gmail_thread_id` may repeat.
+- Newsletter parsing covers representative Morning Brew, Semafor Flagship, TLDR, AP Wire, 1440, malformed, and empty fixtures.
+- Promotion creates only non-live `needs_review` rows with WITM blank or human-required.
+- Promotion links `newsletter_story_extractions.signal_post_id` to created or safe existing non-live rows.
+- Runtime dry-run and disabled modes perform no writes.
+- Public leakage tests prove `newsletter_emails.raw_content` and `signal_posts.context_material` are not selected or rendered publicly.
 
 ## Evidence and Confidence
 
