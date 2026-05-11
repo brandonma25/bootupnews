@@ -8,11 +8,11 @@
 ## Fix
 - Exact change: Replaced the TLDR digest DOM extraction dependency with a deterministic anchor/heading extractor so production cron code no longer imports `jsdom`.
 - Related PRD: `PRD-60`, `PRD-61`
-- PR: Pending
+- PR: `#222`
 - Branch: `fix/prd-60-rss-cron-esm-packaging`
-- Head SHA: Pending
+- Head SHA: `97d7df3c40dd3e5a650079b7aee67c2acef28542`
 - Merge SHA: Pending
-- GitHub source-of-truth status: Local branch pending PR.
+- GitHub source-of-truth status: PR open.
 - External references reviewed, if any: Sanitized production log evidence only; no secrets, raw email content, snippets, or message IDs recorded.
 - Google Sheet / Work Log reference, if historically relevant: Not used as canonical source of truth.
 - Branch cleanup status: Pending PR merge.
