@@ -9,6 +9,7 @@ import {
 import {
   createGmailApiClient,
   fetchBootUpBenchmarkEmails,
+  verifyGmailNewsletterLabelVisible,
   type GmailApiClient,
   type GmailMessageRef,
 } from "@/lib/newsletter-ingestion/gmail";
@@ -347,6 +348,20 @@ export async function runNewsletterIngestion(
   });
 
   try {
+    const labelPreflight = await verifyGmailNewsletterLabelVisible(gmailClient, config.label);
+
+    if (!labelPreflight.ok) {
+      return buildResult({
+        success: false,
+        timestamp,
+        config,
+        sinceDate,
+        briefingDate,
+        testRunId,
+        message: labelPreflight.message,
+      });
+    }
+
     const refs = await fetchBootUpBenchmarkEmails(sinceDate, {
       gmailClient,
       label: config.label,

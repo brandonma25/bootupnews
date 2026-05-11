@@ -120,6 +120,14 @@ function createGmailClient(): GmailApiClient {
   ].join("\r\n");
 
   return {
+    async getLabelByName() {
+      return {
+        id: "Label_1",
+        name: "boot-up-benchmark",
+        messagesTotal: 1,
+        messagesUnread: 0,
+      };
+    },
     async listNewsletterMessages() {
       return [{ id: "gmail-1", threadId: "thread-1" }];
     },
@@ -178,6 +186,38 @@ describe("controlled newsletter ingestion runner", () => {
     expect(result.success).toBe(true);
     expect(result.summary.fetchedMessageCount).toBe(1);
     expect(result.summary.extractedStoryCount).toBe(1);
+    expect(tables.newsletter_emails).toHaveLength(0);
+    expect(tables.newsletter_story_extractions).toHaveLength(0);
+    expect(tables.signal_posts).toHaveLength(0);
+  });
+
+  it("fails closed before message search when the configured label is not visible", async () => {
+    const { db, tables } = createDb();
+    const gmailClient = {
+      getLabelByName: vi.fn(async () => null),
+      listNewsletterMessages: vi.fn(),
+      getRawMessage: vi.fn(),
+    } as unknown as GmailApiClient;
+    const config = resolveNewsletterIngestionConfig({
+      NEWSLETTER_INGESTION_ENABLED: "true",
+      NEWSLETTER_INGESTION_DRY_RUN: "true",
+      GMAIL_CLIENT_ID: "client",
+      GMAIL_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN: "refresh",
+    });
+
+    const result = await runNewsletterIngestion({
+      now: new Date("2026-05-10T00:00:00.000Z"),
+    }, {
+      config,
+      db,
+      gmailClient,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.summary.message).toMatch(/label missing\/account mismatch/i);
+    expect(gmailClient.listNewsletterMessages).not.toHaveBeenCalled();
+    expect(gmailClient.getRawMessage).not.toHaveBeenCalled();
     expect(tables.newsletter_emails).toHaveLength(0);
     expect(tables.newsletter_story_extractions).toHaveLength(0);
     expect(tables.signal_posts).toHaveLength(0);

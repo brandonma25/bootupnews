@@ -13,12 +13,20 @@ export type GmailMessageRef = {
   threadId: string;
 };
 
+export type GmailLabel = {
+  id: string;
+  name: string;
+  messagesTotal: number | null;
+  messagesUnread: number | null;
+};
+
 export type GmailRawMessage = GmailMessageRef & {
   raw: string;
   internalDate: string | null;
 };
 
 export type GmailApiClient = {
+  getLabelByName(label: string): Promise<GmailLabel | null>;
   listNewsletterMessages(input: {
     label?: string;
     sinceDate: Date;
@@ -39,6 +47,15 @@ type GmailRawMessageResponse = {
   threadId?: string;
   raw?: string;
   internalDate?: string;
+};
+
+type GmailLabelsResponse = {
+  labels?: Array<{
+    id?: string;
+    name?: string;
+    messagesTotal?: number;
+    messagesUnread?: number;
+  }>;
 };
 
 type GmailTokenResponse = {
@@ -180,6 +197,30 @@ export function createGmailApiClient(input: {
   }
 
   return {
+    async getLabelByName(label) {
+      const normalizedLabel = normalizeLabel(label);
+      const accessToken = await getAccessToken();
+      const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/labels");
+      const body = await gmailFetchJson<GmailLabelsResponse>({
+        url,
+        accessToken,
+        fetchImpl,
+        failureLabel: "Gmail label preflight",
+      });
+      const labelMatch = (body.labels ?? []).find((entry) => entry.name === normalizedLabel);
+
+      if (!labelMatch?.id || !labelMatch.name) {
+        return null;
+      }
+
+      return {
+        id: labelMatch.id,
+        name: labelMatch.name,
+        messagesTotal: typeof labelMatch.messagesTotal === "number" ? labelMatch.messagesTotal : null,
+        messagesUnread: typeof labelMatch.messagesUnread === "number" ? labelMatch.messagesUnread : null,
+      };
+    },
+
     async listNewsletterMessages({ label = DEFAULT_NEWSLETTER_LABEL, sinceDate, maxResults }) {
       const accessToken = await getAccessToken();
       const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
@@ -244,4 +285,39 @@ export async function fetchBootUpBenchmarkEmails(
     sinceDate,
     maxResults: input.maxResults,
   });
+}
+
+export type GmailLabelPreflightResult =
+  | {
+      ok: true;
+      label: GmailLabel;
+    }
+  | {
+      ok: false;
+      label: string;
+      message: string;
+    };
+
+export async function verifyGmailNewsletterLabelVisible(
+  gmailClient: GmailApiClient,
+  label = DEFAULT_NEWSLETTER_LABEL,
+): Promise<GmailLabelPreflightResult> {
+  const normalizedLabel = normalizeLabel(label);
+  const visibleLabel = await gmailClient.getLabelByName(normalizedLabel);
+
+  if (!visibleLabel) {
+    return {
+      ok: false,
+      label: normalizedLabel,
+      message:
+        `Gmail label "${normalizedLabel}" is not visible to the authorized account ` +
+        "(label missing/account mismatch). " +
+        "Regenerate the refresh token from the Gmail account that contains that label.",
+    };
+  }
+
+  return {
+    ok: true,
+    label: visibleLabel,
+  };
 }

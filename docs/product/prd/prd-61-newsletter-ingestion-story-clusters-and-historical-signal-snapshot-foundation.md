@@ -41,6 +41,8 @@ This amendment supersedes the original runtime non-goals only for the controlled
 - Known newsletter sources in that label: Morning Brew, Semafor Flagship, TLDR, AP Wire, and 1440.
 - Backend integration uses the server-side Gmail API directly with OAuth2 refresh-token credentials supplied by environment variables.
 - Gmail MCP, Chrome, and personal browser state are not backend dependencies.
+- The controlled path must verify the exact Gmail label `boot-up-benchmark` is visible to the same REST OAuth token before message search.
+- If the label is missing, the runtime must fail closed with a sanitized label missing/account mismatch message before searching messages or writing records.
 - Newsletters are discovery and context sources, not final editorial judgment.
 - Newsletter-derived items are internal Article evidence candidates.
 - BM remains the editorial layer and writes all WITM manually.
@@ -50,6 +52,8 @@ This amendment supersedes the original runtime non-goals only for the controlled
 - `signal_posts.context_material` stores internal newsletter excerpt or framing for editorial grounding only.
 - `newsletter_emails.raw_content` is internal-only raw source material.
 - Dry-run mode is required and defaults on. Dry-run fetches and parses only in memory and performs no database writes.
+- A dedicated dry-run report command must produce sanitized inventory, extraction, source URL quality, category distribution, dedup, and promotion-preview output without writing newsletter or `signal_posts` records.
+- Promotion preview must reuse the same source URL, title/source dedup, and rank-availability rules as write-mode promotion while returning only read-only statuses: `eligible`, `invalid_source_url`, `duplicate_public_row`, or `no_available_candidate_rank`.
 - Runtime writes are fail-closed. Missing Gmail credentials, disabled ingestion, dry-run mode, production guard failure, Gmail auth failure, Gmail rate limits, or database errors must not publish or create live rows.
 - Production writes require all three runtime write gates: `NEWSLETTER_INGESTION_ENABLED=true`, `NEWSLETTER_INGESTION_DRY_RUN=false`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true`.
 - The Phase 1 parser is heuristic and conservative. It should prefer fewer higher-confidence newsletter Article candidates over noisy over-extraction.
@@ -71,7 +75,7 @@ This amendment supersedes the original runtime non-goals only for the controlled
 - No ranking threshold change.
 - No WITM threshold change.
 - No production migration execution.
-- No production newsletter ingestion write-mode execution during implementation.
+- No production newsletter ingestion write-mode execution without explicit BM authorization.
 - No production cron execution during implementation.
 
 ## Implementation Shape / System Impact
@@ -82,6 +86,8 @@ This amendment supersedes the original runtime non-goals only for the controlled
   - internal MIME/newsletter parser
   - storage/extraction helpers
   - controlled runner
+  - zero-write dry-run report script
+  - read-only promotion preview helper
   - guarded cron route, disabled by default through environment gates
 - RLS v1: service-role-only access for all new internal Phase 2 tables. No anon or authenticated policies are created for newsletter, Story Cluster, Signal evolution, or cross-event connection tables.
 - `published_slates` and `published_slate_items` remain internal service-role tables and become the historical snapshot foundation.
@@ -119,13 +125,40 @@ This amendment supersedes the original runtime non-goals only for the controlled
 - Existing public homepage and `/signals` query shapes remain unchanged and still require live published rows through app-controlled service-role queries.
 - Local validation passes or any failure is documented with exact scope.
 - Gmail search query uses `label:boot-up-benchmark` plus the configured since date.
+- Gmail label preflight proves exact `boot-up-benchmark` visibility before message search and fails closed on label missing/account mismatch.
 - Gmail credentials come only from environment variables and are never logged.
+- Dry-run report output excludes credentials, raw content, snippets, Gmail message IDs, and thread IDs.
+- Dry-run report lists sanitized email inventory, extraction counts, sample headlines, source URL quality, category distribution, read-only dedup analysis, and eligible promotion candidate title/source URL pairs.
 - Newsletter ingestion is idempotent by `newsletter_emails.gmail_message_id`; `gmail_thread_id` may repeat.
 - Newsletter parsing covers representative Morning Brew, Semafor Flagship, TLDR, AP Wire, 1440, malformed, and empty fixtures.
 - Promotion creates only non-live `needs_review` rows with WITM blank or human-required.
 - Promotion links `newsletter_story_extractions.signal_post_id` to created or safe existing non-live rows.
+- Promotion preview matches write-mode promotion skip/link/create rules without calling insert or update helpers.
 - Runtime dry-run and disabled modes perform no writes.
 - Public leakage tests prove `newsletter_emails.raw_content` and `signal_posts.context_material` are not selected or rendered publicly.
+
+## Editorial-Cycle Validation Closeout
+
+Controlled validation completed on `2026-05-11` in branch `fix/prd-61-newsletter-dry-run-validation`.
+
+Dry-run validation:
+- Gmail REST OAuth succeeded with the Web application client named `Boot Up Newsletter Ingestion OAuth Playground`.
+- The same token used by the controlled runner saw the exact Gmail label `boot-up-benchmark`.
+- Pre-counts were `newsletter_emails = 0`, `newsletter_story_extractions = 0`, and `signal_posts = 68`.
+- Dry-run fetched `3` labeled emails, extracted `24` newsletter-derived Article candidates, identified `5` eligible non-live Surface Placement promotion candidates, and recorded `0` failed emails.
+- Dry-run performed zero database writes, and post-counts remained unchanged.
+
+BM-authorized write validation:
+- The controlled newsletter runner was executed once with production write gates explicitly enabled.
+- The run stored `3` `newsletter_emails` rows, stored `24` `newsletter_story_extractions` rows, and created `5` non-live `signal_posts` review candidates.
+- Post-write counts were `newsletter_emails = 3`, `newsletter_story_extractions = 24`, and `signal_posts = 73`.
+- Candidate rows remained non-live review candidates; no publish path, cron path, RSS path, or `draft_only` path was run.
+- Public checks confirmed `/` HTTP `200` with the existing May 6 slate, `/signals` HTTP `200`, and latest public renderable Signal count `3`.
+- Local credential and OAuth capture files were deleted after the run.
+
+Remaining operational follow-up:
+- Remove temporary local OAuth redirect URI `http://127.0.0.1:53682/oauth2callback` from the `Boot Up Newsletter Ingestion OAuth Playground` Web client after no further local token generation is needed.
+- Production cron remains out of scope until separate BM approval.
 
 ## Evidence and Confidence
 
