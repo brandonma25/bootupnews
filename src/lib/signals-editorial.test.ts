@@ -1495,6 +1495,45 @@ describe("signals editorial workflow", () => {
     expect(insertedRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
+  it("reserves existing newsletter discovery candidates outside the RSS snapshot ranks", async () => {
+    const rows = Array.from({ length: 5 }, (_, index) =>
+      createRow({
+        id: `newsletter-${index + 1}`,
+        briefing_date: "2026-05-11",
+        rank: index + 1,
+        title: `Newsletter Candidate ${index + 1}`,
+        selection_reason: "Newsletter discovery candidate; BM review required.",
+        ai_why_it_matters: "",
+        why_it_matters_validation_status: "requires_human_rewrite",
+        why_it_matters_validation_failures: ["incomplete_sentence"],
+        why_it_matters_validation_details: ["BM must write structural why-it-matters manually before publication."],
+        editorial_status: "needs_review",
+        final_slate_rank: null,
+        final_slate_tier: null,
+        editorial_decision: "pending_review",
+        is_live: false,
+        published_at: null,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-05-11",
+      items: Array.from({ length: 20 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.insertedCount).toBe(15);
+    expect(result.message).toContain("Reserved 5 newsletter discovery candidate rank(s)");
+
+    const rssRows = rows.filter((row) => row.title.startsWith("Generated Signal"));
+    const newsletterRows = rows.filter((row) => row.title.startsWith("Newsletter Candidate"));
+    expect(rssRows).toHaveLength(15);
+    expect(rssRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    expect(newsletterRows.map((row) => row.rank)).toEqual([16, 17, 18, 19, 20]);
+  });
+
   it("draft_only mode persists only review rows with validation details", async () => {
     const rows: SignalPostRow[] = [];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
