@@ -46,3 +46,8 @@ SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE=1
 - Confirm PostHog Live Events receive the expected MVP events and that recordings/heatmaps are available only for public routes.
 - Confirm custom app properties do not contain emails, auth/session values, cookies, API keys, source URL query strings, full article body, full Why It Matters body, or private admin notes.
 - Confirm Sentry has browser-side error capture enabled with sanitized request URLs and sensitive fields.
+
+## Tracking Records
+- Canonical PRD: `docs/product/prd/prd-62-analytics-capacity-v1.md`.
+- Feature control row: `docs/product/feature-system.csv` row for `PRD-62`.
+- Validation/testing record: `docs/engineering/testing/2026-05-12-analytics-ux-diagnostics-validation.md`.
