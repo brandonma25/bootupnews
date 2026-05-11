@@ -10,6 +10,8 @@ const MAX_PROPERTY_KEYS = 40;
 const MAX_PROPERTY_STRING_LENGTH = 240;
 const MAX_PROPERTY_ARRAY_LENGTH = 16;
 const MAX_PROPERTY_DEPTH = 2;
+const MVP_VISITOR_STORAGE_KEY = "bootup:mvp-measurement:visitor-id";
+const MVP_SESSION_STORAGE_KEY = "bootup:mvp-measurement:session-id";
 
 const SECRET_PROPERTY_KEY_PATTERN =
   /(authorization|cookie|set-cookie|token|secret|password|passwd|api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|dsn|email)/i;
@@ -26,12 +28,14 @@ const ADMIN_OR_AUTH_URL_IGNORELIST = [
 
 let initialized = false;
 let routeSyncInstalled = false;
+let lastCapturedPageviewRoute = "";
 
 type PostHogClientConfig = {
   enabled: boolean;
   token: string;
   host: string;
   sessionReplayEnabled: boolean;
+  pageviewsEnabled: boolean;
   autocaptureEnabled: boolean;
   heatmapsEnabled: boolean;
   deadClicksEnabled: boolean;
@@ -49,6 +53,7 @@ export function readPostHogClientConfig(): PostHogClientConfig {
     token,
     host,
     sessionReplayEnabled,
+    pageviewsEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_PAGEVIEWS),
     autocaptureEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE),
     heatmapsEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS),
     deadClicksEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS),
@@ -109,6 +114,7 @@ export function initializePostHogClient() {
     });
 
     initialized = true;
+    capturePostHogPageview(config);
     installRouteSessionReplaySync(config);
     return posthog;
   } catch {
@@ -176,7 +182,7 @@ function buildPostHogMvpProperties(event: ValidatedMvpMeasurementEvent): Propert
 
 async function sendPostHogBrowserCapture(
   config: Pick<PostHogClientConfig, "host" | "token">,
-  eventName: ValidatedMvpMeasurementEvent["eventName"],
+  eventName: ValidatedMvpMeasurementEvent["eventName"] | "$pageview",
   properties: Properties,
 ) {
   try {
@@ -418,7 +424,10 @@ function installRouteSessionReplaySync(config: PostHogClientConfig) {
   }
 
   routeSyncInstalled = true;
-  const sync = () => syncSessionRecordingForRoute(posthog, config);
+  const sync = () => {
+    syncSessionRecordingForRoute(posthog, config);
+    capturePostHogPageview(config);
+  };
   const originalPushState = window.history.pushState;
   const originalReplaceState = window.history.replaceState;
 
@@ -435,6 +444,58 @@ function installRouteSessionReplaySync(config: PostHogClientConfig) {
   };
 
   window.addEventListener("popstate", sync);
+}
+
+function capturePostHogPageview(config: Pick<PostHogClientConfig, "host" | "pageviewsEnabled" | "token">) {
+  if (!config.pageviewsEnabled || typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const route = sanitizeRoutePath(window.location.href) || "/";
+    if (!isPostHogSessionReplayEligible(route) || route === lastCapturedPageviewRoute) {
+      return;
+    }
+
+    lastCapturedPageviewRoute = route;
+    void sendPostHogBrowserCapture(
+      config,
+      "$pageview",
+      sanitizePostHogProperties({
+        $current_url: window.location.href,
+        $pathname: window.location.pathname,
+        route,
+        mvpVisitorId: getOrCreatePostHogStorageId(window.localStorage, MVP_VISITOR_STORAGE_KEY, "mvp"),
+        mvpSessionId: getOrCreatePostHogStorageId(window.sessionStorage, MVP_SESSION_STORAGE_KEY, "mvp_session"),
+      }),
+    );
+  } catch {
+    // PostHog pageview capture is best effort and must never affect routing.
+  }
+}
+
+function getOrCreatePostHogStorageId(storage: Storage, key: string, prefix: string) {
+  try {
+    const existing = storage.getItem(key);
+    if (existing?.startsWith(`${prefix}_`)) {
+      return existing;
+    }
+
+    const value = createPostHogStorageId(prefix);
+    storage.setItem(key, value);
+    return value;
+  } catch {
+    return createPostHogStorageId(prefix);
+  }
+}
+
+function createPostHogStorageId(prefix: string) {
+  const randomId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+  return `${prefix}_${randomId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
 function syncSessionRecordingForRoute(
