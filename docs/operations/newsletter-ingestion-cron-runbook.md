@@ -2,7 +2,9 @@
 
 Source of truth: PRD-61
 
-Cron route: `/api/cron/newsletter-ingestion`
+Cron routes:
+- Scheduled combined route: `/api/cron/fetch-editorial-inputs`
+- Newsletter-only diagnostic route: `/api/cron/newsletter-ingestion`
 
 Default state: disabled and dry-run.
 
@@ -162,8 +164,10 @@ Required post-flight:
 
 Do this only after PR review, dry-run validation, and BM approval.
 
-1. Add a Vercel cron schedule for `/api/cron/newsletter-ingestion`.
-2. Use 6 AM Taipei daily: `22:00 UTC`, schedule `0 22 * * *`.
+1. Add Vercel cron schedules for `/api/cron/fetch-editorial-inputs`.
+2. Use the approved Taipei evening fetch windows:
+   - 6:15 PM Taipei = `10:15 UTC`, schedule `15 10 * * *`
+   - 7:45 PM Taipei = `11:45 UTC`, schedule `45 11 * * *`
 3. Configure production env:
    - `NEWSLETTER_INGESTION_ENABLED=true`
    - `NEWSLETTER_INGESTION_DRY_RUN=false`
@@ -173,7 +177,7 @@ Do this only after PR review, dry-run validation, and BM approval.
    - `CRON_SECRET`
 4. Confirm the first production run only creates non-live review candidates.
 
-This PR does not add the production Vercel cron schedule.
+The combined cron route runs RSS first, then newsletter ingestion with `writeCandidates: true`. Newsletter writes remain fail-closed unless the production env gates above are set.
 
 ## Disable Immediately
 
