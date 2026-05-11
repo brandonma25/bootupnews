@@ -1,7 +1,7 @@
 "use client";
 
 import posthog from "posthog-js";
-import type { CaptureResult, Properties } from "posthog-js";
+import type { AutocaptureConfig, CaptureResult, CapturedNetworkRequest, Properties } from "posthog-js";
 
 import type { ValidatedMvpMeasurementEvent } from "@/lib/mvp-measurement";
 
@@ -19,6 +19,10 @@ const ROUTE_PROPERTY_KEY_PATTERN = /(^route$|path(name)?$)/i;
 const URL_PROPERTY_KEY_PATTERN = /(url|href|link)$/i;
 const ADMIN_OR_AUTH_ROUTE_PATTERN =
   /^\/(?:admin|dashboard|internal|account|login|signup|auth|reset-password|forgot-password)(?:\/|$)/;
+const ADMIN_OR_AUTH_URL_IGNORELIST = [
+  /^https?:\/\/[^/]+\/(?:admin|dashboard|internal|account|login|signup|auth|reset-password|forgot-password)(?:[/?#]|$)/i,
+  /^\/(?:admin|dashboard|internal|account|login|signup|auth|reset-password|forgot-password)(?:[/?#]|$)/i,
+];
 
 let initialized = false;
 let routeSyncInstalled = false;
@@ -28,23 +32,27 @@ type PostHogClientConfig = {
   token: string;
   host: string;
   sessionReplayEnabled: boolean;
+  autocaptureEnabled: boolean;
+  heatmapsEnabled: boolean;
+  deadClicksEnabled: boolean;
+  replaySampleRate: number;
 };
 
 export function readPostHogClientConfig(): PostHogClientConfig {
-  const enabled = ENABLED_VALUES.has(
-    process.env.NEXT_PUBLIC_ENABLE_POSTHOG?.trim().toLowerCase() ?? "",
-  );
+  const enabled = readEnabledValue(process.env.NEXT_PUBLIC_ENABLE_POSTHOG);
   const token = process.env.NEXT_PUBLIC_POSTHOG_TOKEN?.trim() ?? "";
   const host = normalizePostHogHost(process.env.NEXT_PUBLIC_POSTHOG_HOST);
-  const sessionReplayEnabled = ENABLED_VALUES.has(
-    process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY?.trim().toLowerCase() ?? "",
-  );
+  const sessionReplayEnabled = readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY);
 
   return {
     enabled: enabled && Boolean(token && host),
     token,
     host,
     sessionReplayEnabled,
+    autocaptureEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_AUTOCAPTURE),
+    heatmapsEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS),
+    deadClicksEnabled: readEnabledValue(process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS),
+    replaySampleRate: readRatioValue(process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE, 1),
   };
 }
 
@@ -61,21 +69,27 @@ export function initializePostHogClient() {
   try {
     posthog.init(config.token, {
       api_host: config.host,
-      autocapture: false,
+      autocapture: buildAutocaptureConfig(config.autocaptureEnabled),
       capture_pageview: false,
       capture_pageleave: false,
+      capture_dead_clicks: config.deadClicksEnabled,
+      capture_heatmaps: config.heatmapsEnabled,
       disable_session_recording: true,
+      enable_heatmaps: config.heatmapsEnabled,
       mask_all_element_attributes: true,
       mask_all_text: true,
       mask_personal_data_properties: true,
       property_denylist: [
-        "$current_url",
-        "$host",
-        "$pathname",
-        "$referrer",
-        "$referring_domain",
+        "authorization",
         "email",
         "cookie",
+        "set-cookie",
+        "password",
+        "secret",
+        "api_key",
+        "apikey",
+        "access_token",
+        "refresh_token",
       ],
       session_recording: {
         maskAllInputs: true,
@@ -83,17 +97,19 @@ export function initializePostHogClient() {
         blockSelector: "input, textarea, select, [contenteditable=true], [data-ph-no-capture], .ph-no-capture",
         recordBody: false,
         recordHeaders: false,
+        sampleRate: config.replaySampleRate,
+        maskCapturedNetworkRequestFn: sanitizeCapturedNetworkRequest,
       },
       before_send(capture) {
         return sanitizePostHogCapture(capture);
       },
       loaded(instance) {
-        syncSessionRecordingForRoute(instance, config.sessionReplayEnabled);
+        syncSessionRecordingForRoute(instance, config);
       },
     });
 
     initialized = true;
-    installRouteSessionReplaySync(config.sessionReplayEnabled);
+    installRouteSessionReplaySync(config);
     return posthog;
   } catch {
     return null;
@@ -102,12 +118,18 @@ export function initializePostHogClient() {
 
 export function capturePostHogMvpMeasurementEvent(event: ValidatedMvpMeasurementEvent) {
   try {
-    const client = initializePostHogClient();
-    if (!client) {
+    const config = readPostHogClientConfig();
+    if (!config.enabled || typeof window === "undefined") {
       return;
     }
 
-    client.capture(event.eventName, buildPostHogMvpProperties(event));
+    initializePostHogClient();
+    const properties = buildPostHogMvpProperties(event);
+    if (!isPostHogCaptureEligible(properties)) {
+      return;
+    }
+
+    void sendPostHogBrowserCapture(config, event.eventName, properties);
   } catch {
     // Product analytics is best effort and must never affect reading or navigation.
   }
@@ -152,8 +174,42 @@ function buildPostHogMvpProperties(event: ValidatedMvpMeasurementEvent): Propert
   });
 }
 
+async function sendPostHogBrowserCapture(
+  config: Pick<PostHogClientConfig, "host" | "token">,
+  eventName: ValidatedMvpMeasurementEvent["eventName"],
+  properties: Properties,
+) {
+  try {
+    const endpoint = `${config.host}/capture/`;
+    await fetch(endpoint, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      keepalive: true,
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        api_key: config.token,
+        event: eventName,
+        properties: {
+          ...properties,
+          distinct_id: properties.mvpVisitorId,
+          $session_id: properties.mvpSessionId,
+        },
+      }),
+    });
+  } catch {
+    // Direct PostHog capture is best effort and must never block reading.
+  }
+}
+
 function sanitizePostHogCapture(capture: CaptureResult | null) {
   if (!capture) {
+    return null;
+  }
+
+  if (!isPostHogCaptureEligible(capture.properties)) {
     return null;
   }
 
@@ -217,7 +273,48 @@ function sanitizeStringProperty(key: string, value: string) {
 }
 
 function sanitizePropertyKey(key: string) {
-  return key.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 64);
+  return key.replace(/[^a-zA-Z0-9_$.-]/g, "_").slice(0, 64);
+}
+
+function readEnabledValue(value: string | undefined) {
+  return ENABLED_VALUES.has(value?.trim().toLowerCase() ?? "");
+}
+
+function readRatioValue(value: string | undefined, fallback: number) {
+  const rawValue = value?.trim();
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseFloat(rawValue);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.min(parsed, 1));
+}
+
+function buildAutocaptureConfig(enabled: boolean): false | AutocaptureConfig {
+  if (!enabled) {
+    return false;
+  }
+
+  return {
+    capture_copied_text: false,
+    dom_event_allowlist: ["click"],
+    element_allowlist: ["a", "button"],
+    element_attribute_ignorelist: [
+      "href",
+      "src",
+      "value",
+      "title",
+      "aria-label",
+      "data-testid",
+      "data-mvp-signal-slug",
+      "data-mvp-source-name",
+    ],
+    url_ignorelist: ADMIN_OR_AUTH_URL_IGNORELIST,
+  };
 }
 
 function normalizePostHogHost(value: string | undefined) {
@@ -274,13 +371,54 @@ function isUrlLike(value: string) {
   return /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
 }
 
-function installRouteSessionReplaySync(sessionReplayEnabled: boolean) {
+function sanitizeCapturedNetworkRequest(data: CapturedNetworkRequest) {
+  try {
+    const sanitized = {
+      ...data,
+      name: typeof data.name === "string" ? sanitizeUrl(data.name) : data.name,
+      requestBody: null,
+      requestHeaders: undefined,
+      responseBody: null,
+      responseHeaders: undefined,
+    };
+
+    return sanitized;
+  } catch {
+    return undefined;
+  }
+}
+
+function isPostHogCaptureEligible(properties: Properties | undefined) {
+  if (typeof window !== "undefined" && !isPostHogSessionReplayEligible(window.location.pathname)) {
+    return false;
+  }
+
+  const route = readCaptureRoute(properties);
+  return route ? isPostHogSessionReplayEligible(route) : true;
+}
+
+function readCaptureRoute(properties: Properties | undefined) {
+  if (!properties) {
+    return "";
+  }
+
+  for (const key of ["$pathname", "pathname", "path", "route", "$current_url", "currentUrl"]) {
+    const value = properties[key];
+    if (typeof value === "string" && value.trim()) {
+      return sanitizeRoutePath(value);
+    }
+  }
+
+  return "";
+}
+
+function installRouteSessionReplaySync(config: PostHogClientConfig) {
   if (routeSyncInstalled || typeof window === "undefined") {
     return;
   }
 
   routeSyncInstalled = true;
-  const sync = () => syncSessionRecordingForRoute(posthog, sessionReplayEnabled);
+  const sync = () => syncSessionRecordingForRoute(posthog, config);
   const originalPushState = window.history.pushState;
   const originalReplaceState = window.history.replaceState;
 
@@ -301,15 +439,15 @@ function installRouteSessionReplaySync(sessionReplayEnabled: boolean) {
 
 function syncSessionRecordingForRoute(
   client: Pick<typeof posthog, "startSessionRecording" | "stopSessionRecording">,
-  sessionReplayEnabled: boolean,
+  config: Pick<PostHogClientConfig, "sessionReplayEnabled" | "replaySampleRate">,
 ) {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
-    if (sessionReplayEnabled && isPostHogSessionReplayEligible(window.location.pathname)) {
-      client.startSessionRecording({ sampling: true });
+    if (config.sessionReplayEnabled && isPostHogSessionReplayEligible(window.location.pathname)) {
+      client.startSessionRecording(config.replaySampleRate >= 1 ? true : undefined);
     } else {
       client.stopSessionRecording();
     }
