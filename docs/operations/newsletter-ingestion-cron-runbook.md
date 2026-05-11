@@ -160,6 +160,14 @@ Required post-flight:
 - Public surface remained gated: `/` HTTP 200 with the May 6 slate, `/signals` HTTP 200, latest public renderable Signal count `3`.
 - Local secret files and OAuth capture files were deleted after validation.
 
+2026-05-12 production Gmail token remediation result:
+- Production Gmail OAuth was regenerated from the Gmail account that exposes exact label `boot-up-benchmark`.
+- Vercel Production `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN` were realigned to the same OAuth Playground Web application client without recording secret values.
+- Production redeploy reached `READY`.
+- Protected newsletter route returned HTTP `200` with `fetchedMessageCount=3`, `existingEmailCount=3`, `storedEmailCount=0`, `extractedStoryCount=0`, `promotedCandidateCount=0`, and `failedEmailCount=0`.
+- Protected combined editorial-input route returned HTTP `200`; RSS reported the daily Signal snapshot already existed, and newsletter ingestion remained successful and idempotent.
+- Public surface remained gated: `/` HTTP 200 with the May 6 slate, `/signals` HTTP 200 with `3` published Signals.
+
 ## Enable Production Cron After Approval
 
 Do this only after PR review, dry-run validation, and BM approval.
