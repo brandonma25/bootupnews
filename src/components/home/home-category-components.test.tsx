@@ -70,6 +70,7 @@ function createSection(overrides: Partial<HomepageCategorySection>): HomepageCat
     label: overrides.label ?? "Tech",
     description: overrides.description ?? "Technology coverage.",
     events: overrides.events ?? [],
+    articles: overrides.articles ?? [],
     fallbackEvents: overrides.fallbackEvents ?? [],
     placeholderCount: overrides.placeholderCount ?? 0,
     state: overrides.state ?? "empty",
@@ -125,6 +126,46 @@ describe("CategoryTabStrip", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
 
     fetchSpy.mockRestore();
+  });
+
+  it("renders category Article rows ahead of fallback Signal cards", () => {
+    render(
+      <CategoryTabStrip
+        topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
+        categorySections={[
+          createSection({
+            key: "tech",
+            label: "Tech",
+            events: [createEvent({ id: "tech-signal", title: "Tech Signal card" })],
+            articles: [
+              {
+                id: "article-1",
+                category: "tech",
+                title: "Tech Article row",
+                sourceName: "The Verge",
+                url: "https://www.theverge.com/article-1",
+                summary: "Article summary.",
+                publishedAt: "2026-05-12T10:00:00.000Z",
+                ingestedAt: "2026-05-12T11:45:00.000Z",
+                runId: "pipeline-1",
+              },
+            ],
+            state: "sparse",
+          }),
+        ]}
+        renderTopEvent={(event) => <article>{event.title}</article>}
+        renderCategoryEvent={(event) => <article>{event.title}</article>}
+        renderCategoryArticle={(article) => <a href={article.url}>{article.title}</a>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
+
+    expect(screen.getByRole("link", { name: "Tech Article row" })).toHaveAttribute(
+      "href",
+      "https://www.theverge.com/article-1",
+    );
+    expect(screen.queryByText("Tech Signal card")).not.toBeInTheDocument();
   });
 
   it("lets signed-in users open populated category tabs without the soft gate", () => {

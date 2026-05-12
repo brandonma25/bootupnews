@@ -28,6 +28,20 @@ const PAYWALL_LIMITED_HOSTS = [
   "theinformation.com",
   "stratechery.com",
   "puck.news",
+  "foreignaffairs.com",
+  "marketwatch.com",
+];
+
+const PAYWALL_LIMITED_SOURCE_NAMES = [
+  "financial times",
+  "bloomberg",
+  "wall street journal",
+  "the economist",
+  "the information",
+  "stratechery",
+  "puck",
+  "foreign affairs",
+  "marketwatch",
 ];
 
 const CORE_SUPPORTING_ROLES = new Set<SourceRole>([
@@ -103,16 +117,36 @@ function sourceHost(value: string | null | undefined) {
   }
 }
 
+export function isPaywallLimitedHost(value: string | null | undefined) {
+  const host = sourceHost(value);
+
+  return PAYWALL_LIMITED_HOSTS.some(
+    (paywallHost) => host === paywallHost || host.endsWith(`.${paywallHost}`),
+  );
+}
+
+export function isLikelyPaywalledArticleSource(input: {
+  sourceName?: string | null;
+  url?: string | null;
+  homepageUrl?: string | null;
+  feedUrl?: string | null;
+}) {
+  const normalizedSourceName = cleanText(input.sourceName).toLowerCase();
+
+  return (
+    [input.url, input.homepageUrl, input.feedUrl].some((value) => isPaywallLimitedHost(value)) ||
+    PAYWALL_LIMITED_SOURCE_NAMES.some((sourceName) => normalizedSourceName.includes(sourceName))
+  );
+}
+
 function isPaywallLimitedSource(source: SourceDefinition, articleUrl: string) {
   const hostCandidates = [
-    sourceHost(articleUrl),
-    sourceHost(source.homepageUrl),
-    sourceHost(source.fetch.feedUrl),
+    articleUrl,
+    source.homepageUrl,
+    source.fetch.feedUrl,
   ];
 
-  return hostCandidates.some((host) =>
-    PAYWALL_LIMITED_HOSTS.some((paywallHost) => host === paywallHost || host.endsWith(`.${paywallHost}`)),
-  );
+  return hostCandidates.some((value) => isPaywallLimitedHost(value));
 }
 
 function isTitleOnlySummary(summary: string, title: string) {
