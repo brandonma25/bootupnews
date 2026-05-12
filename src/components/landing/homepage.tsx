@@ -23,7 +23,7 @@ import {
   type EditorialWhyItMattersContent,
 } from "@/lib/editorial-content";
 import { trackMvpMeasurementEvent } from "@/lib/mvp-measurement-client";
-import type { DashboardData, ViewerAccount } from "@/lib/types";
+import type { DashboardData, HomepageCategoryArticle, ViewerAccount } from "@/lib/types";
 import { cn, getBriefingDateKey, minutesToLabel } from "@/lib/utils";
 
 type LandingHomepageProps = {
@@ -125,6 +125,7 @@ export default function LandingHomepage({
               }}
             />
           )}
+          renderCategoryArticle={(article) => <CategoryArticleRow article={article} />}
         />
 
         <DevelopingNow events={developingNowEvents} />
@@ -145,6 +146,54 @@ export default function LandingHomepage({
       </div>
     </AppShell>
   );
+}
+
+function CategoryArticleRow({ article }: { article: HomepageCategoryArticle }) {
+  const summary = article.summary.trim();
+
+  return (
+    <a
+      href={article.url}
+      target="_blank"
+      rel="noreferrer"
+      className="group block rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3 transition-colors hover:border-[var(--text-secondary)]"
+      data-mvp-measurement-event="source_click"
+      data-mvp-route="/"
+      data-mvp-surface={`home_${article.category}_article_tab`}
+      data-mvp-source-name={article.sourceName}
+    >
+      <article className="space-y-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--text-secondary)]">
+          <span>{formatArticleDate(article.publishedAt)}</span>
+          <span aria-hidden="true">/</span>
+          <span>{article.sourceName}</span>
+        </div>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-base font-semibold leading-snug text-[var(--text-primary)] group-hover:text-[var(--accent)]">
+            {article.title}
+          </h3>
+          <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
+        </div>
+        {summary ? (
+          <p className="line-clamp-2 text-sm leading-6 text-[var(--text-secondary)]">{summary}</p>
+        ) : null}
+      </article>
+    </a>
+  );
+}
+
+function formatArticleDate(value: string) {
+  const timestamp = Date.parse(value);
+
+  if (!Number.isFinite(timestamp)) {
+    return "Latest";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "Asia/Taipei",
+  }).format(new Date(timestamp));
 }
 
 function dedupeEvents(events: Array<HomepageEvent | null>) {

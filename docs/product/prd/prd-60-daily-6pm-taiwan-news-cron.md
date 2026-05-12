@@ -19,6 +19,7 @@ The editor needs generated Top 5 Signal Cards and newsletter-derived review cand
 - Add a protected `/api/cron/fetch-news` endpoint.
 - Require `Authorization: Bearer <CRON_SECRET>`.
 - Reuse the existing daily briefing generation and editorial snapshot persistence logic.
+- Persist Article candidate `published_at` metadata so cron-backed homepage category tabs can render Article dates without fetching feeds during homepage SSR.
 - Reuse the existing PRD-61 newsletter label preflight, parser, idempotent storage, and non-live review-candidate promotion gates.
 - Return a sanitized JSON summary with timestamp, success state, pipeline counts, and persistence result.
 - Refuse to persist deterministic seed-fallback output as editorial Signal Cards.
@@ -35,7 +36,7 @@ The editor needs generated Top 5 Signal Cards and newsletter-derived review cand
 
 ## Implementation Shape / System Impact
 
-The scheduled route delegates first to the existing `generateDailyBriefing` pipeline and `persistSignalPostsForBriefing` editorial read-model persistence, then to `runNewsletterIngestion({ writeCandidates: true })`. The cron wrapper adds authorization, observability, failure handling, seed-fallback protection through the existing RSS path, PRD-61 newsletter env/write gates, and a sanitized combined JSON run summary.
+The scheduled route delegates first to the existing `generateDailyBriefing` pipeline and `persistSignalPostsForBriefing` editorial read-model persistence, then to `runNewsletterIngestion({ writeCandidates: true })`. The cron wrapper adds authorization, observability, failure handling, seed-fallback protection through the existing RSS path, PRD-61 newsletter env/write gates, and a sanitized combined JSON run summary. The RSS pipeline also writes normalized Article candidates synchronously enough for serverless cron execution to retain candidate rows for downstream persisted read models.
 
 ## Terminology Requirement
 
@@ -59,6 +60,7 @@ The scheduled route delegates first to the existing `generateDailyBriefing` pipe
 - Unauthorized requests return HTTP `401` and do not call the pipeline.
 - Authorized requests call the existing RSS pipeline once and the existing PRD-61 newsletter ingestion path once.
 - Successful authorized requests persist generated Top 5 Signal Cards for editorial review.
+- Successful authorized RSS runs persist normalized Article candidate rows with source URL, title, source name, cron ingestion time, and Article publication date when available.
 - Successful authorized newsletter runs create only non-live `needs_review` review candidates.
 - Seed fallback output is not persisted.
 - Response JSON includes `success`, `timestamp`, and `summary`.

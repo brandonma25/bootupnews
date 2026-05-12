@@ -238,6 +238,7 @@ export type DashboardData = {
   topics: Topic[];
   sources: Source[];
   publicRankedItems?: BriefingItem[];
+  homepageCategoryArticles?: HomepageCategoryArticleMap;
   homepageFreshnessNotice?: {
     kind: "stale" | "empty";
     text: string;
@@ -258,6 +259,22 @@ export type DashboardData = {
     };
   };
 };
+
+export type HomepageArticleCategory = "tech" | "finance" | "politics";
+
+export type HomepageCategoryArticle = {
+  id: string;
+  category: HomepageArticleCategory;
+  title: string;
+  sourceName: string;
+  url: string;
+  summary: string;
+  publishedAt: string;
+  ingestedAt: string;
+  runId: string;
+};
+
+export type HomepageCategoryArticleMap = Record<HomepageArticleCategory, HomepageCategoryArticle[]>;
 
 export type ViewerAccount = {
   id: string;

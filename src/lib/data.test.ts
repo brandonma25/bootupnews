@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const safeGetUser = vi.fn();
 const createSupabaseServerClient = vi.fn();
+const createSupabaseServiceRoleClient = vi.fn();
 const getHomepageSignalSnapshot = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   safeGetUser,
   createSupabaseServerClient,
+  createSupabaseServiceRoleClient,
 }));
 
 vi.mock("@/lib/signals-editorial", () => ({
@@ -164,8 +166,10 @@ describe("homepage read model", () => {
   beforeEach(() => {
     safeGetUser.mockReset();
     createSupabaseServerClient.mockReset();
+    createSupabaseServiceRoleClient.mockReset();
     getHomepageSignalSnapshot.mockReset();
     createSupabaseServerClient.mockResolvedValue(null);
+    createSupabaseServiceRoleClient.mockReturnValue(null);
     safeGetUser.mockResolvedValue({
       supabase: null,
       user: null,
@@ -356,8 +360,10 @@ describe("account page read model", () => {
   beforeEach(() => {
     safeGetUser.mockReset();
     createSupabaseServerClient.mockReset();
+    createSupabaseServiceRoleClient.mockReset();
     getHomepageSignalSnapshot.mockReset();
     createSupabaseServerClient.mockResolvedValue(null);
+    createSupabaseServiceRoleClient.mockReturnValue(null);
   });
 
   it("keeps account SSR on auth, profile, and source reads only", async () => {

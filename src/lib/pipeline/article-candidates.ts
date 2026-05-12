@@ -32,6 +32,26 @@ type CandidateUpdate = {
   };
 };
 
+type CandidateInsertRow = {
+  run_id: string;
+  ingested_at: string;
+  source_name: string;
+  source_tier: string | null;
+  canonical_url: string;
+  title: string;
+  summary: string | null;
+  keywords: string[] | null;
+  entities: string[] | null;
+  published_at: string;
+  cluster_id: string | null;
+  ranking_score: number | null;
+  surfaced: boolean;
+  pipeline_stage_reached: PipelineStageReached;
+  drop_reason: CandidateDropReason | null;
+};
+
+type LegacyCandidateInsertRow = Omit<CandidateInsertRow, "published_at">;
+
 function getPipelineCandidateClient() {
   return createSupabaseServiceRoleClient();
 }
@@ -85,7 +105,7 @@ function schedulePipelineCandidateWrite(
   runId: string,
   operation: (client: PipelineCandidateClient) => Promise<void>,
 ) {
-  void runPipelineCandidateWrite(label, runId, operation);
+  return runPipelineCandidateWrite(label, runId, operation);
 }
 
 function getSourceTier(article: NormalizedArticle) {
@@ -154,7 +174,40 @@ function getDedupDropReasons(articles: NormalizedArticle[]) {
   return dropReasons;
 }
 
-export function persistNormalizedArticleCandidates({
+function isMissingPublishedAtColumnError(error: unknown) {
+  const maybeError = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  const haystack = [maybeError.code, maybeError.message, maybeError.details, maybeError.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    haystack.includes("42703") ||
+    (haystack.includes("published_at") &&
+      (haystack.includes("does not exist") || haystack.includes("could not find")))
+  );
+}
+
+function omitPublishedAt(rows: CandidateInsertRow[]): LegacyCandidateInsertRow[] {
+  return rows.map((row) => ({
+    run_id: row.run_id,
+    ingested_at: row.ingested_at,
+    source_name: row.source_name,
+    source_tier: row.source_tier,
+    canonical_url: row.canonical_url,
+    title: row.title,
+    summary: row.summary,
+    keywords: row.keywords,
+    entities: row.entities,
+    cluster_id: row.cluster_id,
+    ranking_score: row.ranking_score,
+    surfaced: row.surfaced,
+    pipeline_stage_reached: row.pipeline_stage_reached,
+    drop_reason: row.drop_reason,
+  }));
+}
+
+export async function persistNormalizedArticleCandidates({
   runId,
   articles,
   ingestedAt = new Date(),
@@ -167,8 +220,8 @@ export function persistNormalizedArticleCandidates({
     return;
   }
 
-  schedulePipelineCandidateWrite("normalized_insert", runId, async (client) => {
-    const rows = articles.map((article) => ({
+  await schedulePipelineCandidateWrite("normalized_insert", runId, async (client) => {
+    const rows = articles.map((article): CandidateInsertRow => ({
       run_id: runId,
       ingested_at: ingestedAt.toISOString(),
       source_name: article.source,
@@ -178,14 +231,19 @@ export function persistNormalizedArticleCandidates({
       summary: article.content || null,
       keywords: article.keywords.length ? article.keywords : null,
       entities: article.normalized_entities.length ? article.normalized_entities : article.entities,
+      published_at: article.published_at,
       cluster_id: null,
       ranking_score: null,
       surfaced: false,
-      pipeline_stage_reached: "normalized" satisfies PipelineStageReached,
+      pipeline_stage_reached: "normalized",
       drop_reason: null,
     }));
 
-    const result = await client.from(PIPELINE_ARTICLE_CANDIDATES_TABLE).insert(rows);
+    let result = await client.from(PIPELINE_ARTICLE_CANDIDATES_TABLE).insert(rows);
+    if (result.error && isMissingPublishedAtColumnError(result.error)) {
+      result = await client.from(PIPELINE_ARTICLE_CANDIDATES_TABLE).insert(omitPublishedAt(rows));
+    }
+
     if (result.error) {
       throw result.error;
     }
@@ -197,7 +255,7 @@ export function persistNormalizedArticleCandidates({
   });
 }
 
-export function updateArticleCandidateClusters({
+export async function updateArticleCandidateClusters({
   runId,
   clusters,
 }: {
@@ -219,7 +277,7 @@ export function updateArticleCandidateClusters({
     return;
   }
 
-  schedulePipelineCandidateWrite("cluster_update", runId, async (client) => {
+  await schedulePipelineCandidateWrite("cluster_update", runId, async (client) => {
     await applyCandidateUpdates(client, runId, updates);
     logPipelineEvent("info", "Updated article candidate cluster assignments", {
       run_id: runId,
@@ -228,7 +286,7 @@ export function updateArticleCandidateClusters({
   });
 }
 
-export function updateArticleCandidateRankingOutcomes({
+export async function updateArticleCandidateRankingOutcomes({
   runId,
   normalizedArticles,
   dedupedArticles,
@@ -299,7 +357,7 @@ export function updateArticleCandidateRankingOutcomes({
     };
   });
 
-  schedulePipelineCandidateWrite("ranking_surface_update", runId, async (client) => {
+  await schedulePipelineCandidateWrite("ranking_surface_update", runId, async (client) => {
     await applyCandidateUpdates(client, runId, updates);
     logPipelineEvent("info", "Updated article candidate ranking outcomes", {
       run_id: runId,

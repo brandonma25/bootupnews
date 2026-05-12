@@ -61,9 +61,9 @@ export async function runClusterFirstPipeline(options: {
   const rankedStoryClusters = rankStoryClusters(clusters);
 
   if (shouldPersistArticleCandidates) {
-    persistNormalizedArticleCandidates({ runId: run.run_id, articles: normalized });
-    updateArticleCandidateClusters({ runId: run.run_id, clusters });
-    updateArticleCandidateRankingOutcomes({
+    await persistNormalizedArticleCandidates({ runId: run.run_id, articles: normalized });
+    await updateArticleCandidateClusters({ runId: run.run_id, clusters });
+    await updateArticleCandidateRankingOutcomes({
       runId: run.run_id,
       normalizedArticles: normalized,
       dedupedArticles: deduped,

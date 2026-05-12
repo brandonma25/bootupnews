@@ -1,4 +1,9 @@
-import type { DashboardData, BriefingItem, EventIntelligence } from "@/lib/types";
+import type {
+  DashboardData,
+  BriefingItem,
+  EventIntelligence,
+  HomepageCategoryArticle,
+} from "@/lib/types";
 import {
   getEditorialHomepagePreviewText,
   type EditorialWhyItMattersContent,
@@ -75,6 +80,7 @@ export type HomepageCategorySection = {
   label: string;
   description: string;
   events: HomepageEvent[];
+  articles: HomepageCategoryArticle[];
   fallbackEvents: HomepageEvent[];
   placeholderCount: number;
   state: "populated" | "sparse" | "empty";
@@ -220,6 +226,11 @@ export function buildHomepageViewModel(
   });
   const categoryTabSourceEvents = categoryTabPool.sourceEvents;
   const excludedCategoryTabIds = new Set(categoryTabPool.initialExcludedEventIds);
+  const categoryArticleMap = data.homepageCategoryArticles ?? {
+    tech: [],
+    finance: [],
+    politics: [],
+  };
   const categorySections = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
     const sectionSelection = selectCategoryTabEvents({
       rankedEvents: categoryTabSourceEvents,
@@ -266,12 +277,13 @@ export function buildHomepageViewModel(
       label: getCategoryTabLabel(category.key),
       description: getHomepageCategoryDescription(category.key),
       events: displayEvents,
+      articles: categoryArticleMap[category.key] ?? [],
       fallbackEvents: [] as HomepageEvent[],
       placeholderCount: 0,
       state:
-        displayEvents.length >= 3
+        displayEvents.length + (categoryArticleMap[category.key]?.length ?? 0) >= 3
           ? "populated"
-          : displayEvents.length > 0
+          : displayEvents.length + (categoryArticleMap[category.key]?.length ?? 0) > 0
             ? "sparse"
             : "empty",
       emptyReason,

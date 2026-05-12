@@ -9,6 +9,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import type { HomepageCategorySection, HomepageEvent } from "@/lib/homepage-model";
+import type { HomepageCategoryArticle } from "@/lib/types";
 import type { HomepageCategoryKey } from "@/lib/homepage-taxonomy";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,11 @@ export type CategoryTabStripProps = {
     section: HomepageCategorySection,
     index: number,
   ) => ReactNode;
+  renderCategoryArticle?: (
+    article: HomepageCategoryArticle,
+    section: HomepageCategorySection,
+    index: number,
+  ) => ReactNode;
   topEventsEmptyState?: ReactNode;
   isAuthenticated?: boolean;
   gatedCategoryState?: ReactNode | ((args: GatedCategoryStateArgs) => ReactNode);
@@ -51,6 +57,7 @@ export function CategoryTabStrip({
   categorySections,
   renderTopEvent,
   renderCategoryEvent,
+  renderCategoryArticle,
   topEventsEmptyState,
   isAuthenticated = true,
   gatedCategoryState,
@@ -129,12 +136,18 @@ export function CategoryTabStrip({
       </TabsContent>
 
       {visibleCategorySections.map((section) => {
+        const sectionHasArticles = (section.articles?.length ?? 0) > 0 && Boolean(renderCategoryArticle);
         const sectionHasEvents = section.events.length > 0;
+        const sectionHasContent = sectionHasArticles || sectionHasEvents;
         const shouldRenderGate =
-          activeCategoryIsGated && safeActiveTab === section.key && sectionHasEvents;
+          activeCategoryIsGated && safeActiveTab === section.key && sectionHasContent;
         const sectionContent = (
           <div className="grid gap-4">
-            {sectionHasEvents ? (
+            {sectionHasArticles && renderCategoryArticle ? (
+              section.articles.map((article, index) => (
+                <div key={article.id}>{renderCategoryArticle(article, section, index)}</div>
+              ))
+            ) : sectionHasEvents ? (
               section.events.map((event, index) => (
                 <div key={event.id}>{renderCategoryEvent(event, section, index)}</div>
               ))

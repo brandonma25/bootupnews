@@ -11,6 +11,10 @@ import { assembleExplanationPacket } from "@/lib/explanation-support";
 import { isAiConfigured } from "@/lib/env";
 import { buildEventIntelligence } from "@/lib/event-intelligence";
 import {
+  createEmptyHomepageCategoryArticleMap,
+  loadHomepageCategoryArticles,
+} from "@/lib/homepage-category-articles";
+import {
   classifyHomepageCategory,
   countSourcesByHomepageCategory,
 } from "@/lib/homepage-taxonomy";
@@ -480,7 +484,10 @@ function formatHomepageFreshnessDate(dateKey: string) {
   }).format(date);
 }
 
-function buildEmptyPublicHomepageData(message = "The latest briefing is not yet available. Please check back soon."): DashboardData {
+function buildEmptyPublicHomepageData(
+  message = "The latest briefing is not yet available. Please check back soon.",
+  homepageCategoryArticles = createEmptyHomepageCategoryArticleMap(),
+): DashboardData {
   const sources = getSourcesForPublicSurface("public.home");
   const briefingDate = normalizeCalendarSafeBriefingDate(getBriefingDateKey(formatISO(new Date())));
 
@@ -497,6 +504,7 @@ function buildEmptyPublicHomepageData(message = "The latest briefing is not yet 
     topics: demoTopics,
     sources,
     publicRankedItems: [],
+    homepageCategoryArticles,
     homepageFreshnessNotice: {
       kind: "empty",
       text: message,
@@ -511,8 +519,14 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const sources = getSourcesForPublicSurface("public.home");
 
   if (homepageSignalSnapshot.posts.length === 0) {
+    const homepageCategoryArticles = await loadHomepageCategoryArticles({
+      excludedSignalItems: [],
+      route: "/",
+    });
+
     return buildEmptyPublicHomepageData(
       homepageSignalSnapshot.errorMessage ? PUBLIC_BRIEFING_TEMPORARILY_UNAVAILABLE_MESSAGE : undefined,
+      homepageCategoryArticles,
     );
   }
 
@@ -529,6 +543,10 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
     ? homepageSignalSnapshot.depthPosts
     : homepageSignalSnapshot.posts
   ).map((post) => mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source));
+  const homepageCategoryArticles = await loadHomepageCategoryArticles({
+    excludedSignalItems: depthItems,
+    route: "/",
+  });
   const intro =
     homepageSignalSnapshot.source === "published_live"
       ? "The homepage renders from today's published signal set instead of triggering feed ingestion during SSR."
@@ -555,6 +573,7 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
     topics: demoTopics,
     sources,
     publicRankedItems: depthItems,
+    homepageCategoryArticles,
     homepageFreshnessNotice,
     homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, depthItems.length),
   };
@@ -677,6 +696,10 @@ async function buildSignedInHomepageData(authState: RequestAuthState): Promise<D
     topics,
     sources,
     publicRankedItems: latestBriefing.items,
+    homepageCategoryArticles: await loadHomepageCategoryArticles({
+      excludedSignalItems: latestBriefing.items,
+      route: authState.route,
+    }),
     homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, latestBriefing.items.length),
   };
 }
@@ -1106,6 +1129,7 @@ async function getPipelineBackedDashboardData(input: {
     topics: fallbackTopics,
     sources: fallbackSources,
     publicRankedItems,
+    homepageCategoryArticles: createEmptyHomepageCategoryArticleMap(),
     homepageDiagnostics: {
       totalArticlesFetched: pipelineRun.num_raw_items,
       totalCandidateEvents: pipelineRun.num_clusters,

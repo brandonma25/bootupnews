@@ -15,7 +15,7 @@ The current public homepage exposes only the Top 5 Signals layer plus client-sid
 
 ## Scope
 
-This feature adds two new Experience-layer modules beneath Top 5 Signals: a Developing Now module and a By Category module. Both modules must consume the existing ranked briefing output and the existing `homepageClassification` / fallback taxonomy path without modifying ingestion, source governance, ranking, or classification rules. Top 5 Signals remains capped at five and keeps its current rendering path. Category tabs remain client-side and keep their current hide-empty-tab behavior.
+This feature adds two new Experience-layer modules beneath Top 5 Signals: a Developing Now module and a By Category module. Both modules must consume the existing ranked briefing output and the existing `homepageClassification` / fallback taxonomy path without modifying ingestion, source governance, ranking, or classification rules. Top 5 Signals remains capped at five and keeps its current rendering path. Category tabs remain client-side and may also consume the persisted PRD-60 cron Article candidate pool when available, capped at 50 Articles per category and filtered away from the current top 5-7 Signal Cards.
 
 Developing Now selects from the ranked briefing output after excluding any event already surfaced in Top 5 Signals. Candidates are ordered by a composite of normalized freshness and a source-diversity bonus so the module favors recent developments from sources not already represented in the top layer. The module returns up to ten items, degrades honestly to fewer when supply is thin, and suppresses semantic near-duplicates so it does not restate the same story family with weaker phrasing.
 
@@ -23,11 +23,13 @@ By Category renders three subsections in the fixed order Tech, Finance, Politics
 
 ## Non-Goals
 
-This feature does not introduce story clusters, multi-article grouping, access-type metadata, personalization, new routes, manifest edits, ingestion changes, ranking changes, or taxonomy redesign. It also does not change the existing category-tab interaction model or the Top 5 Signals cap and rendering path.
+This feature does not introduce story clusters, multi-article grouping, personalization, new routes, manifest edits, source activation changes, ranking changes, or taxonomy redesign. It also does not change the existing category-tab interaction model or the Top 5 Signals cap and rendering path. Category Article rows must come from persisted cron output, not a live homepage RSS fetch.
 
 ## Implementation Shape / System Impact
 
 The implementation lives in the homepage view-model and rendering layers. `src/lib/homepage-model.ts` gains pure selection helpers for Developing Now and category previews, plus a wrapper that adds these selections to the homepage view model. The homepage component renders the new modules beneath the existing Top 5 Signals experience and reuses the existing lighter category card treatment rather than introducing new design primitives.
+
+Follow-up remediation adds a persisted Article list for the category tab Surface Placements. The homepage reads the latest two PRD-60 cron-backed `pipeline_article_candidates` runs, groups Articles into Tech, Finance, and Politics through the existing homepage taxonomy, excludes likely paywalled sources, excludes URL/title duplicates from the current top 5-7 Signal Cards, and renders date/source/title rows as direct links to the original Articles. This keeps homepage SSR on persisted read models and does not fetch RSS feeds during render.
 
 The key editorial choice is to reject a simple “positions 6–15” module. That approach is structurally redundant with Top 5 Signals because it only extends the same ranking story with weaker items. Source-diverse freshness is a distinct job: it answers what is newly building from sources not already represented above, which broadens awareness without diluting the understanding-first role of Top 5.
 
@@ -39,7 +41,7 @@ This feature depends on the current governed contracts from PRD-17, PRD-36, PRD-
 
 ## Acceptance Criteria
 
-When public source supply is healthy, the homepage surfaces materially more than five distinct events across Top 5 Signals, Developing Now, and By Category. Developing Now must exclude Top 5 IDs, favor fresher items, prefer sources not already represented in Top 5, and return no semantic near-duplicates of already surfaced stories. By Category must render Tech, Finance, and Politics in that order, show up to three fresh items per subsection, never overlap with Top 5 or Developing Now, and preserve honest empty-state behavior when a category has no eligible items. The existing Top 5 Signals path, category-tab behavior, public manifest, ranking logic, and Politics empty-state invariant must remain intact.
+When public source supply is healthy, the homepage surfaces materially more than five distinct events across Top 5 Signals, Developing Now, and By Category. Developing Now must exclude Top 5 IDs, favor fresher items, prefer sources not already represented in Top 5, and return no semantic near-duplicates of already surfaced stories. By Category must render Tech, Finance, and Politics in that order, show up to three fresh items per subsection, never overlap with Top 5 or Developing Now, and preserve honest empty-state behavior when a category has no eligible items. The existing Top 5 Signals path, category-tab behavior, public manifest, ranking logic, and Politics empty-state invariant must remain intact. When persisted PRD-60 Article candidates are available, each category tab may render up to 50 non-paywalled Articles from the latest two cron runs, with Article date and clickable original-source link, and those Article rows must not duplicate the current top 5-7 Signal Card source URLs or titles.
 
 ## Evidence and Confidence
 

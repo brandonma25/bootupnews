@@ -407,6 +407,7 @@ create table if not exists public.pipeline_article_candidates (
   id uuid primary key default gen_random_uuid(),
   run_id text not null,
   ingested_at timestamptz not null,
+  published_at timestamptz,
   source_name text not null,
   source_tier text check (source_tier in ('tier_1', 'tier_2', 'tier_3')),
   canonical_url text not null,
@@ -440,6 +441,9 @@ on public.pipeline_article_candidates (run_id, surfaced);
 
 create index if not exists pipeline_article_candidates_ingested_at_idx
 on public.pipeline_article_candidates (ingested_at);
+
+create index if not exists pipeline_article_candidates_published_at_idx
+on public.pipeline_article_candidates (published_at desc);
 
 create table if not exists public.newsletter_story_extractions (
   id uuid primary key default gen_random_uuid(),
