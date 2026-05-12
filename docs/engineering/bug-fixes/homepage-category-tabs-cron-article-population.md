@@ -7,8 +7,9 @@
 
 ## Fix
 - Exact change: read the latest two cron-backed `pipeline_article_candidates` runs into a homepage category Article map, cap each category at 50 Articles, exclude likely paywalled sources, exclude URL/title duplicates from the current top 5-7 Signal Cards, render date/source/title/summary rows with clickable original Article links, and await candidate persistence during the cron pipeline so serverless execution does not drop candidate writes.
+- Post-deployment warning cleanup: disable Sentry release creation and sourcemap upload during builds that intentionally lack `SENTRY_AUTH_TOKEN`, and mark the package as ESM so Vercel no longer warns while loading `tailwind.config.ts`.
 - Related PRD: PRD-57 and PRD-60.
-- PR: pending.
+- PR: #227.
 - Branch: `fix/category-tabs-populate-articles-20260512`
 - Head SHA: pending.
 - Merge SHA: pending.
@@ -31,6 +32,7 @@
   - `npx vitest run src/lib/data.test.ts` passed.
   - `npm run test` passed: 93 files, 680 tests.
   - `npm run build` passed.
+  - Post-deployment warning fix validation: `npm run lint`, `npm run build`, `npm run test`, and `node scripts/preview-check.js https://bootup-git-fix-category-tabs-popul-8598af-brandonma25s-projects.vercel.app` passed after the Sentry and ESM changes.
   - `python3 scripts/release-governance-gate.py --diff-mode local --branch-name fix/category-tabs-populate-articles-20260512 --pr-title "Fix homepage category tabs with cron Article population"` passed.
   - `python3 scripts/validate-documentation-coverage.py --diff-mode local --branch-name fix/category-tabs-populate-articles-20260512 --pr-title "Fix homepage category tabs with cron Article population"` passed.
   - `python3 scripts/validate-feature-system-csv.py` passed with pre-existing slug warnings.
