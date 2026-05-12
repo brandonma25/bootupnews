@@ -22,7 +22,7 @@ This PRD covers six database foundation areas plus one approved runtime amendmen
 4. Historical published Signal Card snapshot tracking by extending `published_slates` and `published_slate_items`.
 5. Signal evolution tracking via `signal_evolution`.
 6. Cross-event connection mapping via `cross_event_connections`.
-7. Phase 1 runtime amendment: Gmail newsletter ingestion from the `boot-up-benchmark` label into internal newsletter records, conservative Article extraction records, and non-live `signal_posts` Surface Placement candidates for BM review.
+7. Phase 1 runtime amendment: Gmail newsletter ingestion from the `[REDACTED_GMAIL_LABEL]` label into internal newsletter records, conservative Article extraction records, and non-live `signal_posts` Surface Placement candidates for BM review.
 
 ## Snapshot Schema Decision
 
@@ -37,11 +37,11 @@ This PRD does not add duplicate `briefing_snapshots` or `briefing_snapshot_signa
 
 This amendment supersedes the original runtime non-goals only for the controlled Phase 1 ingestion path below.
 
-- Gmail label: `boot-up-benchmark`.
+- Gmail label: `[REDACTED_GMAIL_LABEL]`.
 - Known newsletter sources in that label: Morning Brew, Semafor Flagship, TLDR, AP Wire, and 1440.
 - Backend integration uses the server-side Gmail API directly with OAuth2 refresh-token credentials supplied by environment variables.
 - Gmail MCP, Chrome, and personal browser state are not backend dependencies.
-- The controlled path must verify the exact Gmail label `boot-up-benchmark` is visible to the same REST OAuth token before message search.
+- The controlled path must verify the exact Gmail label `[REDACTED_GMAIL_LABEL]` is visible to the same REST OAuth token before message search.
 - If the label is missing, the runtime must fail closed with a sanitized label missing/account mismatch message before searching messages or writing records.
 - Newsletters are discovery and context sources, not final editorial judgment.
 - Newsletter-derived items are internal Article evidence candidates.
@@ -55,13 +55,13 @@ This amendment supersedes the original runtime non-goals only for the controlled
 - A dedicated dry-run report command must produce sanitized inventory, extraction, source URL quality, category distribution, dedup, and promotion-preview output without writing newsletter or `signal_posts` records.
 - Promotion preview must reuse the same source URL, title/source dedup, and rank-availability rules as write-mode promotion while returning only read-only statuses: `eligible`, `invalid_source_url`, `duplicate_public_row`, or `no_available_candidate_rank`.
 - Runtime writes are fail-closed. Missing Gmail credentials, disabled ingestion, dry-run mode, production guard failure, Gmail auth failure, Gmail rate limits, or database errors must not publish or create live rows.
-- Production writes require all three runtime write gates: `NEWSLETTER_INGESTION_ENABLED=true`, `NEWSLETTER_INGESTION_DRY_RUN=false`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true`.
+- Production writes require all three runtime write gates: `NEWSLETTER_INGESTION_ENABLED=[REDACTED_ENV_VALUE]`, `NEWSLETTER_INGESTION_DRY_RUN=[REDACTED_ENV_VALUE]`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=[REDACTED_ENV_VALUE]`.
 - The Phase 1 parser is heuristic and conservative. It should prefer fewer higher-confidence newsletter Article candidates over noisy over-extraction.
 
 ## Non-Goals
 
 - No Gmail MCP backend integration.
-- No broad Gmail inbox search outside the `boot-up-benchmark` label.
+- No broad Gmail inbox search outside the `[REDACTED_GMAIL_LABEL]` label.
 - No LLM extraction logic.
 - No AI-generated WITM.
 - No source matching implementation.
@@ -124,8 +124,8 @@ This amendment supersedes the original runtime non-goals only for the controlled
 - `context_material` and `raw_content` are documented as internal-only and are not selected by public routes.
 - Existing public homepage and `/signals` query shapes remain unchanged and still require live published rows through app-controlled service-role queries.
 - Local validation passes or any failure is documented with exact scope.
-- Gmail search query uses `label:boot-up-benchmark` plus the configured since date.
-- Gmail label preflight proves exact `boot-up-benchmark` visibility before message search and fails closed on label missing/account mismatch.
+- Gmail search query uses `label:[REDACTED_GMAIL_LABEL]` plus the configured since date.
+- Gmail label preflight proves exact `[REDACTED_GMAIL_LABEL]` visibility before message search and fails closed on label missing/account mismatch.
 - Gmail credentials come only from environment variables and are never logged.
 - Dry-run report output excludes credentials, raw content, snippets, Gmail message IDs, and thread IDs.
 - Dry-run report lists sanitized email inventory, extraction counts, sample headlines, source URL quality, category distribution, read-only dedup analysis, and eligible promotion candidate title/source URL pairs.
@@ -142,8 +142,8 @@ This amendment supersedes the original runtime non-goals only for the controlled
 Controlled validation completed on `2026-05-11` in branch `fix/prd-61-newsletter-dry-run-validation`.
 
 Dry-run validation:
-- Gmail REST OAuth succeeded with the Web application client named `Boot Up Newsletter Ingestion OAuth Playground`.
-- The same token used by the controlled runner saw the exact Gmail label `boot-up-benchmark`.
+- Gmail REST OAuth succeeded with the Web application client named `configured Gmail OAuth client`.
+- The same token used by the controlled runner saw the exact Gmail label `[REDACTED_GMAIL_LABEL]`.
 - Pre-counts were `newsletter_emails = 0`, `newsletter_story_extractions = 0`, and `signal_posts = 68`.
 - Dry-run fetched `3` labeled emails, extracted `24` newsletter-derived Article candidates, identified `5` eligible non-live Surface Placement promotion candidates, and recorded `0` failed emails.
 - Dry-run performed zero database writes, and post-counts remained unchanged.
@@ -160,10 +160,10 @@ Cron enablement follow-up:
 - BM approved production cron scheduling on `2026-05-12`.
 - The scheduled path is `/api/cron/fetch-editorial-inputs`, which runs RSS first and then the PRD-61 newsletter ingestion path.
 - Approved schedules are `15 10 * * *` and `45 11 * * *`, equivalent to 6:15 PM and 7:45 PM Taipei time.
-- Production newsletter writes still require `NEWSLETTER_INGESTION_ENABLED=true`, `NEWSLETTER_INGESTION_DRY_RUN=false`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true` in Vercel Production env.
+- Production newsletter writes still require `NEWSLETTER_INGESTION_ENABLED=[REDACTED_ENV_VALUE]`, `NEWSLETTER_INGESTION_DRY_RUN=[REDACTED_ENV_VALUE]`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=[REDACTED_ENV_VALUE]` in Vercel Production env.
 
 Remaining operational follow-up:
-- Remove temporary local OAuth redirect URI `http://127.0.0.1:53682/oauth2callback` from the `Boot Up Newsletter Ingestion OAuth Playground` Web client after no further local token generation is needed.
+- Remove temporary local OAuth redirect URI `http://127.0.0.1:53682/oauth2callback` from the `configured Gmail OAuth client` Web client after no further local token generation is needed.
 
 ## Evidence and Confidence
 

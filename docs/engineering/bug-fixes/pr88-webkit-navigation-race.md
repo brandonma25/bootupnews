@@ -25,9 +25,9 @@
   - `npm run lint || true`
   - `npm run test || true`
   - `npm run build`
-  - `PLAYWRIGHT_MANAGED_WEBSERVER=1 ... npx playwright test tests/audit/route-traversal.spec.ts tests/navigation/app-navigation.spec.ts --project=webkit --workers=1`
-  - `PLAYWRIGHT_MANAGED_WEBSERVER=1 ... npm run test:e2e:webkit`
-  - `CI=1 PLAYWRIGHT_MANAGED_WEBSERVER=1 ... npm run test:e2e:webkit`
+  - `PLAYWRIGHT_MANAGED_WEBSERVER=[REDACTED_ENV_VALUE] ... npx playwright test tests/audit/route-traversal.spec.ts tests/navigation/app-navigation.spec.ts --project=webkit --workers=1`
+  - `PLAYWRIGHT_MANAGED_WEBSERVER=[REDACTED_ENV_VALUE] ... npm run test:e2e:webkit`
+  - `CI=1 PLAYWRIGHT_MANAGED_WEBSERVER=[REDACTED_ENV_VALUE] ... npm run test:e2e:webkit`
   - `npm run dev`, then `curl -I http://localhost:3000/` and `curl -I http://localhost:3000/dashboard`
 - Human checks: Preview and real auth/session validation remain required before merge readiness.
 

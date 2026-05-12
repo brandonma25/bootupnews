@@ -25,7 +25,7 @@
 ## When a Bug-Fix Record Is Usually Not Required
 - Pure docs-only corrections.
 - Tiny typo-only code changes with no real defect narrative.
-- Structural repo cleanup that truthfully belongs in `docs/engineering/change-records/`.
+- Structural repo cleanup whose detailed operational evidence belongs in PR metadata or private archive records rather than a bug-fix record.
 - A new system or feature that should be documented primarily through a PRD instead of a bug record.
 
 ## Required Minimum Content
@@ -42,8 +42,8 @@
 
 ## Cross-Reference Rules
 - If the bug repair materially changes an existing numbered feature, reference the canonical `PRD-XX` inside the bug-fix record.
-- If the work changes a governance rule or release behavior, also update the relevant protocol or change-record doc.
-- Do not copy the same narrative into the PRD, bug-fix record, and testing note; keep each document truthful to its job.
+- If the work changes a governance rule or release behavior, also update the relevant protocol, template, or decision artifact.
+- Do not copy the same narrative into the PRD, bug-fix record, and PR validation evidence; keep each artifact truthful to its job.
 - If a legacy `docs/bugs/` record contains durable history, consolidate unique content into `docs/engineering/bug-fixes/` and leave at most a redirect note in the legacy file.
 - Deleted remediation, bug-fix, hotfix, Codex, feature, or docs branches must remain reconcilable from GitHub documentation and PR metadata.
 

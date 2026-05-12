@@ -8,7 +8,7 @@
 ## Source Of Truth
 - Live production audit of `bootupnews.vercel.app` on 2026-05-02.
 - PR #180, #181, #187, and #189 metadata and PR bodies.
-- Prior Phase 1 change record: `docs/engineering/change-records/2026-05-02-public-card-cleanup-phase-1.md`.
+- Prior Phase 1 change-record evidence was preserved as operational evidence. The durable public interpretation is captured in the relevant PRs, product source-of-truth docs, and this consolidated remediation record.
 - GitHub source-of-truth status: canonical consolidated remediation record created on 2026-05-04.
 - External references reviewed, if any: GitHub PR #180, #181, #187, and #189 metadata and prior Phase 1 change record.
 - Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
@@ -61,8 +61,8 @@
 ## Branch Cleanup Status
 - Branch deletion state was not fully recoverable during this cleanup.
 - PR metadata preserves branch names, head SHAs, merge SHAs, and merge state for all four phases.
-- Any future deletion of these feature branches must be recorded in `docs/operations/branch-cleanup/`.
+- Future validation should be summarized in the PR body/checklist, with operational detail kept in private archive records when needed.
 
 ## Remaining Risks / Follow-up
 - This consolidated record does not claim production validation or Google tracker updates.
-- Active Google sync workflow decommissioning was completed in `docs/engineering/change-records/2026-05-04-google-sheets-sync-decommission.md`; historical tracker-sync artifacts remain compatibility records.
+- Active Google sync workflow decommissioning evidence was preserved as operational evidence. Operational closeout and tracker-sync evidence should live in PR metadata, GitHub history, or private archive records rather than public documentation links.

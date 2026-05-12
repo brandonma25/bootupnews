@@ -29,7 +29,7 @@ The site can produce ranked signal posts, but the final public “Why it matters
 ## Scope
 
 - Add an environment-variable based admin/editor authorization helper using `ADMIN_EMAILS`.
-- Grant admin/editor access to configured Google-authenticated users, including `brandonma25@gmail.com` when configured.
+- Grant admin/editor access to configured Google-authenticated users, including `[REDACTED_EMAIL_ADDRESS]` when configured.
 - Add `/dashboard/signals/editorial-review` as the private review route.
 - Add a persisted `signal_posts` editorial model for the current Top 5 list.
 - Support draft save, approval, reset to AI draft, and full-list publishing.

@@ -64,5 +64,5 @@ Boot Up needs preview and production visibility into which public Signal surface
 ## Evidence and Confidence
 
 - Repo evidence used: existing MVP measurement client/API, Sentry client instrumentation, root layout Vercel Analytics rendering, RSS observability files, and feature-system registry.
-- Validation record: `docs/engineering/testing/2026-05-12-analytics-ux-diagnostics-validation.md`.
+- Validation evidence was preserved as operational evidence outside the durable public source-of-truth surface. For reviewer-facing context, use the PR body, GitHub metadata, and current public decision/governance docs.
 - Confidence: High for local code path, sanitization coverage, Preview PostHog delivery, browser Sentry ingest, and public-route UX diagnostics startup. Production validation remains post-merge only.

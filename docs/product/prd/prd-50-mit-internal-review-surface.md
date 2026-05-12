@@ -63,13 +63,13 @@ MIT review currently depends on Issue #70 plus logs. Reviewers need a compact pa
   - `src/lib/pipeline/ingestion/index.ts`
   - `scripts/mit-probationary-review.mjs`
   - `.github/workflows/mit-probationary-review.yml`
-  - `docs/engineering/change-records/mit-probationary-review-automation.md`
+  - Historical change-record evidence for MIT probationary review automation was preserved as operational evidence. The durable public interpretation is captured in the relevant PR, this PRD, and product source-of-truth docs.
 - Confidence: High for local route gating, sanitized evidence shaping, and source-resolution display. Medium for deployed access truth until Vercel preview validates the authenticated internal route.
 
 ## Closeout Checklist
 
 - Scope completed: Yes.
-- Tests run: Yes. See `docs/engineering/testing/mit-internal-review-surface.md`.
+- Tests run: Yes. Historical validation evidence was preserved as operational evidence outside the durable public source-of-truth surface. For reviewer-facing context, use the PR body, GitHub metadata, and current public decision/governance docs.
 - Local validation complete: Yes for unauthenticated route gating, route render, noindex metadata, sanitized evidence shaping, build, unit tests, and focused Playwright Chromium/WebKit smoke after restoring required e2e CI contexts. Authenticated deployed access truth remains a preview requirement.
 - Preview validation complete, if applicable: No. Vercel preview validation remains required for authenticated internal-route truth.
 - Production sanity check complete, only after preview is good: No.

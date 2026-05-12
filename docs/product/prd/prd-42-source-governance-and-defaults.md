@@ -72,6 +72,5 @@ The product needs a narrow high-signal source mix. If catalog additions, fallbac
   - `src/adapters/donors/registry.ts`
   - `src/lib/observability/pipeline-run.ts`
   - `src/lib/pipeline/ingestion/index.ts`
-  - `docs/engineering/change-records/source-catalog-cleanup-bbc-cnbc.md`
-  - `docs/engineering/change-records/source-onboarding-model.md`
+  - Historical change-record evidence for source catalog cleanup and source onboarding was preserved as operational evidence. The durable public interpretation is captured in the relevant PRs, this PRD, and product source-of-truth docs.
 - Confidence: High. The runtime default path, catalog metadata, and source preference policy are covered by focused regression tests and local release-governance validation.

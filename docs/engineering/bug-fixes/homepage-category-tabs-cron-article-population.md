@@ -32,7 +32,7 @@
   - `npx vitest run src/lib/data.test.ts` passed.
   - `npm run test` passed: 93 files, 680 tests.
   - `npm run build` passed.
-  - Post-deployment warning fix validation: `npm run lint`, `npm run build`, `npm run test`, and `node scripts/preview-check.js https://bootup-git-fix-category-tabs-popul-8598af-brandonma25s-projects.vercel.app` passed after the Sentry and ESM changes.
+  - Post-deployment warning fix validation: `npm run lint`, `npm run build`, `npm run test`, and `node scripts/preview-check.js [REDACTED_DEPLOYMENT_URL]` passed after the Sentry and ESM changes.
   - `python3 scripts/release-governance-gate.py --diff-mode local --branch-name fix/category-tabs-populate-articles-20260512 --pr-title "Fix homepage category tabs with cron Article population"` passed.
   - `python3 scripts/validate-documentation-coverage.py --diff-mode local --branch-name fix/category-tabs-populate-articles-20260512 --pr-title "Fix homepage category tabs with cron Article population"` passed.
   - `python3 scripts/validate-feature-system-csv.py` passed with pre-existing slug warnings.

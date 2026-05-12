@@ -12,7 +12,7 @@
 - Branch: `bugfix/source-url-prewrite-guard-20260510`
 - Head SHA: `0349988e60ce0d860c18fd26ca4b07d92ec2f6d5`.
 - Merge SHA: `24cf07e3b8f4f4394c3dd3667eec663de1f0782b`.
-- Production deploy: `dpl_5CDb9wxaBU54pnRw3ujF6podY3Hh`.
+- Production deploy: `[REDACTED_DEPLOYMENT_ID]`.
 - GitHub source-of-truth status: This record is the repo-side bug-fix record for the remediation.
 - External references reviewed, if any: None.
 - Google Sheet / Work Log reference, if historically relevant: None.
@@ -39,7 +39,7 @@
   - Production public routes `/`, `/signals`, and `/briefing/2026-05-06` returned HTTP 200.
   - Production cron endpoint `/api/cron/fetch-news` returned HTTP 401 without credentials.
   - Vercel deployed cron list returned `crons: []`.
-  - Post-merge production deployment `dpl_5CDb9wxaBU54pnRw3ujF6podY3Hh` reached `Ready`.
+  - Post-merge production deployment `[REDACTED_DEPLOYMENT_ID]` reached `Ready`.
 
 ## Remaining Risks / Follow-up
 - The database constraint is present as a repo migration and should be applied through the normal migration/deploy path for production enforcement. Application-level guards already prevent draft insertion, approval, final-slate assignment, and publish readiness for missing public URLs after this code is deployed.

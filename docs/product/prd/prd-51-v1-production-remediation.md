@@ -61,14 +61,14 @@ This remediation spans the Experience and Data layers. The app shell, route surf
   - Locked V1 artifact files supplied with the remediation request.
   - `docs/product/briefs/v1-production-remediation-2026-04-21.md`
   - `docs/engineering/bug-fixes/v1-production-remediation-2026-04-21.md`
-  - `docs/engineering/testing/v1-production-remediation-local-validation-2026-04-21.md`
+  - Historical validation evidence was preserved as operational evidence outside the durable public source-of-truth surface.
   - `supabase/migrations/20260421120000_v1_account_controls.sql`
 - Confidence: High for local route, shell, soft-gate, and migration coverage. Medium for deployed auth/session truth until Vercel preview validation and human auth checks complete.
 
 ## Closeout Checklist
 
 - Scope completed: Implementation branch created and pushed for PR review.
-- Tests run: See `docs/engineering/testing/v1-production-remediation-local-validation-2026-04-21.md`.
+- Tests run: Historical validation evidence was preserved as operational evidence outside the durable public source-of-truth surface. For reviewer-facing context, use the PR body, GitHub metadata, and current public decision/governance docs.
 - Local validation complete: Partially complete, with focused Chromium route coverage passing after conflict resolution.
 - Preview validation complete, if applicable: Not complete; branch preview must still be validated.
 - Production sanity check complete, only after preview is good: Not complete.

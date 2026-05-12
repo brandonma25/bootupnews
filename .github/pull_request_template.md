@@ -4,7 +4,12 @@
 - [ ] Correct branch used
 - [ ] No unrelated changes included
 - [ ] PR title or branch includes canonical `PRD-XX` when this work maps to a governed feature
-- [ ] If this work is intentionally unmapped, document it in the correct GitHub repo lane instead of creating external tracker rows
+
+## Change Classification
+- [ ] Change type declared: feature / remediation / refactor / bug-fix / hotfix / docs-only
+- [ ] Source of truth identified: PRD, bug report, remediation brief, decision ledger, or explicit request
+- [ ] User-facing behavior changes stated, or confirmed none
+- [ ] If this is not feature work, no new canonical PRD was created
 
 ## Terminology
 - [ ] Read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
@@ -39,9 +44,8 @@
 ## Documentation Updates
 - [ ] `docs/product/briefs/` updated if applicable
 - [ ] `docs/product/prd/` updated if applicable
-- [ ] relevant `docs/engineering/` bucket updated if applicable
-- [ ] GitHub repo documentation closeout completed in the canonical lane
-- [ ] No Google Sheet update or routine tracker-sync fallback claimed
+- [ ] Stable public docs updated if product behavior, public framing, or governance changed
+- [ ] Operational evidence kept in PR body, GitHub metadata, or private archive when not portfolio-facing
 - [ ] No sensitive information included
 
 ## Security Check

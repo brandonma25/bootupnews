@@ -28,8 +28,7 @@ Code changes required before MVP: no, based on the current routed app surface. A
 - `src/lib/homepage-editorial-overrides.ts`
 - `src/lib/data.ts`
 - `src/lib/signals-editorial.test.ts`
-- `docs/engineering/change-records/signals-admin-editorial-layer.md`
-- `docs/engineering/testing/signals-admin-editorial-layer.md`
+- Historical change-record and validation evidence for the signals admin editorial layer was preserved as operational evidence. The durable public interpretation is captured in the relevant PR, product source-of-truth docs, or DECISIONS.md.
 
 Searches run:
 

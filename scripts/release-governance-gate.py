@@ -77,11 +77,12 @@ def format_missing_doc_failure(context: GovernanceContext, missing_doc_groups: l
         + (bullet_list(context.doc_lanes_updated) if context.doc_lanes_updated else "- none"),
     ]
 
-    if any(set(group) == {"protocol", "change-record", "governance-root"} for group in missing_doc_groups):
+    if any(set(group) == {"protocol", "template", "governance-root"} for group in missing_doc_groups):
         base.append(
             "Fastest valid fix: this PR changes a governance hotspot. Add or update one governance-facing "
-            "document, usually a concise `docs/engineering/change-records/...` note, a relevant protocol update, "
-            "or another approved governance-root document when the operating rule itself changed."
+            "artifact, usually the PR body/checklist, `docs/engineering/templates/llm-prompt-template-change-classification.md`, "
+            "a relevant protocol update, `docs/product/feature-system.csv`, or another approved governance-root "
+            "document when the operating rule itself changed."
         )
     elif context.classification == "bug-fix":
         base.append(

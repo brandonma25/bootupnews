@@ -83,8 +83,8 @@ When optional PRD-53 placement fields are available, public helpers may use them
 - Local dev server on `http://localhost:3000` - verified with Codex computer browser inspection:
   - `/` rendered public-safe briefing-prepared copy and did not expose internal schema details.
   - `/signals` rendered `Briefing pending` and a public-safe temporary-unavailable state.
-- `PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e:chromium` - passed: 33 tests.
-- `PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e:webkit` - first run had one transient WebKit locator miss, immediate rerun passed: 33 tests.
+- `PLAYWRIGHT_BASE_URL=[REDACTED_ENV_VALUE] npm run test:e2e:chromium` - passed: 33 tests.
+- `PLAYWRIGHT_BASE_URL=[REDACTED_ENV_VALUE] npm run test:e2e:webkit` - first run had one transient WebKit locator miss, immediate rerun passed: 33 tests.
 
 ## Production Note
 

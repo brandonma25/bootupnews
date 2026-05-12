@@ -29,7 +29,7 @@
   - `npm run test` — PASS, 80 files / 601 tests.
   - `npm run build` — PASS.
   - `./scripts/release-check.sh` — local route smoke now passes after marker alignment; one Chromium mobile-navigation run flaked outside the touched surface, while WebKit passed in the wrapper and a managed full Chromium rerun passed.
-  - `PLAYWRIGHT_MANAGED_WEBSERVER=1 npm run test:e2e:chromium` — PASS, 33 tests.
+  - `PLAYWRIGHT_MANAGED_WEBSERVER=[REDACTED_ENV_VALUE] npm run test:e2e:chromium` — PASS, 33 tests.
   - `python3 scripts/validate-feature-system-csv.py` — PASS.
   - `npm run governance:coverage` — PASS.
   - `npm run governance:hotspots` — PASS.
