@@ -14,10 +14,10 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
       <body className="min-h-screen">
         <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center px-4 py-10">
           <div className="glass-panel w-full rounded-card p-8">
-            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+            <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
               Global fallback
             </p>
-            <h1 className="mt-3 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
+            <h1 className="mt-3 text-xl font-medium text-[var(--text-primary)] md:text-2xl">
               We hit a larger app error, but the workspace itself is still reachable.
             </h1>
             <p className="mt-3 max-w-2xl text-base text-[var(--text-secondary)]">

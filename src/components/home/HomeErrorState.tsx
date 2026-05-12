@@ -16,7 +16,7 @@ export function HomeErrorState({ onRetry, isRetrying }: HomeErrorStateProps) {
       <p className="section-label text-[var(--error)]">
         Briefing unavailable
       </p>
-      <h2 className="mt-3 text-xl font-semibold text-[var(--foreground)] sm:text-2xl">
+      <h2 className="mt-3 text-xl font-medium text-[var(--foreground)] sm:text-2xl">
         We could not load today&apos;s briefing.
       </h2>
       <p className="mt-3 max-w-md text-sm leading-7 text-[var(--muted)]">

@@ -14,8 +14,8 @@ describe("Button", () => {
     const button = screen.getByRole("button", { name: "Publish Final Slate" });
 
     expect(button).toBeDisabled();
-    expect(button.className).toContain("disabled:bg-[var(--sidebar)]");
-    expect(button.className).toContain("disabled:!text-[var(--text-secondary)]");
+    expect(button.className).toContain("disabled:bg-[var(--bu-border-default)]");
+    expect(button.className).toContain("disabled:!text-[var(--bu-text-tertiary)]");
     expect(button.className).toContain("disabled:opacity-100");
   });
 
@@ -25,7 +25,7 @@ describe("Button", () => {
     const button = screen.getByRole("button", { name: "Publish Final Slate" });
 
     expect(button).toBeEnabled();
-    expect(button.className).toContain("bg-[var(--accent)]");
-    expect(button.className).toContain("!text-[#FFFFFF]");
+    expect(button.className).toContain("bg-[var(--bu-accent)]");
+    expect(button.className).toContain("text-[var(--bu-accent-on)]");
   });
 });

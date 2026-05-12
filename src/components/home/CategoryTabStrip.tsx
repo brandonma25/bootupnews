@@ -44,12 +44,13 @@ export type CategoryTabStripProps = {
   topEventsEmptyState?: ReactNode;
   isAuthenticated?: boolean;
   gatedCategoryState?: ReactNode | ((args: GatedCategoryStateArgs) => ReactNode);
+  demoted?: boolean;
   className?: string;
 };
 
 const topEventsTab: CategoryTab = {
   key: "top-events",
-  label: "Top Events",
+  label: "Today's signals",
 };
 
 export function CategoryTabStrip({
@@ -61,24 +62,32 @@ export function CategoryTabStrip({
   topEventsEmptyState,
   isAuthenticated = true,
   gatedCategoryState,
+  demoted = false,
   className,
 }: CategoryTabStripProps) {
-  const [activeTab, setActiveTab] = useState<HomeTabKey>(topEventsTab.key);
   const triggerRefs = useRef<Partial<Record<HomeTabKey, HTMLButtonElement | null>>>({});
   const visibleCategorySections = useMemo(() => categorySections, [categorySections]);
+  const initialTab = demoted ? visibleCategorySections[0]?.key ?? topEventsTab.key : topEventsTab.key;
+  const [activeTab, setActiveTab] = useState<HomeTabKey>(initialTab);
   const tabs = useMemo(
-    () => [
-      topEventsTab,
-      ...visibleCategorySections.map((section) => ({
+    () => {
+      const categoryTabs = visibleCategorySections.map((section) => ({
         key: section.key,
         label: section.label,
-      })),
-    ],
-    [visibleCategorySections],
+      }));
+
+      return demoted ? categoryTabs : [topEventsTab, ...categoryTabs];
+    },
+    [demoted, visibleCategorySections],
   );
   const activeTabIsVisible =
-    activeTab === topEventsTab.key || visibleCategorySections.some((section) => section.key === activeTab);
-  const safeActiveTab = activeTabIsVisible ? activeTab : topEventsTab.key;
+    (!demoted && activeTab === topEventsTab.key) ||
+    visibleCategorySections.some((section) => section.key === activeTab);
+  const safeActiveTab = activeTabIsVisible
+    ? activeTab
+    : demoted
+      ? visibleCategorySections[0]?.key ?? topEventsTab.key
+      : topEventsTab.key;
   const activeCategoryIsGated = !isAuthenticated && safeActiveTab !== topEventsTab.key;
   const activeSection =
     safeActiveTab === topEventsTab.key
@@ -113,27 +122,63 @@ export function CategoryTabStrip({
       ? gatedCategoryState({ onDismiss: dismissGate, activeSection })
       : gatedCategoryState;
 
+  if (demoted && visibleCategorySections.length === 0) {
+    return null;
+  }
+
   return (
     <Tabs className={className}>
-      <TabsList className="-mx-4 px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-6 sm:px-6 lg:mx-0 lg:overflow-visible lg:px-0">
-        {tabs.map((tab) => (
-          <TabsTrigger
-            key={tab.key}
-            ref={(node) => {
-              triggerRefs.current[tab.key] = node;
-            }}
-            active={safeActiveTab === tab.key}
-            aria-controls={`${tab.key}-panel`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
+      {demoted ? (
+        <div className="flex flex-wrap items-center gap-x-[var(--bu-space-5)] gap-y-[var(--bu-space-2)]">
+          <p className="text-[var(--bu-size-micro)] font-medium uppercase tracking-[0.08em] text-[var(--bu-text-tertiary)]">
+            Browse by
+          </p>
+          <div className="flex flex-wrap items-center gap-[var(--bu-space-5)]">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                ref={(node) => {
+                  triggerRefs.current[tab.key] = node;
+                }}
+                type="button"
+                className={cn(
+                  "text-[var(--bu-size-ui)] leading-5 transition-colors",
+                  safeActiveTab === tab.key
+                    ? "font-medium text-[var(--bu-text-primary)]"
+                    : "font-normal text-[var(--bu-text-secondary)] hover:text-[var(--bu-accent)]",
+                )}
+                aria-controls={`${tab.key}-panel`}
+                aria-current={safeActiveTab === tab.key ? "page" : undefined}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <TabsList className="-mx-4 px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-6 sm:px-6 lg:mx-0 lg:overflow-visible lg:px-0">
+          {tabs.map((tab) => (
+            <TabsTrigger
+              key={tab.key}
+              ref={(node) => {
+                triggerRefs.current[tab.key] = node;
+              }}
+              active={safeActiveTab === tab.key}
+              aria-controls={`${tab.key}-panel`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      )}
 
-      <TabsContent id="top-events-panel" active={safeActiveTab === topEventsTab.key}>
-        {topEventsContent}
-      </TabsContent>
+      {!demoted ? (
+        <TabsContent id="top-events-panel" active={safeActiveTab === topEventsTab.key}>
+          {topEventsContent}
+        </TabsContent>
+      ) : null}
 
       {visibleCategorySections.map((section) => {
         const sectionHasArticles = (section.articles?.length ?? 0) > 0 && Boolean(renderCategoryArticle);
@@ -167,6 +212,7 @@ export function CategoryTabStrip({
             key={section.key}
             id={`${section.key}-panel`}
             active={safeActiveTab === section.key}
+            className={demoted ? "mt-[var(--bu-space-4)]" : undefined}
           >
             {shouldRenderGate ? (
               <div className="space-y-5">

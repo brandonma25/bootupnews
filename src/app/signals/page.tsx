@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 
+import { AppShell } from "@/components/app-shell";
 import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
-import { Badge } from "@/components/ui/badge";
+import { SignalCard } from "@/components/signals/SignalCard";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
@@ -15,188 +15,125 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Boot Up — Today's Signals",
+  title: "Boot Up — All signals",
 };
-
-const INTERNAL_PUBLIC_SIGNAL_TAGS = new Set(["critical", "high", "watch"]);
 
 export default async function PublicSignalsPage() {
   const state = await getPublicSignalsPageState();
   const posts = state.kind === "published" ? state.posts : [];
-  const corePosts = posts.filter(isCorePublicSignal);
-  const contextPosts = posts.filter(isContextPublicSignal);
-  const hasPublishedPosts = state.kind === "published";
   const briefingDate = posts[0]?.briefingDate ?? null;
+  const groupedPosts = groupPostsByDate(posts);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 md:px-6">
-      <MvpMeasurementTracker
-        pageView={{
-          eventName: "signals_page_view",
-          route: "/signals",
-          surface: "signals_index",
-          briefingDate,
-          metadata: {
-            visibleSignalCount: posts.length,
-            coreSignalCount: corePosts.length,
-            contextSignalCount: contextPosts.length,
-            rendersCoreAndContext: corePosts.length === 5 && contextPosts.length === 2,
-            stateKind: state.kind,
-          },
-        }}
-      />
-      <div className="space-y-5">
-        <header className="space-y-4 border-b border-[var(--border)] pb-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge>Signals</Badge>
-            {hasPublishedPosts ? <Badge>{posts.length} signals</Badge> : <Badge>Briefing pending</Badge>}
+    <AppShell currentPath="/signals" mode="public" account={null}>
+      <main className="mx-auto w-full max-w-[var(--bu-container-narrow)] px-[var(--bu-space-2)] py-[var(--bu-space-7)] md:px-0">
+        <MvpMeasurementTracker
+          pageView={{
+            eventName: "signals_page_view",
+            route: "/signals",
+            surface: "signals_index",
+            briefingDate,
+            metadata: {
+              visibleSignalCount: posts.length,
+              coreSignalCount: posts.filter(isCorePublicSignal).length,
+              contextSignalCount: posts.filter(isContextPublicSignal).length,
+              rendersCoreAndContext: posts.filter(isCorePublicSignal).length === 5 && posts.filter(isContextPublicSignal).length === 2,
+              stateKind: state.kind,
+            },
+          }}
+        />
+
+        <header className="mb-[var(--bu-space-6)] flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="section-label">All signals</p>
+            <h1 className="mt-2 text-[var(--bu-size-page-title)] font-medium leading-tight text-[var(--bu-text-primary)]">
+              All signals
+            </h1>
           </div>
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-3xl space-y-3">
-              <h1 className="text-2xl font-semibold tracking-normal text-[var(--text-primary)] md:text-3xl">
-                Published Signals
-              </h1>
-              <p className="text-base leading-7 text-[var(--text-secondary)]">
-                The current editor-approved public briefing.
-              </p>
-            </div>
-            <Button asChild variant="secondary">
-              <Link href="/">Home briefing</Link>
-            </Button>
-          </div>
+          <Button asChild variant="secondary">
+            <Link href="/">Back to today</Link>
+          </Button>
         </header>
 
-        {hasPublishedPosts ? (
-          <div className="space-y-7">
-            <SignalSection
-              title="Core Signals"
-              description="The highest-priority published Signals for the current briefing."
-              posts={corePosts}
-              briefingDate={briefingDate}
-            />
-            {contextPosts.length > 0 ? (
-              <SignalSection
-                title="Context Signals"
-                description="Published Context Signals that add useful adjacent explanation without displacing the Core slate."
-                posts={contextPosts}
-                briefingDate={briefingDate}
-              />
-            ) : null}
+        {state.kind === "published" ? (
+          <div className="space-y-[var(--bu-space-7)]">
+            {groupedPosts.map((group) => (
+              <section key={group.date} className="space-y-[var(--bu-space-3)]">
+                <div className="flex items-center justify-between gap-4 border-b border-[var(--bu-border-subtle)] pb-[var(--bu-space-2)]">
+                  <h2 className="text-[var(--bu-size-ui)] font-medium text-[var(--bu-text-primary)]">
+                    {formatSignalsDate(group.date)}
+                  </h2>
+                  <p className="text-[var(--bu-size-meta)] font-normal text-[var(--bu-text-tertiary)]">
+                    {group.posts.length} {group.posts.length === 1 ? "signal" : "signals"}
+                  </p>
+                </div>
+                <div className="grid gap-[var(--bu-space-2)]">
+                  {group.posts.map((post) => (
+                    <SignalCard
+                      key={post.id}
+                      signal={post}
+                      compact
+                      rank={getPublicSignalDisplayRank(post)}
+                      tier={isContextPublicSignal(post) ? "context" : "core"}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         ) : state.kind === "temporarily_unavailable" ? (
           <Panel className="p-6">
-            <p className="text-base font-semibold text-[var(--text-primary)]">
+            <p className="text-base font-medium text-[var(--bu-text-primary)]">
               Published briefing is temporarily unavailable
             </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="mt-2 text-sm leading-6 text-[var(--bu-text-secondary)]">
               The reviewed briefing is being kept offline until it can be read safely. Check back shortly.
             </p>
           </Panel>
         ) : (
           <Panel className="p-6">
-            <p className="text-base font-semibold text-[var(--text-primary)]">
-              Published Signals are not available yet
+            <p className="text-base font-medium text-[var(--bu-text-primary)]">
+              Nothing here yet
             </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              The public signal page will appear after an editor approves and publishes the current Signal slate.
+            <p className="mt-2 text-sm leading-6 text-[var(--bu-text-secondary)]">
+              This page will list published signals after the current slate is approved.
             </p>
           </Panel>
         )}
-      </div>
-    </main>
+      </main>
+    </AppShell>
   );
 }
 
-function SignalSection({
-  title,
-  description,
-  posts,
-  briefingDate,
-}: {
-  title: string;
-  description: string;
-  posts: EditorialSignalPost[];
-  briefingDate: string | null;
-}) {
-  if (posts.length === 0) {
-    return null;
+function groupPostsByDate(posts: EditorialSignalPost[]) {
+  const groups = new Map<string, EditorialSignalPost[]>();
+
+  for (const post of posts) {
+    const date = post.briefingDate ?? "unknown";
+    groups.set(date, [...(groups.get(date) ?? []), post]);
   }
 
-  return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-lg font-semibold tracking-normal text-[var(--text-primary)]">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
-      </div>
-      <ol className="space-y-4">
-        {posts.map((post) => (
-          <li key={post.id}>
-            <Panel className="p-5">
-              <div className="grid gap-4 md:grid-cols-[3rem_1fr]">
-                <span className="flex h-10 w-10 items-center justify-center rounded-card bg-[var(--sidebar)] text-sm font-semibold text-[var(--text-primary)]">
-                  {getPublicSignalDisplayRank(post)}
-                </span>
-                <div className="min-w-0 space-y-3">
-                  <div>
-                    <div className="flex flex-wrap gap-2">
-                      {getPublicSignalTags(post).map((tag) => (
-                        <Badge key={tag}>{tag}</Badge>
-                      ))}
-                    </div>
-                    <h3 className="mt-3 text-xl font-semibold leading-7 text-[var(--text-primary)]">
-                      {post.title}
-                    </h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <span>{post.sourceName || "Unknown source"}</span>
-                      {post.sourceUrl ? (
-                        <a
-                          href={post.sourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
-                          data-mvp-measurement-event="source_click"
-                          data-mvp-route="/signals"
-                          data-mvp-surface="signals_published_slate"
-                          data-mvp-signal-post-id={post.id}
-                          data-mvp-signal-slug={post.title}
-                          data-mvp-signal-rank={getPublicSignalDisplayRank(post)}
-                          data-mvp-briefing-date={briefingDate ?? undefined}
-                          data-mvp-source-name={post.sourceName || "Unknown source"}
-                        >
-                          Source
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="text-sm leading-6 text-[var(--text-secondary)]">{post.summary}</p>
-                  <div className="rounded-card border border-[var(--border)] bg-[var(--bg)] p-4">
-                    <p className="text-xs font-semibold tracking-normal text-[var(--text-secondary)]">
-                      Why this ranks
-                    </p>
-                    <p
-                      className="mt-2 line-clamp-2 text-base leading-7 text-[var(--text-primary)]"
-                      data-testid="signals-why-it-matters-preview"
-                    >
-                      {post.publishedWhyItMatters}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Panel>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
+  return Array.from(groups.entries()).map(([date, groupPosts]) => ({
+    date,
+    posts: groupPosts.slice().sort((left, right) => getPublicSignalDisplayRank(left) - getPublicSignalDisplayRank(right)),
+  }));
+}
+
+function formatSignalsDate(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return "Undated";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00.000Z`));
 }
 
 function getPublicSignalDisplayRank(post: EditorialSignalPost) {
   return post.finalSlateRank ?? post.rank;
-}
-
-function getPublicSignalTags(post: EditorialSignalPost) {
-  return post.tags.filter((tag) => !INTERNAL_PUBLIC_SIGNAL_TAGS.has(tag.trim().toLowerCase()));
 }
 
 function isCorePublicSignal(post: EditorialSignalPost) {

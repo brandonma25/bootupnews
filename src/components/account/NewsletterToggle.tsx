@@ -41,7 +41,7 @@ export function NewsletterToggle({ enabled, onToggle }: NewsletterToggleProps) {
     <div className="w-full space-y-2">
       <div className="flex w-full items-center justify-between gap-4 rounded-card border border-[var(--line)] p-4">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[var(--foreground)]">Daily email digest</p>
+          <p className="text-sm font-medium text-[var(--foreground)]">Daily email digest</p>
           <p className="text-sm text-[var(--muted)]">
             {currentEnabled ? "Subscribed" : "Not subscribed"}
           </p>

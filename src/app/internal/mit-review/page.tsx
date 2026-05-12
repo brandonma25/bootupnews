@@ -42,7 +42,7 @@ export default async function MitReviewPage() {
           </div>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl space-y-3">
-              <h1 className="text-2xl font-semibold tracking-normal text-[var(--text-primary)] md:text-3xl">
+              <h1 className="text-2xl font-medium tracking-normal text-[var(--text-primary)] md:text-3xl">
                 MIT probationary review
               </h1>
               <p className="text-base leading-7 text-[var(--text-secondary)]">
@@ -83,7 +83,7 @@ export default async function MitReviewPage() {
             <div className="flex flex-col gap-2 border-b border-[var(--border)] pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="section-label">Recent MIT feed sample</p>
-                <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">Top MIT item titles</h2>
+                <h2 className="mt-1 text-lg font-medium text-[var(--text-primary)]">Top MIT item titles</h2>
               </div>
               <Badge>{data.feed.sourceId}</Badge>
             </div>
@@ -95,7 +95,7 @@ export default async function MitReviewPage() {
               </ol>
             ) : (
               <div className="mt-4 rounded-card border border-dashed border-[var(--border)] bg-[var(--bg)] p-4">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">No MIT items available</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">No MIT items available</p>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   The current request could not show a feed sample. Check Issue #70 and rerun after the upstream feed is reachable.
                 </p>
@@ -113,7 +113,7 @@ export default async function MitReviewPage() {
               <Metric label="Comparison fetch failures" value={`${data.review.baselineFetchFailureCount}`} />
             </div>
             <div className="mt-5 rounded-card border border-[var(--border)] bg-[var(--bg)] p-4">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Contribution usefulness</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Contribution usefulness</p>
               <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{data.review.contributionUsefulness}</p>
             </div>
             <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">{data.review.duplicationNoiseNotes}</p>
@@ -156,7 +156,7 @@ function LockedInternalPage() {
               <Badge>Internal review</Badge>
               <Badge>No evidence exposed</Badge>
             </div>
-            <h1 className="text-2xl font-semibold tracking-normal text-[var(--text-primary)]">
+            <h1 className="text-2xl font-medium tracking-normal text-[var(--text-primary)]">
               Internal access required
             </h1>
             <p className="text-base leading-7 text-[var(--text-secondary)]">
@@ -194,7 +194,7 @@ function StatusPanel({
         </span>
         <div className="min-w-0">
           <p className="section-label">{label}</p>
-          <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{value}</p>
+          <p className="mt-1 text-lg font-medium text-[var(--text-primary)]">{value}</p>
           <p className="mt-1 break-words text-sm leading-6 text-[var(--text-secondary)]">{detail}</p>
         </div>
       </div>
@@ -205,11 +205,11 @@ function StatusPanel({
 function MitItemRow({ item, index }: { item: MitReviewItem; index: number }) {
   return (
     <li className="grid gap-3 py-4 sm:grid-cols-[2rem_1fr_auto] sm:items-start">
-      <span className="flex h-8 w-8 items-center justify-center rounded-card bg-[var(--sidebar)] text-sm font-semibold text-[var(--text-primary)]">
+      <span className="flex h-8 w-8 items-center justify-center rounded-card bg-[var(--sidebar)] text-sm font-medium text-[var(--text-primary)]">
         {index + 1}
       </span>
       <div className="min-w-0">
-        <h3 className="text-base font-semibold leading-6 text-[var(--text-primary)]">{item.title}</h3>
+        <h3 className="text-base font-medium leading-6 text-[var(--text-primary)]">{item.title}</h3>
         {item.summarySnippet ? (
           <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{item.summarySnippet}</p>
         ) : null}
@@ -223,7 +223,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-3 last:border-0 last:pb-0">
       <p className="text-sm text-[var(--text-secondary)]">{label}</p>
-      <p className="text-sm font-semibold text-[var(--text-primary)]">{value}</p>
+      <p className="text-sm font-medium text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }
@@ -233,7 +233,7 @@ function NotesPanel({ title, items }: { title: string; items: string[] }) {
     <Panel className="p-5">
       <div className="flex items-center gap-2">
         <ShieldCheck className="h-4 w-4 text-[var(--text-primary)]" />
-        <h2 className="text-base font-semibold text-[var(--text-primary)]">{title}</h2>
+        <h2 className="text-base font-medium text-[var(--text-primary)]">{title}</h2>
       </div>
       <ul className="mt-4 space-y-3">
         {items.map((item) => (

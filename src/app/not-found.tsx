@@ -2,21 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Page not found — Daily Intelligence",
+  title: "Boot Up — Page not found",
 };
 
 export default function NotFound() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-8 text-center max-w-sm w-full">
-        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+        <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
           404
         </p>
-        <h1 className="mt-3 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
+        <h1 className="mt-3 text-xl font-medium text-[var(--text-primary)] md:text-2xl">
           Page not found
         </h1>
         <p className="mt-3 text-base text-[var(--text-secondary)]">
-          Head back home to continue your daily briefing.
+          Head back home to continue today&apos;s signals.
         </p>
         <Link
           href="/"

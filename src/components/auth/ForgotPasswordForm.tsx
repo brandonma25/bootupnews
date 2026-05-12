@@ -67,7 +67,7 @@ export function ForgotPasswordForm({ className }: ForgotPasswordFormProps) {
         <p role="status" className="rounded-xl border border-[var(--line-strong)] bg-[var(--surface-strong)] px-4 py-3 text-sm leading-6 text-[var(--foreground)]">
           Check your inbox — we&apos;ve sent a reset link to {submittedEmail}
         </p>
-        <Link href="/login" className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--foreground)] underline underline-offset-4">
+        <Link href="/login" className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--foreground)] underline underline-offset-4">
           Back to login
         </Link>
       </div>
@@ -109,7 +109,7 @@ export function ForgotPasswordForm({ className }: ForgotPasswordFormProps) {
         )}
       </Button>
 
-      <Link href="/login" className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--foreground)] underline underline-offset-4">
+      <Link href="/login" className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--foreground)] underline underline-offset-4">
         Back to login
       </Link>
     </form>

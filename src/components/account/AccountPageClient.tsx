@@ -134,7 +134,7 @@ export function AccountPageClient({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
               <p className="section-label">Admin</p>
-              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Editorial Review</h2>
+              <h2 className="text-xl font-medium text-[var(--text-primary)]">Editorial Review</h2>
               <p className="max-w-2xl text-sm text-[var(--text-secondary)]">
                 Review, approve, and publish the Top 5 Signals editorial layer.
               </p>
@@ -149,7 +149,7 @@ export function AccountPageClient({
       <Panel className="p-5">
         <div className="space-y-2">
           <p className="section-label">RSS feeds</p>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Sources</h2>
+          <h2 className="text-xl font-medium text-[var(--text-primary)]">Sources</h2>
           <p className="max-w-2xl text-sm text-[var(--text-secondary)]">
             Add RSS feeds that should be considered for your briefing.
           </p>
@@ -171,7 +171,7 @@ export function AccountPageClient({
       <Panel className="p-5">
         <div className="space-y-2">
           <p className="section-label">Category preferences</p>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Briefing categories</h2>
+          <h2 className="text-xl font-medium text-[var(--text-primary)]">Briefing categories</h2>
           <p className="max-w-2xl text-sm text-[var(--text-secondary)]">
             Choose the V1 categories that should stay available in your signed-in briefing.
           </p>
@@ -200,7 +200,7 @@ export function AccountPageClient({
       <Panel className="p-5">
         <div className="space-y-2">
           <p className="section-label">Newsletter</p>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Daily digest</h2>
+          <h2 className="text-xl font-medium text-[var(--text-primary)]">Daily digest</h2>
           <p className="max-w-2xl text-sm text-[var(--text-secondary)]">
             Save whether this account should receive the daily newsletter when delivery infrastructure is enabled.
           </p>

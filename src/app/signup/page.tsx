@@ -8,7 +8,7 @@ import { safePostAuthRedirectPath } from "@/lib/auth";
 import { getViewerAccount } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "Signup — Daily Intelligence",
+  title: "Boot Up — Signup",
 };
 
 export default async function SignupPage({
@@ -30,23 +30,23 @@ export default async function SignupPage({
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm space-y-5">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Create account</h1>
+          <h1 className="text-2xl font-medium text-[var(--text-primary)]">Create account</h1>
           <p className="text-sm text-[var(--text-secondary)]">
-            Create your Daily Intelligence account.
+            Create your Boot Up account.
           </p>
         </div>
         <SignupForm redirectTo={redirectTo} />
         <div className="text-center text-sm">
           <Link
             href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
-            className="font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+            className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
           >
             Already have an account? Sign in
           </Link>
         </div>
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-[var(--line)]" />
-          <span className="text-xs font-semibold uppercase tracking-normal text-[var(--muted)]">Or</span>
+          <span className="text-xs font-medium uppercase tracking-normal text-[var(--muted)]">Or</span>
           <div className="h-px flex-1 bg-[var(--line)]" />
         </div>
         <GoogleAuthButton redirectPath={redirectTo} />

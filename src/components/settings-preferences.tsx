@@ -133,10 +133,10 @@ export function SettingsPreferences({
     <Panel className="p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Personal settings
           </p>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+          <h3 className="mt-2 text-xl font-medium text-[var(--text-primary)]">
             Tune your personal briefing
           </h3>
           <p className="mt-2 text-base text-[var(--text-secondary)]">
@@ -152,7 +152,7 @@ export function SettingsPreferences({
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Personalization status
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -172,12 +172,12 @@ export function SettingsPreferences({
         </div>
 
         <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Briefing effect
           </p>
-          <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">How the ranking changes</h4>
+          <h4 className="mt-2 text-lg font-medium text-[var(--text-primary)]">How the ranking changes</h4>
           <div className="mt-4 space-y-2 rounded-card border border-[var(--border)] bg-[var(--panel)]/45 p-4 text-base text-[var(--text-secondary)]">
-            <p>Confirmed multi-source events still dominate Top Events.</p>
+            <p>Confirmed multi-source events still dominate Today&apos;s signals.</p>
             <p>Matching priorities can move strong events higher for you.</p>
             <p>Early Signals stay separate even when they match your interests.</p>
           </div>
@@ -235,10 +235,10 @@ export function SettingsPreferences({
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Topic preferences
           </p>
-          <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Choose what should pull harder</h4>
+          <h4 className="mt-2 text-lg font-medium text-[var(--text-primary)]">Choose what should pull harder</h4>
           <p className="mt-2 text-base text-[var(--text-secondary)]">
             Keep this list tight. A few focused priorities produce the clearest personalization.
           </p>
@@ -267,10 +267,10 @@ export function SettingsPreferences({
         </div>
 
         <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Save behavior
           </p>
-          <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Local for now, explicit by design</h4>
+          <h4 className="mt-2 text-lg font-medium text-[var(--text-primary)]">Local for now, explicit by design</h4>
           <p className="mt-2 text-base text-[var(--text-secondary)]">
             Preferences currently save to this browser. That keeps the foundation safe and predictable while account-backed persistence stays a follow-up.
           </p>
@@ -282,10 +282,10 @@ export function SettingsPreferences({
       </div>
 
       <div className="mt-6 rounded-card border border-[var(--border)] bg-[var(--card)] p-5">
-        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+        <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
           Followed entities
         </p>
-        <h4 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Add entities you want surfaced faster</h4>
+        <h4 className="mt-2 text-lg font-medium text-[var(--text-primary)]">Add entities you want surfaced faster</h4>
         <p className="mt-2 text-base text-[var(--text-secondary)]">
           Use this for companies, institutions, leaders, or products you actively watch.
         </p>
@@ -324,7 +324,7 @@ export function SettingsPreferences({
 
         {suggestedEntities.length ? (
           <div className="mt-5">
-            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+            <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
               Suggested from current briefing
             </p>
             <div className="mt-3 flex flex-wrap gap-2">

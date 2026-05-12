@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { BriefingDetailView } from "@/components/briefing/BriefingDetailView";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { isAdminUser } from "@/lib/admin-auth";
 import { getBriefingDetailPageState } from "@/lib/data";
 import { isValidBriefingDateKey } from "@/lib/utils";
 
@@ -17,7 +18,7 @@ export async function generateMetadata({
   const { date } = await params;
 
   return {
-    title: `Boot Up — Briefing ${formatBriefingDateTitle(date)}`,
+    title: `Boot Up — Briefing, ${formatBriefingDateTitle(date)}`,
   };
 }
 
@@ -36,15 +37,20 @@ export default async function BriefingDetailPage({
 
   if (!briefing) {
     return (
-      <AppShell currentPath={`/briefing/${date}`} mode={data.mode} account={viewer}>
+      <AppShell
+        currentPath={`/briefing/${date}`}
+        mode={data.mode}
+        account={viewer}
+        isAdmin={isAdminUser({ email: viewer?.email ?? undefined })}
+      >
         <div className="py-2">
           <Panel className="p-6">
             <p className="section-label">Briefing unavailable</p>
-            <h1 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
+            <h1 className="mt-2 text-2xl font-medium text-[var(--text-primary)]">
               This briefing is not available
             </h1>
             <p className="mt-3 max-w-2xl text-base text-[var(--text-secondary)]">
-              Public access is limited to the current Top Events briefing. Sign in and open History to review saved briefing dates.
+              Public access is limited to the current briefing. Sign in and open History to review saved briefing dates.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild>
@@ -63,7 +69,12 @@ export default async function BriefingDetailPage({
   }
 
   return (
-    <AppShell currentPath={`/briefing/${date}`} mode={data.mode} account={viewer}>
+      <AppShell
+        currentPath={`/briefing/${date}`}
+        mode={data.mode}
+        account={viewer}
+        isAdmin={isAdminUser({ email: viewer?.email ?? undefined })}
+      >
       <BriefingDetailView data={{ ...data, briefing }} viewer={viewer} />
     </AppShell>
   );

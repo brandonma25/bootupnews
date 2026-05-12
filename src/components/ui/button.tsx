@@ -23,14 +23,14 @@ type ButtonProps =
 export function Button(props: ButtonProps) {
   const { children, className, variant = "primary" } = props;
   const classes = cn(
-    "inline-flex items-center justify-center rounded-button px-4 py-2 text-sm font-medium leading-none transition-colors duration-150 disabled:cursor-not-allowed",
+    "inline-flex items-center justify-center rounded-button px-4 py-2 text-[var(--bu-size-ui)] font-medium leading-none transition-colors duration-150 disabled:cursor-not-allowed",
     variant === "primary" &&
-      "bg-[var(--accent)] !text-[#FFFFFF] hover:bg-[var(--accent-hover)] hover:!text-[#FFFFFF] active:bg-[var(--accent-hover)] active:!text-[#FFFFFF]",
+      "bg-[var(--bu-accent)] !text-[var(--bu-accent-on)] hover:bg-[var(--bu-accent-hover)] hover:!text-[var(--bu-accent-on)] active:bg-[var(--bu-accent-hover)] active:!text-[var(--bu-accent-on)]",
     variant === "secondary" &&
-      "border border-[var(--text-primary)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg)] active:bg-[var(--sidebar)]",
-    variant === "ghost" && "text-[var(--text-primary)] hover:bg-[var(--bg)] active:bg-[var(--sidebar)]",
+      "border border-[var(--bu-border-default)] bg-transparent text-[var(--bu-text-secondary)] hover:border-[var(--bu-accent)] hover:text-[var(--bu-accent)] active:bg-[var(--bu-bg-subtle)]",
+    variant === "ghost" && "text-[var(--bu-text-secondary)] hover:text-[var(--bu-accent)] active:bg-[var(--bu-bg-subtle)]",
     className,
-    "disabled:border disabled:border-[var(--border)] disabled:bg-[var(--sidebar)] disabled:!text-[var(--text-secondary)] disabled:opacity-100 disabled:hover:bg-[var(--sidebar)] disabled:hover:!text-[var(--text-secondary)] disabled:active:bg-[var(--sidebar)] disabled:active:!text-[var(--text-secondary)]",
+    "disabled:border disabled:border-[var(--bu-border-default)] disabled:bg-[var(--bu-border-default)] disabled:!text-[var(--bu-text-tertiary)] disabled:opacity-100 disabled:hover:bg-[var(--bu-border-default)] disabled:hover:!text-[var(--bu-text-tertiary)] disabled:active:bg-[var(--bu-border-default)] disabled:active:!text-[var(--bu-text-tertiary)]",
   );
 
   if ("asChild" in props && props.asChild) {

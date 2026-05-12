@@ -8,7 +8,7 @@ import { isAdminUser } from "@/lib/admin-auth";
 import { getAccountPageState } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "Account — Daily Intelligence",
+  title: "Boot Up — Account",
 };
 
 export default async function AccountPage() {
@@ -19,11 +19,16 @@ export default async function AccountPage() {
   }
 
   return (
-    <AppShell currentPath="/account" mode="live" account={viewer}>
+    <AppShell
+      currentPath="/account"
+      mode="live"
+      account={viewer}
+      isAdmin={isAdminUser({ email: viewer.email })}
+    >
       <div className="space-y-5 py-2">
         <PageHeader
           eyebrow="Account"
-          title="Manage your briefing account"
+          title="Account"
           description="Profile, RSS feeds, category preferences, newsletter delivery, and sign out live here in V1."
         />
         <AccountPageClient

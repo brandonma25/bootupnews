@@ -46,10 +46,11 @@ type StructuredEditorialFieldsProps = {
 type SignalPostEditorProps = {
   post: EditorialSignalPost;
   storageReady: boolean;
+  defaultExpanded?: boolean;
 };
 
-export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export function SignalPostEditor({ post, storageReady, defaultExpanded = false }: SignalPostEditorProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const editableText = post.editedWhyItMatters || post.publishedWhyItMatters || post.aiWhyItMatters;
   const structuredContent =
     post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
@@ -73,7 +74,7 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-card bg-[var(--sidebar)] text-sm font-semibold text-[var(--text-primary)]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-card bg-[var(--sidebar)] text-sm font-medium text-[var(--text-primary)]">
                   {post.rank}
                 </span>
                 {post.briefingDate ? <Badge>{post.briefingDate}</Badge> : null}
@@ -103,7 +104,7 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
               </Button>
             </div>
             <div>
-              <h2 className="text-xl font-semibold leading-7 text-[var(--text-primary)]">{post.title}</h2>
+              <h2 className="text-xl font-medium leading-7 text-[var(--text-primary)]">{post.title}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--text-secondary)]">
                 <span>{post.sourceName || "Unknown source"}</span>
                 {post.sourceUrl ? (
@@ -133,7 +134,7 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
             <p className="text-sm leading-6 text-[var(--text-secondary)]">{post.aiWhyItMatters}</p>
             {requiresHumanRewrite ? (
               <div className="rounded-card border border-[var(--border)] bg-[var(--card)] p-3">
-                <p className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                   <AlertTriangle className="h-4 w-4" />
                   Quality gate reasons
                 </p>
@@ -188,7 +189,7 @@ export function SignalPostEditor({ post, storageReady }: SignalPostEditorProps) 
             </Button>
           </div>
           <div className="space-y-3 rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
-            <label htmlFor={`decisionNote-${post.id}`} className="text-sm font-semibold text-[var(--text-primary)]">
+            <label htmlFor={`decisionNote-${post.id}`} className="text-sm font-medium text-[var(--text-primary)]">
               Editorial decision note
               <textarea
                 id={`decisionNote-${post.id}`}
@@ -316,7 +317,7 @@ export function StructuredEditorialFields({
           <FieldBlock
             id={`editorialThesis-${postId}`}
             label="Thesis / opening statement"
-            help="The first expanded statement. Frame the executive takeaway here."
+            help="The first expanded statement. Frame the main point here."
           >
             <textarea
               id={`editorialThesis-${postId}`}
@@ -330,14 +331,14 @@ export function StructuredEditorialFields({
 
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Structured argument sections</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Structured argument sections</p>
               <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
                 Use only the sections you need. Empty slots are ignored.
               </p>
             </div>
             {sectionTitles.map((title, index) => (
               <div key={index} className="rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
-                <label className="text-sm font-semibold text-[var(--text-primary)]">
+                <label className="text-sm font-medium text-[var(--text-primary)]">
                   Section {index + 1} title
                   <input
                     name="sectionTitle"
@@ -352,7 +353,7 @@ export function StructuredEditorialFields({
                     className="mt-2 w-full rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
                   />
                 </label>
-                <label className="mt-3 block text-sm font-semibold text-[var(--text-primary)]">
+                <label className="mt-3 block text-sm font-medium text-[var(--text-primary)]">
                   Section {index + 1} body
                   <textarea
                     name="sectionBody"
@@ -388,7 +389,7 @@ export function StructuredEditorialFields({
                   type="button"
                   onClick={() => setPreviewMode(mode)}
                   className={[
-                    "rounded-button px-3 py-1.5 text-xs font-semibold capitalize",
+                    "rounded-button px-3 py-1.5 text-xs font-medium capitalize",
                     previewMode === mode
                       ? "bg-[var(--text-primary)] text-white"
                       : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
@@ -416,7 +417,7 @@ export function StructuredEditorialFields({
               {content?.sections.map((section, index) => (
                 <section key={`${index}-${section.title}`} className="space-y-1.5 border-l-2 border-[var(--border)] pl-3">
                   {section.title ? (
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                    <h3 className="text-sm font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
                       {section.title}
                     </h3>
                   ) : null}
@@ -446,7 +447,7 @@ function FieldBlock({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="text-sm font-semibold text-[var(--text-primary)]">
+      <label htmlFor={id} className="text-sm font-medium text-[var(--text-primary)]">
         {label}
       </label>
       <span className="mt-1 block text-sm leading-6 text-[var(--text-secondary)]">{help}</span>

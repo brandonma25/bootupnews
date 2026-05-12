@@ -51,7 +51,7 @@ export const TabsTrigger = forwardRef<
       role="tab"
       aria-selected={active}
       className={cn(
-        "relative min-h-11 shrink-0 whitespace-nowrap px-1 pb-3 pt-2 text-sm font-semibold text-[var(--muted)] transition-colors lg:hover:text-[var(--foreground)]",
+        "relative min-h-11 shrink-0 whitespace-nowrap px-1 pb-3 pt-2 text-sm font-medium text-[var(--muted)] transition-colors lg:hover:text-[var(--foreground)]",
         active && "text-[var(--foreground)] after:absolute after:inset-x-0 after:bottom-[-1px] after:h-0.5 after:rounded-full after:bg-[var(--accent)]",
         className,
       )}
