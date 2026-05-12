@@ -2,7 +2,10 @@ import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const getHomepagePageState = vi.fn();
-const landingHomepage = vi.fn(() => <div>landing-homepage</div>);
+const landingHomepage = vi.fn((props: unknown) => {
+  void props;
+  return <div>landing-homepage</div>;
+});
 const homepageViewModel = {
   featured: null,
   topRanked: [],
@@ -105,8 +108,8 @@ describe("homepage SSR auth snapshot", () => {
     expect(landingHomepage).toHaveBeenCalledWith(
       expect.objectContaining({
         data: editorialData,
-        briefingDateLabel: "Thursday, January 2, 2020",
         homepageViewModel,
+        isAdmin: false,
         viewer: expect.objectContaining({
           email: "analyst@example.com",
         }),

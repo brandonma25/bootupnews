@@ -50,7 +50,7 @@ function createData(): DashboardData {
     briefing: {
       id: "published-homepage-2026-05-06",
       briefingDate: "2026-05-06T09:00:00.000Z",
-      title: "Daily Executive Briefing",
+      title: "Boot Up",
       intro: developerSubtitle,
       readingWindow: "4 minutes",
       items: [item],
@@ -79,16 +79,16 @@ function createData(): DashboardData {
 }
 
 describe("BriefingDetailView", () => {
-  it("does not render the developer subtitle or inherited panel border on public detail cards", () => {
+  it("renders the Boot Up detail surface without the retired public-card chrome", () => {
     render(<BriefingDetailView data={createData()} viewer={null} />);
 
-    expect(screen.getByRole("heading", { name: "Daily Executive Briefing" })).toBeInTheDocument();
+    expect(screen.getByText("Wednesday")).toBeInTheDocument();
+    expect(screen.getByText(/May 6, 2026/)).toBeInTheDocument();
     expect(screen.queryByText(developerSubtitle)).not.toBeInTheDocument();
 
-    const [detailCard] = screen.getAllByTestId("briefing-detail-card");
+    const [detailCard] = screen.getAllByTestId("signal-card");
     expect(detailCard).not.toHaveClass("glass-panel");
-    expect(detailCard).toHaveClass("border-transparent");
-    expect(screen.getByText("Core Signal")).toBeInTheDocument();
+    expect(screen.getByText("Core signal · 01")).toBeInTheDocument();
     expect(screen.queryByText("Top Event")).not.toBeInTheDocument();
     expect(screen.queryByText("TOP EVENT")).not.toBeInTheDocument();
   });
@@ -106,6 +106,6 @@ describe("BriefingDetailView", () => {
     render(<BriefingDetailView data={createData()} viewer={null} />);
 
     expect(screen.getAllByText(item.whatHappened)).toHaveLength(1);
-    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
+    expect(screen.getByText("What happened")).toBeInTheDocument();
   });
 });

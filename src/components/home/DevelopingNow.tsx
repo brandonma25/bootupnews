@@ -17,7 +17,7 @@ export function DevelopingNow({ events }: DevelopingNowProps) {
       <div className="space-y-2">
         <p className="section-label">Developing now</p>
         <div className="space-y-1">
-          <h2 id="developing-now-heading" className="text-xl font-semibold text-[var(--text-primary)]">
+          <h2 id="developing-now-heading" className="text-xl font-medium text-[var(--text-primary)]">
             Developing Now
           </h2>
           <p className="text-sm text-[var(--text-secondary)]">

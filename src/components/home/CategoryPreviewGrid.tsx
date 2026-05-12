@@ -24,7 +24,7 @@ export function CategoryPreviewGrid({ categoryPreviews }: CategoryPreviewGridPro
       <div className="space-y-2">
         <p className="section-label">By category</p>
         <div className="space-y-1">
-          <h2 id="by-category-heading" className="text-xl font-semibold text-[var(--text-primary)]">
+          <h2 id="by-category-heading" className="text-xl font-medium text-[var(--text-primary)]">
             By Category
           </h2>
           <p className="text-sm text-[var(--text-secondary)]">
@@ -42,7 +42,7 @@ export function CategoryPreviewGrid({ categoryPreviews }: CategoryPreviewGridPro
               <div className="space-y-1">
                 <h3
                   id={`category-preview-${category.key}`}
-                  className="text-base font-semibold text-[var(--text-primary)]"
+                  className="text-base font-medium text-[var(--text-primary)]"
                 >
                   {category.label}
                 </h3>

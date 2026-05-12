@@ -124,7 +124,7 @@ describe("StoryCard timeline", () => {
       />,
     );
 
-    expect(screen.getByText("Why this ranks")).toBeInTheDocument();
+    expect(screen.getByText("Why this matters")).toBeInTheDocument();
     expect(
       screen.getAllByText(/Broad coverage around the Federal Reserve across 5 articles from 3 sources/i)
         .length,

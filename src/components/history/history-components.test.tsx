@@ -48,8 +48,9 @@ describe("history components", () => {
   it("renders the history empty-state message and link CTAs", () => {
     render(<HistoryEmptyState />);
 
-    expect(screen.getByText(/Your daily briefing history starts today/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to Home" })).toHaveAttribute(
+    expect(screen.getByText("Past briefings")).toBeInTheDocument();
+    expect(screen.getByText(/Nothing here yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to today" })).toHaveAttribute(
       "href",
       "/",
     );

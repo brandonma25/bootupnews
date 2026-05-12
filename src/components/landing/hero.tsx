@@ -8,7 +8,7 @@ export default function HeroSection({ onGetStarted }: Props) {
   return (
     <section className="flex flex-col items-center justify-center text-center px-6 py-24">
       <div className="mx-auto max-w-3xl">
-        <h1 className="mb-4 text-xl font-semibold tracking-normal text-[var(--text-primary)] md:text-2xl">
+        <h1 className="mb-4 text-xl font-medium tracking-normal text-[var(--text-primary)] md:text-2xl">
           Understand the news in 10 minutes, not 60.
         </h1>
 

@@ -21,11 +21,11 @@ export function HomeEmptyState({
       <p className="section-label">
         Briefing pending
       </p>
-      <h2 className="mt-3 text-xl font-semibold text-[var(--foreground)] sm:text-2xl">
+      <h2 className="mt-3 text-xl font-medium text-[var(--foreground)] sm:text-2xl">
         {message}
       </h2>
       <p className="mt-3 max-w-md text-sm leading-7 text-[var(--muted)]">
-        Expected generation time: <span className="font-semibold text-[var(--foreground)]">{expectedGenerationTime}</span>
+        Expected generation time: <span className="font-medium text-[var(--foreground)]">{expectedGenerationTime}</span>
       </p>
     </div>
   );

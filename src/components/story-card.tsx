@@ -99,14 +99,14 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </div>
 
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             What happened
           </p>
           <p className="text-base text-[var(--text-primary)]">{item.whatHappened}</p>
         </section>
 
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Key points
           </p>
           <ul className="space-y-2 text-[13px] leading-[1.6] text-[var(--text-primary)] md:text-sm">
@@ -120,8 +120,8 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </section>
 
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
-            Why this ranks
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
+            Why this matters
           </p>
           <p className="text-base text-[var(--text-primary)]">
             {item.eventIntelligence?.rankingReason ??
@@ -145,7 +145,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         {item.explanationPacket?.connection_layer ? (
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+              <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                 Connections
               </p>
               <span className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]">
@@ -154,7 +154,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
             </div>
             <div className="space-y-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+                <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                   What led to this
                 </p>
                 <p className="mt-1 text-base text-[var(--text-primary)]">
@@ -162,7 +162,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
                 </p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+                <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                   What it connects to
                 </p>
                 <p className="mt-1 text-base text-[var(--text-primary)]">
@@ -176,7 +176,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         <section className="space-y-2" data-trust-tier={trustLayer.tier}>
           <p
             className={cn(
-              "text-xs font-semibold uppercase tracking-normal",
+              "text-xs font-medium uppercase tracking-normal",
               trustLayer.tier === "high" ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]",
             )}
           >
@@ -206,7 +206,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </section>
 
         <section className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Related coverage
           </p>
           <div className="flex flex-wrap gap-2">
@@ -240,7 +240,7 @@ export function StoryCard({ item }: { item: BriefingItem }) {
         </section>
 
         <section className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Timeline
           </p>
           <TimelineBlock timeline={item.timeline} />
@@ -266,7 +266,7 @@ function TimelineBlock({ timeline }: { timeline: BriefingItem["timeline"] }) {
           <div key={group.dateKey} className="grid gap-3 md:grid-cols-[84px_minmax(0,1fr)]">
             <div className="flex items-start gap-2">
               <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-button bg-[var(--text-secondary)]" />
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{group.dateLabel}</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{group.dateLabel}</p>
             </div>
             <div className="space-y-3">
               {group.entries.map((entry) => (
@@ -274,7 +274,7 @@ function TimelineBlock({ timeline }: { timeline: BriefingItem["timeline"] }) {
                   key={`${group.dateKey}-${entry.source}-${entry.title}`}
                   className="rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3"
                 >
-                  <p className="text-sm font-semibold leading-6 text-[var(--text-primary)]">{entry.title}</p>
+                  <p className="text-sm font-medium leading-6 text-[var(--text-primary)]">{entry.title}</p>
                   <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{entry.summary}</p>
                   <p className="mt-1 text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                     {entry.source}

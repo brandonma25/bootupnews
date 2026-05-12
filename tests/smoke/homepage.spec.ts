@@ -7,12 +7,17 @@ test.describe("homepage smoke", () => {
   test("loads the public V1 homepage and respects the current fallback state", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("Boot Up").first()).toBeVisible();
+    await expect(page.getByText("For people who want to understand the world, not just consume it.").first())
+      .toBeVisible();
+    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
 
-    const detailLink = page.getByRole("link", { name: "Details" }).first();
+    const detailLink = page.getByRole("link", { name: "Read more →" }).first();
     if (!(await detailLink.isVisible())) {
       await expect(page.getByText(fallbackBriefingCopy).first()).toBeVisible();
       await expect(page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail/i)).toHaveCount(0);
+      await expect(page.getByText(/min read/i)).toHaveCount(0);
       return;
     }
 

@@ -24,10 +24,10 @@ export default function Error({ error, reset }: Props) {
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+            <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
               Temporary issue
             </p>
-            <h1 className="text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
+            <h1 className="text-xl font-medium text-[var(--text-primary)] md:text-2xl">
               This page hit a server problem, but the app is still recoverable.
             </h1>
             <p className="max-w-2xl text-base text-[var(--text-secondary)]">
@@ -44,7 +44,7 @@ export default function Error({ error, reset }: Props) {
               </button>
               <Link
                 href="/"
-                className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]"
+                className="inline-flex items-center rounded-button border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-medium text-[var(--text-primary)]"
               >
                 Open Home
               </Link>

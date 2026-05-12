@@ -29,7 +29,7 @@ export function FeaturePlaceholder({
         </span>
         <Badge>Coming soon</Badge>
       </div>
-      <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
+      <h3 className="mt-3 text-sm font-medium text-[var(--text-primary)]">{title}</h3>
       <p className="mt-1.5 text-xs text-[var(--text-secondary)]">{description}</p>
       <p className="mt-3 rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs text-[var(--text-primary)]">
         {note}

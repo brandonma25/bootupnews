@@ -496,7 +496,7 @@ function buildEmptyPublicHomepageData(
     briefing: {
       id: `empty-homepage-${getBriefingDateKey(briefingDate)}`,
       briefingDate,
-      title: "Daily Executive Briefing",
+      title: "Boot Up",
       intro: message,
       readingWindow: "0 minutes",
       items: [],
@@ -565,7 +565,7 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
     briefing: {
       id: `published-homepage-${getBriefingDateKey(briefingDate)}`,
       briefingDate,
-      title: "Daily Executive Briefing",
+      title: "Boot Up",
       intro,
       readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
       items,
@@ -1355,8 +1355,8 @@ export async function generateDailyBriefing(
       ? {
           id: `generated-${Date.now()}`,
           briefingDate: formatISO(new Date()),
-          title: "Daily Executive Briefing",
-          intro: "A deterministic scan of the strongest multi-source news clusters moving right now.",
+          title: "Boot Up",
+          intro: "A focused scan of the strongest signals moving right now.",
           readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
           items,
         }

@@ -22,13 +22,13 @@ export const coreRoutes: AuditRoute[] = [
     path: "/",
     slug: "home",
     navLabel: "Home",
-    heading: /Daily Intelligence Briefing/i,
+    heading: /Today's signals/i,
   },
   {
     name: "Dashboard",
     path: "/dashboard",
     slug: "dashboard",
-    heading: /Daily Intelligence Briefing/i,
+    heading: /Today's signals/i,
     expectedPath: "/",
   },
   {
@@ -36,7 +36,7 @@ export const coreRoutes: AuditRoute[] = [
     path: "/history",
     slug: "history",
     navLabel: "History",
-    heading: /briefing history/i,
+    heading: /Past briefings|Sign in to view briefing history/i,
   },
   {
     name: "Account",

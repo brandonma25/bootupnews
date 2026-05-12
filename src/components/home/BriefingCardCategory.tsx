@@ -53,7 +53,7 @@ export function BriefingCardCategory({
   return (
     <Card className={cn("w-full p-5", className)}>
       <div className="space-y-3">
-        <h3 className="text-base font-semibold leading-tight text-[var(--foreground)] sm:text-lg">
+        <h3 className="text-base font-medium leading-tight text-[var(--foreground)] sm:text-lg">
           {item.title}
         </h3>
         <p className="text-sm leading-6 text-[var(--muted)] sm:text-[15px] sm:leading-7">
@@ -64,7 +64,7 @@ export function BriefingCardCategory({
             {sourcePills.map((sourceTitle) => (
               <span
                 key={sourceTitle}
-                className="inline-flex max-w-full items-center rounded-button border border-[var(--line)] bg-[var(--card)] px-2.5 py-1 text-xs font-semibold text-[var(--muted)] break-words"
+                className="inline-flex max-w-full items-center rounded-button border border-[var(--line)] bg-[var(--card)] px-2.5 py-1 text-xs font-medium text-[var(--muted)] break-words"
               >
                 {sourceTitle}
               </span>

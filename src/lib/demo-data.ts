@@ -523,9 +523,9 @@ export function areMvpDefaultPublicSources(sources: Source[]): boolean {
 export const demoBriefing: DailyBriefing = {
   id: "briefing-today",
   briefingDate: today,
-  title: "Daily Executive Briefing",
+  title: "Boot Up",
   intro:
-    "A focused scan of the handful of stories most likely to change product, market, and strategic decisions today.",
+    "A focused scan of the signals most likely to change how the day makes sense.",
   readingWindow: "34 minutes",
   items: [
     {
@@ -595,13 +595,13 @@ export const demoHistory: DailyBriefing[] = [
     ...demoBriefing,
     id: "briefing-yesterday",
     briefingDate: subDays(new Date(), 1).toISOString(),
-    title: "Daily Executive Briefing",
+    title: "Boot Up",
   },
   {
     ...demoBriefing,
     id: "briefing-two-days",
     briefingDate: subDays(new Date(), 2).toISOString(),
-    title: "Daily Executive Briefing",
+    title: "Boot Up",
   },
 ];
 

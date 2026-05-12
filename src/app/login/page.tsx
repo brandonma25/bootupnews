@@ -8,7 +8,7 @@ import { safePostAuthRedirectPath } from "@/lib/auth";
 import { getViewerAccount } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "Login — Daily Intelligence",
+  title: "Boot Up — Login",
 };
 
 export default async function LoginPage({
@@ -30,29 +30,29 @@ export default async function LoginPage({
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm space-y-5">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Sign in</h1>
+          <h1 className="text-2xl font-medium text-[var(--text-primary)]">Sign in</h1>
           <p className="text-sm text-[var(--text-secondary)]">
-            Continue to your Daily Intelligence account.
+            Continue to your Boot Up account.
           </p>
         </div>
         <LoginForm redirectTo={redirectTo} />
         <div className="flex items-center justify-between gap-3 text-sm">
           <Link
             href="/forgot-password"
-            className="font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+            className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
           >
             Forgot Password?
           </Link>
           <Link
             href={`/signup?redirectTo=${encodeURIComponent(redirectTo)}`}
-            className="font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+            className="font-medium text-[var(--accent)] underline-offset-4 hover:underline"
           >
             Create account
           </Link>
         </div>
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-[var(--line)]" />
-          <span className="text-xs font-semibold uppercase tracking-normal text-[var(--muted)]">Or</span>
+          <span className="text-xs font-medium uppercase tracking-normal text-[var(--muted)]">Or</span>
           <div className="h-px flex-1 bg-[var(--line)]" />
         </div>
         <GoogleAuthButton redirectPath={redirectTo} />
