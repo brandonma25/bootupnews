@@ -5,7 +5,7 @@ import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 import { getViewerAccount } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "Forgot Password — Daily Intelligence",
+  title: "Boot Up — Forgot password",
 };
 
 export default async function ForgotPasswordPage() {

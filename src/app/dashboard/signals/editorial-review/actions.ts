@@ -218,6 +218,19 @@ export async function assignFinalSlateSlotAction(formData: FormData) {
   redirectWithResult(result);
 }
 
+export async function assignFinalSlateSlotInlineAction(postId: string, finalSlateRank: number) {
+  const result = await assignSignalPostToFinalSlateSlot({
+    postId,
+    finalSlateRank,
+  });
+
+  if (result.ok) {
+    revalidateEditorialReviewRoute();
+  }
+
+  return result;
+}
+
 export async function removeFromFinalSlateAction(formData: FormData) {
   const result = await removeSignalPostFromFinalSlate({
     postId: String(formData.get("postId") ?? ""),

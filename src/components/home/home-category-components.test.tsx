@@ -97,7 +97,7 @@ describe("CategoryTabStrip", () => {
       />,
     );
 
-    expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Today's signals" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
     expect(screen.getByText("Top ranked event")).toBeInTheDocument();
@@ -212,14 +212,14 @@ describe("CategoryTabStrip", () => {
       />,
     );
 
-    expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Today's signals" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Finance" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Politics" })).toBeInTheDocument();
     expect(screen.getByText("Top ranked event")).toBeInTheDocument();
   });
 
-  it("renders a dismissible inline gate for signed-out category tabs without duplicating Top Events", () => {
+  it("renders a dismissible inline gate for signed-out category tabs without duplicating today's signals", () => {
     render(
       <CategoryTabStrip
         topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
@@ -239,7 +239,7 @@ describe("CategoryTabStrip", () => {
     );
 
     expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Today's signals" })).toHaveAttribute("aria-selected", "true");
 
     fireEvent.click(screen.getByRole("tab", { name: "Tech" }));
 
@@ -250,7 +250,7 @@ describe("CategoryTabStrip", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
-    expect(screen.getByRole("tab", { name: "Top Events" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Today's signals" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText("Sign up to be notified when new signals are published.")).not.toBeInTheDocument();
     expect(screen.getByText("Top ranked event")).toBeInTheDocument();
   });

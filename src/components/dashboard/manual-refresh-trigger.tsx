@@ -21,10 +21,10 @@ export function ManualRefreshTrigger({
   return (
     <div className="flex flex-col items-stretch gap-2 min-w-[168px]">
       <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+        <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
           Reading window
         </p>
-        <p className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+        <p className="mt-1 text-xl font-medium text-[var(--text-primary)]">
           {readingWindow}
         </p>
         {readingMetrics ? (

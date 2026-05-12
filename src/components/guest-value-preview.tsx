@@ -45,7 +45,7 @@ export function GuestValuePreview({
           <Badge className="border-[var(--border)] bg-[var(--card)] text-[var(--text-primary)]">
             You&apos;re viewing the public briefing
           </Badge>
-          <h2 className={cn("mt-3 text-lg font-semibold text-[var(--text-primary)]", compact && "text-base")}>
+          <h2 className={cn("mt-3 text-lg font-medium text-[var(--text-primary)]", compact && "text-base")}>
             Sign in to personalize your intelligence
           </h2>
           <p className="mt-2 max-w-2xl text-base text-[var(--text-secondary)]">
@@ -53,7 +53,7 @@ export function GuestValuePreview({
           </p>
           <Link
             href={ctaHref}
-            className="mt-4 inline-flex text-sm font-semibold text-[var(--accent)] hover:underline"
+            className="mt-4 inline-flex text-sm font-medium text-[var(--accent)] hover:underline"
           >
             {ctaLabel}
           </Link>
@@ -66,7 +66,7 @@ export function GuestValuePreview({
             key={feature.title}
             className="rounded-card border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-4"
           >
-            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+            <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
               <LockKeyhole className="h-4 w-4 text-[var(--text-secondary)]" />
               <span>{feature.title}</span>
             </div>

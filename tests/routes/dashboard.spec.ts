@@ -11,7 +11,8 @@ test.describe("dashboard route", () => {
 
     await expectNoAppCrash(page);
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("tab", { name: "Top Events" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
+    await expect(page.getByText("Browse by")).toBeVisible();
 
     await expectNamedVisibleButtons(page);
     await expectSafeInternalLinks(page);
@@ -23,7 +24,8 @@ test.describe("dashboard route", () => {
 
       await expectNoAppCrash(page);
       await expect(page).toHaveURL(/\/$/);
-      await expect(page.getByRole("tab", { name: "Top Events" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
+      await expect(page.getByText("Browse by")).toBeVisible();
 
       await expectNamedVisibleButtons(page);
       await expectSafeInternalLinks(page);

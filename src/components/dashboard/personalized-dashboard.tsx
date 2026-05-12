@@ -104,7 +104,7 @@ export default function PersonalizedDashboard({
           title={isSignedIn ? "Full briefing workspace" : "Today's public briefing"}
           description={
             isSignedIn
-              ? "This is the complete Daily Intelligence workspace: confirmed event clusters first, early signals kept separate, visible ranking logic on every card, and the full reading workflow in one place."
+              ? "This is the complete Boot Up workspace: confirmed event clusters first, early signals kept separate, visible ranking logic on every card, and the full reading workflow in one place."
               : "You're viewing the public briefing. Sign in to personalize your intelligence and unlock the complete ranked workspace."
           }
           aside={
@@ -131,15 +131,15 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+                <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                   Personalization
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                <h2 className="mt-2 text-xl font-medium text-[var(--text-primary)]">
                   {personalizationActive ? "Your ranking is tuned to your briefing priorities" : "Add priorities to tune this briefing"}
                 </h2>
                 <p className="mt-2 max-w-2xl text-base text-[var(--text-secondary)]">
                   {personalizationActive
-                    ? `${personalizationSummary}. Matching confirmed events can surface earlier for you, but confirmed multi-source quality still decides what belongs in Top Events.`
+                    ? `${personalizationSummary}. Matching confirmed events can surface earlier for you, but confirmed multi-source quality still decides what belongs in Today's signals.`
                     : "Track a few topics or entities and the dashboard will shift strong matching events upward without flooding the briefing with weak coverage."}
                 </p>
               </div>
@@ -169,10 +169,10 @@ export default function PersonalizedDashboard({
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
           <Panel className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+            <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
               {isSignedIn ? "Unlocked view" : "Public briefing"}
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+            <h2 className="mt-2 text-xl font-medium text-[var(--text-primary)]">
               {isSignedIn ? "The capped signal briefing starts here" : "What signing in unlocks"}
             </h2>
             <p className="mt-2 text-base text-[var(--text-secondary)]">
@@ -192,11 +192,11 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+                <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                   Reading window
                 </p>
                 <div className="mt-2 flex flex-wrap items-end gap-3">
-                  <h2 className="text-xl font-semibold tracking-normal text-[var(--text-primary)] md:text-2xl">
+                  <h2 className="text-xl font-medium tracking-normal text-[var(--text-primary)] md:text-2xl">
                     {formatReadingWindow(readingMetrics.totalMinutes)}
                   </h2>
                   <p className="pb-1 text-sm font-medium text-[var(--text-secondary)]">today</p>
@@ -235,10 +235,10 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+                <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                   Since your last pass
                 </p>
-                <h2 className="mt-1.5 text-xl font-semibold text-[var(--text-primary)]">
+                <h2 className="mt-1.5 text-xl font-medium text-[var(--text-primary)]">
                   What changed since yesterday
                 </h2>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
@@ -259,10 +259,10 @@ export default function PersonalizedDashboard({
           <Panel className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+                <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                   Main briefing
                 </p>
-                <h2 className="mt-1.5 text-xl font-semibold text-[var(--text-primary)]">
+                <h2 className="mt-1.5 text-xl font-medium text-[var(--text-primary)]">
                   Today&apos;s signal briefing
                 </h2>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
@@ -320,7 +320,7 @@ export default function PersonalizedDashboard({
 
           <div className="xl:sticky xl:top-4 xl:self-start">
             <Panel className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+              <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
                 Display rules
               </p>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
@@ -337,12 +337,12 @@ export default function PersonalizedDashboard({
 
         {canTrackProgress ? (
           <Panel className="p-6">
-            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+            <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
               Session status
             </p>
             {isCaughtUp ? (
               <>
-                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
+                <h2 className="mt-2 text-xl font-medium text-[var(--text-primary)] md:text-2xl">
                   You&apos;re caught up
                 </h2>
                 <p className="mt-2 text-base text-[var(--text-secondary)]">
@@ -351,7 +351,7 @@ export default function PersonalizedDashboard({
               </>
             ) : (
               <>
-                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)] md:text-2xl">
+                <h2 className="mt-2 text-xl font-medium text-[var(--text-primary)] md:text-2xl">
                   Keep scanning
                 </h2>
                 <p className="mt-2 text-base text-[var(--text-secondary)]">
@@ -461,7 +461,7 @@ function DashboardEventCard({
       </div>
 
       <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+        <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
           Ranking reason
         </p>
         <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{intelligence.rankingReason}</p>
@@ -481,13 +481,13 @@ function DashboardEventCard({
       </div>
 
       <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--bg)] px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-primary)]">Why it matters</p>
+        <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-primary)]">Why it matters</p>
         <p className="mt-2 text-base text-[var(--text-primary)]">{item.whyItMatters}</p>
       </div>
 
       {intelligence.keyEntities.length ? (
         <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">Key entities</p>
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">Key entities</p>
           <div className="mt-2 flex max-w-full flex-wrap gap-2">
             {intelligence.keyEntities.map((entity) => (
               <span
@@ -503,7 +503,7 @@ function DashboardEventCard({
 
       <div className="mt-4 rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">
+          <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">
             Supporting coverage
           </p>
           <p className="text-xs font-medium text-[var(--text-secondary)]">{intelligence.sourceLabel}</p>
@@ -524,7 +524,7 @@ function DashboardEventCard({
                 className="flex flex-col gap-2 rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 transition-colors hover:bg-[var(--card)] sm:flex-row sm:items-start sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold leading-6 text-[var(--text-primary)]">{article.title}</p>
+                  <p className="break-words text-sm font-medium leading-6 text-[var(--text-primary)]">{article.title}</p>
                   <p className="mt-1 text-xs text-[var(--text-secondary)]">{article.sourceName}</p>
                 </div>
                 <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
@@ -566,7 +566,7 @@ function SignalTierSection({
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
+          <h3 className="text-lg font-medium text-[var(--text-primary)]">{title}</h3>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">{description}</p>
         </div>
         <Badge>{items.length} {items.length === 1 ? "signal" : "signals"}</Badge>
@@ -589,7 +589,7 @@ function SignalTierSection({
 function SignalStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-normal text-[var(--text-secondary)]">{label}</p>
+      <p className="text-[11px] font-medium uppercase tracking-normal text-[var(--text-secondary)]">{label}</p>
       <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{value}</p>
     </div>
   );
@@ -598,8 +598,8 @@ function SignalStat({ label, value }: { label: string; value: string }) {
 function StateMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-normal text-[var(--text-secondary)]">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{value}</p>
+      <p className="text-xs font-medium uppercase tracking-normal text-[var(--text-secondary)]">{label}</p>
+      <p className="mt-1 text-lg font-medium text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }

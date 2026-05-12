@@ -29,7 +29,7 @@ function buildBriefing(): DailyBriefing {
   return {
     id: "briefing-test",
     briefingDate: "2026-04-27T12:00:00.000Z",
-    title: "Daily Executive Briefing",
+    title: "Boot Up",
     intro: "Controlled test briefing.",
     readingWindow: "10 minutes",
     items: [],

@@ -2,19 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
-import { DateGroupHeader } from "@/components/history/DateGroupHeader";
 import { HistoryEmptyState } from "@/components/history/HistoryEmptyState";
-import { StoryPreviewRow } from "@/components/history/StoryPreviewRow";
-import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { isAdminUser } from "@/lib/admin-auth";
 import { getHistoryPageState } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getBriefingDateKey } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "History — Daily Intelligence",
+  title: "Boot Up — Past briefings",
 };
 
 export default async function HistoryPage() {
@@ -22,52 +19,43 @@ export default async function HistoryPage() {
   const mode = viewer ? "live" : isSupabaseConfigured ? "public" : "demo";
 
   return (
-    <AppShell currentPath="/history" mode={mode} account={viewer}>
-      <div className="space-y-5 py-2">
-        <PageHeader
-          eyebrow="History"
-          title="Briefing history"
-          description="Review saved daily briefings by date and reopen the full briefing detail."
-        />
-
+    <AppShell
+      currentPath="/history"
+      mode={mode}
+      account={viewer}
+      isAdmin={isAdminUser({ email: viewer?.email ?? undefined })}
+    >
+      <div className="mx-auto w-full max-w-[var(--bu-container-narrow)] px-[var(--bu-space-2)] py-[var(--bu-space-7)] md:px-0">
         {!viewer ? (
           <HistorySoftGate />
         ) : history.length === 0 ? (
           <HistoryEmptyState />
         ) : (
-          <div className="space-y-4">
-            {history.map((briefing) => {
-              const dateKey = getBriefingDateKey(briefing.briefingDate);
-              const previewItems = briefing.items.slice(0, 4);
+          <section>
+            <h1 className="text-[var(--bu-size-page-title)] font-medium leading-tight text-[var(--bu-text-primary)]">
+              Past briefings
+            </h1>
+            <div className="mt-[var(--bu-space-5)] divide-y divide-[var(--bu-border-subtle)] border-y border-[var(--bu-border-subtle)]">
+              {history.map((briefing) => {
+                const dateKey = getBriefingDateKey(briefing.briefingDate);
 
-              return (
-                <Panel key={briefing.id} className="p-5">
-                  <DateGroupHeader date={dateKey} briefingDate={dateKey} />
-                  <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="max-w-3xl">
-                      <h2 className="briefing-title text-[var(--text-primary)]">
-                        {briefing.title}
-                      </h2>
-                      <p className="mt-2 text-base text-[var(--text-secondary)]">
-                        {briefing.intro}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <Badge>{briefing.items.length} {briefing.items.length === 1 ? "event" : "events"}</Badge>
-                      <Badge>{briefing.readingWindow}</Badge>
-                    </div>
-                  </div>
-                  {previewItems.length ? (
-                    <div className="mt-4 space-y-1">
-                      {previewItems.map((item) => (
-                        <StoryPreviewRow key={item.id} title={item.title} />
-                      ))}
-                    </div>
-                  ) : null}
-                </Panel>
-              );
-            })}
-          </div>
+                return (
+                  <Link
+                    key={briefing.id}
+                    href={`/briefing/${dateKey}`}
+                    className="flex items-center justify-between gap-4 px-[var(--bu-space-3)] py-[var(--bu-space-4)] transition-colors hover:bg-[var(--bu-bg-subtle)]"
+                  >
+                    <span className="text-[var(--bu-size-card-title)] font-medium leading-tight text-[var(--bu-text-primary)]">
+                      {formatHistoryDate(dateKey)}
+                    </span>
+                    <span className="text-[var(--bu-size-meta)] font-normal text-[var(--bu-text-tertiary)]">
+                      {briefing.items.length} {briefing.items.length === 1 ? "signal" : "signals"}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
         )}
       </div>
     </AppShell>
@@ -79,11 +67,11 @@ function HistorySoftGate() {
     <Panel className="p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="max-w-xl">
-          <p className="text-base font-semibold text-[var(--text-primary)]">
+          <h1 className="text-base font-medium text-[var(--bu-text-primary)]">
             Sign in to view briefing history
-          </p>
-          <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Home Top Events stay public. Saved briefing history is account-only.
+          </h1>
+          <p className="mt-2 text-sm text-[var(--bu-text-secondary)]">
+            Today&apos;s signals stay public. Saved briefing history is account-only.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -97,4 +85,13 @@ function HistorySoftGate() {
       </div>
     </Panel>
   );
+}
+
+function formatHistoryDate(dateKey: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${dateKey}T12:00:00.000Z`));
 }

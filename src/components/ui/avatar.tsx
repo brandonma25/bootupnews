@@ -36,7 +36,7 @@ export function AvatarFallback({ className, ...props }: ComponentPropsWithoutRef
   return (
     <span
       className={cn(
-        "flex h-full w-full items-center justify-center text-sm font-semibold text-[var(--foreground)]",
+        "flex h-full w-full items-center justify-center text-sm font-medium text-[var(--foreground)]",
         className,
       )}
       {...props}

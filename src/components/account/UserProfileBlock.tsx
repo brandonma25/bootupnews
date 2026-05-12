@@ -56,7 +56,7 @@ export function UserProfileBlock({
             {!user.avatarUrl ? <AvatarFallback>{getInitials(user.name)}</AvatarFallback> : null}
           </Avatar>
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-[var(--foreground)]">{user.name}</h2>
+            <h2 className="truncate text-base font-medium text-[var(--foreground)]">{user.name}</h2>
             <p className="truncate text-sm text-[var(--muted)]">{user.email}</p>
           </div>
         </div>

@@ -82,7 +82,7 @@ describe("public signals page", () => {
     expect(screen.queryByText("Private newsletter grounding snippet should never be public")).not.toBeInTheDocument();
   }, 10000);
 
-  it("renders public card-face labels and clamps the why-this-ranks preview", async () => {
+  it("renders public card-face labels and clamps the why-this-matters preview", async () => {
     getPublicSignalsPageState.mockResolvedValue({
       kind: "published",
       posts: [createPublishedPost(1)],
@@ -91,15 +91,13 @@ describe("public signals page", () => {
     const Page = (await import("@/app/signals/page")).default;
     render(await Page());
 
-    expect(screen.getByText("Why this ranks")).toBeInTheDocument();
-    expect(screen.queryByText("Why it matters")).not.toBeInTheDocument();
-    expect(screen.queryByText("WHY IT MATTERS")).not.toBeInTheDocument();
+    expect(screen.getByText("Why this matters")).toBeInTheDocument();
     expect(screen.queryByText("Top Event")).not.toBeInTheDocument();
     expect(screen.queryByText("TOP EVENT")).not.toBeInTheDocument();
-    expect(screen.getByTestId("signals-why-it-matters-preview")).toHaveClass("line-clamp-2");
+    expect(screen.getByTestId("signal-why-this-matters")).toHaveClass("line-clamp-2");
   }, 10000);
 
-  it("renders Core and Context sections for the published slate", async () => {
+  it("renders Core and Context tier markers for the published slate", async () => {
     getPublicSignalsPageState.mockResolvedValue({
       kind: "published",
       posts: [
@@ -122,8 +120,9 @@ describe("public signals page", () => {
     const Page = (await import("@/app/signals/page")).default;
     render(await Page());
 
-    expect(screen.getByRole("heading", { name: "Core Signals" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Context Signals" })).toBeInTheDocument();
+    expect(screen.getByText("Core signal · 01")).toBeInTheDocument();
+    expect(screen.getByText("Context · 06")).toBeInTheDocument();
+    expect(screen.getByText("Context · 07")).toBeInTheDocument();
     expect(screen.getByText("Published context signal 1")).toBeInTheDocument();
     expect(screen.getByText("Published context signal 2")).toBeInTheDocument();
     expect(screen.getByText("Human final context version 1")).toBeInTheDocument();
@@ -143,7 +142,7 @@ describe("public signals page", () => {
     expect(screen.getAllByText(/^Published signal /)).toHaveLength(3);
     expect(screen.queryByText("Published signal 4")).not.toBeInTheDocument();
     expect(screen.queryByText("Published signal 5")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Context Signals" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Context · 06")).not.toBeInTheDocument();
   }, 10000);
 
   it("renders reader-facing breadcrumb copy instead of internal editorial layer language", async () => {
@@ -155,12 +154,12 @@ describe("public signals page", () => {
     const Page = (await import("@/app/signals/page")).default;
     render(await Page());
 
-    expect(screen.getByText("Signals")).toBeInTheDocument();
+    expect(screen.getAllByText("All signals").length).toBeGreaterThan(0);
     expect(screen.getByText("3 signals")).toBeInTheDocument();
     expect(screen.queryByText("Published editorial layer")).not.toBeInTheDocument();
   }, 10000);
 
-  it("removes internal editorial tag labels while keeping the public category", async () => {
+  it("removes internal editorial tag labels from the compact list", async () => {
     getPublicSignalsPageState.mockResolvedValue({
       kind: "published",
       posts: [
@@ -173,7 +172,7 @@ describe("public signals page", () => {
     const Page = (await import("@/app/signals/page")).default;
     render(await Page());
 
-    expect(screen.getByText("Finance")).toBeInTheDocument();
+    expect(screen.queryByText("Finance")).not.toBeInTheDocument();
     expect(screen.queryByText("watch")).not.toBeInTheDocument();
     expect(screen.queryByText("High")).not.toBeInTheDocument();
   }, 10000);
@@ -188,7 +187,6 @@ describe("public signals page", () => {
     render(await Page());
 
     expect(screen.getByText("Published briefing is temporarily unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Briefing pending")).toBeInTheDocument();
     expect(screen.queryByText("0 signals")).not.toBeInTheDocument();
     expect(screen.queryByText(/schema preflight/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/final_slate_rank|editorial_decision|reviewed_at/i)).not.toBeInTheDocument();

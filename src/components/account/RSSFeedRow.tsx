@@ -32,7 +32,7 @@ export function RSSFeedRow({ feed, onRemove }: RSSFeedRowProps) {
       <div className="flex w-full items-center justify-between gap-3 rounded-card border border-[var(--line)] p-3 transition-colors lg:hover:bg-[var(--warm)]">
         <div className="min-w-0">
           {feed.label ? (
-            <p className="truncate text-sm font-semibold text-[var(--foreground)]">{feed.label}</p>
+            <p className="truncate text-sm font-medium text-[var(--foreground)]">{feed.label}</p>
           ) : null}
           <p className="truncate text-sm text-[var(--muted)]">{feed.url}</p>
         </div>

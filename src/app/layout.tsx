@@ -1,18 +1,21 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Inter, Lora } from "next/font/google";
+import { Inter_Tight, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const interTight = Inter_Tight({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--bu-font-sans",
+  weight: ["400", "500"],
   display: "swap",
 });
 
-const lora = Lora({
+const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
-  variable: "--font-lora",
+  variable: "--bu-font-serif",
+  weight: ["400"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -22,7 +25,7 @@ const enableVercelSpeedInsights = process.env.VERCEL === "1";
 export const metadata: Metadata = {
   title: "Boot Up",
   description:
-    "Curated daily intelligence for ambitious readers. Ranked signals with structured reasoning to understand the world, not just follow it.",
+    "Ranked daily signals for people who want to understand the world, not just consume it.",
 };
 
 export default function RootLayout({
@@ -31,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${lora.variable} antialiased`}>
+    <html lang="en" className={`${interTight.variable} ${sourceSerif.variable} antialiased`}>
       <body className="min-h-screen font-sans">
         {children}
         {enableVercelAnalytics ? <Analytics /> : null}

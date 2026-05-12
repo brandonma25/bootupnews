@@ -24,10 +24,10 @@ export function DateGroupHeader({ date, briefingDate }: DateGroupHeaderProps) {
 
   return (
     <div className="flex w-full items-center justify-between gap-4 border-b border-[var(--line)] pb-3">
-      <h2 className="text-base font-semibold text-[var(--foreground)]">{dateLabel}</h2>
+      <h2 className="text-base font-medium text-[var(--foreground)]">{dateLabel}</h2>
       <Link
         href={`/briefing/${encodeURIComponent(briefingDate)}`}
-        className="shrink-0 text-sm font-semibold text-[var(--foreground)] underline-offset-4 lg:hover:underline"
+        className="shrink-0 text-sm font-medium text-[var(--foreground)] underline-offset-4 lg:hover:underline"
       >
         Open full briefing
       </Link>

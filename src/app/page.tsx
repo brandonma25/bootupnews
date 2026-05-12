@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import LandingHomepage from "@/components/landing/homepage";
 import { getHomepagePageState } from "@/lib/data";
+import { isAdminUser } from "@/lib/admin-auth";
 import { buildPublicAppUrl, getPublicAppOrigin, isHomepageDebugConfigured } from "@/lib/env";
 import { applyHomepageEditorialOverridesToDashboardData } from "@/lib/homepage-editorial-overrides";
 import { buildHomepageViewModel } from "@/lib/homepage-model";
-import { formatHomeBriefingDateLabel } from "@/lib/utils";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -18,6 +18,7 @@ function readSingleParam(value: string | string[] | undefined) {
 const homepageUrl = buildPublicAppUrl("/");
 
 export const metadata: Metadata = {
+  title: "Boot Up — Today's signals",
   metadataBase: new URL(getPublicAppOrigin()),
   alternates: {
     canonical: homepageUrl,
@@ -41,16 +42,15 @@ export default async function Page({ searchParams }: PageProps) {
   const authState = readSingleParam(resolvedSearchParams?.auth);
   const debugParam = readSingleParam(resolvedSearchParams?.debug);
   const debugEnabled = isHomepageDebugConfigured || /^(1|true|yes|on)$/i.test(debugParam ?? "");
-  const briefingDateLabel = formatHomeBriefingDateLabel(data.briefing.briefingDate);
   const homepageViewModel = buildHomepageViewModel(data);
 
   return (
     <LandingHomepage
       data={data}
       viewer={pageState.viewer}
+      isAdmin={isAdminUser({ email: pageState.viewer?.email ?? undefined })}
       authState={authState}
       debugEnabled={debugEnabled}
-      briefingDateLabel={briefingDateLabel}
       homepageViewModel={homepageViewModel}
     />
   );
