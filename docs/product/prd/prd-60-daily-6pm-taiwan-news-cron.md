@@ -17,7 +17,7 @@ The editor needs generated Top 5 Signal Cards and newsletter-derived review cand
 - Add Vercel Cron Jobs for `15 10 * * *` and `45 11 * * *`, equivalent to 6:15 PM and 7:45 PM Taipei time.
 - Add a protected `/api/cron/fetch-editorial-inputs` endpoint that runs the existing RSS fetch path and the PRD-61 Gmail newsletter ingestion path sequentially.
 - Add a protected `/api/cron/fetch-news` endpoint.
-- Require `Authorization: Bearer <CRON_SECRET>`.
+- Require `Authorization: [REDACTED_ENV_VALUE] <CRON_SECRET>`.
 - Reuse the existing daily briefing generation and editorial snapshot persistence logic.
 - Persist Article candidate `published_at` metadata so cron-backed homepage category tabs can render Article dates without fetching feeds during homepage SSR.
 - Reuse the existing PRD-61 newsletter label preflight, parser, idempotent storage, and non-live review-candidate promotion gates.
@@ -49,7 +49,7 @@ The scheduled route delegates first to the existing `generateDailyBriefing` pipe
 - Requires Vercel production cron execution.
 - Requires `CRON_SECRET`.
 - Requires existing Supabase env vars and `SUPABASE_SERVICE_ROLE_KEY` for editorial persistence.
-- Requires PRD-61 Gmail OAuth env vars, `NEWSLETTER_INGESTION_ENABLED=true`, `NEWSLETTER_INGESTION_DRY_RUN=false`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true` for production newsletter writes.
+- Requires PRD-61 Gmail OAuth env vars, `NEWSLETTER_INGESTION_ENABLED=[REDACTED_ENV_VALUE]`, `NEWSLETTER_INGESTION_DRY_RUN=[REDACTED_ENV_VALUE]`, and `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=[REDACTED_ENV_VALUE]` for production newsletter writes.
 - Feed outages can still occur; seed fallback is intentionally blocked from persistence.
 - Preview validation cannot prove scheduled execution because Vercel Cron Jobs run on production deployments.
 - Exact minute execution depends on the active Vercel plan. The repo cron expressions target 6:15 PM and 7:45 PM Taipei; Vercel Hobby scheduling can be less minute-exact.

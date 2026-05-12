@@ -3,10 +3,11 @@
 This repository uses a controlled documentation system. The goal is to keep docs useful, short, and non-duplicated.
 
 ## Core Rules
-- GitHub repo documentation is the canonical source of truth for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- Public repo documentation is the canonical source of truth for product framing, durable decisions, canonical PRDs, feature governance metadata, standing process rules, and portfolio-facing architecture/process artifacts.
+- PR bodies, GitHub metadata, and external/private archives are the preferred home for per-run operational evidence, validation transcripts, branch-cleanup details, and closeout records.
 - Google Sheet / Google Work Log records are retired as live source-of-truth systems and may be used only as historical reference inputs.
-- Routine closeout must not update Google Sheets, claim tracker updates, or create tracker-sync fallback files.
-- `docs/operations/tracker-sync/` remains historical compatibility only unless the user explicitly asks for a Google-reference reconciliation artifact.
+- Routine closeout must not update Google Sheets, claim tracker updates, or create public tracker-sync fallback files.
+- LLM coding agents should use `docs/engineering/templates/llm-prompt-template-change-classification.md` before selecting a governance path.
 - Terminology requirement: before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`. Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions. Do not use cluster, signal, story, or card interchangeably.
 - `docs/product/feature-system.csv` is the repo-side control layer for PRD mapping, build order, and durable governance metadata.
 - The CSV is the product control layer and its schema is locked to exactly 12 columns in this exact order:
@@ -27,12 +28,10 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - PRDs must stay short, execution-focused, and current.
 - Small changes do not require PRDs.
 - Product briefs belong in `docs/product/briefs/` when feature work is meaningful enough to merit concise scoping before or alongside implementation.
-- Testing notes belong in `docs/engineering/testing/` only when they add validation context that should live outside the PRD.
 - Bug records belong in `docs/engineering/bug-fixes/` only when they capture a real defect, root cause, and fix history that should stay separate from the PRD.
 - Incident records belong in `docs/engineering/incidents/` only when they capture a meaningful governance, process, release, or workflow failure.
-- Change records belong in `docs/engineering/change-records/` when the work is primarily an audit, migration, consolidation, normalization, or repo-structure change.
+- Validation notes, audits, migrations, consolidations, normalization passes, and repo-structure cleanup should usually stay in PR bodies, GitHub metadata, or external/private archives unless a stable public artifact is explicitly needed.
 - Rules, checklists, and templates belong in `docs/engineering/protocols/`.
-- Branch cleanup reconciliation belongs in `docs/operations/branch-cleanup/`.
 - `docs/bugs/` and `docs/changes/` are deprecated and non-canonical. Do not create new records there.
 - Existing `docs/bugs/` or `docs/changes/` files that contain durable history must be migrated, consolidated, or replaced with redirect notes pointing to the canonical GitHub doc path.
 - Governance tier ownership lives in `docs/engineering/protocols/governance-gate-map.md`.
@@ -48,11 +47,12 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - No duplicate feature descriptions across product, PRD, testing, and bug-fix docs.
 - No PRDs for UI tweaks, copy edits, or minor fixes.
 - No bug-fix docs for repo audits or structural cleanup when a change record is the truthful home.
-- No testing reports in protocol folders.
+- No testing diary reports in public protocol folders.
 - No checklists stored as testing notes when they are actually operating standards.
 - No new `docs/bugs/` records.
 - No new `docs/changes/` records.
 - No routine tracker-sync fallback files for normal closeout.
+- No new public operational logs for routine validation, branch cleanup, or closeout.
 
 ## Required Workflow
 1. Check `docs/product/feature-system.csv` first.
@@ -60,9 +60,9 @@ This repository uses a controlled documentation system. The goal is to keep docs
 3. Respect dependencies before implementation.
 4. Complete the terminology check and state which object level the work modifies: Article, Story Cluster, Signal, Card, or Surface Placement.
 5. If the feature already has a PRD, update that file instead of creating a new one.
-6. Update the relevant GitHub documentation lane for serious feature, bug-fix, remediation, validation, governance, or branch-cleanup history.
+6. Update stable public documentation only when the change creates durable product, governance, or portfolio-facing information.
 7. Do not update Google Sheets or claim tracker updates.
-8. Do not create routine tracker-sync fallback files.
+8. Do not create routine tracker-sync fallback files or public operational logs.
 9. During active branch work, set CSV `status = In Progress` when feature metadata changes are in scope.
 10. When implementation is complete but awaiting merge or review, set CSV `status = In Review` when feature metadata changes are in scope.
 11. After merge or explicit user acceptance, set CSV `status = Built`, `decision = keep`, and update `last_updated` when feature metadata changes are in scope.
@@ -86,16 +86,12 @@ This repository uses a controlled documentation system. The goal is to keep docs
   Concise defect-specific records
 - `docs/engineering/incidents/`:
   Governance, process, release, or workflow incident records
-- `docs/engineering/change-records/`:
-  Audits, migrations, consolidations, and structural change history
-- `docs/engineering/testing/`:
-  Concise validation notes and test reports
 - `docs/engineering/protocols/`:
   Operating rules, templates, checklists, and governance standards
-- `docs/operations/tracker-sync/`:
-  Historical compatibility records only; not a routine closeout lane
-- `docs/operations/branch-cleanup/`:
-  Branch deletion and cleanup reconciliation records
+- `docs/engineering/templates/`:
+  Reusable public-safe engineering and governance templates
+- PR bodies, GitHub metadata, and external/private archives:
+  Per-run validation, operational logs, branch cleanup, migration evidence, and closeout records
 - `docs/bugs/`:
   Deprecated legacy bug reports; migrate durable content into `docs/engineering/bug-fixes/`
 - `docs/changes/`:
@@ -117,7 +113,5 @@ This repository uses a controlled documentation system. The goal is to keep docs
 3. If the work fixes a real defect, create or update `docs/engineering/bug-fixes/`.
    Use `docs/engineering/protocols/bug-tracking-governance.md` for the bug-fix threshold and template guidance.
 4. If the work records a meaningful process, governance, release, or workflow failure, use `docs/engineering/incidents/`.
-5. If the work primarily records an audit, migration, normalization, taxonomy cleanup, or repo-structure repair, use `docs/engineering/change-records/`.
-6. If the work records meaningful validation performed, use `docs/engineering/testing/`.
-7. If the file is a standing rule, checklist, template, or standard, use `docs/engineering/protocols/`.
-8. If the work records branch deletion, branch-prune reconciliation, or deleted-branch recovery metadata, use `docs/operations/branch-cleanup/`.
+5. If the work primarily records an audit, migration, normalization, taxonomy cleanup, validation run, or branch cleanup, keep the evidence in the PR body, GitHub metadata, or an external/private archive unless a stable public artifact is explicitly needed.
+6. If the file is a standing rule, checklist, template, or standard, use `docs/engineering/protocols/` or `docs/engineering/templates/`.

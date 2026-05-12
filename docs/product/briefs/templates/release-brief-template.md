@@ -39,7 +39,8 @@
 ## Documentation Updates Required
 - `docs/product/briefs/`
 - `docs/product/prd/` when the release maps to numbered feature work
-- `docs/engineering/testing/`
 - `docs/engineering/bug-fixes/` when a real defect was fixed
-- `docs/operations/branch-cleanup/` when branch deletion or bulk branch cleanup occurred
-- GitHub documentation closeout completed in the canonical lane
+- PR body validation summary
+- Release evidence generated to stdout by `npm run release:docs -- --slug <slug> --title "<title>"`, or written only to an explicit `--output <path>`
+- Private/external archive reference if operational evidence exists
+- Public decision, protocol, template, or portfolio documentation only when durable and reviewer-facing

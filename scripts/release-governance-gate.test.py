@@ -91,14 +91,35 @@ class GovernanceGateVelocityTests(unittest.TestCase):
         )
         missing = find_missing_doc_groups(context)
 
-        self.assertIn(("protocol", "change-record", "governance-root"), missing)
+        self.assertIn(("protocol", "template", "governance-root"), missing)
         message = format_missing_doc_failure(context, missing)
         self.assertIn("Hotspot file(s) touched", message)
         self.assertIn("docs/product/feature-system.csv", message)
         self.assertIn("Fastest valid fix", message)
-        self.assertIn("docs/engineering/change-records", message)
+        self.assertIn("docs/engineering/templates/llm-prompt-template-change-classification.md", message)
 
     def test_hotspot_prd_csv_change_with_governance_lane_passes_doc_coverage(self) -> None:
+        changes = {
+            "docs/product/feature-system.csv": Change("docs/product/feature-system.csv", "M", 1, 0),
+            "docs/product/prd/prd-36-signal-display-cap.md": Change(
+                "docs/product/prd/prd-36-signal-display-cap.md", "A", 20, 0
+            ),
+            "docs/engineering/templates/llm-prompt-template-change-classification.md": Change(
+                "docs/engineering/templates/llm-prompt-template-change-classification.md", "A", 16, 0
+            ),
+            "src/components/dashboard/personalized-dashboard.tsx": Change(
+                "src/components/dashboard/personalized-dashboard.tsx", "M", 12, 2
+            ),
+        }
+        context = classify_changes(
+            changes,
+            "feature/prd-36-signal-display-cap",
+            "feat: enforce 5-signal display cap",
+        )
+
+        self.assertEqual(find_missing_doc_groups(context), [])
+
+    def test_legacy_change_record_does_not_satisfy_hotspot_governance_lane(self) -> None:
         changes = {
             "docs/product/feature-system.csv": Change("docs/product/feature-system.csv", "M", 1, 0),
             "docs/product/prd/prd-36-signal-display-cap.md": Change(
@@ -117,12 +138,13 @@ class GovernanceGateVelocityTests(unittest.TestCase):
             "feat: enforce 5-signal display cap",
         )
 
-        self.assertEqual(find_missing_doc_groups(context), [])
+        self.assertIn("legacy-change-record", context.doc_lanes_updated)
+        self.assertIn(("protocol", "template", "governance-root"), find_missing_doc_groups(context))
 
     def test_new_source_policy_file_without_prd_has_actionable_message(self) -> None:
         changes = {
-            "docs/engineering/change-records/source-onboarding-model.md": Change(
-                "docs/engineering/change-records/source-onboarding-model.md", "A", 18, 0
+            "docs/engineering/templates/source-onboarding-model.md": Change(
+                "docs/engineering/templates/source-onboarding-model.md", "A", 18, 0
             ),
             "src/lib/source-policy.ts": Change("src/lib/source-policy.ts", "A", 40, 0),
         }
@@ -174,26 +196,23 @@ class GovernanceGateVelocityTests(unittest.TestCase):
                 [prd_file],
             )
 
-    def test_audit_remediation_feature_with_explicit_no_prd_change_record_uses_documented_lane(self) -> None:
+    def test_audit_remediation_feature_with_explicit_no_prd_governance_artifact_uses_documented_lane(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
-            change_record_path = "docs/engineering/change-records/pipeline-candidate-capture.md"
+            governance_artifact_path = "docs/engineering/templates/pipeline-candidate-capture-governance.md"
             write_file(
                 repo_root,
-                change_record_path,
+                governance_artifact_path,
                 "\n".join(
                     [
-                        "# Change Record",
+                        "# Governance Artifact",
                         "- Canonical PRD required: `no`",
                         "- Source of truth: audit remediation gap.",
                     ]
                 ),
             )
             changes = {
-                change_record_path: Change(change_record_path, "A", 3, 0),
-                "docs/engineering/testing/pipeline-candidate-capture.md": Change(
-                    "docs/engineering/testing/pipeline-candidate-capture.md", "A", 3, 0
-                ),
+                governance_artifact_path: Change(governance_artifact_path, "A", 3, 0),
                 "src/lib/pipeline/article-candidates.ts": Change(
                     "src/lib/pipeline/article-candidates.ts", "A", 40, 0
                 ),

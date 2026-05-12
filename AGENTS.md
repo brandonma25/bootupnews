@@ -208,13 +208,13 @@ Rules:
 - Never commit or expose API keys, tokens, secrets, auth vulnerabilities, exploit steps, cookies, headers, or sensitive logs.
 
 ## 7a. GitHub Documentation Source-of-Truth Governance
-- GitHub repo documentation is canonical for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- Public repo documentation is canonical for product framing, durable decisions, PRD/feature metadata, standing governance rules, and stable process artifacts.
 - `docs/product/feature-system.csv` is the repo-side control file for PRD mapping, build order, dependencies, decisions, and durable feature governance metadata.
+- Per-run operational evidence, validation transcripts, branch-cleanup details, and closeout records should live in PR bodies, GitHub metadata, or external/private archives unless the user explicitly asks for a stable public artifact.
 - Google Sheet / Google Work Log records are retired as source-of-truth systems. They may be read only as historical reference inputs when relevant.
-- Codex must not update Google Sheets, claim tracker updates, or treat the Google Work Log as canonical.
-- Codex must not create new `docs/operations/tracker-sync/` files for routine closeout. `tracker-sync` remains a historical compatibility folder unless the user explicitly asks for a Google-reference reconciliation artifact.
-- If an external Google Sheet or Work Log reference materially explains a decision, cite it inside the relevant GitHub doc without making it canonical.
-- Closeout for feature, fix, refactor, UX, and governance work must update the relevant GitHub repo documentation and `docs/product/feature-system.csv` when PRD/feature metadata changes.
+- Codex must not update Google Sheets, claim tracker updates, treat the Google Work Log as canonical, or create new public tracker-sync records.
+- LLM coding agents should classify work using `docs/engineering/templates/llm-prompt-template-change-classification.md` before choosing a governance path.
+- Closeout for feature, fix, refactor, UX, and governance work must update the PR body/checklist and `docs/product/feature-system.csv` when PRD/feature metadata changes. Update public repo docs only when the change creates durable product, governance, or portfolio-facing information.
 - Agents must not claim production, preview, tracker, or Google Work Log validation unless that exact system was actually checked in the current task.
 
 ## 8. Merge Conditions
@@ -226,7 +226,8 @@ This repository uses a strict documentation system to prevent bloat and maintain
 
 ### Source of Truth
 - `PRD-XX` is the single source of truth for feature identity across the repo.
-- GitHub repo documentation is the source of truth for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
+- Public repo documentation is the source of truth for product framing, durable decisions, canonical PRDs, feature metadata, and standing governance rules.
+- PR bodies, GitHub metadata, and external/private archives are the preferred home for operational evidence, validation transcripts, branch-cleanup details, and closeout records.
 - `/docs/product/feature-system.csv` remains the repo-side source of truth for PRD mapping, build order, dependencies, decisions, and durable repo governance metadata.
 - Google Sheet and Google Work Log records are historical reference inputs only.
 
@@ -294,28 +295,24 @@ The CSV must be updated in the same PR as the feature work whenever feature stat
 - Product control documents remain at `docs/product/`.
 - Product briefs for meaningful feature work belong in `docs/product/briefs/`.
 - Numbered feature PRDs belong in `docs/product/prd/`.
-- Defects, regressions, hotfixes, and remediations with root cause belong in `docs/engineering/bug-fixes/`.
-- Audits, migrations, repo-structure cleanup, and source-of-truth cleanup belong in `docs/engineering/change-records/`.
-- Validation notes and test records belong in `docs/engineering/testing/`.
-- Governance, process, release, and workflow failures belong in `docs/engineering/incidents/`.
+- Defects, regressions, hotfixes, and remediations with durable public-maintenance value may use `docs/engineering/bug-fixes/`.
+- Audits, migrations, repo-structure cleanup, validation notes, and release evidence should usually be recorded in PR bodies, GitHub metadata, or external/private archives rather than new public operational logs.
+- Governance, process, release, and workflow failures belong in public docs only when they create a durable operating rule or reviewer-facing artifact.
 - Operating rules, templates, checklists, and standards belong in `docs/engineering/protocols/`.
-- Branch cleanup reconciliation records belong in `docs/operations/branch-cleanup/`.
 - Do not create new records under `docs/bugs/` or `docs/changes/`; those folders are deprecated and non-canonical.
 - If existing `docs/bugs/` or `docs/changes/` files contain durable history, migrate or consolidate the useful content into the canonical GitHub doc lane and leave at most a redirect note.
 - "Meaningful" means work that changes behavior, coordination, validation expectations, or future maintenance understanding. Tiny copy edits, trivial renames, and purely mechanical one-line fixes do not require standalone docs.
 - When uncertain between bug-fix, incident, and change-record docs:
   1. Use `bug-fixes` for user-facing or system-facing defects with a real root cause and fix.
-  2. Use `incidents` for process, governance, release, or operational failures that need lessons and follow-up.
-  3. Use `change-records` for audits, migrations, structural cleanup, and normalization passes.
+  2. Use a stable protocol/template update for process, governance, release, or workflow lessons that should remain public.
+  3. Use PR bodies, GitHub metadata, or external/private archives for audits, migrations, structural cleanup, validation transcripts, and operational details that do not need to remain in the public browse path.
 
 ### Branch Cleanup Documentation
-- Before deleting any remediation, bug-fix, hotfix, Codex, feature, or docs branch, capture:
+- Before deleting any remediation, bug-fix, hotfix, Codex, feature, or docs branch, capture in the PR body, GitHub metadata, or a private archive:
   - branch name
   - PR number or `no PR found`
   - head SHA if recoverable
   - merge state
-  - canonical documentation path
   - cleanup date
   - cleanup reason
-- Bulk branch deletion events require a branch cleanup record in `docs/operations/branch-cleanup/`.
 - Deleted branches must remain reconcilable from GitHub documentation and PR metadata.

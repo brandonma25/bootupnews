@@ -83,7 +83,7 @@ Do not touch:
 | `src/lib/explanation-support.test.ts` | `SignalCluster` | `StoryCluster` | Story Cluster explanation fixture | None. Test type annotation only. |
 | `src/adapters/donors/registry.test.ts` | `SignalCluster` | `StoryCluster` | Story Cluster donor fixture | None. Test type annotation only. |
 | `docs/engineering/TERMINOLOGY_REFACTOR_TRANCHE_1.md` | n/a | Refactor log | Tranche documentation | None. Documentation only. |
-| `docs/engineering/change-records/terminology-refactor-tranche-1.md` | n/a | Change-record lane pointer | Documentation governance coverage | None. Documentation only. |
+| Historical terminology-refactor change-record evidence | n/a | Archived operational evidence | Documentation governance coverage | None. Documentation only. |
 
 ## Deprecated Names Preserved
 

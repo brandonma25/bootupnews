@@ -54,14 +54,14 @@
   - Local browser `/signals` confirmed `Published editorial layer`, `watch`, and `High` were absent and the `Signals` public badge rendered.
   - Local browser `/briefing/2026-05-06` did not have production snapshot data available, but confirmed `Why this ranks here` and `confirmed-event rail` were absent from the rendered page.
   - Vercel preview verification passed for `/`, `/signals`, and `/briefing/2026-05-06`; removed internal strings were absent and unchanged public content remained visible.
-  - Production deployment: `dpl_5vYVQSc3ak8Wi39B6E42xUsDSsva`, `https://bootup-l9r4iysw2-brandonma25s-projects.vercel.app`, created `2026-05-07T04:58:31Z`, target `production`, status `Ready`.
+  - Production deployment was verified without retaining concrete deployment identifiers in the public doc.
   - Production alias checked: `https://bootupnews.vercel.app`.
   - Production HTTP checks passed: `/` 200, `/signals` 200, `/briefing/2026-05-06` 200.
   - Production Chrome incognito click-level QA passed: homepage category tabs, category gates, login routing, briefing detail navigation, detail tabs, `/signals`, and `/signals` to homepage navigation all worked.
   - Fix-specific production QA passed: `/briefing/2026-05-06` no longer rendered `Why this ranks here` or `confirmed-event rail`; `/signals` no longer rendered `watch`, `High`, or `Published editorial layer`; `/signals` still rendered category tags such as `Finance` and `Tech`.
 
 ## Documentation Closeout
-- `docs/engineering/testing/pr-202-public-surface-copy-remediation-validation.md` records the post-merge preview, production, and click-level QA evidence.
+- Historical validation evidence was preserved as operational evidence outside the durable public source-of-truth surface. For reviewer-facing context, use the PR body, GitHub metadata, and current public decision/governance docs.
 - No binary screenshot artifact is committed with this docs closeout; the production UI state is recorded as route, click, and string-presence evidence to keep the documentation PR lightweight.
 - No Google Sheet, Work Log, tracker sync, or external documentation target was written.
 

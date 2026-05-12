@@ -45,5 +45,5 @@
 ## Documentation Updates Required
 - `docs/product/briefs/v1-production-remediation-2026-04-21.md`
 - `docs/engineering/bug-fixes/v1-production-remediation-2026-04-21.md`
-- `docs/engineering/testing/v1-production-remediation-local-validation-2026-04-21.md`
-- GitHub documentation closeout in the canonical lane; historical tracker-sync records are not canonical.
+- Historical validation evidence was preserved as operational evidence outside the durable public source-of-truth surface.
+- Public documentation or PR evidence completed in the appropriate durable surface; tracker-sync details are not canonical and belong in PR metadata, GitHub history, or private archive records rather than public documentation links.

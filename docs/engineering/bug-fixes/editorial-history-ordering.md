@@ -50,5 +50,5 @@ Tie-breakers:
 - Homepage ranking logic was not changed.
 - Ingestion, clustering, scoring, and editorial approval logic were not changed.
 - Signed-in admin visual validation remains a preview/human check.
-- Google Sheet / Work Log reference, if historically relevant: historical tracker-sync reference only, `docs/operations/tracker-sync/2026-04-26-editorial-history-ordering.md`.
+- Google Sheet / Work Log reference, if historically relevant: Operational closeout and tracker-sync evidence should live in PR metadata, GitHub history, or private archive records rather than public documentation links.
 - Branch cleanup status: branch deletion state not independently recoverable in this cleanup; PR metadata preserves branch and SHA.

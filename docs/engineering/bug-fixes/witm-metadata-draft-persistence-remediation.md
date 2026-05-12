@@ -12,8 +12,8 @@
 - Branch: `codex/preserve-witm-metadata-draft-persistence`
 - Head SHA: `f634ad1750117e84d43d2b81d9402387e7e9f70b`
 - Merge SHA: `a25328a8378f73082e0e10cc35989c11c1c7c0c8`
-- GitHub source-of-truth status: Canonical bug-fix record; detailed validation remains in `docs/engineering/testing/witm-metadata-draft-persistence-remediation.md`.
-- External references reviewed, if any: GitHub PR #143 metadata/body/files; merge diff for PR #143; existing testing remediation record.
+- GitHub source-of-truth status: Canonical bug-fix record; detailed validation evidence was preserved as operational evidence outside the durable public source-of-truth surface.
+- External references reviewed, if any: GitHub PR #143 metadata/body/files; merge diff for PR #143; historical validation record.
 - Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
 - Branch cleanup status: PR metadata and this record preserve the deleted/suspected-deleted branch recovery details; no branch deletion was performed in this follow-up.
 

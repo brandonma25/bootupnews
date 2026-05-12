@@ -97,13 +97,13 @@ For every serious feature, fix, consolidation, or release, Codex must update con
 ### Gate 7 — GitHub Documentation Closeout Gate
 Before a task is considered complete, Codex must update the canonical GitHub repo documentation lane.
 
-Required documentation closeout:
-- GitHub repo documentation is canonical for bug-fix history, remediation history, branch-cleanup history, PRD/feature governance metadata, validation records, and release/governance records.
-- `docs/product/feature-system.csv` remains the repo-side feature/PRD control file when feature metadata changes.
+Required documentation evidence:
+- `docs/product/prd/` and `docs/product/feature-system.csv` are canonical for product feature identity, scope, and metadata.
+- `DECISIONS.md`, stable governance templates, and PR metadata are the public-safe homes for durable engineering decisions and release evidence.
 - Google Sheet / Google Work Log records are retired as source-of-truth systems and may be used only as historical reference inputs.
-- Do not update Google Sheets or claim tracker updates for routine closeout.
-- Do not create routine tracker-sync fallback files. `docs/operations/tracker-sync/` remains historical compatibility only unless the user explicitly asks for a Google-reference reconciliation artifact.
-- If external Google context matters, cite it in the relevant GitHub doc without making it canonical.
+- Do not update Google Sheets or claim tracker updates for routine completion.
+- Tracker-sync and operational details should live in PR metadata, GitHub history, or private archive records rather than public documentation links.
+- If external Google context matters, summarize the relevant context without making it canonical.
 
 ---
 
@@ -191,20 +191,20 @@ For serious implementation or release work, Codex should report in a structured 
 3. validation performed
 4. preview status
 5. human-only checks still needed
-6. GitHub documentation closeout status
+6. public documentation or PR evidence status
 7. merge decision
 8. exact git result
 9. docs updated
 
 ---
 
-## 11. Reusable Codex Closeout Block
+## 11. Reusable Codex Completion Block
 Before closing any feature, fix, refactor, governance, or UX task:
-1. Update required GitHub repo docs.
+1. Update required public docs only when the change creates durable reviewer-facing product, governance, or decision context.
 2. Update `docs/product/feature-system.csv` only when PRD/feature metadata changes.
-3. Do not update Google Sheets or claim Google tracker closeout.
-4. Do not create a routine tracker-sync fallback file unless the user explicitly requested a Google-reference reconciliation artifact.
-5. Do not mark the task complete until the canonical GitHub documentation closeout is present and validation results are recorded.
+3. Do not update Google Sheets or claim Google tracker completion.
+4. Do not create routine public tracker records; use PR metadata, GitHub history, or private archive records for operational detail.
+5. Do not mark the task complete until validation results are recorded in the PR body/checklist, GitHub metadata, an explicit release output, or a durable public artifact when one is needed.
 
 ---
 

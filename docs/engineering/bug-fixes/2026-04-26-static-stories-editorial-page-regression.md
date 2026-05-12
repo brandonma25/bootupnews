@@ -14,7 +14,7 @@
 - Merge SHA: `ab4536b7a6b05ac9642dc5b4053f0778096cd5b8`
 - GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; deprecated legacy redirect was removed on 2026-05-04.
 - External references reviewed, if any: PR #109 metadata and the legacy bug report.
-- Google Sheet / Work Log reference, if historically relevant: historical tracker-sync reference only, `docs/operations/tracker-sync/2026-04-26-static-stories-editorial-page-regression.md`.
+- Google Sheet / Work Log reference, if historically relevant: Operational closeout and tracker-sync evidence should live in PR metadata, GitHub history, or private archive records rather than public documentation links.
 - Branch cleanup status: branch deletion state not independently recoverable in this cleanup; PR metadata preserves branch and SHA.
 
 ## Root Cause Detail
@@ -31,7 +31,7 @@
   - `npm run test`
   - `npm run build`
   - Local dev server on `http://localhost:3000`
-  - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test tests/smoke/homepage.spec.ts tests/homepage.spec.ts --project=chromium`
+  - `PLAYWRIGHT_BASE_URL=[REDACTED_ENV_VALUE] npx playwright test tests/smoke/homepage.spec.ts tests/homepage.spec.ts --project=chromium`
 - Route probes:
   - `HEAD /` returned `200`
   - `HEAD /dashboard/signals/editorial-review` returned `200`

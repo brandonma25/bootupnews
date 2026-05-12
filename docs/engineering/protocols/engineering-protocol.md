@@ -1,4 +1,4 @@
-# Daily Intelligence Aggregator — Engineering & Product Management Protocol
+# Boot Up — Engineering & Product Management Protocol
 
 ## System Authority
 - `AGENTS.md` = execution rules enforced by Codex
@@ -6,8 +6,9 @@
 - `test-checklist.md` = validation reference
 - `prd-template.md` = planning standard
 - `pull_request_template.md` = merge enforcement
-- GitHub repo documentation = canonical source of truth for bug-fix, remediation, branch-cleanup, validation, release, and governance history
+- Public repo documentation = canonical source of truth for product framing, durable decisions, canonical PRDs, feature metadata, and standing governance rules
 - `docs/product/feature-system.csv` = repo-side feature control layer for PRD mapping and build order
+- PR bodies, GitHub metadata, and external/private archives = preferred home for operational evidence, validation transcripts, branch-cleanup details, and closeout records
 - Google Sheet / Google Work Log records = historical reference inputs only
 
 ## 1. Core Operating Model
@@ -50,18 +51,19 @@
 - Canonical numbered PRDs live at `docs/product/prd/`.
 - Meaningful defect records live at `docs/engineering/bug-fixes/`.
 - Meaningful governance, process, release, or workflow failures live at `docs/engineering/incidents/`.
-- Meaningful audits, migrations, consolidations, taxonomy changes, and repo-structure updates live at `docs/engineering/change-records/`.
-- Meaningful validation reports and execution notes live at `docs/engineering/testing/`.
 - Rules, checklists, templates, and standards live at `docs/engineering/protocols/`.
-- Branch cleanup reconciliation lives at `docs/operations/branch-cleanup/`.
+- Reusable engineering and governance templates live at `docs/engineering/templates/`.
+- Audits, migrations, validation reports, execution notes, branch cleanup, and closeout evidence should usually live in PR bodies, GitHub metadata, or external/private archives unless a stable public artifact is explicitly needed.
 - `docs/bugs/` and `docs/changes/` are deprecated and non-canonical. Do not add new records there.
 - Durable history in deprecated folders must be migrated or consolidated into the canonical lane, leaving at most a redirect note.
 - "Meaningful" means the work materially changes behavior, implementation shape, operational expectations, or future maintenance understanding. Small copy tweaks and tiny mechanical edits do not need standalone docs.
 - If a work item needs more than one supporting doc, choose the smallest truthful set instead of duplicating the same narrative in multiple places.
 
-## 4. Codex Prompt Standard
-- Every substantial prompt must include:
-- branch decision
+## 4. LLM Coding Agent Prompt Standard
+- Every substantial implementation prompt should use `docs/engineering/templates/llm-prompt-template-change-classification.md` or include equivalent fields:
+- change type
+- source of truth
+- business / governance intent
 - scope boundaries
 - protected files or systems
 - testing instructions
@@ -172,8 +174,7 @@ git checkout -b feature/prd-<number>-<short-name>
 
 ### Post-Merge Cleanup Requirement
 - Delete merged branches immediately after merge, both locally and remotely.
-- Before deleting any remediation, bug-fix, hotfix, Codex, feature, or docs branch, capture the branch name, PR number or `no PR found`, recoverable head SHA, merge state, canonical documentation path, cleanup date, and cleanup reason.
-- Bulk branch deletion events require a reconciliation record in `docs/operations/branch-cleanup/`.
+- Before deleting any remediation, bug-fix, hotfix, Codex, feature, or docs branch, capture the branch name, PR number or `no PR found`, recoverable head SHA, merge state, cleanup date, and cleanup reason in the PR body, GitHub metadata, or an external/private archive.
 - Use this exact cleanup flow:
 
 ```bash
@@ -352,9 +353,8 @@ Never bypass worktree safety with --force or --ignore-other-worktrees for ordina
 - `docs/product/briefs/`
 - `docs/engineering/bug-fixes/`
 - `docs/engineering/incidents/`
-- `docs/engineering/change-records/`
-- `docs/engineering/testing/`
 - `docs/engineering/protocols/`
+- `docs/engineering/templates/`
 
 ## 15. Enforcement Behavior
 - Do not recommend merge when:

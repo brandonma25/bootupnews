@@ -43,8 +43,8 @@
   - `npm run lint` - PASS.
   - `npm run test` - PASS, 80 files / 603 tests.
   - `npm run build` - PASS with existing workspace-root and module-type warnings.
-  - `PLAYWRIGHT_MANAGED_WEBSERVER=1 npm run test:e2e:chromium` - PASS, 33 tests.
-  - `PLAYWRIGHT_MANAGED_WEBSERVER=1 npm run test:e2e:webkit` - PASS, 33 tests.
+  - `PLAYWRIGHT_MANAGED_WEBSERVER=[REDACTED_ENV_VALUE] npm run test:e2e:chromium` - PASS, 33 tests.
+  - `PLAYWRIGHT_MANAGED_WEBSERVER=[REDACTED_ENV_VALUE] npm run test:e2e:webkit` - PASS, 33 tests.
   - `python3 scripts/validate-feature-system-csv.py` - PASS with existing PRD slug warnings.
   - `npm run governance:coverage` - PASS.
   - `npm run governance:hotspots` - PASS.

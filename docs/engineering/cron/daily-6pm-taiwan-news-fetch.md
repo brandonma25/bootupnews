@@ -26,15 +26,15 @@ Exact minute execution depends on the Vercel plan. The repo configuration target
 
 ## Required Env Var
 
-- `CRON_SECRET`: shared secret expected in the request header `Authorization: Bearer <CRON_SECRET>`
+- `CRON_SECRET`: shared secret expected in the request header `Authorization: [REDACTED_ENV_VALUE] <CRON_SECRET>`
 - `SUPABASE_SERVICE_ROLE_KEY`: required by the existing editorial persistence layer
 - Existing Supabase public env vars are still required by the app: `NEXT_PUBLIC_SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - PRD-61 Gmail OAuth env vars: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN`
 - Newsletter gates for production writes:
-  - `NEWSLETTER_INGESTION_ENABLED=true`
-  - `NEWSLETTER_INGESTION_DRY_RUN=false`
-  - `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true`
-  - `GMAIL_NEWSLETTER_LABEL=boot-up-benchmark` or omitted to use the default
+  - `NEWSLETTER_INGESTION_ENABLED=[REDACTED_ENV_VALUE]`
+  - `NEWSLETTER_INGESTION_DRY_RUN=[REDACTED_ENV_VALUE]`
+  - `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=[REDACTED_ENV_VALUE]`
+  - `GMAIL_NEWSLETTER_LABEL=[REDACTED_ENV_VALUE]` or omitted to use the default
 
 Do not commit secret values.
 
@@ -54,7 +54,7 @@ Expected: HTTP `401` with JSON `success: false`.
 
 ```bash
 curl -i \
-  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Authorization: [REDACTED_ENV_VALUE] $CRON_SECRET" \
   http://localhost:3000/api/cron/fetch-editorial-inputs
 ```
 
@@ -81,5 +81,5 @@ Vercel Cron Jobs run on production deployments, not preview deployments.
 1. Remove the `/api/cron/fetch-editorial-inputs` entries from `vercel.json`, or revert the deployment containing this change.
 2. Keep `CRON_SECRET` in Vercel until the rollback is deployed, then remove it if no other cron job uses it.
 3. Verify Vercel no longer invokes `/api/cron/fetch-editorial-inputs`.
-4. To immediately pause newsletter writes without a deploy, set `NEWSLETTER_INGESTION_DRY_RUN=true`, set `NEWSLETTER_INGESTION_ENABLED=false`, or remove `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=true`.
+4. To immediately pause newsletter writes without a deploy, set `NEWSLETTER_INGESTION_DRY_RUN=[REDACTED_ENV_VALUE]`, set `NEWSLETTER_INGESTION_ENABLED=[REDACTED_ENV_VALUE]`, or remove `ALLOW_PRODUCTION_NEWSLETTER_INGESTION=[REDACTED_ENV_VALUE]`.
 5. Existing generated editorial snapshots and non-live newsletter candidates can remain in storage; unpublished rows do not publish public Signal Cards by themselves.

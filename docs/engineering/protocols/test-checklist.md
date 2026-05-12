@@ -43,9 +43,9 @@
 - [ ] PRD does not describe UI cards as signals unless referring to the underlying Signal object.
 - Product brief added or updated if the feature work is meaningful.
 - `docs/product/feature-system.csv` updated if applicable.
-- Bug-fix, incident, or change-record doc created if applicable.
-- Branch cleanup record created in `docs/operations/branch-cleanup/` if branch deletion or bulk branch cleanup occurred.
-- Testing note added if meaningful validation was performed.
+- Bug-fix, incident, protocol, template, or decision artifact created if durable public documentation is needed.
+- Branch cleanup evidence captured in the PR body, PR checklist, GitHub metadata, or an external/private archive if branch deletion or bulk branch cleanup occurred.
+- Meaningful validation evidence recorded in the PR body, PR checklist, GitHub metadata, or an external/private archive; create stable public docs only when durable and reviewer-facing.
 - Google Sheet / Google Work Log was not treated as canonical and was not updated for routine closeout.
 - No routine tracker-sync fallback file was created.
 - No sensitive information is included.
@@ -53,6 +53,6 @@
 ## 8. Merge Readiness
 - Build passes.
 - Preview validation is complete.
-- GitHub documentation closeout is complete in the correct canonical lane.
+- Public documentation updates are complete only when the change creates durable reviewer-facing product, governance, or decision context.
 - Codex has not claimed Google tracker, preview, production, or external-log validation unless that system was actually checked.
 - No known blockers remain.

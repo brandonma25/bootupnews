@@ -14,7 +14,7 @@
 - Merge SHA: `316a089c37fe8b83c8fe88b71216917ef71be5eb`
 - GitHub source-of-truth status: Merged into `main` on 2026-05-11.
 - External references reviewed, if any: None.
-- Google Sheet / Work Log reference, if historically relevant: No live Google Sheets update claimed; repo closeout record is maintained in `docs/operations/tracker-sync/2026-05-12-rss-newsletter-snapshot-separation.md`.
+- Google Sheet / Work Log reference, if historically relevant: No live Google Sheets update claimed. Operational closeout and tracker-sync evidence should live in PR metadata, GitHub history, or private archive records rather than public documentation links.
 - Branch cleanup status: Source branch and temporary implementation worktree were removed after merge.
 
 ## Terminology Requirement
@@ -34,7 +34,7 @@
   - `python3 scripts/validate-documentation-coverage.py`
   - `python3 scripts/pr-governance-audit.py`
 - Human checks:
-  - Confirm production Gmail OAuth refresh token belongs to the Gmail account with `boot-up-benchmark`.
+  - Confirm production Gmail OAuth refresh token belongs to the Gmail account with `[REDACTED_GMAIL_LABEL]`.
   - After deployment and env correction, run the combined fetch and confirm the current editorial set contains RSS candidates above newsletter discovery rows.
 - GitHub PR checks:
   - `feature-system-csv-validation`
@@ -54,5 +54,5 @@
 
 ## Remaining Risks / Follow-up
 - RSS snapshot rank collision is fixed and post-deploy fetch rebalanced existing newsletter discovery rows out of the RSS top-rank range.
-- Production newsletter fetching remains blocked until `GMAIL_REFRESH_TOKEN` is regenerated from the Gmail account that exposes `boot-up-benchmark`.
+- Production newsletter fetching remains blocked until `GMAIL_REFRESH_TOKEN` is regenerated from the Gmail account that exposes `[REDACTED_GMAIL_LABEL]`.
 - Publishing the new public signal slate remains an editorial action; no publish was performed by this fix.

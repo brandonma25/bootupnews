@@ -55,8 +55,7 @@ Relevant repo files:
 - `supabase/migrations/20260510130000_phase2_historical_signal_newsletter_foundation.sql`
 - `supabase/schema.sql`
 - `docs/product/prd/prd-61-newsletter-ingestion-story-clusters-and-historical-signal-snapshot-foundation.md`
-- `docs/engineering/change-records/2026-05-10-newsletter-ingestion-schema-foundation.md`
-- `docs/engineering/change-records/2026-05-10-phase2-db-foundation-production-migration-verification.md`
+- Historical operational evidence for the schema foundation and production migration verification was preserved outside the public browse path.
 
 `supabase/schema.sql` reflects the new Phase 2 tables, the `signal_posts` extension columns, the published-slate history extensions, indexes, constraints, and service-role policies. It does not define duplicate `briefing_snapshots` or `briefing_snapshot_signals` tables.
 

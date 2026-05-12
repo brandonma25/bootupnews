@@ -36,5 +36,5 @@
   - Production fetch retry requires merge, deployment, valid production env, and BM authorization.
 
 ## Remaining Risks / Follow-up
-- Gmail newsletter ingestion remains blocked until the production REST OAuth refresh token belongs to the Gmail account that can see exact label `boot-up-benchmark`.
+- Gmail newsletter ingestion remains blocked until the production REST OAuth refresh token belongs to the Gmail account that can see exact label `[REDACTED_GMAIL_LABEL]`.
 - Vercel preview or production should be used to verify the cron route after this fix is merged and deployed.

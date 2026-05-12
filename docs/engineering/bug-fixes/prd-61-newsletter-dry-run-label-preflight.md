@@ -2,7 +2,7 @@
 
 ## Summary
 
-- Problem addressed: Gmail OAuth could succeed while the runner searched an account that did not expose the expected `boot-up-benchmark` label, making an account/token mismatch look like an empty newsletter inventory.
+- Problem addressed: Gmail OAuth could succeed while the runner searched an account that did not expose the expected `[REDACTED_GMAIL_LABEL]` label, making an account/token mismatch look like an empty newsletter inventory.
 - Root cause: The controlled path searched Gmail messages directly and did not first prove exact label visibility for the same REST OAuth token.
 - Affected object level: Article ingestion and Surface Placement candidate preview only.
 
@@ -37,8 +37,8 @@ Automated checks completed:
 - `git diff --check` passed.
 
 Controlled operations validation completed:
-- Gmail REST OAuth refresh-token exchange succeeded with the Web application client named `Boot Up Newsletter Ingestion OAuth Playground`.
-- Exact Gmail label `boot-up-benchmark` was visible to the same token used by the runner.
+- Gmail REST OAuth refresh-token exchange succeeded with the Web application client named `configured Gmail OAuth client`.
+- Exact Gmail label `[REDACTED_GMAIL_LABEL]` was visible to the same token used by the runner.
 - Zero-write dry-run fetched `3` labeled emails, extracted `24` Article candidates, identified `5` eligible Surface Placement promotion candidates, and left counts unchanged at `newsletter_emails = 0`, `newsletter_story_extractions = 0`, `signal_posts = 68`.
 - BM then authorized controlled write-mode validation.
 - Controlled write stored `3` `newsletter_emails` rows, stored `24` `newsletter_story_extractions` rows, and created `5` non-live `signal_posts` review candidates.
@@ -48,6 +48,6 @@ Controlled operations validation completed:
 
 ## Remaining Risks / Follow-Up
 
-- Remove temporary local OAuth redirect URI `http://127.0.0.1:53682/oauth2callback` from the `Boot Up Newsletter Ingestion OAuth Playground` Web client after confirming no more local token generation is needed.
+- Remove temporary local OAuth redirect URI `http://127.0.0.1:53682/oauth2callback` from the `configured Gmail OAuth client` Web client after confirming no more local token generation is needed.
 - Production cron remains disabled and still requires separate BM approval before scheduling.
-- If label preflight fails in future runs, regenerate the refresh token from the Gmail account that actually contains `boot-up-benchmark`.
+- If label preflight fails in future runs, regenerate the refresh token from the Gmail account that actually contains `[REDACTED_GMAIL_LABEL]`.

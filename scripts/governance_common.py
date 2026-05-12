@@ -36,9 +36,10 @@ DOC_LANE_PREFIXES = {
     "docs/product/prd/": "prd",
     "docs/engineering/bug-fixes/": "bug-fix",
     "docs/engineering/incidents/": "incident",
-    "docs/engineering/change-records/": "change-record",
-    "docs/engineering/testing/": "testing",
     "docs/engineering/protocols/": "protocol",
+    "docs/engineering/templates/": "template",
+    "docs/engineering/change-records/": "legacy-change-record",
+    "docs/engineering/testing/": "legacy-testing",
 }
 RELEVANT_DOC_PREFIXES = tuple(DOC_LANE_PREFIXES)
 RELEVANT_DOC_FILES = (
@@ -315,7 +316,16 @@ def detect_prd_exception(repo_root: Path | None, changed_paths: list[str]) -> tu
 
     reasons: list[str] = []
     for path in changed_paths:
-        if not path.startswith("docs/engineering/change-records/"):
+        lane = label_doc_lane(path)
+        is_stable_governance_doc = lane in {
+            "product-brief",
+            "bug-fix",
+            "incident",
+            "protocol",
+            "template",
+            "governance-root",
+        }
+        if not is_stable_governance_doc:
             continue
 
         target = repo_root / path
@@ -428,15 +438,14 @@ def required_doc_groups(context: GovernanceContext) -> list[tuple[str, ...]]:
                 "prd",
                 "bug-fix",
                 "incident",
-                "change-record",
-                "testing",
                 "protocol",
+                "template",
                 "governance-root",
             )
         )
 
     if context.gate_tier == "hotspot" and context.non_test_monitored:
-        groups.append(("protocol", "change-record", "governance-root"))
+        groups.append(("protocol", "template", "governance-root"))
 
     return groups
 

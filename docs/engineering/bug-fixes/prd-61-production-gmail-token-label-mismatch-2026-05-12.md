@@ -2,13 +2,13 @@
 
 ## Summary
 
-- Problem addressed: Production newsletter ingestion failed closed because the deployed Gmail REST OAuth token could not see the exact `boot-up-benchmark` Gmail label.
+- Problem addressed: Production newsletter ingestion failed closed because the deployed Gmail REST OAuth token could not see the exact `[REDACTED_GMAIL_LABEL]` Gmail label.
 - Root cause: The deployed Gmail OAuth credential set did not point to the Gmail account and OAuth client pairing that exposes the newsletter label used by PRD-61.
 - Affected object level: Article ingestion and non-live Surface Placement review candidates.
 
 ## Fix
 
-- Exact change: Regenerated Gmail readonly OAuth authorization from the Gmail account that owns `boot-up-benchmark`, verified exact label visibility before upload, updated the Vercel Production Gmail OAuth env set, and redeployed production so the corrected token is active.
+- Exact change: Regenerated Gmail readonly OAuth authorization from the Gmail account that owns `[REDACTED_GMAIL_LABEL]`, verified exact label visibility before upload, updated the Vercel Production Gmail OAuth env set, and redeployed production so the corrected token is active.
 - Related PRD: PRD-61.
 - PR: This remediation PR.
 - Branch: `docs/newsletter-prod-gmail-token-remediation-20260512`
@@ -29,7 +29,7 @@
 
 Automated and operational checks:
 - Gmail OAuth authorization completed with readonly Gmail scope.
-- Gmail label preflight confirmed exact `boot-up-benchmark` visibility before Vercel env update.
+- Gmail label preflight confirmed exact `[REDACTED_GMAIL_LABEL]` visibility before Vercel env update.
 - Vercel Production Gmail OAuth env set was updated without printing secret values.
 - Production redeploy reached `READY`.
 - Protected newsletter diagnostic route returned HTTP `200`.

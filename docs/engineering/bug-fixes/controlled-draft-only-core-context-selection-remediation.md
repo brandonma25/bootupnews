@@ -2,7 +2,7 @@
 
 ## Summary
 - Problem addressed: The controlled `draft_only` seven-row product-target path could persist seven Core/Context-eligible rows that did not match the dry-run report's five Core plus two Context slate shape.
-- Root cause: The live-RSS draft selector applied the `core,context` allowlist and `PIPELINE_DRAFT_MAX_ROWS=7` as a flat ranked slice, so extra Core-eligible rows could displace Context rows before persistence.
+- Root cause: The live-RSS draft selector applied the `core,context` allowlist and `PIPELINE_DRAFT_MAX_ROWS=[REDACTED_ENV_VALUE]` as a flat ranked slice, so extra Core-eligible rows could displace Context rows before persistence.
 - Affected object level: Signal / Surface Placement.
 
 ## Fix

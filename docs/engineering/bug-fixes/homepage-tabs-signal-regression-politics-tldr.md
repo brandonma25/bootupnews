@@ -15,14 +15,14 @@
   - Keep Developing Now and By Category depth modules empty in that no-depth-pool case instead of duplicating Top Events as fresh additional intelligence.
   - Second follow-up correction: widen `signal_posts` rank storage to a bounded public depth pool and publish non-Top rows as category-depth rows when the approved Top 5 set is published. This preserves the Top 5 editorial contract while giving homepage tabs real non-Top public depth.
 - Related PRD: existing homepage category/depth behavior is governed by `docs/product/prd/prd-46-home-category-tabs.md` and `docs/product/prd/prd-57-homepage-volume-layers.md`; no new canonical PRD is required.
-- Migration/change record: `docs/engineering/change-records/2026-04-26-signal-post-public-depth-migration.md`
+- Migration/change-record evidence was preserved as operational evidence. The durable public interpretation is captured in the relevant PR, product source-of-truth docs, or DECISIONS.md.
 - PR: #114, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/114`
 - Branch: `bugfix/homepage-tabs-signal-regression`
 - Head SHA: `f3d4448c8078be9fef374d762420e2cafd71e3fb`
 - Merge SHA: `c6e0fb6f745f6a19e2a18e2fa40f4e38d0b02d45`
 - GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; deprecated legacy redirect was removed on 2026-05-04.
 - External references reviewed, if any: PR #114 metadata and the legacy bug report.
-- Google Sheet / Work Log reference, if historically relevant: historical tracker-sync reference only, `docs/operations/tracker-sync/2026-04-26-homepage-tabs-signal-regression-politics-tldr.md`.
+- Google Sheet / Work Log reference, if historically relevant: Operational closeout and tracker-sync evidence should live in PR metadata, GitHub history, or private archive records rather than public documentation links.
 - Branch cleanup status: branch is still present locally at `/Users/bm/dev/worktrees/daily-intel-homepage-tabs-signal-regression`; no deletion was performed in this branch.
 
 ## Data-Flow Diagnosis
@@ -45,8 +45,8 @@
   - `npm run lint`
   - `npm run test`
   - `npm run build`
-  - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium`
-  - `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=webkit`
+  - `PLAYWRIGHT_BASE_URL=[REDACTED_ENV_VALUE] npx playwright test --project=chromium`
+  - `PLAYWRIGHT_BASE_URL=[REDACTED_ENV_VALUE] npx playwright test --project=webkit`
   - Follow-up targeted checks:
   - `npm run test -- src/lib/homepage-model.test.ts src/lib/data.test.ts src/lib/signals-editorial.test.ts`
   - Added regression coverage for non-Top category depth, Top 5-only fallback, generic editorial tags, and broader published live snapshot depth.
