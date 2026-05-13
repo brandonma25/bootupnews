@@ -19,7 +19,7 @@
 - Branch cleanup status: pending merge.
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - [x] Confirmed object level before coding: Article and Surface Placement.
 - [x] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
 - [x] Legacy `signal_posts` references remain treated as Surface Placement plus Card copy/read-model storage.

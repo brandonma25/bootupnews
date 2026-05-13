@@ -3,7 +3,7 @@
 ## Summary
 - Date: 2026-04-26
 - Branch: `fix/editorial-history-ordering`
-- PR: #111, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/111`
+- PR: #111, `https://github.com/brandonma25/bootupnews/pull/111`
 - Head SHA: `d2d399acf28e209130e035e978b03ff8feceb5be`
 - Merge SHA: `bdefaedec1bfb8f2eab8c9ff32ecbb73766fe93c`
 - GitHub source-of-truth status: canonical record consolidated here on 2026-05-04; deprecated legacy redirect was removed on 2026-05-04.

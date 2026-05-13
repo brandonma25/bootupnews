@@ -8,7 +8,7 @@ import { safePostAuthRedirectPath } from "@/lib/auth";
 import { getViewerAccount } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "Boot Up — Login",
+  title: "Bootup News — Login",
 };
 
 export default async function LoginPage({
@@ -32,7 +32,7 @@ export default async function LoginPage({
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-medium text-[var(--text-primary)]">Sign in</h1>
           <p className="text-sm text-[var(--text-secondary)]">
-            Continue to your Boot Up account.
+            Continue to your Bootup News account.
           </p>
         </div>
         <LoginForm redirectTo={redirectTo} />

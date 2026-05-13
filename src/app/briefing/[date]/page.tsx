@@ -18,7 +18,7 @@ export async function generateMetadata({
   const { date } = await params;
 
   return {
-    title: `Boot Up — Briefing, ${formatBriefingDateTitle(date)}`,
+    title: `Bootup News — Briefing, ${formatBriefingDateTitle(date)}`,
   };
 }
 

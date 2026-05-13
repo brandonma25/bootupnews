@@ -11,7 +11,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { getBriefingDateKey } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Boot Up — Past briefings",
+  title: "Bootup News — Past briefings",
 };
 
 export default async function HistoryPage() {

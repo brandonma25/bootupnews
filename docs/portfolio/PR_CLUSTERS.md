@@ -1,6 +1,6 @@
 # PR Clusters
 
-Boot Up's raw PR history includes feature delivery, remediation, diagnostics, release-safety work, and documentation cleanup. This map groups the implementation history by product and engineering story so reviewers can inspect the build without relying on PR titles alone.
+Bootup News's raw PR history includes feature delivery, remediation, diagnostics, release-safety work, and documentation cleanup. This map groups the implementation history by product and engineering story so reviewers can inspect the build without relying on PR titles alone.
 
 The clusters are not a replacement for the raw GitHub record. They are a reviewer-facing interpretation layer: what changed, which decision the work demonstrates, what trade-off was accepted, and what I would do differently after seeing the system evolve.
 
@@ -12,7 +12,7 @@ Closed PR titles are part of the historical record. Rewriting them would make th
 
 **PRs:** #89, #94, #180, #181, #201, #202, #204, #205, #211, #227
 
-**What changed:** The public surface moved toward a clearer Boot Up briefing experience: tighter homepage and briefing copy, less internal editorial language, stronger card presentation, category behavior fixes, and production URL alignment.
+**What changed:** The public surface moved toward a clearer Bootup News briefing experience: tighter homepage and briefing copy, less internal editorial language, stronger card presentation, category behavior fixes, and production URL alignment.
 
 **Decision demonstrated:** The product should read as an opinionated briefing, not a generic content surface or implementation demo.
 
@@ -130,4 +130,4 @@ Closed PR titles are part of the historical record. Rewriting them would make th
 
 ## How To Read This With DECISIONS.md
 
-DECISIONS.md summarizes the durable product and engineering trade-offs behind Boot Up. PR_CLUSTERS.md maps those decisions back to implementation history. The raw PRs remain the evidence layer, while these two documents help reviewers understand why the work took the shape it did.
+DECISIONS.md summarizes the durable product and engineering trade-offs behind Bootup News. PR_CLUSTERS.md maps those decisions back to implementation history. The raw PRs remain the evidence layer, while these two documents help reviewers understand why the work took the shape it did.

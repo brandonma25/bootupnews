@@ -2,7 +2,7 @@
 
 Date: 2026-04-23  
 Scope: read-only architecture audit plus this markdown deliverable.  
-Branch/worktree: `/Users/bm/Documents/daily-intelligence-aggregator-main` on `docs/source-activation-audit`.
+Branch/worktree: `/Users/bm/Documents/bootupnews-main` on `docs/source-activation-audit`.
 
 ## Executive Summary
 

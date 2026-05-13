@@ -9,7 +9,7 @@
 ## GitHub Source-of-Truth Metadata
 
 - Affected object level: Card and Surface Placement.
-- PR: #162, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/162`.
+- PR: #162, `https://github.com/brandonma25/bootupnews/pull/162`.
 - Branch: `codex/hotfix-public-schema-preflight-fallback`.
 - Head SHA: `863af2ca788292d45ca5f434246868bb164c93dc`.
 - Merge SHA: `1f31eed95bb88268775c24cb0cc0962d0d5702d5`.
@@ -20,7 +20,7 @@
 
 ## Source Of Truth
 
-- Product position: Boot Up is a curated daily intelligence briefing, not a feed.
+- Product position: Bootup News is a curated daily intelligence briefing, not a feed.
 - Public product target: Top 5 Core Signals plus Next 2 Context Signals with no false freshness.
 - PRD-53: `docs/product/prd/prd-53-signals-admin-editorial-layer.md`
 - PRD-53 diagnostics from PR #158 through PR #161, which record unresolved migration-history drift and missing PRD-53 production schema.

@@ -15,7 +15,7 @@
 - Branch cleanup status: PR metadata and this record preserve branch names, head SHAs, merge SHAs, and merge state for all four phases; no branch deletion was performed in this metadata enrichment branch.
 
 ## Phase 1 — PR #180 Public Card Cleanup
-- PR: #180, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/180`
+- PR: #180, `https://github.com/brandonma25/bootupnews/pull/180`
 - Branch: `feature/public-card-cleanup-phase-1`
 - Head SHA: `ea33c7529b228c15f093bdff4845e4e04a222c78`
 - Merge SHA: `d2cd4140bb5f1f1b2a5fc5c4eff6921dff371475`
@@ -26,7 +26,7 @@
 - Remaining risks: visual verification on Vercel preview remained the relevant deployment gate.
 
 ## Phase 2 — PR #181 Stale-State Copy
-- PR: #181, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/181`
+- PR: #181, `https://github.com/brandonma25/bootupnews/pull/181`
 - Branch: `feature/public-card-cleanup-phase-2`
 - Head SHA: `4800791f5a9bad84eee8a286ec74622e1240c51d`
 - Merge SHA: `cc8e3140c8f511ea3acd591bf613e4d96e9a2c50`
@@ -37,7 +37,7 @@
 - Remaining risks: Vercel preview visual verification remained the relevant gate.
 
 ## Phase 4 — PR #187 Empty By Category Grid
-- PR: #187, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/187`
+- PR: #187, `https://github.com/brandonma25/bootupnews/pull/187`
 - Branch: `feature/public-card-cleanup-phase-4`
 - Head SHA: `fc851ba33463ba108465e51cb71ef0141ea9c03c`
 - Merge SHA: `ed6d751e9c5492664ee927db2d193825df1d64cd`
@@ -48,7 +48,7 @@
 - Remaining risks: no ranking, classification, source manifest, auth, or pipeline changes were made; preview visual check remained the deployment gate.
 
 ## Phase 3 — PR #189 Briefing Detail Public Access
-- PR: #189, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/189`
+- PR: #189, `https://github.com/brandonma25/bootupnews/pull/189`
 - Branch: `feature/public-card-cleanup-phase-3`
 - Head SHA: `0a07de381598ec19123356b99c98d771ad3a4588`
 - Merge SHA: `f2694a81ca66b02d4f4faff671798ba1c3117ba2`

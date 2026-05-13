@@ -120,7 +120,7 @@ function createGmailClient(raw: string): GmailApiClient {
     async getLabelByName() {
       return {
         id: "Label_1",
-        name: "boot-up-benchmark",
+        name: "bootup-news-benchmark",
         messagesTotal: 1,
         messagesUnread: 0,
       };
@@ -172,13 +172,13 @@ describe("newsletter email storage and story extraction", () => {
       db,
       gmailClient,
       messageRef: { id: "gmail-1", threadId: "thread-1" },
-      label: "boot-up-benchmark",
+      label: "bootup-news-benchmark",
     });
     const skipped = await insertNewsletterEmail({
       db,
       gmailClient,
       messageRef: { id: "gmail-1", threadId: "thread-1" },
-      label: "boot-up-benchmark",
+      label: "bootup-news-benchmark",
     });
 
     expect(inserted.status).toBe("inserted");
@@ -186,7 +186,7 @@ describe("newsletter email storage and story extraction", () => {
     expect(tables.newsletter_emails.filter((row) => row.gmail_thread_id === "thread-1")).toHaveLength(2);
     expect(tables.newsletter_emails.at(-1)).toMatchObject({
       gmail_message_id: "gmail-1",
-      label: "boot-up-benchmark",
+      label: "bootup-news-benchmark",
       extraction_status: "pending",
     });
     expect(tables.newsletter_emails.at(-1)?.content_sha256).toEqual(expect.any(String));

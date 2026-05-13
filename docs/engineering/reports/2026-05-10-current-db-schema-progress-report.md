@@ -61,7 +61,7 @@ Relevant repo files:
 
 PR #213 exists as a docs-only production migration verification PR:
 
-- PR: `https://github.com/brandonma25/daily-intelligence-aggregator/pull/213`
+- PR: `https://github.com/brandonma25/bootupnews/pull/213`
 - Branch: `docs/phase2-db-foundation-production-migration-verification`
 - Status at audit time: open, not draft, clean, checks green
 

@@ -5,7 +5,7 @@ import { DateBadge } from "@/components/signals/DateBadge";
 import { SignalCard } from "@/components/signals/SignalCard";
 import { TierBadge } from "@/components/signals/TierBadge";
 
-describe("Boot Up visual system components", () => {
+describe("Bootup News visual system components", () => {
   it("renders the Core tier marker with a zero-padded rank", () => {
     render(<TierBadge tier="core" rank={3} />);
 

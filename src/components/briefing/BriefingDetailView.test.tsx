@@ -50,7 +50,7 @@ function createData(): DashboardData {
     briefing: {
       id: "published-homepage-2026-05-06",
       briefingDate: "2026-05-06T09:00:00.000Z",
-      title: "Boot Up",
+      title: "Bootup News",
       intro: developerSubtitle,
       readingWindow: "4 minutes",
       items: [item],
@@ -79,7 +79,7 @@ function createData(): DashboardData {
 }
 
 describe("BriefingDetailView", () => {
-  it("renders the Boot Up detail surface without the retired public-card chrome", () => {
+  it("renders the Bootup News detail surface without the retired public-card chrome", () => {
     render(<BriefingDetailView data={createData()} viewer={null} />);
 
     expect(screen.getByText("Wednesday")).toBeInTheDocument();

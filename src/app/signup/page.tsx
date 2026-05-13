@@ -8,7 +8,7 @@ import { safePostAuthRedirectPath } from "@/lib/auth";
 import { getViewerAccount } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "Boot Up — Signup",
+  title: "Bootup News — Signup",
 };
 
 export default async function SignupPage({
@@ -32,7 +32,7 @@ export default async function SignupPage({
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-medium text-[var(--text-primary)]">Create account</h1>
           <p className="text-sm text-[var(--text-secondary)]">
-            Create your Boot Up account.
+            Create your Bootup News account.
           </p>
         </div>
         <SignupForm redirectTo={redirectTo} />

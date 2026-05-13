@@ -2,7 +2,7 @@
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Signal and Surface Placement.
-- PR: #54, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/54`.
+- PR: #54, `https://github.com/brandonma25/bootupnews/pull/54`.
 - Branch: `feature/ingestion-v1`.
 - Head SHA: `0c7903edd9b8c71f0ae7bbc21ff2987218fa8e26`.
 - Merge SHA: `bc16e875ad9579acafad3ac768768284a528c151`.

@@ -239,7 +239,7 @@ describe("runControlledPipeline", () => {
       briefing: {
         id: "briefing-test",
         briefingDate: "2026-04-27T12:00:00.000Z",
-        title: "Boot Up",
+        title: "Bootup News",
         intro: "Controlled test briefing.",
         readingWindow: "20 minutes",
         items: items.slice(0, 5),
@@ -332,7 +332,7 @@ describe("runControlledPipeline", () => {
       briefing: {
         id: "briefing-phase-b",
         briefingDate: "2026-04-27T12:00:00.000Z",
-        title: "Boot Up",
+        title: "Bootup News",
         intro: "Controlled test briefing.",
         readingWindow: "20 minutes",
         items: [items[0]],
@@ -379,7 +379,7 @@ describe("runControlledPipeline", () => {
       briefing: {
         id: "briefing-capped",
         briefingDate: "2026-04-27T12:00:00.000Z",
-        title: "Boot Up",
+        title: "Bootup News",
         intro: "Controlled test briefing.",
         readingWindow: "20 minutes",
         items: [items[0]],
@@ -430,7 +430,7 @@ describe("runControlledPipeline", () => {
       briefing: {
         id: "briefing-product-target",
         briefingDate: "2026-04-27T12:00:00.000Z",
-        title: "Boot Up",
+        title: "Bootup News",
         intro: "Controlled test briefing.",
         readingWindow: "20 minutes",
         items: items.slice(0, 5),
@@ -494,7 +494,7 @@ describe("runControlledPipeline", () => {
       briefing: {
         id: "briefing-product-target-context-preserved",
         briefingDate: "2026-04-27T12:00:00.000Z",
-        title: "Boot Up",
+        title: "Bootup News",
         intro: "Controlled test briefing.",
         readingWindow: "20 minutes",
         items: items.slice(0, 5),
@@ -555,7 +555,7 @@ describe("runControlledPipeline", () => {
       briefing: {
         id: "briefing-product-target-capped",
         briefingDate: "2026-04-27T12:00:00.000Z",
-        title: "Boot Up",
+        title: "Bootup News",
         intro: "Controlled test briefing.",
         readingWindow: "20 minutes",
         items: items.slice(0, 5),

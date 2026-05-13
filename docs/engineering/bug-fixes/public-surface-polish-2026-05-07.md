@@ -6,7 +6,7 @@
 - Affected object level: Card and Surface Placement.
 
 ## Fix
-- Exact change: renamed public card-face reasoning labels to `Why this ranks`, added `line-clamp-2` to public WITM preview text, changed the empty-tab signup prompt to neutral notification copy, aligned public card tier labels to `Core Signal`, updated public route metadata to Boot Up reader-facing titles and description, and aligned the local release smoke marker with the data-empty homepage state.
+- Exact change: renamed public card-face reasoning labels to `Why this ranks`, added `line-clamp-2` to public WITM preview text, changed the empty-tab signup prompt to neutral notification copy, aligned public card tier labels to `Core Signal`, updated public route metadata to Bootup News reader-facing titles and description, and aligned the local release smoke marker with the data-empty homepage state.
 - Related PRD: Not applicable. Canonical PRD required: No. This is bug-fix / public surface polish.
 - PR: TBD
 - Branch: `bugfix/public-surface-polish-20260507`
@@ -36,7 +36,7 @@
   - `python3 scripts/release-governance-gate.py` — PASS.
   - `npm run governance:audit` — PASS.
 - Human checks:
-  - Local browser metadata: `/` title `Boot Up`, `/signals` title `Boot Up — Today's Signals`, `/briefing/2026-05-06` title `Boot Up — Briefing May 6, 2026`.
+  - Local browser metadata: `/` title `Bootup News`, `/signals` title `Bootup News — Today's Signals`, `/briefing/2026-05-06` title `Bootup News — Briefing May 6, 2026`.
   - Local browser empty-tab copy: neutral signup line rendered; old `Create a free account to read...` line absent; honest empty-state sentence remained.
   - Local card-face visual check: blocked by the local dev environment having zero published public cards; Vercel preview and production verification must confirm card labels and clamps with deployed data.
 

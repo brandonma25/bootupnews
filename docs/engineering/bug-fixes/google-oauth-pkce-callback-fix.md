@@ -5,7 +5,7 @@ Google OAuth could start, but the callback did not reliably complete in hosted e
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Surface Placement.
-- PR: #8, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/8`; #9, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/9`; #12, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/12`.
+- PR: #8, `https://github.com/brandonma25/bootupnews/pull/8`; #9, `https://github.com/brandonma25/bootupnews/pull/9`; #12, `https://github.com/brandonma25/bootupnews/pull/12`.
 - Branch: `feature/google-oauth-production-callback-fix`; `feature/auth-preview-host-fix`; `docs/google-oauth-bug-report`.
 - Head SHA: #8 `9160be28e0ce60855400034b989a32d24bebee77`; #9 `e8f63e9911a0f2b7f0858ebcad0de4a1d18334d1`; #12 `076539365aa73a3ab8f06feb1d74fad40d13b7de`.
 - Merge SHA: #8 `a0a4e0698cc34d302234c1ce0e8800b81f286b60`; #9 `040e326602f6f6ed55cab17623df076d92bd3ec2`; #12 `92cefcd3f3253a1af5b774c28fcbdbdac875efb1`.

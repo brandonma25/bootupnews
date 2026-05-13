@@ -6,7 +6,7 @@
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Card.
-- PR: #100, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/100`.
+- PR: #100, `https://github.com/brandonma25/bootupnews/pull/100`.
 - Branch: `codex/signals-admin-editorial-layer`.
 - Head SHA: `4e895c44aad579281e7d612b985efb0470bb2d99`.
 - Merge SHA: `cacb0753de59fc1efe7c72c9655c62625a99991e`.

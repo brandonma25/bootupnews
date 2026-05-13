@@ -11,8 +11,8 @@ import {
 describe("Gmail newsletter API client", () => {
   it("builds the benchmark label search query with a since date", () => {
     expect(
-      buildGmailNewsletterSearchQuery("boot-up-benchmark", new Date("2026-05-09T14:30:00.000Z")),
-    ).toBe("label:boot-up-benchmark after:2026/05/09");
+      buildGmailNewsletterSearchQuery("bootup-news-benchmark", new Date("2026-05-09T14:30:00.000Z")),
+    ).toBe("label:bootup-news-benchmark after:2026/05/09");
   });
 
   it("uses OAuth refresh-token flow and searches Gmail without exposing credentials", async () => {
@@ -24,7 +24,7 @@ describe("Gmail newsletter API client", () => {
       }
 
       expect(url).toContain("gmail.googleapis.com");
-      expect(new URL(url).searchParams.get("q")).toBe("label:boot-up-benchmark after:2026/05/09");
+      expect(new URL(url).searchParams.get("q")).toBe("label:bootup-news-benchmark after:2026/05/09");
       return Response.json({
         messages: [
           { id: "message-1", threadId: "thread-a" },
@@ -95,8 +95,8 @@ describe("Gmail newsletter API client", () => {
       expect(url).toBe("https://gmail.googleapis.com/gmail/v1/users/me/labels");
       return Response.json({
         labels: [
-          { id: "Label_1", name: "boot-up-benchmark", messagesTotal: 7, messagesUnread: 2 },
-          { id: "Label_2", name: "Boot Up Benchmark", messagesTotal: 1, messagesUnread: 0 },
+          { id: "Label_1", name: "bootup-news-benchmark", messagesTotal: 7, messagesUnread: 2 },
+          { id: "Label_2", name: "Bootup News Benchmark", messagesTotal: 1, messagesUnread: 0 },
         ],
       });
     });
@@ -109,13 +109,13 @@ describe("Gmail newsletter API client", () => {
       fetchImpl: fetchImpl as typeof fetch,
     });
 
-    const result = await verifyGmailNewsletterLabelVisible(gmailClient, "boot-up-benchmark");
+    const result = await verifyGmailNewsletterLabelVisible(gmailClient, "bootup-news-benchmark");
 
     expect(result).toEqual({
       ok: true,
       label: {
         id: "Label_1",
-        name: "boot-up-benchmark",
+        name: "bootup-news-benchmark",
         messagesTotal: 7,
         messagesUnread: 2,
       },
@@ -147,11 +147,11 @@ describe("Gmail newsletter API client", () => {
       fetchImpl: fetchImpl as typeof fetch,
     });
 
-    const result = await verifyGmailNewsletterLabelVisible(gmailClient, "boot-up-benchmark");
+    const result = await verifyGmailNewsletterLabelVisible(gmailClient, "bootup-news-benchmark");
 
     expect(result).toEqual({
       ok: false,
-      label: "boot-up-benchmark",
+      label: "bootup-news-benchmark",
       message: expect.stringMatching(/label missing\/account mismatch/i),
     });
     if (!result.ok) {

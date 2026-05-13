@@ -16,7 +16,7 @@
   - Second follow-up correction: widen `signal_posts` rank storage to a bounded public depth pool and publish non-Top rows as category-depth rows when the approved Top 5 set is published. This preserves the Top 5 editorial contract while giving homepage tabs real non-Top public depth.
 - Related PRD: existing homepage category/depth behavior is governed by `docs/product/prd/prd-46-home-category-tabs.md` and `docs/product/prd/prd-57-homepage-volume-layers.md`; no new canonical PRD is required.
 - Migration/change-record evidence was preserved as operational evidence. The durable public interpretation is captured in the relevant PR, product source-of-truth docs, or DECISIONS.md.
-- PR: #114, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/114`
+- PR: #114, `https://github.com/brandonma25/bootupnews/pull/114`
 - Branch: `bugfix/homepage-tabs-signal-regression`
 - Head SHA: `f3d4448c8078be9fef374d762420e2cafd71e3fb`
 - Merge SHA: `c6e0fb6f745f6a19e2a18e2fa40f4e38d0b02d45`

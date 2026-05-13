@@ -108,7 +108,7 @@ export default function AuthModal({ open, onClose, errorMessage }: Props) {
       <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-card border border-[var(--border)] bg-[var(--card)] p-6 ">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-medium text-[var(--text-primary)]">Continue to Boot Up</h2>
+            <h2 className="text-xl font-medium text-[var(--text-primary)]">Continue to Bootup News</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
               Use Google for the fastest path, or continue with email and password. Existing onboarding will continue after auth.
             </p>

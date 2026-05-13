@@ -15,7 +15,7 @@
 - `DECISIONS.md` D06 — Separate generation from publication; preserve the approve → publish two-gate workflow.
 
 ## Terminology Requirement
-- Read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - Object level modified:
   - Change 1: **Card** — the UI rendering of a Signal. The underlying Signal identity, ranking, and selection logic are unchanged.
   - Change 2: **Surface Placement / editorial workflow** — the editorial composer surface that gates which approved Signals become live on the public Surface Placement. Signal identity is unchanged.

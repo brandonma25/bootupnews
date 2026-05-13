@@ -8,7 +8,7 @@
 ## Fix
 - Exact change: RSS persistence now reserves existing unselected newsletter discovery rows into lower-priority rank slots before inserting the RSS snapshot, and newsletter promotion now allocates open ranks from `20` downward.
 - Related PRD: PRD-60 scheduled RSS fetch and PRD-61 newsletter ingestion runtime.
-- PR: [#223](https://github.com/brandonma25/daily-intelligence-aggregator/pull/223)
+- PR: [#223](https://github.com/brandonma25/bootupnews/pull/223)
 - Branch: `fix/rss-newsletter-snapshot-separation`
 - Head SHA: `dce4b0c7c104424d2ea0a9ce36c68b2a046975e0`
 - Merge SHA: `316a089c37fe8b83c8fe88b71216917ef71be5eb`
@@ -18,7 +18,7 @@
 - Branch cleanup status: Source branch and temporary implementation worktree were removed after merge.
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - [x] Confirmed object level before coding: Surface Placement.
 - [x] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
 - [x] Legacy `signal_posts` naming remains documented as operational placement storage.

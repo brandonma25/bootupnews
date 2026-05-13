@@ -35,7 +35,7 @@ test.describe("homepage", () => {
   test("renders the public V1 briefing flow", async ({ page, diagnostics }) => {
     await page.goto("/");
 
-    await expect(page).toHaveTitle(/Boot Up/i);
+    await expect(page).toHaveTitle(/Bootup News/i);
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first()).toBeVisible();
     await expect(page.getByText("BROWSE BY")).toBeVisible();

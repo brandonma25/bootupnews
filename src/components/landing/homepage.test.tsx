@@ -94,12 +94,12 @@ function renderHomepage(data: DashboardData, options: Partial<ComponentProps<typ
 }
 
 describe("LandingHomepage", () => {
-  it("renders the Boot Up shell with the locked tagline and primary nav", () => {
+  it("renders the Bootup News shell with the locked tagline and primary nav", () => {
     const data = createData([createItem()]);
 
     renderHomepage(data);
 
-    expect(screen.getAllByText("Boot Up").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bootup News").length).toBeGreaterThan(0);
     expect(screen.getByText("For people who want to understand the world, not just consume it."))
       .toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Home" }).length).toBeGreaterThan(0);

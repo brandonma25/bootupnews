@@ -11,7 +11,7 @@ Before ANY substantial implementation work, you MUST read:
 - `docs/product/documentation-rules.md`
 - `docs/engineering/protocols/bug-tracking-governance.md`
 - `docs/engineering/bug-fixes/templates/bug-fix-record-template.md`
-- `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
+- `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`
 
 ## Branch Discipline Rules (Mandatory)
 
@@ -94,7 +94,7 @@ Before starting any new development:
 Required branch creation flow:
 
 ```bash
-cd "/Users/bm/dev/daily-intelligence-aggregator"
+cd "/Users/bm/dev/bootupnews"
 pwd
 git checkout main
 git pull
@@ -104,12 +104,12 @@ git checkout -b feature/prd-<number>-<short-name>
 Required worktree creation flow when a dedicated worktree is requested:
 
 ```bash
-cd "/Users/bm/dev/daily-intelligence-aggregator"
+cd "/Users/bm/dev/bootupnews"
 pwd
 git checkout main
 git pull
-git worktree add "/Users/bm/dev/worktrees/daily-intelligence-aggregator-<short-name>" -b <branch-name>
-cd "/Users/bm/dev/worktrees/daily-intelligence-aggregator-<short-name>"
+git worktree add "/Users/bm/dev/worktrees/bootupnews-<short-name>" -b <branch-name>
+cd "/Users/bm/dev/worktrees/bootupnews-<short-name>"
 pwd
 git branch --show-current
 git status --short --branch
@@ -132,7 +132,7 @@ git push origin --delete feature/<name>
 - Do not modify unrelated files.
 
 ## 2a. Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
 - Do not use cluster, signal, story, or card interchangeably.
 - Before coding, confirm the object level being changed: Article, Story Cluster, Signal, Card, or Surface Placement.

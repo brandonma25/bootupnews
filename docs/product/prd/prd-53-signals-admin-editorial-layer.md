@@ -93,14 +93,14 @@ Product Position
 Existing PRD-53 Signals admin editorial layer
 April 29 controlled manual publish cycle summary
 Change Classification and Governance template
-Boot Up canonical terminology
+Bootup News canonical terminology
 ```
 
-Boot Up's product standard remains a curated daily intelligence briefing, not a feed: `Top 5 Core Signals + Next 2 Context Signals`, each with explicit structural "why it matters" reasoning and no false freshness.
+Bootup News's product standard remains a curated daily intelligence briefing, not a feed: `Top 5 Core Signals + Next 2 Context Signals`, each with explicit structural "why it matters" reasoning and no false freshness.
 
 ### Problem Statement
 
-The April 29 controlled manual publish cycle proved that Boot Up can produce a real public briefing when pipeline output is paired with human editorial judgment.
+The April 29 controlled manual publish cycle proved that Bootup News can produce a real public briefing when pipeline output is paired with human editorial judgment.
 
 The cycle delivered:
 
@@ -132,7 +132,7 @@ remediating /signals so Context rows became publicly visible
 
 This exposed a product gap: the current admin flow can support review, but it does not yet give editors explicit card-level authority over final slate composition. Without this capability, future publish cycles risk direct database intervention becoming the operating workflow, weak WITM rows slipping into publishable state, Depth or parked rows leaking publicly, slate composition being implicit rather than auditable, source concentration decisions being undocumented, replacement decisions being unreplayable, and public surfaces diverging from editorial intent.
 
-The core product issue is that Boot Up needs a repeatable in-app way to turn pipeline candidates into a reviewed public editorial slate.
+The core product issue is that Bootup News needs a repeatable in-app way to turn pipeline candidates into a reviewed public editorial slate.
 
 ### Amendment Goals
 

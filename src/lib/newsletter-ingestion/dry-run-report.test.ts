@@ -106,7 +106,7 @@ function createGmailClient(input: {
         ? null
         : {
             id: "Label_1",
-            name: "boot-up-benchmark",
+            name: "bootup-news-benchmark",
             messagesTotal: 1,
             messagesUnread: 0,
           }),

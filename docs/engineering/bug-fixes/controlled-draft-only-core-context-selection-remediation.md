@@ -8,7 +8,7 @@
 ## Fix
 - Exact change: For the approved seven-row controlled draft-only path, select up to five `core_signal_eligible` rows and up to two `context_signal_eligible` rows from the same ranked candidate pool, preserving fail-closed exclusion of Depth rows.
 - Related PRD: No new PRD required; this is controlled operations remediation for the existing Phase 1 editorial cycle validation path.
-- PR: https://github.com/brandonma25/daily-intelligence-aggregator/pull/206.
+- PR: https://github.com/brandonma25/bootupnews/pull/206.
 - Branch: `fix/controlled-draft-only-core-context-selection-20260508`.
 - Head SHA at PR creation: `7a8fd1d65d3ea88441edf85286c7f5a9d42061a4`.
 - Merge SHA: TBD.
@@ -18,7 +18,7 @@
 - Branch cleanup status: pending post-merge cleanup.
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - [x] Confirmed object level before coding: Signal / Surface Placement.
 - [x] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
 - [x] Legacy `signal_posts` naming remains treated as Surface Placement plus editorial read-model storage.

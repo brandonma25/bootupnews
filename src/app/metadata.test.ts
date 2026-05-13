@@ -6,11 +6,11 @@ vi.mock("next/font/google", () => ({
 }));
 
 describe("public page metadata", () => {
-  it("uses the Boot Up brand in homepage metadata without premium dashboard copy", async () => {
+  it("uses the Bootup News brand in homepage metadata without premium dashboard copy", async () => {
     const { metadata } = await import("@/app/layout");
 
-    expect(metadata.title).toBe("Boot Up");
-    expect(String(metadata.title)).toContain("Boot Up");
+    expect(metadata.title).toBe("Bootup News");
+    expect(String(metadata.title)).toContain("Bootup News");
     expect(metadata.description).not.toMatch(/premium|dashboard/i);
     expect(String(metadata.description).length).toBeLessThanOrEqual(160);
   });
@@ -33,14 +33,14 @@ describe("public page metadata", () => {
   it("uses reader-facing public signals metadata", async () => {
     const { metadata } = await import("@/app/signals/page");
 
-    expect(metadata.title).toBe("Boot Up — All signals");
+    expect(metadata.title).toBe("Bootup News — All signals");
   });
 
   it("uses a formatted briefing date in public detail metadata", async () => {
     const { generateMetadata } = await import("@/app/briefing/[date]/page");
 
     await expect(generateMetadata({ params: Promise.resolve({ date: "2026-05-06" }) })).resolves.toEqual({
-      title: "Boot Up — Briefing, May 6, 2026",
+      title: "Bootup News — Briefing, May 6, 2026",
     });
   });
 });

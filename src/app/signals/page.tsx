@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Boot Up — All signals",
+  title: "Bootup News — All signals",
 };
 
 export default async function PublicSignalsPage() {
