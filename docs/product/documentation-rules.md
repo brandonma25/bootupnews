@@ -60,17 +60,18 @@ This repository uses a controlled documentation system. The goal is to keep docs
 3. Respect dependencies before implementation.
 4. Complete the terminology check and state which object level the work modifies: Article, Story Cluster, Signal, Card, or Surface Placement.
 5. If the feature already has a PRD, update that file instead of creating a new one.
-6. Update stable public documentation only when the change creates durable product, governance, or portfolio-facing information.
-7. Do not update Google Sheets or claim tracker updates.
-8. Do not create routine tracker-sync fallback files or public operational logs.
-9. During active branch work, set CSV `status = In Progress` when feature metadata changes are in scope.
-10. When implementation is complete but awaiting merge or review, set CSV `status = In Review` when feature metadata changes are in scope.
-11. After merge or explicit user acceptance, set CSV `status = Built`, `decision = keep`, and update `last_updated` when feature metadata changes are in scope.
+6. If the user explicitly asks for a new feature or new system-level behavior and no existing row maps it, create the canonical PRD and matching CSV row in the same branch before or alongside implementation.
+7. Update stable public documentation only when the change creates durable product, governance, or portfolio-facing information.
+8. Do not update Google Sheets or claim tracker updates.
+9. Do not create routine tracker-sync fallback files or public operational logs.
+10. During active branch work, set CSV `status = In Progress` when feature metadata changes are in scope.
+11. When implementation is complete but awaiting merge or review, set CSV `status = In Review` when feature metadata changes are in scope.
+12. After merge or explicit user acceptance, set CSV `status = Built`, `decision = keep`, and update `last_updated` when feature metadata changes are in scope.
 
 ## Change Control
 - Do not implement features marked `delay` or `kill`.
 - Do not change `build_order` without explicit user instruction.
-- Do not create new feature rows unless explicitly asked.
+- Do not create new feature rows unless explicitly asked, or unless the user has requested a new feature/system implementation that has no existing PRD/CSV mapping and is classified as `new-feature-or-system`.
 - If a feature is no longer active, set `status = Deprecated`.
 - Update `decision` accordingly if explicitly instructed.
 - Update the CSV in the same PR as the feature work whenever feature state changes.

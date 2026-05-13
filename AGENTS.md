@@ -224,6 +224,15 @@ Rules:
 
 This repository uses a strict documentation system to prevent bloat and maintain clarity.
 
+### Required Governance Files Before Implementation
+- Before editing product or system code, classify the request using `docs/engineering/templates/llm-prompt-template-change-classification.md`.
+- If the user explicitly asks for a new feature or new system-level behavior and no existing `PRD-XX` / `feature-system.csv` row covers it, create the required governance files in the same branch before or alongside the first implementation commit.
+- Required files for new feature or system work:
+  1. exactly one canonical PRD at `/docs/product/prd/prd-XX-<feature-name>.md`
+  2. exactly one matching row in `/docs/product/feature-system.csv` with `prd_id` and `prd_file`
+- Do not wait for `release-governance-gate` to fail before adding these files. The branch is incomplete until the governance files and implementation changes agree.
+- This does not authorize documentation sprawl: bug fixes, remediation, refactors, audits, and tiny UI/copy changes still use the smaller documentation lane defined below.
+
 ### Source of Truth
 - `PRD-XX` is the single source of truth for feature identity across the repo.
 - Public repo documentation is the source of truth for product framing, durable decisions, canonical PRDs, feature metadata, and standing governance rules.
@@ -276,7 +285,7 @@ After merge or explicit user acceptance:
 Do not:
 - implement features marked `delay` or `kill`
 - change `build_order` without explicit user instruction
-- create new feature rows unless explicitly asked
+- create new feature rows unless explicitly asked, or unless the user has requested a new feature/system implementation that has no existing PRD/CSV mapping and is classified as `new-feature-or-system`
 
 If a feature is no longer active:
 - set `status = Deprecated`
