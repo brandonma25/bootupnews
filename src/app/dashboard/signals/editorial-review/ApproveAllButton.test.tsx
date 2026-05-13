@@ -1,42 +1,39 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ApproveAllButton } from "@/app/dashboard/signals/editorial-review/ApproveAllButton";
 
 describe("ApproveAllButton", () => {
-  it("copies current eligible structured editor values into the bulk approval form", () => {
+  it("renders with the WITM-passed label and is enabled when eligible candidates exist", () => {
+    render(<ApproveAllButton disabled={false} />);
+
+    const button = screen.getByRole("button", { name: /Approve all WITM-passed/i });
+    expect(button).toBeEnabled();
+    expect(button).toHaveTextContent("Approve all WITM-passed");
+  });
+
+  it("is disabled and surfaces the provided reason as a tooltip", () => {
     render(
-      <div>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-          }}
-        >
-          <div data-approve-all-fields hidden />
-          <ApproveAllButton disabled={false} />
-        </form>
-        <input data-approve-all-post-id="signal-1" defaultValue="Edited value 1" />
-        <input data-approve-all-post-id="signal-2" defaultValue="Edited value 2" />
-        <input defaultValue="Not eligible" />
-      </div>,
+      <ApproveAllButton
+        disabled
+        disabledReason="No WITM-passed candidates assigned to slots"
+      />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Approve All" }));
+    const button = screen.getByTestId("bulk-approve-submit");
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("title", "No WITM-passed candidates assigned to slots");
+    expect(button).toHaveAttribute(
+      "aria-label",
+      "Approve all WITM-passed — No WITM-passed candidates assigned to slots",
+    );
+  });
 
-    const postIds = screen
-      .getByRole("button", { name: "Approve All" })
-      .form?.querySelectorAll<HTMLInputElement>('input[name="postId"]');
-    const editedValues = screen
-      .getByRole("button", { name: "Approve All" })
-      .form?.querySelectorAll<HTMLInputElement>('input[name="editedWhyItMatters"]');
+  it("omits the tooltip when no reason is provided", () => {
+    render(<ApproveAllButton disabled />);
 
-    expect(Array.from(postIds ?? []).map((input) => input.value)).toEqual([
-      "signal-1",
-      "signal-2",
-    ]);
-    expect(Array.from(editedValues ?? []).map((input) => input.value)).toEqual([
-      "Edited value 1",
-      "Edited value 2",
-    ]);
+    const button = screen.getByTestId("bulk-approve-submit");
+    expect(button).toBeDisabled();
+    expect(button).not.toHaveAttribute("title");
   });
 });

@@ -163,11 +163,20 @@ describe("signals editorial review page", () => {
     expect(screen.getByText(approvedPost.editedWhyItMatters ?? "")).toBeInTheDocument();
     expect(
       screen
-        .getAllByRole("button", { name: /Publish slate/i })
+        .getAllByTestId("publish-slate-open")
         .every((button) => button.hasAttribute("disabled")),
     ).toBe(true);
     expect(screen.queryByText("Published Slate Audit")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Approve All" })).not.toBeInTheDocument();
+    // Bulk approve is rendered at the top of the candidate pool with the
+    // WITM-passed-bounded label. Neither test post has been assigned to
+    // a slot, so the button is disabled with the documented tooltip.
+    const bulkApproveButton = screen.getByTestId("bulk-approve-submit");
+    expect(bulkApproveButton).toHaveTextContent("Approve all WITM-passed");
+    expect(bulkApproveButton).toBeDisabled();
+    expect(bulkApproveButton).toHaveAttribute(
+      "title",
+      "No WITM-passed candidates assigned to slots",
+    );
   }, 10000);
 
   it("enables the publish CTA when the selected slate passes existing readiness gates", async () => {
@@ -186,11 +195,13 @@ describe("signals editorial review page", () => {
 
     expect(screen.getAllByText("1 / 7").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Approved Signal").length).toBeGreaterThan(0);
-    expect(
-      screen
-        .getAllByRole("button", { name: /Publish slate/i })
-        .every((button) => !button.hasAttribute("disabled")),
-    ).toBe(true);
+    // The Publish slate button is now dynamic — it surfaces the pending
+    // publish count in its label and remains enabled when at least one
+    // approved candidate is awaiting publish.
+    const publishButtons = screen.getAllByTestId("publish-slate-open");
+    expect(publishButtons.length).toBeGreaterThan(0);
+    expect(publishButtons.every((button) => !button.hasAttribute("disabled"))).toBe(true);
+    expect(publishButtons[0]).toHaveTextContent(/Publish 1 candidate/i);
     expect(screen.getAllByText("Sticky · stays visible on scroll").length).toBeGreaterThan(0);
   }, 10000);
 
