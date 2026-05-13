@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
 
@@ -18,6 +18,7 @@ function installStorage(name: "localStorage" | "sessionStorage") {
 
 describe("MvpMeasurementTracker", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     installStorage("localStorage");
     installStorage("sessionStorage");
     vi.stubGlobal(
@@ -26,7 +27,13 @@ describe("MvpMeasurementTracker", () => {
     );
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("emits a homepage view event with anonymous visitor and session identifiers", async () => {
+    vi.useFakeTimers();
+
     render(
       <MvpMeasurementTracker
         pageView={{
@@ -41,7 +48,13 @@ describe("MvpMeasurementTracker", () => {
       />,
     );
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(fetch).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
     const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     const payload = JSON.parse(String(init?.body));
 
@@ -83,11 +96,10 @@ describe("MvpMeasurementTracker", () => {
       </>,
     );
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("link", { name: "Source" }));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1]!;
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     const payload = JSON.parse(String(init?.body));
 
     expect(payload).toMatchObject({
@@ -102,5 +114,48 @@ describe("MvpMeasurementTracker", () => {
         linkText: "Source",
       },
     });
+  });
+
+  it("emits sanitized category tab open events from instrumented buttons", async () => {
+    render(
+      <>
+        <MvpMeasurementTracker
+          pageView={{
+            eventName: "homepage_view",
+            route: "/",
+            surface: "home",
+            briefingDate: "2026-05-01",
+          }}
+        />
+        <button
+          type="button"
+          data-mvp-measurement-event="category_tab_open"
+          data-mvp-route="/?secret=value"
+          data-mvp-surface="home_category_tab"
+          data-mvp-category="finance"
+        >
+          Finance
+        </button>
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Finance" }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const payload = JSON.parse(String(init?.body));
+
+    expect(payload).toMatchObject({
+      eventName: "category_tab_open",
+      route: "/",
+      surface: "home_category_tab",
+      briefingDate: "2026-05-01",
+      metadata: {
+        categoryKey: "finance",
+        linkText: "Finance",
+      },
+    });
+    expect(payload.signalPostId).toBeNull();
+    expect(payload.signalRank).toBeNull();
   });
 });

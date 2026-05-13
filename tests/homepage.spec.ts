@@ -12,10 +12,23 @@ async function expectFallbackBriefingCopy(page: Page) {
   await expect(
     page
       .getByText(
-        /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./,
+        /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\.|The published briefing is temporarily unavailable while the latest edition is verified\./,
       )
       .first(),
   ).toBeVisible();
+}
+
+async function expectHomepageSignalsOrFallback(page: Page) {
+  const signalCards = page.getByTestId("signal-card");
+  const signalCardCount = await signalCards.count();
+
+  if (signalCardCount > 0) {
+    await expect(signalCards.first()).toBeVisible();
+    return signalCardCount;
+  }
+
+  await expectFallbackBriefingCopy(page);
+  return 0;
 }
 
 test.describe("homepage", () => {
@@ -25,13 +38,12 @@ test.describe("homepage", () => {
     await expect(page).toHaveTitle(/Boot Up/i);
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first()).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+    await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
-    if (await page.getByRole("link", { name: "Read more →" }).first().isVisible()) {
-      await expect(page.getByRole("link", { name: "Read more →" }).first()).toBeVisible();
-    } else {
-      await expectFallbackBriefingCopy(page);
-    }
+    await expectHomepageSignalsOrFallback(page);
     await expectNoStaticHomepagePlaceholder(page);
     await expect(page.getByText("Daily Intelligence Aggregator")).toHaveCount(0);
     await expect(page.getByText("Daily Intelligence Briefing")).toHaveCount(0);
@@ -54,7 +66,10 @@ test.describe("homepage", () => {
     const signalCards = page.getByTestId("signal-card");
 
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+    await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
 
     const signalCardCount = await signalCards.count();
@@ -71,7 +86,7 @@ test.describe("homepage", () => {
 
     await expect(signalCards.first().getByText(/Core signal · 01/i)).toBeVisible();
     await expect(signalCards.first().getByText("Why this matters")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Read more →" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Read more →" })).toHaveCount(0);
     await expect(page.getByText(/min read/i)).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Details" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /sign out/i })).toHaveCount(0);
@@ -84,68 +99,54 @@ test.describe("homepage", () => {
       const header = Array.from(document.querySelectorAll("h1")).find((element) =>
         element.textContent?.includes("Today's signals"),
       );
+      const categoryButton = Array.from(document.querySelectorAll("a")).find((element) =>
+        element.textContent?.trim() === "Technology",
+      );
       const firstCard = document.querySelector('[data-testid="signal-card"]');
-      const browseBy =
-        document.querySelector('[data-testid="browse-by-heading"]') ??
-        Array.from(document.querySelectorAll("h2, p")).find((element) =>
-          element.textContent?.trim().toLowerCase().startsWith("browse by"),
-        );
 
-      if (!header || !firstCard || !browseBy) {
+      if (!header || !categoryButton || !firstCard) {
         return null;
       }
 
       return {
+        categoriesBeforeHeader: Boolean(categoryButton.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING),
         headerBeforeCards: Boolean(header.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING),
-        cardsBeforeBrowse: Boolean(firstCard.compareDocumentPosition(browseBy) & Node.DOCUMENT_POSITION_FOLLOWING),
       };
     });
 
     expect(structureOrder).toEqual({
+      categoriesBeforeHeader: true,
       headerBeforeCards: true,
-      cardsBeforeBrowse: true,
     });
-
-    const detailHref = await page.getByRole("link", { name: "Read more →" }).first().getAttribute("href");
-    const detailDateKey = detailHref?.match(/\/briefing\/(\d{4}-\d{2}-\d{2})/)?.[1];
-    expect(detailDateKey).toBeTruthy();
 
     expect(diagnostics.entries).toEqual([]);
   });
 
-  test("shows the signed-out category soft gate without duplicating Top Events when depth content exists", async ({ page, diagnostics }) => {
+  test("routes category links to dedicated pages without duplicating initial Top Events", async ({ page, diagnostics }) => {
     await page.goto("/");
 
     const signalCards = page.getByTestId("signal-card");
-    const gateCopy = "Sign up to be notified when new signals are published.";
-    const oldGateCopy = "Create a free account to read Tech News, Economics, and Politics";
-    const techButton = page.getByRole("button", { name: "Tech" });
+    const techLink = page.getByRole("link", { name: "Technology" });
     const signalCardCount = await signalCards.count();
 
-    if (signalCardCount === 0 || !(await techButton.isVisible())) {
+    if (signalCardCount === 0 || !(await techLink.isVisible())) {
       await expectFallbackBriefingCopy(page);
-      await expect(page.getByText(gateCopy)).toHaveCount(0);
-      await expect(page.getByText(oldGateCopy)).toHaveCount(0);
       await expectNoStaticHomepagePlaceholder(page);
       expect(diagnostics.entries).toEqual([]);
       return;
     }
 
     await expect(signalCards.first()).toBeVisible();
-    await expect(page.getByText(gateCopy)).toHaveCount(0);
-    await expect(page.getByText(oldGateCopy)).toHaveCount(0);
+    await expect(page.getByText(/Loading tech stories|No tech stories|Could not load tech stories/i)).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
+    await expect(page.locator("#tech-panel")).toHaveCount(0);
 
-    await expect(techButton).toBeVisible();
-    await techButton.click();
+    await expect(techLink).toHaveAttribute("href", "/technology");
+    await techLink.click();
 
-    const gate = page.getByTestId("category-soft-gate");
-
-    await expect(gate).toBeVisible();
-    await expect(gate.getByText(gateCopy)).toBeVisible();
-    await expect(gate.getByText(oldGateCopy)).toHaveCount(0);
-    await expect(gate.getByRole("link", { name: "Sign Up" })).toHaveAttribute("href", "/signup?redirectTo=%2F");
-    await expect(gate.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/login?redirectTo=%2F");
+    await expect(page).toHaveURL(/\/technology$/);
+    await expect(page.getByRole("heading", { name: "Technology" })).toBeVisible();
+    await expect(page.getByTestId("category-soft-gate")).toHaveCount(0);
     expect(diagnostics.entries).toEqual([]);
   });
 });

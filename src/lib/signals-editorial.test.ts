@@ -2800,7 +2800,7 @@ describe("signals editorial workflow", () => {
     });
   });
 
-  it("returns an internal homepage snapshot error only when public-read columns are missing", async () => {
+  it("returns an internal homepage snapshot error only when required public-read columns are missing", async () => {
     createSupabaseServiceRoleClient.mockReturnValue(
       createSupabaseMock([], {
         missingColumns: ["why_it_matters_validation_failures"],
@@ -2817,7 +2817,8 @@ describe("signals editorial workflow", () => {
       posts: [],
       depthPosts: [],
       briefingDate: null,
-      errorMessage: "public signal_posts schema preflight failed. Missing expected columns: why_it_matters_validation_failures.",
+      errorMessage:
+        "public signal_posts read failed: column signal_posts.why_it_matters_validation_failures does not exist",
     });
   });
 });

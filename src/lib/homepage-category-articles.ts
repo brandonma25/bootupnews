@@ -10,7 +10,7 @@ import type {
   HomepageCategoryArticleMap,
 } from "@/lib/types";
 
-const HOMEPAGE_CATEGORY_ARTICLE_LIMIT = 50;
+export const HOMEPAGE_CATEGORY_ARTICLE_LIMIT = 12;
 const HOMEPAGE_CATEGORY_ARTICLE_QUERY_LIMIT = 1000;
 const LATEST_CRON_RUN_COUNT = 2;
 

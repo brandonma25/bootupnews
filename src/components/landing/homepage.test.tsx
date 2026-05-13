@@ -211,7 +211,7 @@ describe("LandingHomepage", () => {
     expect(screen.queryByText("Raw briefing item should not render directly")).not.toBeInTheDocument();
   });
 
-  it("renders the date badge and demoted Browse by category strip below the ranked cards", () => {
+  it("renders the date badge, ranked cards, and demoted category navigation", () => {
     const data = createData([
       createItem({
         id: "tech-1",
@@ -240,19 +240,48 @@ describe("LandingHomepage", () => {
     expect(screen.getByText(/April 15, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Today's signals")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Top Events" })).not.toBeInTheDocument();
-    // Browse-by category strip now uses a prominent heading rather than a
-    // micro-caps label. Match via the testid so the assertion survives
-    // future copy tweaks.
-    expect(screen.getByTestId("browse-by-heading")).toHaveTextContent(/browse by/i);
-    expect(screen.getByRole("button", { name: "Tech" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Finance" })).toBeInTheDocument();
+    expect(screen.getByText("BROWSE BY")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
+    expect(screen.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+    expect(screen.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
 
-    fireEvent.click(screen.getByRole("button", { name: "Finance" }));
+    expect(document.getElementById("finance-panel")).toBeNull();
 
-    const financePanel = document.getElementById("finance-panel");
-    expect(financePanel).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Finance" })).toHaveAttribute("aria-current", "page");
-    expect(financePanel).not.toHaveTextContent("Tech signal");
+    const techLink = screen.getByRole("link", { name: "Technology" });
+    const header = screen.getByRole("heading", { name: "Today's signals" });
+    const firstSignal = screen.getByText("Tech signal");
+    expect(Boolean(techLink.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(header.compareDocumentPosition(firstSignal) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  });
+
+  it("keeps category rows off the homepage and routes category links to dedicated pages", () => {
+    const data = createData(
+      [
+        createItem({
+          id: "finance-1",
+          title: "Finance signal should stay out of initial tab HTML",
+          topicId: "finance",
+          topicName: "Finance",
+          homepageClassification: {
+            primaryCategory: "finance",
+            secondaryCategories: [],
+            confidence: 0.95,
+            scores: { tech: 0, finance: 12, politics: 0 },
+            matchedSignals: { tech: [], finance: ["rates"], politics: [] },
+          },
+        }),
+      ],
+      {
+        publicRankedItems: [],
+      },
+    );
+
+    renderHomepage(data);
+
+    expect(screen.queryByRole("link", { name: /Fed rate debate resets expectations/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Finance signal should stay out of initial tab HTML")).toBeInTheDocument();
+    expect(document.getElementById("finance-panel")).toBeNull();
+    expect(screen.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
   });
 
   it("renders freshness and empty states without placeholder copy", () => {

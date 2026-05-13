@@ -78,6 +78,7 @@ function SidebarPanel({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 className={cn(
                   "flex items-center rounded-none border-l-[3px] py-[var(--bu-space-2)] pr-[var(--bu-space-3)] text-[var(--bu-size-ui)] transition-colors",
                   active
@@ -97,6 +98,7 @@ function SidebarPanel({
         {isAdmin ? (
           <Link
             href="/dashboard/signals/editorial-review"
+            prefetch={false}
             className="block text-[var(--bu-size-meta)] font-medium leading-5 text-[var(--bu-text-tertiary)] transition-colors hover:text-[var(--bu-accent)]"
           >
             Editorial Review
@@ -106,7 +108,7 @@ function SidebarPanel({
         <div className="rounded-[var(--bu-radius-lg)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)] p-4">
           {account ? (
           <div className="space-y-3">
-            <Link href="/account" className="flex items-center gap-3">
+            <Link href="/account" prefetch={false} className="flex items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-button bg-[var(--bu-text-primary)] text-sm font-medium text-white">
                 {account.initials}
               </span>
@@ -131,6 +133,7 @@ function SidebarPanel({
             </p>
             <Link
               href={`/login?redirectTo=${encodeURIComponent(currentPath || "/")}`}
+              prefetch={false}
               className="mt-3 inline-flex text-[var(--bu-size-ui)] font-medium text-[var(--bu-text-secondary)] transition-colors hover:text-[var(--bu-accent)]"
             >
               Sign in
@@ -157,6 +160,7 @@ function MobileBottomTabs({ currentPath }: { currentPath: string }) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex min-h-12 flex-col items-center justify-center rounded-button px-2 py-1 text-[var(--bu-size-meta)] transition-colors",

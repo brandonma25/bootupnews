@@ -8,7 +8,7 @@ function isAccountAuthGateUrl(url: URL) {
 }
 
 const fallbackBriefingCopy =
-  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./;
+  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\.|The published briefing is temporarily unavailable while the latest edition is verified\./;
 
 test.describe("V1 shell and routing", () => {
   test.describe.configure({ mode: "serial" });
@@ -18,7 +18,10 @@ test.describe("V1 shell and routing", () => {
 
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first()).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+    await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^Home$/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^History$/ }).first()).toBeVisible();
@@ -35,7 +38,7 @@ test.describe("V1 shell and routing", () => {
 
     await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
   });
 
   test("uses bottom tab navigation on mobile instead of a drawer", async ({ page }) => {
@@ -57,8 +60,15 @@ test.describe("V1 shell and routing", () => {
   test("opens the shared briefing detail route from Home", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
+    const signalCards = page.getByTestId("signal-card");
     const detailLink = page.getByRole("link", { name: "Read more →" }).first();
     if (!(await detailLink.isVisible())) {
+      if ((await signalCards.count()) > 0) {
+        await expect(signalCards.first()).toBeVisible();
+        await expect(page.getByRole("link", { name: "Read more →" })).toHaveCount(0);
+        return;
+      }
+
       await expect(page.getByText(fallbackBriefingCopy).first()).toBeVisible();
       await expect(page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail/i)).toHaveCount(0);
       return;

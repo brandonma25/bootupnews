@@ -42,16 +42,35 @@ export default async function Page({ searchParams }: PageProps) {
   const authState = readSingleParam(resolvedSearchParams?.auth);
   const debugParam = readSingleParam(resolvedSearchParams?.debug);
   const debugEnabled = isHomepageDebugConfigured || /^(1|true|yes|on)$/i.test(debugParam ?? "");
-  const homepageViewModel = buildHomepageViewModel(data);
+  const homepageViewModel = buildHomepageViewModel(data, null, { includeCategoryTabEvents: false });
+  const homepageClientViewModel = {
+    ...homepageViewModel,
+    developingNowEvents: [],
+    categoryPreviewEvents: {
+      tech: [],
+      finance: [],
+      politics: [],
+    },
+    trending: [],
+    earlySignals: [],
+  };
+  const homepageClientData = {
+    mode: data.mode,
+    briefing: {
+      briefingDate: data.briefing.briefingDate,
+    },
+    homepageFreshnessNotice: data.homepageFreshnessNotice,
+    publicRankedSignalCount: data.publicRankedItems?.length ?? homepageViewModel.debug.rankedEventsCount,
+  };
 
   return (
     <LandingHomepage
-      data={data}
+      data={homepageClientData}
       viewer={pageState.viewer}
       isAdmin={isAdminUser({ email: pageState.viewer?.email ?? undefined })}
       authState={authState}
       debugEnabled={debugEnabled}
-      homepageViewModel={homepageViewModel}
+      homepageViewModel={homepageClientViewModel}
     />
   );
 }
