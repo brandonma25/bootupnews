@@ -12,7 +12,7 @@ async function expectFallbackBriefingCopy(page: Page) {
   await expect(
     page
       .getByText(
-        /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./,
+        /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\.|The published briefing is temporarily unavailable while the latest edition is verified\./,
       )
       .first(),
   ).toBeVisible();

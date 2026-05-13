@@ -8,7 +8,7 @@ function isAccountAuthGateUrl(url: URL) {
 }
 
 const fallbackBriefingCopy =
-  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./;
+  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\.|The published briefing is temporarily unavailable while the latest edition is verified\./;
 
 test.describe("V1 shell and routing", () => {
   test.describe.configure({ mode: "serial" });

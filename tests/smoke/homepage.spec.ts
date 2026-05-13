@@ -1,7 +1,7 @@
 import { expect, test } from "../utils/audit-fixture";
 
 const fallbackBriefingCopy =
-  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\./;
+  /Showing the most recently published briefing\.|The latest briefing is not yet available\. Please check back soon\.|The published briefing is temporarily unavailable while the latest edition is verified\./;
 
 test.describe("homepage smoke", () => {
   test("loads the public V1 homepage and respects the current fallback state", async ({ page }) => {
