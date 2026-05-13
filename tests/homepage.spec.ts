@@ -25,8 +25,8 @@ test.describe("homepage", () => {
     await expect(page).toHaveTitle(/Boot Up/i);
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first()).toBeVisible();
-    await expect(page.getByText("Browse by")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
     await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
     await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
@@ -57,8 +57,8 @@ test.describe("homepage", () => {
     const signalCards = page.getByTestId("signal-card");
 
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-    await expect(page.getByText("Browse by")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
     await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
     await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
@@ -91,7 +91,7 @@ test.describe("homepage", () => {
         element.textContent?.includes("Today's signals"),
       );
       const categoryButton = Array.from(document.querySelectorAll("a")).find((element) =>
-        element.textContent?.trim() === "Tech",
+        element.textContent?.trim() === "Technology",
       );
       const firstCard = document.querySelector('[data-testid="signal-card"]');
 
@@ -100,14 +100,14 @@ test.describe("homepage", () => {
       }
 
       return {
-        headerBeforeCategories: Boolean(header.compareDocumentPosition(categoryButton) & Node.DOCUMENT_POSITION_FOLLOWING),
-        categoriesBeforeCards: Boolean(categoryButton.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING),
+        headerBeforeCards: Boolean(header.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING),
+        cardsBeforeCategories: Boolean(firstCard.compareDocumentPosition(categoryButton) & Node.DOCUMENT_POSITION_FOLLOWING),
       };
     });
 
     expect(structureOrder).toEqual({
-      headerBeforeCategories: true,
-      categoriesBeforeCards: true,
+      headerBeforeCards: true,
+      cardsBeforeCategories: true,
     });
 
     const detailHref = await page.getByRole("link", { name: "Read more →" }).first().getAttribute("href");
@@ -121,7 +121,7 @@ test.describe("homepage", () => {
     await page.goto("/");
 
     const signalCards = page.getByTestId("signal-card");
-    const techLink = page.getByRole("link", { name: "Tech" });
+    const techLink = page.getByRole("link", { name: "Technology" });
     const signalCardCount = await signalCards.count();
 
     if (signalCardCount === 0 || !(await techLink.isVisible())) {
@@ -140,7 +140,7 @@ test.describe("homepage", () => {
     await techLink.click();
 
     await expect(page).toHaveURL(/\/technology$/);
-    await expect(page.getByRole("heading", { name: "Tech" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Technology" })).toBeVisible();
     await expect(page.getByTestId("category-soft-gate")).toHaveCount(0);
     expect(diagnostics.entries).toEqual([]);
   });

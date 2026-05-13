@@ -7,13 +7,13 @@ This record covers the production load-time remediation for the public homepage.
 ## Changes Under Test
 
 - Homepage SSR no longer loads category Article rows.
-- Tech, Finance, and Politics controls link to dedicated category pages; category Articles are not fetched or expanded on the homepage.
+- Technology, Finance, and Politics controls link to dedicated category pages; category Articles are not fetched or expanded on the homepage.
 - Category Article rows come from the latest two cron-backed `pipeline_article_candidates` runs, exclude likely paywalled sources, exclude current Signal Card URL/title duplicates, and cap at 12 per category.
 - Supabase MVP measurement and PostHog forwarding remain enabled; category tab opens use the sanitized `category_tab_open` event.
 - Production route-probe defaults now use current Boot Up homepage markers so route verification can reach the performance gate.
 - Production verification now includes `npm run release:performance` with 3000 ms hard fails for LCP and network idle, plus a 2000 ms visible-content target.
 - App-shell navigation disables eager prefetch for Home, History, Account, Login, and editorial/admin entry links so the signed-out homepage does not spend its first seconds fetching routes the reader has not requested.
-- The visible "Browse by category" heading has been removed; Tech, Finance, and Politics links render above the Signal Card list and route to `/technology`, `/economics`, and `/politics`.
+- The visible `BROWSE BY` label is restored; Technology, Finance, and Politics links render below the Signal Card list and route to `/technology`, `/economics`, and `/politics`.
 - Automatic page-view analytics and PostHog initialization remain enabled but defer briefly after mount; user-intent events such as source clicks and category tab opens still track immediately.
 
 ## Validation Plan
@@ -35,7 +35,7 @@ This record covers the production load-time remediation for the public homepage.
 - `python3 scripts/release-governance-gate.py`: passed.
 - `npm run release:production -- --base-url https://bootupnews.vercel.app`: passed route probe for current production.
 - `npm run release:performance -- --base-url https://bootupnews.vercel.app`: failed against current production before this PR is deployed, with LCP 19756 ms, FCP 4080 ms, decompressed homepage HTML 827.3 KB, script bytes 1.75 MB, and 45 route requests.
-- Local browser QA on `http://127.0.0.1:3000/`: passed. The homepage rendered category links without an initial category panel; opening Tech routed to the dedicated category page and no browser console errors were observed.
+- Local browser QA on `http://127.0.0.1:3000/`: passed. The homepage rendered category links without an initial category panel; opening Technology routed to the dedicated category page and no browser console errors were observed.
 
 ## Notes
 

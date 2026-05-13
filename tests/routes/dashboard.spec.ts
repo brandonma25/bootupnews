@@ -12,8 +12,8 @@ test.describe("dashboard route", () => {
     await expectNoAppCrash(page);
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-    await expect(page.getByText("Browse by")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
     await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
     await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
 
@@ -22,7 +22,7 @@ test.describe("dashboard route", () => {
   });
 
   for (const { path, heading } of [
-    { path: "/technology", heading: "Tech" },
+    { path: "/technology", heading: "Technology" },
     { path: "/economics", heading: "Finance" },
     { path: "/politics", heading: "Politics" },
   ]) {
@@ -32,8 +32,8 @@ test.describe("dashboard route", () => {
       await expectNoAppCrash(page);
       await expect(page).toHaveURL(new RegExp(`${path}$`));
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
-      await expect(page.getByText("Browse by")).toHaveCount(0);
-      await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+      await expect(page.getByText("BROWSE BY")).toBeVisible();
+      await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
       await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
       await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
 

@@ -211,7 +211,7 @@ describe("LandingHomepage", () => {
     expect(screen.queryByText("Raw briefing item should not render directly")).not.toBeInTheDocument();
   });
 
-  it("renders the date badge and category tab strip above the ranked cards", () => {
+  it("renders the date badge, ranked cards, and demoted category navigation", () => {
     const data = createData([
       createItem({
         id: "tech-1",
@@ -240,16 +240,16 @@ describe("LandingHomepage", () => {
     expect(screen.getByText(/April 15, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Today's signals")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Top Events" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/browse by category/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    expect(screen.getByText("BROWSE BY")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
     expect(screen.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
     expect(screen.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
 
     expect(document.getElementById("finance-panel")).toBeNull();
 
-    const techButton = screen.getByRole("link", { name: "Tech" });
+    const techLink = screen.getByRole("link", { name: "Technology" });
     const firstSignal = screen.getByText("Tech signal");
-    expect(Boolean(techButton.compareDocumentPosition(firstSignal) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(firstSignal.compareDocumentPosition(techLink) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
   });
 
   it("keeps category rows off the homepage and routes category links to dedicated pages", () => {

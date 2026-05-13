@@ -11,7 +11,8 @@ export const DEFAULT_ROUTE_EXPECTATIONS = [
     expected: [
       "Boot Up",
       "Today's signals",
-      "Tech",
+      "BROWSE BY",
+      "Technology",
       "Finance",
       "Politics",
     ],

@@ -1,11 +1,11 @@
 import { AppShell } from "@/components/app-shell";
 import { CategoryArticleRow } from "@/components/home/CategoryArticleRow";
 import { CategoryNavigation } from "@/components/home/CategoryNavigation";
+import { getCategoryNavigationLabel } from "@/components/home/category-navigation-labels";
 import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
 import { Panel } from "@/components/ui/panel";
 import {
   getHomepageCategoryDescription,
-  getHomepageCategoryLabel,
   type HomepageCategoryKey,
 } from "@/lib/homepage-taxonomy";
 import type { HomepageCategoryArticle, ViewerAccount } from "@/lib/types";
@@ -23,7 +23,7 @@ export function CategoryPage({
   isAdmin?: boolean;
   currentPath: string;
 }) {
-  const label = getHomepageCategoryLabel(category);
+  const label = getCategoryNavigationLabel(category);
   const description = getHomepageCategoryDescription(category);
 
   return (

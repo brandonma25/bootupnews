@@ -10,8 +10,8 @@ test.describe("homepage smoke", () => {
     await expect(page.getByText("Boot Up").first()).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first())
       .toBeVisible();
-    await expect(page.getByText("Browse by")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByText("BROWSE BY")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Technology" })).toHaveAttribute("href", "/technology");
     await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
     await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);

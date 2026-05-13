@@ -83,10 +83,6 @@ export default function LandingHomepage({
           </Panel>
         ) : null}
 
-        <div className="mb-[var(--bu-space-5)]">
-          <CategoryNavigation />
-        </div>
-
         <header className="mb-[var(--bu-space-6)] flex items-baseline justify-between gap-4">
           <DateBadge date={parseBriefingDate(data.briefing.briefingDate)} />
           <h1 className="text-[var(--bu-size-meta)] font-medium uppercase tracking-[0.08em] text-[var(--bu-text-tertiary)]">
@@ -126,6 +122,8 @@ export default function LandingHomepage({
         ) : (
           <StatusPanel title={topEventsEmptyMessage.title} body={topEventsEmptyMessage.body} />
         )}
+
+        <CategoryNavigation className="mt-[var(--bu-space-6)]" />
 
         {debugEnabled ? (
           <Panel className="mt-[var(--bu-space-5)] p-5">
