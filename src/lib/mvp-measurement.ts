@@ -1,5 +1,6 @@
 export const MVP_MEASUREMENT_EVENT_NAMES = [
   "homepage_view",
+  "category_page_view",
   "signals_page_view",
   "signal_card_expand",
   "signal_full_expansion",

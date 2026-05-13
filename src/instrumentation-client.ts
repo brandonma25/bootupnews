@@ -41,6 +41,8 @@ if (dsn) {
   });
 }
 
-initializePostHogClient();
+window.setTimeout(() => {
+  initializePostHogClient();
+}, 3000);
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

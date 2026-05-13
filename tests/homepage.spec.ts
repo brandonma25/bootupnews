@@ -26,9 +26,9 @@ test.describe("homepage", () => {
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first()).toBeVisible();
     await expect(page.getByText("Browse by")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+    await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
     if (await page.getByRole("link", { name: "Read more →" }).first().isVisible()) {
       await expect(page.getByRole("link", { name: "Read more →" }).first()).toBeVisible();
@@ -58,9 +58,9 @@ test.describe("homepage", () => {
 
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("Browse by")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+    await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
 
     const signalCardCount = await signalCards.count();
@@ -90,7 +90,7 @@ test.describe("homepage", () => {
       const header = Array.from(document.querySelectorAll("h1")).find((element) =>
         element.textContent?.includes("Today's signals"),
       );
-      const categoryButton = Array.from(document.querySelectorAll("button")).find((element) =>
+      const categoryButton = Array.from(document.querySelectorAll("a")).find((element) =>
         element.textContent?.trim() === "Tech",
       );
       const firstCard = document.querySelector('[data-testid="signal-card"]');
@@ -117,14 +117,14 @@ test.describe("homepage", () => {
     expect(diagnostics.entries).toEqual([]);
   });
 
-  test("loads category tabs progressively without duplicating initial Top Events", async ({ page, diagnostics }) => {
+  test("routes category links to dedicated pages without duplicating initial Top Events", async ({ page, diagnostics }) => {
     await page.goto("/");
 
     const signalCards = page.getByTestId("signal-card");
-    const techButton = page.getByRole("button", { name: "Tech" });
+    const techLink = page.getByRole("link", { name: "Tech" });
     const signalCardCount = await signalCards.count();
 
-    if (signalCardCount === 0 || !(await techButton.isVisible())) {
+    if (signalCardCount === 0 || !(await techLink.isVisible())) {
       await expectFallbackBriefingCopy(page);
       await expectNoStaticHomepagePlaceholder(page);
       expect(diagnostics.entries).toEqual([]);
@@ -134,14 +134,13 @@ test.describe("homepage", () => {
     await expect(signalCards.first()).toBeVisible();
     await expect(page.getByText(/Loading tech stories|No tech stories|Could not load tech stories/i)).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
+    await expect(page.locator("#tech-panel")).toHaveCount(0);
 
-    await expect(techButton).toBeVisible();
-    await techButton.click();
+    await expect(techLink).toHaveAttribute("href", "/technology");
+    await techLink.click();
 
-    await expect(page.locator("#tech-panel")).toBeVisible();
-    await expect(
-      page.locator("#tech-panel").getByText(/Loading tech stories|No tech stories|Could not load tech stories/i),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/technology$/);
+    await expect(page.getByRole("heading", { name: "Tech" })).toBeVisible();
     await expect(page.getByTestId("category-soft-gate")).toHaveCount(0);
     expect(diagnostics.entries).toEqual([]);
   });

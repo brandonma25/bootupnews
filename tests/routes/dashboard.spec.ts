@@ -13,25 +13,29 @@ test.describe("dashboard route", () => {
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("Browse by")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+    await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+    await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
 
     await expectNamedVisibleButtons(page);
     await expectSafeInternalLinks(page);
   });
 
-  for (const path of ["/technology", "/economics", "/politics"]) {
-    test(`${path} redirects to Home so category browsing stays in homepage tabs`, async ({ page }) => {
+  for (const { path, heading } of [
+    { path: "/technology", heading: "Tech" },
+    { path: "/economics", heading: "Finance" },
+    { path: "/politics", heading: "Politics" },
+  ]) {
+    test(`${path} renders a dedicated category page`, async ({ page }) => {
       await page.goto(path);
 
       await expectNoAppCrash(page);
-      await expect(page).toHaveURL(/\/$/);
-      await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
       await expect(page.getByText("Browse by")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Tech" })).toHaveAttribute("href", "/technology");
+      await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
+      await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
 
       await expectNamedVisibleButtons(page);
       await expectSafeInternalLinks(page);

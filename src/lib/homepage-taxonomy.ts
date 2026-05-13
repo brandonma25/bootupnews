@@ -24,6 +24,11 @@ export type HomepageCategoryClassification = {
 };
 
 export const HOMEPAGE_CATEGORY_TARGET = 3;
+const HOMEPAGE_CATEGORY_PATHS: Record<HomepageCategoryKey, string> = {
+  tech: "/technology",
+  finance: "/economics",
+  politics: "/politics",
+};
 
 export const HOMEPAGE_CATEGORY_CONFIG: CategoryConfig[] = [
   {
@@ -142,6 +147,10 @@ export function getHomepageCategoryLabel(categoryKey: HomepageCategoryKey) {
 
 export function getHomepageCategoryDescription(categoryKey: HomepageCategoryKey) {
   return CATEGORY_BY_KEY[categoryKey].description;
+}
+
+export function getHomepageCategoryPath(categoryKey: HomepageCategoryKey) {
+  return HOMEPAGE_CATEGORY_PATHS[categoryKey];
 }
 
 export function classifyHomepageCategory(input: ClassificationInput): HomepageCategoryClassification {
