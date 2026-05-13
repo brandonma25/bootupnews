@@ -188,6 +188,12 @@ describe("Boot Up visual system components", () => {
     );
 
     expect(screen.getByText("Core signal · 01")).toHaveClass("text-[var(--bu-text-tertiary)]");
-    expect(screen.getByRole("link", { name: "Read more →" })).toHaveClass("hover:text-[var(--bu-text-primary)]");
+    // The source attribution itself is now the article link — visible on
+    // the card face without needing to expand or follow a separate Read
+    // more → affordance.
+    const sourceLink = screen.getByTestId("signal-card-source-link");
+    expect(sourceLink).toHaveAttribute("href", "https://www.reuters.com/story");
+    expect(sourceLink).toHaveAttribute("target", "_blank");
+    expect(sourceLink).toHaveTextContent("Reuters");
   });
 });

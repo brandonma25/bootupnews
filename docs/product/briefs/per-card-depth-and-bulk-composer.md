@@ -6,7 +6,7 @@
 
 ## Change Type
 - Remediation / Alignment (per `docs/engineering/templates/llm-prompt-template-change-classification.md`).
-- No new canonical PRD is required. This brief is the supporting governance artifact; the source of truth is PR #229 (visual system v1) plus `DECISIONS.md` D04, D05, and D06.
+- Canonical PRD required: `no`. This brief is the supporting governance artifact; the source of truth is PR #229 (visual system v1) plus `DECISIONS.md` D04, D05, and D06. The audit/remediation lineage is the visual-system-v1 implementation itself, which this work aligns the homepage Signal Card surface and the editorial composer back to.
 
 ## Source of Truth
 - PR #229 — visual system v1 implementation that introduced the four-layer depth structure on `SignalCard` and the `/briefing/[date]` aggregate page.

@@ -85,9 +85,11 @@ test.describe("homepage", () => {
         element.textContent?.includes("Today's signals"),
       );
       const firstCard = document.querySelector('[data-testid="signal-card"]');
-      const browseBy = Array.from(document.querySelectorAll("p")).find((element) =>
-        element.textContent?.trim() === "Browse by",
-      );
+      const browseBy =
+        document.querySelector('[data-testid="browse-by-heading"]') ??
+        Array.from(document.querySelectorAll("h2, p")).find((element) =>
+          element.textContent?.trim().toLowerCase().startsWith("browse by"),
+        );
 
       if (!header || !firstCard || !browseBy) {
         return null;

@@ -39,7 +39,6 @@ export default function LandingHomepage({
   const { featured, topRanked, categorySections, debug } = homepageViewModel;
   const topEvents = dedupeEvents([featured, ...topRanked]).slice(0, 5);
   const briefingDateKey = getBriefingDateKey(data.briefing.briefingDate);
-  const detailHref = `/briefing/${briefingDateKey}`;
   const noDataMessage = buildOverallNoDataMessage(topEvents.length);
   const topEventsEmptyMessage =
     data.homepageFreshnessNotice?.kind === "empty"
@@ -134,7 +133,6 @@ export default function LandingHomepage({
                 compact
                 rank={index + 1}
                 tier={event.signalRole === "context" ? "context" : "core"}
-                readMoreHref={detailHref}
               />
             )}
             renderCategoryArticle={(article) => <CategoryArticleRow article={article} />}

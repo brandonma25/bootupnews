@@ -144,9 +144,22 @@ export function SignalCard({
       ) : null}
 
       <footer className="mt-4 flex items-center justify-between gap-4 border-t border-[var(--bu-border-subtle)] pt-3">
-        <p className="min-w-0 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)]">
-          {sourceAttribution}
-        </p>
+        {signal.sourceUrl ? (
+          <a
+            href={signal.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-w-0 items-center gap-1 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)] transition-colors hover:text-[var(--bu-accent)]"
+            data-testid="signal-card-source-link"
+          >
+            <span className="truncate">{sourceAttribution}</span>
+            <ExternalLink aria-hidden="true" className="h-3 w-3 shrink-0" />
+          </a>
+        ) : (
+          <p className="min-w-0 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)]">
+            {sourceAttribution}
+          </p>
+        )}
         {interactive ? (
           <button
             type="button"
@@ -173,16 +186,6 @@ export function SignalCard({
           >
             Read more →
           </Link>
-        ) : signal.sourceUrl ? (
-          <a
-            href={signal.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={readMoreClassName}
-            {...trackingAttributes}
-          >
-            Read more →
-          </a>
         ) : null}
       </footer>
 

@@ -235,7 +235,10 @@ describe("LandingHomepage", () => {
     expect(screen.getByText(/April 15, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Today's signals")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Top Events" })).not.toBeInTheDocument();
-    expect(screen.getByText("Browse by")).toBeInTheDocument();
+    // Browse-by category strip now uses a prominent heading rather than a
+    // micro-caps label. Match via the testid so the assertion survives
+    // future copy tweaks.
+    expect(screen.getByTestId("browse-by-heading")).toHaveTextContent(/browse by/i);
     expect(screen.getByRole("button", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Finance" })).toBeInTheDocument();
 
