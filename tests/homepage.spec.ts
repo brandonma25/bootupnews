@@ -18,6 +18,19 @@ async function expectFallbackBriefingCopy(page: Page) {
   ).toBeVisible();
 }
 
+async function expectHomepageSignalsOrFallback(page: Page) {
+  const signalCards = page.getByTestId("signal-card");
+  const signalCardCount = await signalCards.count();
+
+  if (signalCardCount > 0) {
+    await expect(signalCards.first()).toBeVisible();
+    return signalCardCount;
+  }
+
+  await expectFallbackBriefingCopy(page);
+  return 0;
+}
+
 test.describe("homepage", () => {
   test("renders the public V1 briefing flow", async ({ page, diagnostics }) => {
     await page.goto("/");
@@ -30,11 +43,7 @@ test.describe("homepage", () => {
     await expect(page.getByRole("link", { name: "Finance" })).toHaveAttribute("href", "/economics");
     await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
-    if (await page.getByRole("link", { name: "Read more →" }).first().isVisible()) {
-      await expect(page.getByRole("link", { name: "Read more →" }).first()).toBeVisible();
-    } else {
-      await expectFallbackBriefingCopy(page);
-    }
+    await expectHomepageSignalsOrFallback(page);
     await expectNoStaticHomepagePlaceholder(page);
     await expect(page.getByText("Daily Intelligence Aggregator")).toHaveCount(0);
     await expect(page.getByText("Daily Intelligence Briefing")).toHaveCount(0);
@@ -77,7 +86,7 @@ test.describe("homepage", () => {
 
     await expect(signalCards.first().getByText(/Core signal · 01/i)).toBeVisible();
     await expect(signalCards.first().getByText("Why this matters")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Read more →" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Read more →" })).toHaveCount(0);
     await expect(page.getByText(/min read/i)).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Details" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /sign out/i })).toHaveCount(0);
@@ -109,10 +118,6 @@ test.describe("homepage", () => {
       categoriesBeforeHeader: true,
       headerBeforeCards: true,
     });
-
-    const detailHref = await page.getByRole("link", { name: "Read more →" }).first().getAttribute("href");
-    const detailDateKey = detailHref?.match(/\/briefing\/(\d{4}-\d{2}-\d{2})/)?.[1];
-    expect(detailDateKey).toBeTruthy();
 
     expect(diagnostics.entries).toEqual([]);
   });

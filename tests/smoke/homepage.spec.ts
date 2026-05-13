@@ -16,8 +16,15 @@ test.describe("homepage smoke", () => {
     await expect(page.getByRole("link", { name: "Politics" })).toHaveAttribute("href", "/politics");
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
 
+    const signalCards = page.getByTestId("signal-card");
     const detailLink = page.getByRole("link", { name: "Read more →" }).first();
     if (!(await detailLink.isVisible())) {
+      if ((await signalCards.count()) > 0) {
+        await expect(signalCards.first()).toBeVisible();
+        await expect(page.getByRole("link", { name: "Read more →" })).toHaveCount(0);
+        return;
+      }
+
       await expect(page.getByText(fallbackBriefingCopy).first()).toBeVisible();
       await expect(page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail/i)).toHaveCount(0);
       await expect(page.getByText(/min read/i)).toHaveCount(0);

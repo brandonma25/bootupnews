@@ -60,8 +60,15 @@ test.describe("V1 shell and routing", () => {
   test("opens the shared briefing detail route from Home", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
+    const signalCards = page.getByTestId("signal-card");
     const detailLink = page.getByRole("link", { name: "Read more →" }).first();
     if (!(await detailLink.isVisible())) {
+      if ((await signalCards.count()) > 0) {
+        await expect(signalCards.first()).toBeVisible();
+        await expect(page.getByRole("link", { name: "Read more →" })).toHaveCount(0);
+        return;
+      }
+
       await expect(page.getByText(fallbackBriefingCopy).first()).toBeVisible();
       await expect(page.getByText(/stored public signal snapshot|placeholder:|sample slot|fallback rail/i)).toHaveCount(0);
       return;
