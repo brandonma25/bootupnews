@@ -99,7 +99,7 @@ export default function LandingHomepage({
                 signal={event}
                 rank={index + 1}
                 tier="core"
-                defaultExpanded={false}
+                defaultExpanded
                 trackingAttributes={{
                   "data-mvp-measurement-event": "signal_details_click",
                   "data-mvp-route": "/",

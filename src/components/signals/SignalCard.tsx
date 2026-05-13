@@ -144,49 +144,55 @@ export function SignalCard({
       ) : null}
 
       <footer className="mt-4 flex items-center justify-between gap-4 border-t border-[var(--bu-border-subtle)] pt-3">
-        {signal.sourceUrl ? (
-          <a
-            href={signal.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-w-0 items-center gap-1 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)] transition-colors hover:text-[var(--bu-accent)]"
-            data-testid="signal-card-source-link"
-          >
-            <span className="truncate">{sourceAttribution}</span>
-            <ExternalLink aria-hidden="true" className="h-3 w-3 shrink-0" />
-          </a>
-        ) : (
-          <p className="min-w-0 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)]">
-            {sourceAttribution}
-          </p>
-        )}
-        {interactive ? (
-          <button
-            type="button"
-            onClick={handleToggle}
-            aria-expanded={isExpanded}
-            className={toggleClassName}
-            data-testid="signal-card-toggle"
-            {...trackingAttributes}
-          >
-            {isExpanded ? "Collapse" : "Expand"}
-            <ChevronDown
-              aria-hidden="true"
-              className={cn(
-                "h-3.5 w-3.5 transition-transform",
-                isExpanded ? "rotate-180" : "rotate-0",
-              )}
-            />
-          </button>
-        ) : readMoreHref ? (
-          <Link
-            href={readMoreHref}
-            className={readMoreClassName}
-            {...trackingAttributes}
-          >
-            Read more →
-          </Link>
-        ) : null}
+        <p className="min-w-0 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)]">
+          {sourceAttribution}
+        </p>
+        <div className="flex shrink-0 items-center gap-3">
+          {signal.sourceUrl ? (
+            // Standalone external-link icon — matches the source-link
+            // affordance used by category tab article rows so the card
+            // face exposes the original article URL at first glance,
+            // not behind the Expand toggle.
+            <a
+              href={signal.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Read source: ${signal.sourceName ?? "open original article"}`}
+              title="Read at source"
+              className="inline-flex items-center text-[var(--bu-text-secondary)] transition-colors hover:text-[var(--bu-accent)]"
+              data-testid="signal-card-source-link"
+            >
+              <ExternalLink aria-hidden="true" className="h-4 w-4" />
+            </a>
+          ) : null}
+          {interactive ? (
+            <button
+              type="button"
+              onClick={handleToggle}
+              aria-expanded={isExpanded}
+              className={toggleClassName}
+              data-testid="signal-card-toggle"
+              {...trackingAttributes}
+            >
+              {isExpanded ? "Collapse" : "Expand"}
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform",
+                  isExpanded ? "rotate-180" : "rotate-0",
+                )}
+              />
+            </button>
+          ) : readMoreHref ? (
+            <Link
+              href={readMoreHref}
+              className={readMoreClassName}
+              {...trackingAttributes}
+            >
+              Read more →
+            </Link>
+          ) : null}
+        </div>
       </footer>
 
       {isExpanded ? (

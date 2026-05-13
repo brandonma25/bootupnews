@@ -137,20 +137,25 @@ describe("LandingHomepage", () => {
     expect(cards).toHaveLength(5);
     expect(within(cards[0]).getByText("Core signal · 01")).toBeInTheDocument();
     expect(within(cards[4]).getByText("Core signal · 05")).toBeInTheDocument();
-    expect(within(cards[0]).getByText("Why this matters")).toBeInTheDocument();
-    expect(within(cards[0]).getByTestId("signal-why-this-matters")).toHaveClass("line-clamp-2");
-    // Per-card inline depth expansion: top events no longer link out to
-    // /briefing/<date>; they expand in place. The Expand toggle replaces
-    // the previous Read more link.
+    // "Why this matters" appears twice when the card is expanded — once
+    // above the toggle as the collapsed-preview label, once below as
+    // the editorial depth-section label. Both are expected on the
+    // homepage now that cards land expanded by default.
+    expect(within(cards[0]).getAllByText("Why this matters").length).toBeGreaterThan(0);
+    // Per-card inline depth expansion: top events expand in place rather
+    // than linking out, and they now land already expanded on the
+    // homepage so the depth is visible at first glance. The footer
+    // toggle is therefore in its Collapse state.
     expect(within(cards[0]).queryByRole("link", { name: "Read more →" })).toBeNull();
-    expect(within(cards[0]).getByTestId("signal-card-toggle")).toHaveAccessibleName(/expand/i);
+    expect(within(cards[0]).getByTestId("signal-card-toggle")).toHaveAccessibleName(/collapse/i);
+    expect(cards[0]).toHaveAttribute("data-signal-expanded", "true");
     expect(within(cards[0]).queryByText(/min read/i)).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Details")).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Tech")).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Point one")).not.toBeInTheDocument();
   });
 
-  it("expands a Signal Card in place when the Expand toggle is clicked", () => {
+  it("renders homepage Signal Cards expanded by default and supports collapse / re-expand in place", () => {
     const data = createData([
       createItem({
         id: "top-1",
@@ -163,21 +168,21 @@ describe("LandingHomepage", () => {
     renderHomepage(data);
 
     const card = screen.getAllByTestId("signal-card")[0];
-    expect(card).toHaveAttribute("data-signal-expanded", "false");
-    expect(within(card).queryByText("What happened")).not.toBeInTheDocument();
-
-    const toggle = within(card).getByTestId("signal-card-toggle");
-    expect(toggle).toHaveAccessibleName(/expand/i);
-
-    fireEvent.click(toggle);
-
     expect(card).toHaveAttribute("data-signal-expanded", "true");
     expect(within(card).getByText("What happened")).toBeInTheDocument();
     expect(within(card).getByText("What led to this")).toBeInTheDocument();
+
+    const toggle = within(card).getByTestId("signal-card-toggle");
     expect(toggle).toHaveAccessibleName(/collapse/i);
 
     fireEvent.click(toggle);
+
     expect(card).toHaveAttribute("data-signal-expanded", "false");
+    expect(within(card).queryByText("What happened")).not.toBeInTheDocument();
+    expect(toggle).toHaveAccessibleName(/expand/i);
+
+    fireEvent.click(toggle);
+    expect(card).toHaveAttribute("data-signal-expanded", "true");
   });
 
   it("uses the supplied homepage model instead of raw briefing items", () => {
