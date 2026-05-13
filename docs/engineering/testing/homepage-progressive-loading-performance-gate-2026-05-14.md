@@ -11,7 +11,8 @@ This record covers the production load-time remediation for the public homepage.
 - Category Article rows come from the latest two cron-backed `pipeline_article_candidates` runs, exclude likely paywalled sources, exclude current Signal Card URL/title duplicates, and cap at 12 per category.
 - Supabase MVP measurement and PostHog forwarding remain enabled; category tab opens use the sanitized `category_tab_open` event.
 - Production route-probe defaults now use current Boot Up homepage markers so route verification can reach the performance gate.
-- Production verification now includes `npm run release:performance` with a 3000 ms LCP hard fail and 2000 ms target.
+- Production verification now includes `npm run release:performance` with 3000 ms hard fails for LCP and network idle, plus a 2000 ms visible-content target.
+- App-shell navigation disables eager prefetch for Home, History, Account, Login, and editorial/admin entry links so the signed-out homepage does not spend its first seconds fetching routes the reader has not requested.
 
 ## Validation Plan
 

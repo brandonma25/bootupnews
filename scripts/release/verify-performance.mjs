@@ -11,6 +11,7 @@ import {
 
 const DEFAULT_LCP_THRESHOLD_MS = 3000;
 const DEFAULT_LCP_TARGET_MS = 2000;
+const DEFAULT_NETWORK_IDLE_THRESHOLD_MS = 3000;
 
 function parseNumber(value, fallback) {
   const parsed = Number(value);
@@ -101,7 +102,13 @@ async function measureHomepagePerformance(url) {
 
   const startedAt = Date.now();
   await page.goto(url, { waitUntil: "load", timeout: 45_000 });
-  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+  let networkIdleMs = Number.NaN;
+  await page
+    .waitForLoadState("networkidle", { timeout: 15_000 })
+    .then(() => {
+      networkIdleMs = Date.now() - startedAt;
+    })
+    .catch(() => undefined);
   await page.waitForTimeout(1000);
 
   const metrics = await page.evaluate(() => {
@@ -124,6 +131,7 @@ async function measureHomepagePerformance(url) {
   return {
     ...metrics,
     elapsedMs: Date.now() - startedAt,
+    networkIdleMs,
     routeRequestCount: requestUrls.size,
     scriptBytes,
   };
@@ -139,6 +147,10 @@ async function main() {
   const lcpTargetMs = parseNumber(
     args["lcp-target-ms"] || process.env.RELEASE_LCP_TARGET_MS,
     DEFAULT_LCP_TARGET_MS,
+  );
+  const networkIdleThresholdMs = parseNumber(
+    args["network-idle-threshold-ms"] || process.env.RELEASE_NETWORK_IDLE_THRESHOLD_MS,
+    DEFAULT_NETWORK_IDLE_THRESHOLD_MS,
   );
   const step = createStep("homepage performance gate");
   const startedAt = Date.now();
@@ -167,6 +179,7 @@ async function main() {
       `LCP: ${formatMs(metrics.lcp)} (target ${lcpTargetMs}ms, hard fail ${lcpThresholdMs}ms)`,
       `FCP: ${formatMs(metrics.fcp)}`,
       `load event: ${formatMs(metrics.loadEventEnd)}`,
+      `network idle: ${formatMs(metrics.networkIdleMs)} (hard fail ${networkIdleThresholdMs}ms)`,
       `HTML size: ${formatBytes(htmlSize.bytes)} decompressed (HTTP ${htmlSize.status})`,
       `script bytes: ${formatBytes(metrics.scriptBytes)}`,
       `route requests: ${metrics.routeRequestCount}`,
@@ -179,6 +192,12 @@ async function main() {
     } else if (metrics.lcp > lcpThresholdMs) {
       step.status = "failed";
       step.details += `; homepage LCP exceeded ${lcpThresholdMs}ms.`;
+    } else if (!Number.isFinite(metrics.networkIdleMs) || metrics.networkIdleMs <= 0) {
+      step.status = "failed";
+      step.details += "; network idle was not reached within the measurement window.";
+    } else if (metrics.networkIdleMs > networkIdleThresholdMs) {
+      step.status = "failed";
+      step.details += `; homepage network idle exceeded ${networkIdleThresholdMs}ms.`;
     } else {
       step.status = "passed";
     }
