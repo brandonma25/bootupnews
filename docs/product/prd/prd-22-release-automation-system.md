@@ -13,6 +13,7 @@
 ## Scope
 ### Must Do
 - Define the local, PR, preview, production, and human auth/session release gates.
+- Add a production homepage performance gate with a 3000 ms LCP hard fail and 2000 ms target.
 - Provide standard release entrypoints and workflow references.
 - Keep documentation and merge guidance aligned with those gates.
 
@@ -24,12 +25,14 @@
 ## System Behavior
 - Serious work flows through a documented sequence of local validation, PR automation, preview validation, human auth/session checks, production verification, and release documentation.
 - Standard scripts and workflows provide the reusable entrypoints for those gates.
+- Production verification runs route health first, then the homepage performance gate when a production URL is configured.
 - Merge recommendations are blocked when required gates are incomplete.
 
 ## Key Logic
 - `docs/engineering/protocols/release-machine.md` defines the mandatory release protocol.
 - `docs/engineering/protocols/release-automation-operating-guide.md` explains the reusable release-gate architecture and external dependencies.
 - Repo workflows and scripts implement the automated portions of those gates.
+- `npm run release:performance` measures `/` in Playwright Chromium and reports LCP, FCP, load event timing, decompressed homepage HTML size, script bytes, and request count.
 
 ## Risks / Limitations
 - Preview and production checks still depend on external GitHub and Vercel wiring.
@@ -39,6 +42,7 @@
 ## Success Criteria
 - The repo has one canonical PRD for release automation governance.
 - Release gates are clearly named and reusable across future branches.
+- Production homepage LCP regressions above 3000 ms fail the production verification workflow.
 - Human-only checks remain explicit rather than implied.
 
 ## Done When

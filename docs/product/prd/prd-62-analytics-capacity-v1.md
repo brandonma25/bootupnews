@@ -18,6 +18,7 @@ Boot Up needs preview and production visibility into which public Signal surface
 - Initialize PostHog from the existing client instrumentation path.
 - Gate PostHog behind `NEXT_PUBLIC_ENABLE_POSTHOG`, `NEXT_PUBLIC_POSTHOG_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST`, and explicit UX diagnostics switches for session replay, replay sample rate, automatic PostHog pageviews, click autocapture, heatmaps, and dead-click capture.
 - Forward validated MVP measurement events to PostHog with the same event names already used by Supabase storage.
+- Track category tab opens as `category_tab_open` with only the category key, route, and surface so progressive loading can be measured without sending article copy or source URLs.
 - Keep SDK `capture_pageview` disabled so Boot Up can emit sanitized PostHog `$pageview` events through the existing bridge only when BM explicitly enables the pageview stream for broader product analytics.
 - Allow click-only autocapture and heatmaps when explicitly enabled, with admin/auth routes excluded and text/input/attribute masking kept on.
 - Strip query strings, source URL parameters, secrets, email-like fields, cookies, tokens, article bodies, and full Why It Matters copy from forwarded analytics properties.
@@ -55,6 +56,7 @@ Boot Up needs preview and production visibility into which public Signal surface
 - PostHog is disabled when required env vars are missing.
 - Existing MVP events still post to `/api/mvp-measurement/events`.
 - PostHog receives same-name sanitized events when enabled.
+- Category tab opens are stored through Supabase MVP measurement and forwarded best-effort to PostHog when enabled.
 - Analytics capture failures do not throw or block navigation.
 - Admin/auth routes are not eligible for session replay or automatic capture.
 - Automatic PostHog pageviews, heatmaps, and click-only autocapture are disabled by default and enabled only through explicit `NEXT_PUBLIC_POSTHOG_*` switches.

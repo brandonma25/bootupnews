@@ -247,12 +247,74 @@ describe("LandingHomepage", () => {
     expect(screen.getByRole("button", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Finance" })).toBeInTheDocument();
 
+    expect(document.getElementById("finance-panel")).toBeNull();
+  });
+
+  it("keeps category rows out of the initial render and loads the clicked tab in place", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input).startsWith("/api/home/category-articles")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            category: "finance",
+            articles: [
+              {
+                id: "finance-article",
+                category: "finance",
+                title: "Fed rate debate resets expectations",
+                sourceName: "NPR Economy",
+                url: "https://www.npr.org/economy/fed-rates",
+                summary: "A finance story.",
+                publishedAt: "2026-05-12T10:00:00.000Z",
+                ingestedAt: "2026-05-12T11:45:00.000Z",
+                runId: "pipeline-2",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
+      return new Response(JSON.stringify({ ok: true, stored: true }), { status: 202 });
+    });
+    const data = createData(
+      [
+        createItem({
+          id: "finance-1",
+          title: "Finance signal should stay out of initial tab HTML",
+          topicId: "finance",
+          topicName: "Finance",
+          homepageClassification: {
+            primaryCategory: "finance",
+            secondaryCategories: [],
+            confidence: 0.95,
+            scores: { tech: 0, finance: 12, politics: 0 },
+            matchedSignals: { tech: [], finance: ["rates"], politics: [] },
+          },
+        }),
+      ],
+      {
+        publicRankedItems: [],
+      },
+    );
+
+    renderHomepage(data);
+
+    expect(screen.queryByRole("link", { name: /Fed rate debate resets expectations/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Finance signal should stay out of initial tab HTML")).toBeInTheDocument();
+    expect(document.getElementById("finance-panel")).toBeNull();
+
     fireEvent.click(screen.getByRole("button", { name: "Finance" }));
 
-    const financePanel = document.getElementById("finance-panel");
-    expect(financePanel).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Finance" })).toHaveAttribute("aria-current", "page");
-    expect(financePanel).not.toHaveTextContent("Tech signal");
+    expect(await screen.findByRole("link", { name: /Fed rate debate resets expectations/ })).toHaveAttribute(
+      "href",
+      "https://www.npr.org/economy/fed-rates",
+    );
+    expect(
+      fetchSpy.mock.calls.some(([url]) => String(url) === "/api/home/category-articles?category=finance"),
+    ).toBe(true);
+
+    fetchSpy.mockRestore();
   });
 
   it("renders freshness and empty states without placeholder copy", () => {

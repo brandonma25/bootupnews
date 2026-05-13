@@ -118,6 +118,9 @@
 - Standard wrapper: `node scripts/prod-check.js https://app.example.com`
 - Runs after merge to `main` or manually with a supplied production URL.
 - Confirms `/` and `/dashboard` return `200` and do not expose obvious deployment failure markers.
+- Then runs `npm run release:performance -- --base-url https://app.example.com` in Playwright Chromium.
+- The performance gate hard-fails homepage `/` when LCP exceeds `3000ms`; `2000ms` remains the optimization target.
+- The performance report includes FCP, load event timing, decompressed homepage HTML size, script bytes, and route request count.
 - Prior Google Sheets promotion behavior has been removed from the workflow. Production verification results should be recorded in the PR body, PR checklist, GitHub metadata, or an external/private archive when operational detail is needed.
 
 ### 6. Release Documentation Gate

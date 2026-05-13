@@ -18,8 +18,17 @@ import {
 import type { DashboardData, HomepageCategoryArticle, ViewerAccount } from "@/lib/types";
 import { getBriefingDateKey } from "@/lib/utils";
 
+type LandingHomepageData = {
+  mode: DashboardData["mode"];
+  briefing: {
+    briefingDate: string;
+  };
+  homepageFreshnessNotice?: DashboardData["homepageFreshnessNotice"];
+  publicRankedSignalCount?: number;
+};
+
 type LandingHomepageProps = {
-  data: DashboardData;
+  data: LandingHomepageData;
   viewer: ViewerAccount | null;
   isAdmin?: boolean;
   authState?: string;
@@ -39,6 +48,7 @@ export default function LandingHomepage({
   const { featured, topRanked, categorySections, debug } = homepageViewModel;
   const topEvents = dedupeEvents([featured, ...topRanked]).slice(0, 5);
   const briefingDateKey = getBriefingDateKey(data.briefing.briefingDate);
+  const publicRankedSignalCount = data.publicRankedSignalCount ?? homepageViewModel.debug.rankedEventsCount;
   const noDataMessage = buildOverallNoDataMessage(topEvents.length);
   const topEventsEmptyMessage =
     data.homepageFreshnessNotice?.kind === "empty"
@@ -56,7 +66,7 @@ export default function LandingHomepage({
           briefingDate: briefingDateKey,
           metadata: {
             visibleSignalCount: topEvents.length,
-            publicRankedSignalCount: data.publicRankedItems?.length ?? topEvents.length,
+            publicRankedSignalCount,
             coreSignalCount: homepageViewModel.debug.coreSignalCount,
             contextSignalCount: homepageViewModel.debug.contextSignalCount,
             rendersCoreAndContext: homepageViewModel.debug.coreSignalCount >= 5 && homepageViewModel.debug.contextSignalCount >= 2,
@@ -127,6 +137,7 @@ export default function LandingHomepage({
             )}
             topEventsEmptyState={<StatusPanel title={noDataMessage.title} body={noDataMessage.body} />}
             renderTopEvent={(event) => <SignalCard signal={event} compact />}
+            progressiveCategoryArticles
             renderCategoryEvent={(event, section, index) => (
               <SignalCard
                 signal={event}

@@ -113,39 +113,32 @@ test.describe("homepage", () => {
     expect(diagnostics.entries).toEqual([]);
   });
 
-  test("shows the signed-out category soft gate without duplicating Top Events when depth content exists", async ({ page, diagnostics }) => {
+  test("loads category tabs progressively without duplicating initial Top Events", async ({ page, diagnostics }) => {
     await page.goto("/");
 
     const signalCards = page.getByTestId("signal-card");
-    const gateCopy = "Sign up to be notified when new signals are published.";
-    const oldGateCopy = "Create a free account to read Tech News, Economics, and Politics";
     const techButton = page.getByRole("button", { name: "Tech" });
     const signalCardCount = await signalCards.count();
 
     if (signalCardCount === 0 || !(await techButton.isVisible())) {
       await expectFallbackBriefingCopy(page);
-      await expect(page.getByText(gateCopy)).toHaveCount(0);
-      await expect(page.getByText(oldGateCopy)).toHaveCount(0);
       await expectNoStaticHomepagePlaceholder(page);
       expect(diagnostics.entries).toEqual([]);
       return;
     }
 
     await expect(signalCards.first()).toBeVisible();
-    await expect(page.getByText(gateCopy)).toHaveCount(0);
-    await expect(page.getByText(oldGateCopy)).toHaveCount(0);
+    await expect(page.getByText(/Loading tech stories|No tech stories|Could not load tech stories/i)).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
 
     await expect(techButton).toBeVisible();
     await techButton.click();
 
-    const gate = page.getByTestId("category-soft-gate");
-
-    await expect(gate).toBeVisible();
-    await expect(gate.getByText(gateCopy)).toBeVisible();
-    await expect(gate.getByText(oldGateCopy)).toHaveCount(0);
-    await expect(gate.getByRole("link", { name: "Sign Up" })).toHaveAttribute("href", "/signup?redirectTo=%2F");
-    await expect(gate.getByRole("link", { name: "Sign In" })).toHaveAttribute("href", "/login?redirectTo=%2F");
+    await expect(page.locator("#tech-panel")).toBeVisible();
+    await expect(
+      page.locator("#tech-panel").getByText(/Loading tech stories|No tech stories|Could not load tech stories/i),
+    ).toBeVisible();
+    await expect(page.getByTestId("category-soft-gate")).toHaveCount(0);
     expect(diagnostics.entries).toEqual([]);
   });
 });

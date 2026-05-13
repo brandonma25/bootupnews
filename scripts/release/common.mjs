@@ -9,14 +9,15 @@ export const DEFAULT_ROUTE_EXPECTATIONS = [
   {
     path: "/",
     expected: [
-      "Daily Intelligence Briefing",
-      "Top Events",
+      "Boot Up",
+      "Today's signals",
+      "Browse by category",
     ],
     signedOutExpected: ["Public briefing", "Sign in to unlock History and Account."],
   },
   {
     path: "/dashboard",
-    expected: [],
+    expected: ["Boot Up"],
     signedOutExpected: [],
   },
 ];

@@ -103,4 +103,48 @@ describe("MvpMeasurementTracker", () => {
       },
     });
   });
+
+  it("emits sanitized category tab open events from instrumented buttons", async () => {
+    render(
+      <>
+        <MvpMeasurementTracker
+          pageView={{
+            eventName: "homepage_view",
+            route: "/",
+            surface: "home",
+            briefingDate: "2026-05-01",
+          }}
+        />
+        <button
+          type="button"
+          data-mvp-measurement-event="category_tab_open"
+          data-mvp-route="/?secret=value"
+          data-mvp-surface="home_category_tab"
+          data-mvp-category="finance"
+        >
+          Finance
+        </button>
+      </>,
+    );
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Finance" }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1]!;
+    const payload = JSON.parse(String(init?.body));
+
+    expect(payload).toMatchObject({
+      eventName: "category_tab_open",
+      route: "/",
+      surface: "home_category_tab",
+      briefingDate: "2026-05-01",
+      metadata: {
+        categoryKey: "finance",
+        linkText: "Finance",
+      },
+    });
+    expect(payload.signalPostId).toBeNull();
+    expect(payload.signalRank).toBeNull();
+  });
 });
