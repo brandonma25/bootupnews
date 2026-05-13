@@ -47,6 +47,64 @@ describe("proxy auth return handling", () => {
     );
   });
 
+  it("redirects the legacy default Vercel host to the canonical production domain", async () => {
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      {
+        url: "https://bootupnews.vercel.app/briefing/2026-05-06?ref=legacy",
+        headers: new Headers({ host: "bootupnews.vercel.app" }),
+        cookies: {
+          getAll: () => [],
+          set: () => undefined,
+        },
+      } as unknown as NextRequest,
+    );
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe(
+      "https://bootupnews.com/briefing/2026-05-06?ref=legacy",
+    );
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("redirects the www host to the apex canonical production domain", async () => {
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      {
+        url: "https://www.bootupnews.com/signals?ref=www",
+        headers: new Headers({ host: "www.bootupnews.com" }),
+        cookies: {
+          getAll: () => [],
+          set: () => undefined,
+        },
+      } as unknown as NextRequest,
+    );
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe("https://bootupnews.com/signals?ref=www");
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("does not redirect Vercel preview deployment hosts", async () => {
+    const { proxy } = await import("@/proxy");
+
+    const response = await proxy(
+      {
+        url: "https://feature-x-bootupnews.vercel.app/signals",
+        headers: new Headers({ host: "feature-x-bootupnews.vercel.app" }),
+        cookies: {
+          getAll: () => [],
+          set: () => undefined,
+        },
+      } as unknown as NextRequest,
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(getUser).toHaveBeenCalled();
+  });
+
   it("does not refresh auth state on the callback route before code exchange", async () => {
     const { proxy } = await import("@/proxy");
 

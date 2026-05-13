@@ -7,7 +7,7 @@
 
 ## Source Of Truth
 - Cowork frontend UX analysis 2026-05-06, prioritized shortlist Fix 1 and Fix 2.
-- Production URL observed before fix: `https://bootupnews.vercel.app/briefing/2026-05-06`.
+- Production URL observed before fix: `https://bootupnews.com/briefing/2026-05-06`.
 - BOOT_UP_WORK_LOG Decision D3 historical reference: no false freshness; trust matters more than daily automation optics.
 - Canonical PRD required: no.
 

@@ -6,7 +6,7 @@
 - Affected object level: Card and Surface Placement.
 
 ## Source Of Truth
-- Live production audit of `bootupnews.vercel.app` on 2026-05-02.
+- Live production audit of `bootupnews.com` on 2026-05-02.
 - PR #180, #181, #187, and #189 metadata and PR bodies.
 - Prior Phase 1 change-record evidence was preserved as operational evidence. The durable public interpretation is captured in the relevant PRs, product source-of-truth docs, and this consolidated remediation record.
 - GitHub source-of-truth status: canonical consolidated remediation record created on 2026-05-04.

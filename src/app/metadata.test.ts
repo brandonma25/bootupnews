@@ -18,15 +18,15 @@ describe("public page metadata", () => {
   it("exposes canonical and social URL metadata for the public homepage", async () => {
     const { metadata } = await import("@/app/page");
 
-    expect(metadata.metadataBase?.toString()).toBe("https://bootupnews.vercel.app/");
+    expect(metadata.metadataBase?.toString()).toBe("https://bootupnews.com/");
     expect(metadata.alternates).toEqual({
-      canonical: "https://bootupnews.vercel.app/",
+      canonical: "https://bootupnews.com/",
     });
     expect(metadata.openGraph).toEqual({
-      url: "https://bootupnews.vercel.app/",
+      url: "https://bootupnews.com/",
     });
     expect(metadata.other).toEqual({
-      "twitter:url": "https://bootupnews.vercel.app/",
+      "twitter:url": "https://bootupnews.com/",
     });
   });
 

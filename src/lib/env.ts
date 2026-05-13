@@ -12,7 +12,7 @@ function normalizePositiveIntegerEnv(value: string | undefined) {
   return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : "";
 }
 
-export const CANONICAL_PRODUCTION_APP_URL = "https://bootupnews.vercel.app";
+export const CANONICAL_PRODUCTION_APP_URL = "https://bootupnews.com";
 
 function normalizeUrlOrigin(value: string | undefined) {
   const normalized = normalizeEnv(value);

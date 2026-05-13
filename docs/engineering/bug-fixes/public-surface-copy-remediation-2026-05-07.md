@@ -55,7 +55,7 @@
   - Local browser `/briefing/2026-05-06` did not have production snapshot data available, but confirmed `Why this ranks here` and `confirmed-event rail` were absent from the rendered page.
   - Vercel preview verification passed for `/`, `/signals`, and `/briefing/2026-05-06`; removed internal strings were absent and unchanged public content remained visible.
   - Production deployment was verified without retaining concrete deployment identifiers in the public doc.
-  - Production alias checked: `https://bootupnews.vercel.app`.
+  - Production alias checked: `https://bootupnews.com`.
   - Production HTTP checks passed: `/` 200, `/signals` 200, `/briefing/2026-05-06` 200.
   - Production Chrome incognito click-level QA passed: homepage category tabs, category gates, login routing, briefing detail navigation, detail tabs, `/signals`, and `/signals` to homepage navigation all worked.
   - Fix-specific production QA passed: `/briefing/2026-05-06` no longer rendered `Why this ranks here` or `confirmed-event rail`; `/signals` no longer rendered `watch`, `High`, or `Published editorial layer`; `/signals` still rendered category tags such as `Finance` and `Tech`.

@@ -21,7 +21,7 @@ This record covers the production load-time remediation for the public homepage.
 - Focused unit and component tests for the category selector, category API, progressive tab fetch states, and analytics sanitization.
 - Homepage E2E smoke for initial signal-only render plus category tab click behavior.
 - Standard local gate: `npm run lint`, `npm run test`, `npm run build`, and Chromium/WebKit Playwright.
-- Production gate after merge: `npm run release:production -- --base-url https://bootupnews.vercel.app` followed by `npm run release:performance -- --base-url https://bootupnews.vercel.app`.
+- Production gate after merge: `npm run release:production -- --base-url https://bootupnews.com` followed by `npm run release:performance -- --base-url https://bootupnews.com`.
 
 ## Validation Run
 
@@ -33,8 +33,8 @@ This record covers the production load-time remediation for the public homepage.
 - `git diff --check`: passed.
 - `python3 scripts/validate-feature-system-csv.py`: passed with pre-existing slug warnings.
 - `python3 scripts/release-governance-gate.py`: passed.
-- `npm run release:production -- --base-url https://bootupnews.vercel.app`: passed route probe for current production.
-- `npm run release:performance -- --base-url https://bootupnews.vercel.app`: failed against current production before this PR is deployed, with LCP 19756 ms, FCP 4080 ms, decompressed homepage HTML 827.3 KB, script bytes 1.75 MB, and 45 route requests.
+- `npm run release:production -- --base-url https://bootupnews.com`: passed route probe for current production.
+- `npm run release:performance -- --base-url https://bootupnews.com`: failed against current production before this PR is deployed, with LCP 19756 ms, FCP 4080 ms, decompressed homepage HTML 827.3 KB, script bytes 1.75 MB, and 45 route requests.
 - Local browser QA on `http://127.0.0.1:3000/`: passed. The homepage rendered category links without an initial category panel; opening Technology routed to the dedicated category page and no browser console errors were observed.
 
 ## Notes

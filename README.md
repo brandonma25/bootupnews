@@ -1,6 +1,6 @@
 # Boot Up
 
-Live app: [https://bootupnews.vercel.app](https://bootupnews.vercel.app)
+Live app: [https://bootupnews.com](https://bootupnews.com)
 
 Boot Up is a curated daily intelligence briefing for people who want to understand what matters without scanning a large news surface. It is designed around a simple product bet: a useful briefing should reduce the number of things a reader has to inspect while increasing the quality of the judgment behind each item.
 

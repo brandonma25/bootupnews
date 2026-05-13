@@ -44,6 +44,6 @@ describe("public Supabase env resolution", () => {
   });
 
   it("builds public URLs from the canonical production origin by default", () => {
-    expect(buildPublicAppUrl("/sitemap.xml")).toBe("https://bootupnews.vercel.app/sitemap.xml");
+    expect(buildPublicAppUrl("/sitemap.xml")).toBe("https://bootupnews.com/sitemap.xml");
   });
 });

@@ -22,11 +22,11 @@ Production now has the schema foundation for:
 
 This is schema-only foundation. It does not implement Gmail ingestion, newsletter parsing, LLM extraction, source matching, clustering logic, newsletter cron, promotion into `signal_posts`, admin UI, public historical browsing, signal evolution rendering, or cross-event rendering.
 
-The current public content state at `https://bootupnews.vercel.app` shows a May 6 three-signal live slate. That is a public live-row/editorial state issue, not a schema migration issue.
+The current public content state at `https://bootupnews.com` shows a May 6 three-signal live slate. That is a public live-row/editorial state issue, not a schema migration issue.
 
 ## Source Of Truth
 
-- Production URL: `https://bootupnews.vercel.app`
+- Production URL: `https://bootupnews.com`
 - Supabase project: `fwkqjeumreaznfhnlzev`
 - Environment: `main PRODUCTION`
 - PR #210: Newsletter ingestion, story clusters, and historical signal snapshot foundation
@@ -268,7 +268,7 @@ No unexpected rows were found in the six new Phase 2 tables.
 
 ## Public App Smoke
 
-Production URL: `https://bootupnews.vercel.app`
+Production URL: `https://bootupnews.com`
 
 | Route | Status | Observation |
 | --- | ---: | --- |
