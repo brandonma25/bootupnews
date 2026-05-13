@@ -104,11 +104,25 @@ describe("homepage SSR auth snapshot", () => {
     expect(applyHomepageEditorialOverridesToDashboardData).toHaveBeenCalledTimes(1);
     expect(applyHomepageEditorialOverridesToDashboardData).toHaveBeenCalledWith(dashboardData);
     expect(buildHomepageViewModel).toHaveBeenCalledTimes(1);
-    expect(buildHomepageViewModel).toHaveBeenCalledWith(editorialData);
+    expect(buildHomepageViewModel).toHaveBeenCalledWith(editorialData, null, {
+      includeCategoryTabEvents: false,
+    });
     expect(landingHomepage).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: editorialData,
-        homepageViewModel,
+        data: {
+          mode: "live",
+          briefing: {
+            briefingDate: "2020-01-02T09:00:00.000Z",
+          },
+          homepageFreshnessNotice: undefined,
+          publicRankedSignalCount: 0,
+        },
+        homepageViewModel: expect.objectContaining({
+          categorySections: [],
+          developingNowEvents: [],
+          trending: [],
+          earlySignals: [],
+        }),
         isAdmin: false,
         viewer: expect.objectContaining({
           email: "analyst@example.com",

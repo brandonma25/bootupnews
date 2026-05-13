@@ -192,7 +192,11 @@ const SEMANTIC_STOPWORDS = new Set([
 export function buildHomepageViewModel(
   data: DashboardData,
   profile?: BriefingPersonalizationProfile | null,
+  options: {
+    includeCategoryTabEvents?: boolean;
+  } = {},
 ): HomepageViewModel {
+  const includeCategoryTabEvents = options.includeCategoryTabEvents ?? true;
   const topLayerEvents = buildHomepageEvents(data.briefing.items, profile);
   const depthLayerEvents = buildHomepageEvents(data.publicRankedItems ?? [], profile);
   const confirmedTopLayerEvents = topLayerEvents.filter((event) => !event.intelligence.isEarlySignal);
@@ -235,12 +239,17 @@ export function buildHomepageViewModel(
     politics: [],
   };
   const categorySections = HOMEPAGE_CATEGORY_CONFIG.map((category) => {
-    const sectionSelection = selectCategoryTabEvents({
-      rankedEvents: categoryTabSourceEvents,
-      category: category.key,
-      excludedEventIds: excludedCategoryTabIds,
-      limit: CATEGORY_TAB_LIMIT,
-    });
+    const sectionSelection = includeCategoryTabEvents
+      ? selectCategoryTabEvents({
+          rankedEvents: categoryTabSourceEvents,
+          category: category.key,
+          excludedEventIds: excludedCategoryTabIds,
+          limit: CATEGORY_TAB_LIMIT,
+        })
+      : {
+          events: [],
+          suppressedCount: 0,
+        };
     semanticDuplicateSuppressedCount += sectionSelection.suppressedCount;
     const displayEvents = sectionSelection.events;
     const eligibleEvents = categoryTabSourceEvents.filter(

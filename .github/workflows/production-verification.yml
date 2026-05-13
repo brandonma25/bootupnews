@@ -36,6 +36,14 @@ jobs:
         if: ${{ env.PRODUCTION_URL != '' }}
         run: npm run release:production -- --base-url "$PRODUCTION_URL"
 
+      - name: Install Chromium for production performance gate
+        if: ${{ env.PRODUCTION_URL != '' }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify production homepage performance
+        if: ${{ env.PRODUCTION_URL != '' }}
+        run: npm run release:performance -- --base-url "$PRODUCTION_URL"
+
       - name: Skip when production URL is not configured
         if: ${{ env.PRODUCTION_URL == '' }}
         run: |

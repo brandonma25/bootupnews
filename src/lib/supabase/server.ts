@@ -52,9 +52,18 @@ export async function safeGetUser(route: string): Promise<{
   user: User | null;
   sessionCookiePresent: boolean;
 }> {
-  const supabase = await createSupabaseServerClient();
   const cookieStore = await cookies();
   const sessionCookiePresent = hasSupabaseSessionCookie(cookieStore.getAll());
+
+  if (!sessionCookiePresent) {
+    return {
+      supabase: null,
+      user: null,
+      sessionCookiePresent,
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
     return {

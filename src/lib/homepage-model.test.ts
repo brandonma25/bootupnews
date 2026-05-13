@@ -354,6 +354,25 @@ describe("buildHomepageViewModel", () => {
     expect(model.categorySections.every((section) => section.events.length === 0)).toBe(true);
   });
 
+  it("can omit category tab events from the homepage client payload while preserving category controls", () => {
+    const model = buildHomepageViewModel(
+      createData([
+        createItem({
+          id: "briefing-tech",
+          topicId: "tech",
+          topicName: "Tech",
+          title: "Chip makers race to expand AI capacity",
+          matchedKeywords: ["chips", "ai", "capacity"],
+        }),
+      ]),
+      null,
+      { includeCategoryTabEvents: false },
+    );
+
+    expect(model.categorySections.map((section) => section.key)).toEqual(["tech", "finance", "politics"]);
+    expect(model.categorySections.every((section) => section.events.length === 0)).toBe(true);
+  });
+
   it("renders a sparse category tab when a category has thin but eligible data", () => {
     const financeItem = createItem({
       id: "finance-thin",

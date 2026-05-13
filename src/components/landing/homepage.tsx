@@ -1,25 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, X } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { CategoryTabStrip } from "@/components/home/CategoryTabStrip";
+import { CategoryNavigation } from "@/components/home/CategoryNavigation";
 import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
 import { DateBadge } from "@/components/signals/DateBadge";
 import { SignalCard } from "@/components/signals/SignalCard";
-import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import {
   buildOverallNoDataMessage,
   type HomepageViewModel,
   type HomepageEvent,
 } from "@/lib/homepage-model";
-import type { DashboardData, HomepageCategoryArticle, ViewerAccount } from "@/lib/types";
+import type { DashboardData, ViewerAccount } from "@/lib/types";
 import { getBriefingDateKey } from "@/lib/utils";
 
+type LandingHomepageData = {
+  mode: DashboardData["mode"];
+  briefing: {
+    briefingDate: string;
+  };
+  homepageFreshnessNotice?: DashboardData["homepageFreshnessNotice"];
+  publicRankedSignalCount?: number;
+};
+
 type LandingHomepageProps = {
-  data: DashboardData;
+  data: LandingHomepageData;
   viewer: ViewerAccount | null;
   isAdmin?: boolean;
   authState?: string;
@@ -35,10 +42,10 @@ export default function LandingHomepage({
   debugEnabled = false,
   homepageViewModel,
 }: LandingHomepageProps) {
-  const signedIn = Boolean(viewer);
-  const { featured, topRanked, categorySections, debug } = homepageViewModel;
+  const { featured, topRanked, debug } = homepageViewModel;
   const topEvents = dedupeEvents([featured, ...topRanked]).slice(0, 5);
   const briefingDateKey = getBriefingDateKey(data.briefing.briefingDate);
+  const publicRankedSignalCount = data.publicRankedSignalCount ?? homepageViewModel.debug.rankedEventsCount;
   const noDataMessage = buildOverallNoDataMessage(topEvents.length);
   const topEventsEmptyMessage =
     data.homepageFreshnessNotice?.kind === "empty"
@@ -56,7 +63,7 @@ export default function LandingHomepage({
           briefingDate: briefingDateKey,
           metadata: {
             visibleSignalCount: topEvents.length,
-            publicRankedSignalCount: data.publicRankedItems?.length ?? topEvents.length,
+            publicRankedSignalCount,
             coreSignalCount: homepageViewModel.debug.coreSignalCount,
             contextSignalCount: homepageViewModel.debug.contextSignalCount,
             rendersCoreAndContext: homepageViewModel.debug.coreSignalCount >= 5 && homepageViewModel.debug.contextSignalCount >= 2,
@@ -75,6 +82,8 @@ export default function LandingHomepage({
             </Link>
           </Panel>
         ) : null}
+
+        <CategoryNavigation className="mb-[var(--bu-space-6)]" />
 
         <header className="mb-[var(--bu-space-6)] flex items-baseline justify-between gap-4">
           <DateBadge date={parseBriefingDate(data.briefing.briefingDate)} />
@@ -116,29 +125,6 @@ export default function LandingHomepage({
           <StatusPanel title={topEventsEmptyMessage.title} body={topEventsEmptyMessage.body} />
         )}
 
-        <div className="mt-[var(--bu-space-7)]">
-          <CategoryTabStrip
-            demoted
-            topEvents={topEvents}
-            categorySections={categorySections}
-            isAuthenticated={signedIn}
-            gatedCategoryState={({ onDismiss }) => (
-              <CategorySoftGate redirectTo="/" onDismiss={onDismiss} />
-            )}
-            topEventsEmptyState={<StatusPanel title={noDataMessage.title} body={noDataMessage.body} />}
-            renderTopEvent={(event) => <SignalCard signal={event} compact />}
-            renderCategoryEvent={(event, section, index) => (
-              <SignalCard
-                signal={event}
-                compact
-                rank={index + 1}
-                tier={event.signalRole === "context" ? "context" : "core"}
-              />
-            )}
-            renderCategoryArticle={(article) => <CategoryArticleRow article={article} />}
-          />
-        </div>
-
         {debugEnabled ? (
           <Panel className="mt-[var(--bu-space-5)] p-5">
             <p className="section-label">Homepage diagnostics</p>
@@ -153,54 +139,6 @@ export default function LandingHomepage({
       </div>
     </AppShell>
   );
-}
-
-function CategoryArticleRow({ article }: { article: HomepageCategoryArticle }) {
-  const summary = article.summary.trim();
-
-  return (
-    <a
-      href={article.url}
-      target="_blank"
-      rel="noreferrer"
-      className="group block rounded-card border border-[var(--border)] bg-[var(--card)] px-4 py-3 transition-colors hover:border-[var(--text-secondary)]"
-      data-mvp-measurement-event="source_click"
-      data-mvp-route="/"
-      data-mvp-surface={`home_${article.category}_article_tab`}
-      data-mvp-source-name={article.sourceName}
-    >
-      <article className="space-y-2">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-[var(--text-secondary)]">
-          <span>{formatArticleDate(article.publishedAt)}</span>
-          <span aria-hidden="true">/</span>
-          <span>{article.sourceName}</span>
-        </div>
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-medium leading-snug text-[var(--text-primary)] group-hover:text-[var(--accent)]">
-            {article.title}
-          </h3>
-          <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
-        </div>
-        {summary ? (
-          <p className="line-clamp-2 text-sm leading-6 text-[var(--text-secondary)]">{summary}</p>
-        ) : null}
-      </article>
-    </a>
-  );
-}
-
-function formatArticleDate(value: string) {
-  const timestamp = Date.parse(value);
-
-  if (!Number.isFinite(timestamp)) {
-    return "Latest";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "Asia/Taipei",
-  }).format(new Date(timestamp));
 }
 
 function dedupeEvents(events: Array<HomepageEvent | null>) {
@@ -218,43 +156,6 @@ function dedupeEvents(events: Array<HomepageEvent | null>) {
 function parseBriefingDate(value: string) {
   const dateKey = getBriefingDateKey(value);
   return new Date(`${dateKey}T12:00:00.000Z`);
-}
-
-function CategorySoftGate({
-  redirectTo,
-  onDismiss,
-}: {
-  redirectTo: string;
-  onDismiss: () => void;
-}) {
-  return (
-    <Panel className="p-5" data-testid="category-soft-gate">
-      <div className="flex items-start justify-between gap-4">
-        <div className="max-w-xl">
-          <p className="text-base font-medium text-[var(--text-primary)]">
-            Sign up to be notified when new signals are published.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="secondary"
-          className="h-9 w-9 shrink-0 rounded-button px-0"
-          aria-label="Dismiss category gate"
-          onClick={onDismiss}
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </Button>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Button asChild>
-          <Link href={`/signup?redirectTo=${encodeURIComponent(redirectTo)}`}>Sign Up</Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}>Sign In</Link>
-        </Button>
-      </div>
-    </Panel>
-  );
 }
 
 function StatusPanel({ title, body }: { title: string; body?: string }) {

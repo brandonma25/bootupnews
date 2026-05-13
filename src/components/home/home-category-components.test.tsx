@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { BriefingCardCategory } from "@/components/home/BriefingCardCategory";
@@ -166,6 +166,108 @@ describe("CategoryTabStrip", () => {
       "https://www.theverge.com/article-1",
     );
     expect(screen.queryByText("Tech Signal card")).not.toBeInTheDocument();
+  });
+
+  it("progressively fetches only the clicked category before rendering article rows", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          category: "finance",
+          articles: [
+            {
+              id: "finance-article",
+              category: "finance",
+              title: "Fed rate debate resets expectations",
+              sourceName: "NPR Economy",
+              url: "https://www.npr.org/economy/fed-rates",
+              summary: "A finance story.",
+              publishedAt: "2026-05-12T10:00:00.000Z",
+              ingestedAt: "2026-05-12T11:45:00.000Z",
+              runId: "pipeline-2",
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    render(
+      <CategoryTabStrip
+        demoted
+        progressiveCategoryArticles
+        topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
+        categorySections={[
+          createSection({ key: "tech", label: "Tech", events: [createEvent({ id: "tech-signal", title: "Initial Tech Signal" })] }),
+          createSection({ key: "finance", label: "Finance", events: [createEvent({ id: "finance-signal", title: "Initial Finance Signal" })] }),
+        ]}
+        renderTopEvent={(event) => <article>{event.title}</article>}
+        renderCategoryEvent={(event) => <article>{event.title}</article>}
+        renderCategoryArticle={(article) => <a href={article.url}>{article.title}</a>}
+      />,
+    );
+
+    expect(screen.queryByText("Initial Tech Signal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Initial Finance Signal")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Fed rate debate resets expectations" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Finance" }));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/home/category-articles?category=finance",
+        expect.objectContaining({
+          headers: {
+            accept: "application/json",
+          },
+        }),
+      );
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("link", { name: "Fed rate debate resets expectations" })).toHaveAttribute(
+      "href",
+      "https://www.npr.org/economy/fed-rates",
+    );
+    expect(screen.queryByText("Initial Finance Signal")).not.toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("shows progressive loading, retry, and empty states", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: false, error: "temporarily unavailable" }), { status: 500 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, category: "tech", articles: [] }), { status: 200 }),
+      );
+
+    render(
+      <CategoryTabStrip
+        demoted
+        progressiveCategoryArticles
+        topEvents={[createEvent({ id: "top-1", title: "Top ranked event" })]}
+        categorySections={[createSection({ key: "tech", label: "Tech", events: [] })]}
+        renderTopEvent={(event) => <article>{event.title}</article>}
+        renderCategoryEvent={(event) => <article>{event.title}</article>}
+        renderCategoryArticle={(article) => <a href={article.url}>{article.title}</a>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Tech" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading tech stories...");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load tech stories.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("No tech stories available right now.");
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    fetchSpy.mockRestore();
   });
 
   it("lets signed-in users open populated category tabs without the soft gate", () => {

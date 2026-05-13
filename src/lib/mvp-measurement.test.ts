@@ -100,4 +100,34 @@ describe("MVP measurement event validation", () => {
       }),
     });
   });
+
+  it("accepts sanitized category tab opens without signal identifiers", () => {
+    const result = validateMvpMeasurementEvent({
+      eventName: "category_tab_open",
+      visitorId: "mvp_1234567890abcdef",
+      sessionId: "mvp_session_1234567890abcdef",
+      route: "/?token=secret",
+      surface: "home_category_tab",
+      metadata: {
+        categoryKey: "finance",
+        sourceUrl: "https://example.com/story?token=secret",
+        email: "reader@example.com",
+      },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        eventName: "category_tab_open",
+        route: "/",
+        surface: "home_category_tab",
+        signalPostId: null,
+        signalRank: null,
+        metadata: {
+          categoryKey: "finance",
+          sourceUrl: "https://example.com/story",
+        },
+      }),
+    });
+  });
 });

@@ -121,4 +121,21 @@ describe("selectHomepageCategoryArticles", () => {
 
     expect(articles.tech.map((article) => article.id)).toEqual(["latest", "previous"]);
   });
+
+  it("caps each category at 12 articles", () => {
+    const articles = selectHomepageCategoryArticles({
+      rows: Array.from({ length: 16 }, (_, index) =>
+        row({
+          id: `tech-${index + 1}`,
+          title: `AI platform update ${index + 1}`,
+          published_at: `2026-05-12T${String(23 - index).padStart(2, "0")}:00:00.000Z`,
+        }),
+      ),
+    });
+
+    expect(articles.tech).toHaveLength(12);
+    expect(articles.tech.map((article) => article.id)).toEqual(
+      Array.from({ length: 12 }, (_, index) => `tech-${index + 1}`),
+    );
+  });
 });

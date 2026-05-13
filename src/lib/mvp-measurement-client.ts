@@ -136,6 +136,7 @@ export function readMvpMeasurementDataset(element: HTMLElement) {
     briefingDate: element.dataset.mvpBriefingDate ?? null,
     publishedSlateId: element.dataset.mvpPublishedSlateId ?? null,
     metadata: {
+      categoryKey: element.dataset.mvpCategory,
       sourceName: element.dataset.mvpSourceName,
       linkText: element.textContent?.trim().slice(0, 160),
     },

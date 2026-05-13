@@ -12,7 +12,6 @@ import { isAiConfigured } from "@/lib/env";
 import { buildEventIntelligence } from "@/lib/event-intelligence";
 import {
   createEmptyHomepageCategoryArticleMap,
-  loadHomepageCategoryArticles,
 } from "@/lib/homepage-category-articles";
 import {
   classifyHomepageCategory,
@@ -253,6 +252,16 @@ function createEmptyBriefing(): DailyBriefing {
 async function loadHomepageSignalSnapshotSafely() {
   const { getHomepageSignalSnapshot } = await import("@/lib/signals-editorial");
   return getHomepageSignalSnapshot();
+}
+
+export async function loadHomepageSignalItemsForArticleExclusions() {
+  const homepageSignalSnapshot = await loadHomepageSignalSnapshotSafely();
+  const source = homepageSignalSnapshot.source;
+
+  return (homepageSignalSnapshot.depthPosts?.length
+    ? homepageSignalSnapshot.depthPosts
+    : homepageSignalSnapshot.posts
+  ).map((post) => mapHomepageSignalPostToBriefingItem(post, source));
 }
 
 type RequestAuthState = {
@@ -519,14 +528,8 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const sources = getSourcesForPublicSurface("public.home");
 
   if (homepageSignalSnapshot.posts.length === 0) {
-    const homepageCategoryArticles = await loadHomepageCategoryArticles({
-      excludedSignalItems: [],
-      route: "/",
-    });
-
     return buildEmptyPublicHomepageData(
       homepageSignalSnapshot.errorMessage ? PUBLIC_BRIEFING_TEMPORARILY_UNAVAILABLE_MESSAGE : undefined,
-      homepageCategoryArticles,
     );
   }
 
@@ -543,10 +546,6 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
     ? homepageSignalSnapshot.depthPosts
     : homepageSignalSnapshot.posts
   ).map((post) => mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source));
-  const homepageCategoryArticles = await loadHomepageCategoryArticles({
-    excludedSignalItems: depthItems,
-    route: "/",
-  });
   const intro =
     homepageSignalSnapshot.source === "published_live"
       ? "The homepage renders from today's published signal set instead of triggering feed ingestion during SSR."
@@ -573,7 +572,7 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
     topics: demoTopics,
     sources,
     publicRankedItems: depthItems,
-    homepageCategoryArticles,
+    homepageCategoryArticles: createEmptyHomepageCategoryArticleMap(),
     homepageFreshnessNotice,
     homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, depthItems.length),
   };
@@ -696,10 +695,7 @@ async function buildSignedInHomepageData(authState: RequestAuthState): Promise<D
     topics,
     sources,
     publicRankedItems: latestBriefing.items,
-    homepageCategoryArticles: await loadHomepageCategoryArticles({
-      excludedSignalItems: latestBriefing.items,
-      route: authState.route,
-    }),
+    homepageCategoryArticles: createEmptyHomepageCategoryArticleMap(),
     homepageDiagnostics: buildReadOnlyHomepageDiagnostics(sources, latestBriefing.items.length),
   };
 }

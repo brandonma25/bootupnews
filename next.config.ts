@@ -4,27 +4,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
 const sentryBuildPluginEnabled = Boolean(sentryAuthToken);
 
-const nextConfig: NextConfig = {
-  async redirects() {
-    return [
-      {
-        source: "/technology",
-        destination: "/",
-        permanent: false,
-      },
-      {
-        source: "/economics",
-        destination: "/",
-        permanent: false,
-      },
-      {
-        source: "/politics",
-        destination: "/",
-        permanent: false,
-      },
-    ];
-  },
-};
+const nextConfig: NextConfig = {};
 
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
