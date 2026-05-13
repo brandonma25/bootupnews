@@ -9,6 +9,7 @@ import {
 } from "@/lib/mvp-measurement-client";
 
 type PageViewEvent = Omit<MvpMeasurementEventInput, "visitorId" | "sessionId">;
+const PAGE_VIEW_TRACKING_DELAY_MS = 3000;
 
 export function MvpMeasurementTracker({
   pageView,
@@ -20,7 +21,11 @@ export function MvpMeasurementTracker({
   useEffect(() => {
     if (!trackedPageView.current) {
       trackedPageView.current = true;
-      void trackMvpMeasurementEvent(pageView);
+      const timeoutId = window.setTimeout(() => {
+        void trackMvpMeasurementEvent(pageView);
+      }, PAGE_VIEW_TRACKING_DELAY_MS);
+
+      return () => window.clearTimeout(timeoutId);
     }
   }, [pageView]);
 

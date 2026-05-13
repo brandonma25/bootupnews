@@ -101,6 +101,29 @@ export default function LandingHomepage({
           </Panel>
         ) : null}
 
+        <CategoryTabStrip
+          className="mb-[var(--bu-space-5)]"
+          demoted
+          topEvents={topEvents}
+          categorySections={categorySections}
+          isAuthenticated={signedIn}
+          gatedCategoryState={({ onDismiss }) => (
+            <CategorySoftGate redirectTo="/" onDismiss={onDismiss} />
+          )}
+          topEventsEmptyState={<StatusPanel title={noDataMessage.title} body={noDataMessage.body} />}
+          renderTopEvent={(event) => <SignalCard signal={event} compact />}
+          progressiveCategoryArticles
+          renderCategoryEvent={(event, section, index) => (
+            <SignalCard
+              signal={event}
+              compact
+              rank={index + 1}
+              tier={event.signalRole === "context" ? "context" : "core"}
+            />
+          )}
+          renderCategoryArticle={(article) => <CategoryArticleRow article={article} />}
+        />
+
         {topEvents.length ? (
           <div className="grid gap-[var(--bu-space-3)]">
             {topEvents.map((event, index) => (
@@ -125,30 +148,6 @@ export default function LandingHomepage({
         ) : (
           <StatusPanel title={topEventsEmptyMessage.title} body={topEventsEmptyMessage.body} />
         )}
-
-        <div className="mt-[var(--bu-space-7)]">
-          <CategoryTabStrip
-            demoted
-            topEvents={topEvents}
-            categorySections={categorySections}
-            isAuthenticated={signedIn}
-            gatedCategoryState={({ onDismiss }) => (
-              <CategorySoftGate redirectTo="/" onDismiss={onDismiss} />
-            )}
-            topEventsEmptyState={<StatusPanel title={noDataMessage.title} body={noDataMessage.body} />}
-            renderTopEvent={(event) => <SignalCard signal={event} compact />}
-            progressiveCategoryArticles
-            renderCategoryEvent={(event, section, index) => (
-              <SignalCard
-                signal={event}
-                compact
-                rank={index + 1}
-                tier={event.signalRole === "context" ? "context" : "core"}
-              />
-            )}
-            renderCategoryArticle={(article) => <CategoryArticleRow article={article} />}
-          />
-        </div>
 
         {debugEnabled ? (
           <Panel className="mt-[var(--bu-space-5)] p-5">

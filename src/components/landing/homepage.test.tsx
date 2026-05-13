@@ -211,7 +211,7 @@ describe("LandingHomepage", () => {
     expect(screen.queryByText("Raw briefing item should not render directly")).not.toBeInTheDocument();
   });
 
-  it("renders the date badge and demoted Browse by category strip below the ranked cards", () => {
+  it("renders the date badge and category tab strip above the ranked cards", () => {
     const data = createData([
       createItem({
         id: "tech-1",
@@ -240,14 +240,15 @@ describe("LandingHomepage", () => {
     expect(screen.getByText(/April 15, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Today's signals")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Top Events" })).not.toBeInTheDocument();
-    // Browse-by category strip now uses a prominent heading rather than a
-    // micro-caps label. Match via the testid so the assertion survives
-    // future copy tweaks.
-    expect(screen.getByTestId("browse-by-heading")).toHaveTextContent(/browse by/i);
+    expect(screen.queryByText(/browse by category/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Finance" })).toBeInTheDocument();
 
     expect(document.getElementById("finance-panel")).toBeNull();
+
+    const techButton = screen.getByRole("button", { name: "Tech" });
+    const firstSignal = screen.getByText("Tech signal");
+    expect(Boolean(techButton.compareDocumentPosition(firstSignal) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
   });
 
   it("keeps category rows out of the initial render and loads the clicked tab in place", async () => {

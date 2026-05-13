@@ -37,6 +37,7 @@ Boot Up needs preview and production visibility into which public Signal surface
 - Client instrumentation calls `initializePostHogClient()` after the existing Sentry setup.
 - `src/lib/posthog-client.ts` owns browser-only initialization, property sanitization, optional sanitized `$pageview` capture, automatic capture route gating, route replay eligibility, and best-effort capture.
 - `trackMvpMeasurementEvent()` still posts to `/api/mvp-measurement/events`; valid payloads also forward sanitized same-name events to PostHog when enabled.
+- Automatic MVP page-view measurement is deferred briefly after mount so analytics does not compete with the homepage's initial render and network-idle budget; click, source, and category-tab events still track immediately on user intent.
 - `src/lib/mvp-measurement.ts` now centralizes sensitive metadata and query-string stripping before validated event storage.
 - `src/lib/sentry-config.ts` continues to require `NEXT_PUBLIC_SENTRY_DSN` for browser-side Sentry and uses replay sample-rate envs for browser/client replay controls.
 

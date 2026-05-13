@@ -226,39 +226,35 @@ export function CategoryTabStrip({
   return (
     <Tabs className={className}>
       {demoted ? (
-        <div className="space-y-[var(--bu-space-3)]">
-          <h2
-            className="text-[var(--bu-size-card-title-mobile)] font-medium leading-tight tracking-[-0.015em] text-[var(--bu-text-primary)] md:text-[var(--bu-size-card-title)]"
-            data-testid="browse-by-heading"
-          >
-            Browse by category
-          </h2>
-          <div className="flex flex-wrap items-center gap-x-[var(--bu-space-5)] gap-y-[var(--bu-space-2)]">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                ref={(node) => {
-                  triggerRefs.current[tab.key] = node;
-                }}
-                type="button"
-                className={cn(
-                  "text-[var(--bu-size-ui)] leading-5 transition-colors",
-                  safeActiveTab === tab.key
-                    ? "font-medium text-[var(--bu-text-primary)] underline decoration-[var(--bu-accent)] decoration-2 underline-offset-[6px]"
-                    : "font-normal text-[var(--bu-text-secondary)] hover:text-[var(--bu-accent)]",
-                )}
-                aria-controls={`${tab.key}-panel`}
-                aria-current={safeActiveTab === tab.key ? "page" : undefined}
-                data-mvp-measurement-event={tab.key === topEventsTab.key ? undefined : "category_tab_open"}
-                data-mvp-route={tab.key === topEventsTab.key ? undefined : "/"}
-                data-mvp-surface={tab.key === topEventsTab.key ? undefined : "home_category_tab"}
-                data-mvp-category={tab.key === topEventsTab.key ? undefined : tab.key}
-                onClick={() => selectTab(tab)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div
+          className="flex flex-wrap items-center gap-x-[var(--bu-space-5)] gap-y-[var(--bu-space-2)]"
+          role="group"
+          aria-label="Categories"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              ref={(node) => {
+                triggerRefs.current[tab.key] = node;
+              }}
+              type="button"
+              className={cn(
+                "text-[var(--bu-size-ui)] leading-5 transition-colors",
+                safeActiveTab === tab.key
+                  ? "font-medium text-[var(--bu-text-primary)] underline decoration-[var(--bu-accent)] decoration-2 underline-offset-[6px]"
+                  : "font-normal text-[var(--bu-text-secondary)] hover:text-[var(--bu-accent)]",
+              )}
+              aria-controls={`${tab.key}-panel`}
+              aria-current={safeActiveTab === tab.key ? "page" : undefined}
+              data-mvp-measurement-event={tab.key === topEventsTab.key ? undefined : "category_tab_open"}
+              data-mvp-route={tab.key === topEventsTab.key ? undefined : "/"}
+              data-mvp-surface={tab.key === topEventsTab.key ? undefined : "home_category_tab"}
+              data-mvp-category={tab.key === topEventsTab.key ? undefined : tab.key}
+              onClick={() => selectTab(tab)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       ) : (
         <TabsList className="-mx-4 px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-6 sm:px-6 lg:mx-0 lg:overflow-visible lg:px-0">

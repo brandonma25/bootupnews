@@ -25,7 +25,10 @@ test.describe("homepage", () => {
     await expect(page).toHaveTitle(/Boot Up/i);
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first()).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("Browse by")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
     if (await page.getByRole("link", { name: "Read more →" }).first().isVisible()) {
       await expect(page.getByRole("link", { name: "Read more →" }).first()).toBeVisible();
@@ -54,7 +57,10 @@ test.describe("homepage", () => {
     const signalCards = page.getByTestId("signal-card");
 
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("Browse by")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
 
     const signalCardCount = await signalCards.count();
@@ -84,26 +90,24 @@ test.describe("homepage", () => {
       const header = Array.from(document.querySelectorAll("h1")).find((element) =>
         element.textContent?.includes("Today's signals"),
       );
+      const categoryButton = Array.from(document.querySelectorAll("button")).find((element) =>
+        element.textContent?.trim() === "Tech",
+      );
       const firstCard = document.querySelector('[data-testid="signal-card"]');
-      const browseBy =
-        document.querySelector('[data-testid="browse-by-heading"]') ??
-        Array.from(document.querySelectorAll("h2, p")).find((element) =>
-          element.textContent?.trim().toLowerCase().startsWith("browse by"),
-        );
 
-      if (!header || !firstCard || !browseBy) {
+      if (!header || !categoryButton || !firstCard) {
         return null;
       }
 
       return {
-        headerBeforeCards: Boolean(header.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING),
-        cardsBeforeBrowse: Boolean(firstCard.compareDocumentPosition(browseBy) & Node.DOCUMENT_POSITION_FOLLOWING),
+        headerBeforeCategories: Boolean(header.compareDocumentPosition(categoryButton) & Node.DOCUMENT_POSITION_FOLLOWING),
+        categoriesBeforeCards: Boolean(categoryButton.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING),
       };
     });
 
     expect(structureOrder).toEqual({
-      headerBeforeCards: true,
-      cardsBeforeBrowse: true,
+      headerBeforeCategories: true,
+      categoriesBeforeCards: true,
     });
 
     const detailHref = await page.getByRole("link", { name: "Read more →" }).first().getAttribute("href");

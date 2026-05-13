@@ -1684,37 +1684,6 @@ function selectPublicSlatePosts(posts: EditorialSignalPost[], limit: number) {
     .slice(0, limit);
 }
 
-async function loadPublishedHomepageSnapshotForDate(
-  client: EditorialClient,
-  briefingDate: string | null,
-  limit: number,
-  selectColumns: string,
-) {
-  if (!briefingDate) {
-    return [];
-  }
-
-  const result = await client
-    .from("signal_posts")
-    .select(selectColumns)
-    .eq("briefing_date", briefingDate)
-    .eq("is_live", true)
-    .eq("editorial_status", "published")
-    .not("published_at", "is", null)
-    .order("rank", { ascending: true })
-    .limit(100);
-
-  if (result.error) {
-    return [];
-  }
-
-  return selectPublicSlatePosts(
-    ((result.data ?? []) as unknown as Array<Parameters<typeof mapStoredPublicSignalPost>[0]>)
-      .map(mapStoredPublicSignalPost),
-    limit,
-  );
-}
-
 async function loadMostRecentPublishedHomepageSnapshot(
   client: EditorialClient,
   limit: number,
@@ -1735,6 +1704,7 @@ async function loadMostRecentPublishedHomepageSnapshot(
     return {
       briefingDate: null,
       posts: [] as EditorialSignalPost[],
+      errorMessage: result.error.message,
     };
   }
 
@@ -1751,7 +1721,27 @@ async function loadMostRecentPublishedHomepageSnapshot(
           limit,
         )
       : [],
+    errorMessage: null,
   };
+}
+
+async function loadPublicHomepageSnapshotFast(client: EditorialClient, limit: number) {
+  const snapshot = await loadMostRecentPublishedHomepageSnapshot(
+    client,
+    limit,
+    PUBLIC_SIGNAL_POST_WITH_OPTIONAL_PLACEMENT_SELECT,
+  );
+
+  if (
+    snapshot.errorMessage &&
+    PUBLIC_SIGNAL_POST_OPTIONAL_PLACEMENT_COLUMNS.some((column) =>
+      isMissingColumnError({ message: snapshot.errorMessage }, column),
+    )
+  ) {
+    return loadMostRecentPublishedHomepageSnapshot(client, limit, PUBLIC_SIGNAL_POST_BASE_SELECT);
+  }
+
+  return snapshot;
 }
 
 async function getPublicSignalPostSelect(client: EditorialClient) {
@@ -3551,44 +3541,21 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
     };
   }
 
-  const publicSelect = await getPublicSignalPostSelect(supabase);
+  const todayKey = input.today?.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+  const snapshot = await loadPublicHomepageSnapshotFast(supabase, PUBLIC_SIGNAL_SET_SIZE);
+  const posts = snapshot.posts.slice(0, TOP_SIGNAL_SET_SIZE);
 
-  if (!publicSelect.ok) {
+  if (snapshot.errorMessage) {
     return {
       source: "none",
       posts: [],
       depthPosts: [],
       briefingDate: null,
-      errorMessage: publicSelect.errorMessage,
+      errorMessage: `public signal_posts read failed: ${snapshot.errorMessage}`,
     };
   }
 
-  const todayKey = input.today?.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10);
-  const todayDepthPosts = await loadPublishedHomepageSnapshotForDate(
-    supabase,
-    todayKey,
-    PUBLIC_SIGNAL_SET_SIZE,
-    publicSelect.selectColumns,
-  );
-  const todayPosts = todayDepthPosts.slice(0, TOP_SIGNAL_SET_SIZE);
-
-  if (todayPosts.length > 0) {
-    return {
-      source: "published_live",
-      posts: todayPosts,
-      depthPosts: todayDepthPosts,
-      briefingDate: todayKey,
-    };
-  }
-
-  const recentSnapshot = await loadMostRecentPublishedHomepageSnapshot(
-    supabase,
-    PUBLIC_SIGNAL_SET_SIZE,
-    publicSelect.selectColumns,
-  );
-  const recentPosts = recentSnapshot.posts.slice(0, TOP_SIGNAL_SET_SIZE);
-
-  if (recentPosts.length === 0) {
+  if (posts.length === 0 || !snapshot.briefingDate) {
     return {
       source: "none",
       posts: [],
@@ -3598,9 +3565,9 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
   }
 
   return {
-    source: "recent_published",
-    posts: recentPosts,
-    depthPosts: recentSnapshot.posts,
-    briefingDate: recentSnapshot.briefingDate,
+    source: snapshot.briefingDate === todayKey ? "published_live" : "recent_published",
+    posts,
+    depthPosts: snapshot.posts,
+    briefingDate: snapshot.briefingDate,
   };
 }

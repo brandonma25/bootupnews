@@ -18,7 +18,10 @@ test.describe("V1 shell and routing", () => {
 
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first()).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("Browse by")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Top Events" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^Home$/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^History$/ }).first()).toBeVisible();
@@ -35,7 +38,7 @@ test.describe("V1 shell and routing", () => {
 
     await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("Browse by")).toHaveCount(0);
   });
 
   test("uses bottom tab navigation on mobile instead of a drawer", async ({ page }) => {

@@ -11,7 +11,9 @@ export const DEFAULT_ROUTE_EXPECTATIONS = [
     expected: [
       "Boot Up",
       "Today's signals",
-      "Browse by category",
+      "Tech",
+      "Finance",
+      "Politics",
     ],
     signedOutExpected: ["Public briefing", "Sign in to unlock History and Account."],
   },

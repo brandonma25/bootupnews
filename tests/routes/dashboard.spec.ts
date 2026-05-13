@@ -12,7 +12,10 @@ test.describe("dashboard route", () => {
     await expectNoAppCrash(page);
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-    await expect(page.getByText("Browse by")).toBeVisible();
+    await expect(page.getByText("Browse by")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
 
     await expectNamedVisibleButtons(page);
     await expectSafeInternalLinks(page);
@@ -25,7 +28,10 @@ test.describe("dashboard route", () => {
       await expectNoAppCrash(page);
       await expect(page).toHaveURL(/\/$/);
       await expect(page.getByRole("heading", { name: "Today's signals" })).toBeVisible();
-      await expect(page.getByText("Browse by")).toBeVisible();
+      await expect(page.getByText("Browse by")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Tech" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Finance" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Politics" })).toBeVisible();
 
       await expectNamedVisibleButtons(page);
       await expectSafeInternalLinks(page);
