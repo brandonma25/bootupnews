@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DateBadge } from "@/components/signals/DateBadge";
@@ -78,6 +78,98 @@ describe("Boot Up visual system components", () => {
 
     expect(screen.getByText("What happened")).toBeInTheDocument();
     expect(screen.getByText("Supporting coverage")).toBeInTheDocument();
+  });
+
+  it("opens its own depth in place when defaultExpanded is provided", () => {
+    const signal = {
+      id: "signal-interactive",
+      title: "Interactive expansion test",
+      whatHappened: "Bond markets moved after the latest inflation print.",
+      whyItMatters: "Higher-for-longer rates change borrowing costs and risk appetite.",
+      sourceName: "Reuters",
+      sourceUrl: "https://www.reuters.com/story",
+    };
+
+    render(<SignalCard signal={signal} rank={1} defaultExpanded={false} />);
+
+    const card = screen.getByTestId("signal-card");
+    expect(card).toHaveAttribute("data-signal-expanded", "false");
+    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Read more →" })).toBeNull();
+
+    const toggle = screen.getByTestId("signal-card-toggle");
+    expect(toggle).toHaveAccessibleName(/expand/i);
+
+    fireEvent.click(toggle);
+
+    expect(card).toHaveAttribute("data-signal-expanded", "true");
+    expect(screen.getByText("What happened")).toBeInTheDocument();
+    expect(toggle).toHaveAccessibleName(/collapse/i);
+  });
+
+  it("starts expanded when defaultExpanded is true", () => {
+    const signal = {
+      id: "signal-default-open",
+      title: "Briefing detail surface card",
+      whatHappened: "Source headline body.",
+      whyItMatters: "Editorial body.",
+      sourceName: "Reuters",
+      sourceUrl: "https://www.reuters.com/story",
+    };
+
+    render(<SignalCard signal={signal} rank={1} defaultExpanded />);
+
+    const card = screen.getByTestId("signal-card");
+    expect(card).toHaveAttribute("data-signal-expanded", "true");
+    expect(screen.getByText("What happened")).toBeInTheDocument();
+    expect(screen.getByTestId("signal-card-toggle")).toHaveAccessibleName(/collapse/i);
+  });
+
+  it("renders What happened in sans and the other depth sections in serif", () => {
+    const signal = {
+      id: "signal-sans-vs-serif",
+      title: "Typography differentiation",
+      whatHappened: "Factual source-headline body for the What happened layer.",
+      whyItMatters: "Editorial reasoning lives in serif voice.",
+      sourceName: "Reuters",
+      sourceUrl: "https://www.reuters.com/story",
+    };
+
+    render(<SignalCard signal={signal} rank={1} defaultExpanded />);
+
+    // What happened body — sans treatment for the factual layer.
+    const whatHappenedBody = screen.getByText(
+      /Factual source-headline body for the What happened layer/,
+    );
+    expect(whatHappenedBody).toHaveClass("font-sans");
+    expect(whatHappenedBody).not.toHaveClass("font-heading");
+
+    // Why this matters body appears in two places when expanded: the
+    // preview (line-clamped, above the footer) and the depth section
+    // (full, below the footer). Both must use the editorial serif
+    // family so the brand voice stays consistent across modes.
+    const whyItMattersBodies = screen.getAllByText("Editorial reasoning lives in serif voice.");
+    expect(whyItMattersBodies.length).toBeGreaterThan(0);
+    for (const body of whyItMattersBodies) {
+      expect(body).toHaveClass("font-heading");
+    }
+  });
+
+  it("renders the italic empty-state for What led to this when data is missing", () => {
+    const signal = {
+      id: "signal-empty-led",
+      title: "Card without structural context yet",
+      whyItMatters: "Editorial body only.",
+      sourceName: "Reuters",
+      sourceUrl: "https://www.reuters.com/story",
+    };
+
+    render(<SignalCard signal={signal} rank={1} defaultExpanded />);
+
+    expect(screen.getByText("What led to this")).toBeInTheDocument();
+    const placeholder = screen.getByText("No structural context yet for this signal.");
+    expect(placeholder).toHaveClass("italic");
+    expect(placeholder).toHaveClass("text-[var(--bu-text-tertiary)]");
   });
 
   it("keeps compact signals neutral for the secondary list surface", () => {

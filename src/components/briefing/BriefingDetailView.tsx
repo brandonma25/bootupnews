@@ -70,7 +70,7 @@ export function BriefingDetailView({
               signal={event}
               rank={index + 1}
               tier="core"
-              expanded
+              defaultExpanded
             />
           ))}
         </div>

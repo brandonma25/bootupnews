@@ -139,14 +139,45 @@ describe("LandingHomepage", () => {
     expect(within(cards[4]).getByText("Core signal · 05")).toBeInTheDocument();
     expect(within(cards[0]).getByText("Why this matters")).toBeInTheDocument();
     expect(within(cards[0]).getByTestId("signal-why-this-matters")).toHaveClass("line-clamp-2");
-    expect(within(cards[0]).getByRole("link", { name: "Read more →" })).toHaveAttribute(
-      "href",
-      "/briefing/2026-04-15",
-    );
+    // Per-card inline depth expansion: top events no longer link out to
+    // /briefing/<date>; they expand in place. The Expand toggle replaces
+    // the previous Read more link.
+    expect(within(cards[0]).queryByRole("link", { name: "Read more →" })).toBeNull();
+    expect(within(cards[0]).getByTestId("signal-card-toggle")).toHaveAccessibleName(/expand/i);
     expect(within(cards[0]).queryByText(/min read/i)).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Details")).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Tech")).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Point one")).not.toBeInTheDocument();
+  });
+
+  it("expands a Signal Card in place when the Expand toggle is clicked", () => {
+    const data = createData([
+      createItem({
+        id: "top-1",
+        title: "Top event 1",
+        whatHappened: "The source headline appears here as the What happened body.",
+        whyItMatters: "Why this matters body for the top event.",
+      }),
+    ]);
+
+    renderHomepage(data);
+
+    const card = screen.getAllByTestId("signal-card")[0];
+    expect(card).toHaveAttribute("data-signal-expanded", "false");
+    expect(within(card).queryByText("What happened")).not.toBeInTheDocument();
+
+    const toggle = within(card).getByTestId("signal-card-toggle");
+    expect(toggle).toHaveAccessibleName(/expand/i);
+
+    fireEvent.click(toggle);
+
+    expect(card).toHaveAttribute("data-signal-expanded", "true");
+    expect(within(card).getByText("What happened")).toBeInTheDocument();
+    expect(within(card).getByText("What led to this")).toBeInTheDocument();
+    expect(toggle).toHaveAccessibleName(/collapse/i);
+
+    fireEvent.click(toggle);
+    expect(card).toHaveAttribute("data-signal-expanded", "false");
   });
 
   it("uses the supplied homepage model instead of raw briefing items", () => {

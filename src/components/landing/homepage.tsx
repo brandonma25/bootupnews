@@ -100,7 +100,7 @@ export default function LandingHomepage({
                 signal={event}
                 rank={index + 1}
                 tier="core"
-                readMoreHref={detailHref}
+                defaultExpanded={false}
                 trackingAttributes={{
                   "data-mvp-measurement-event": "signal_details_click",
                   "data-mvp-route": "/",

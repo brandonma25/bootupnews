@@ -1,5 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 
 import { buildEditorialWhyItMattersText } from "@/lib/editorial-content";
 import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
@@ -34,6 +37,17 @@ export type SignalCardSignal = {
 
 export type SignalCardProps = {
   signal: SignalCardSignal;
+  /**
+   * Opt into per-card interactive expansion. When provided, the Card owns
+   * its expanded/collapsed state and renders an Expand ↓ / Collapse ↑
+   * toggle in the footer. Used by the homepage (false) and the briefing
+   * detail surface (true).
+   */
+  defaultExpanded?: boolean;
+  /**
+   * Legacy externally-controlled expansion. Used when defaultExpanded is
+   * not provided. Ignored when defaultExpanded is provided.
+   */
   expanded?: boolean;
   compact?: boolean;
   rank?: number;
@@ -45,6 +59,7 @@ export type SignalCardProps = {
 
 export function SignalCard({
   signal,
+  defaultExpanded,
   expanded = false,
   compact = false,
   rank,
@@ -53,17 +68,38 @@ export function SignalCard({
   trackingAttributes,
   className,
 }: SignalCardProps) {
+  const interactive = defaultExpanded !== undefined;
+  const [localExpanded, setLocalExpanded] = useState(defaultExpanded ?? false);
+  const isExpanded = interactive ? localExpanded : expanded;
+
   const displayRank = rank ?? signal.finalSlateRank ?? signal.rank ?? 1;
   const displayTier = tier ?? resolveSignalTier(signal, displayRank);
   const whyItMatters = getWhyItMattersText(signal);
   const sourceAttribution = getSourceAttribution(signal);
   const relatedCoverage = getRelatedCoverage(signal);
-  const whatLedToThis = getStructuredSection(signal.editorialWhyItMatters, /led|caus|before|context/i);
-  const whatItConnectsTo = getStructuredSection(signal.editorialWhyItMatters, /connect|next|watch|implication/i);
+  const whatHappenedBody = (signal.whatHappened || signal.summary || "").trim();
+  const whatLedToThisBody = getStructuredSection(
+    signal.editorialWhyItMatters,
+    /led|caus|before|context/i,
+  );
+  const whatItConnectsToBody = (
+    getStructuredSection(signal.editorialWhyItMatters, /connect|next|watch|implication/i) ||
+    signal.selectionReason ||
+    ""
+  ).trim();
+
   const readMoreClassName = cn(
     "shrink-0 text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-secondary)] transition-colors",
     compact ? "hover:text-[var(--bu-text-primary)]" : "hover:text-[var(--bu-accent)]",
   );
+
+  const toggleClassName = cn(
+    "inline-flex shrink-0 items-center gap-1 text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-secondary)] transition-colors hover:text-[var(--bu-text-primary)]",
+  );
+
+  function handleToggle() {
+    setLocalExpanded((value) => !value);
+  }
 
   return (
     <article
@@ -74,6 +110,7 @@ export function SignalCard({
       )}
       data-testid="signal-card"
       data-signal-tier={displayTier}
+      data-signal-expanded={isExpanded ? "true" : "false"}
     >
       <TierBadge tier={displayTier} rank={displayRank} accented={!compact} />
 
@@ -96,7 +133,7 @@ export function SignalCard({
           <p
             className={cn(
               "mt-1 font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]",
-              !expanded && !compact && "line-clamp-2",
+              !isExpanded && !compact && "line-clamp-2",
               compact && "line-clamp-2 text-[var(--bu-size-meta)] leading-[1.5]",
             )}
             data-testid="signal-why-this-matters"
@@ -110,7 +147,25 @@ export function SignalCard({
         <p className="min-w-0 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)]">
           {sourceAttribution}
         </p>
-        {readMoreHref ? (
+        {interactive ? (
+          <button
+            type="button"
+            onClick={handleToggle}
+            aria-expanded={isExpanded}
+            className={toggleClassName}
+            data-testid="signal-card-toggle"
+            {...trackingAttributes}
+          >
+            {isExpanded ? "Collapse" : "Expand"}
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                "h-3.5 w-3.5 transition-transform",
+                isExpanded ? "rotate-180" : "rotate-0",
+              )}
+            />
+          </button>
+        ) : readMoreHref ? (
           <Link
             href={readMoreHref}
             className={readMoreClassName}
@@ -131,13 +186,16 @@ export function SignalCard({
         ) : null}
       </footer>
 
-      {expanded ? (
+      {isExpanded ? (
         <div className="mt-4 border-t border-[var(--bu-border-subtle)] pt-4">
           <div className="space-y-4">
-            <ExpandedSection label="What happened" body={signal.whatHappened || signal.summary || ""} />
-            <ExpandedSection label="Why this matters" body={whyItMatters} />
-            <ExpandedSection label="What led to this" body={whatLedToThis} />
-            <ExpandedSection label="What it connects to" body={whatItConnectsTo || signal.selectionReason || ""} />
+            <WhatHappenedSection body={whatHappenedBody} />
+            <ExpandedSerifSection label="Why this matters" body={whyItMatters} />
+            <WhatLedToThisSection body={whatLedToThisBody} />
+            <ExpandedSerifSection
+              label="What it connects to"
+              body={whatItConnectsToBody}
+            />
           </div>
 
           {relatedCoverage.length ? (
@@ -172,19 +230,74 @@ export function SignalCard({
   );
 }
 
-function ExpandedSection({ label, body }: { label: string; body: string }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[var(--bu-size-micro)] font-medium uppercase leading-none tracking-[0.08em] text-[var(--bu-text-tertiary)]">
+      {children}
+    </p>
+  );
+}
+
+/**
+ * "What happened" body is the source-headline treatment — rendered in
+ * sans, not serif, to signal factual reporting rather than editorial
+ * judgment. See work prompt Change 1 typography rules.
+ */
+function WhatHappenedSection({ body }: { body: string }) {
   if (!body.trim()) {
     return null;
   }
 
   return (
     <section>
-      <p className="text-[var(--bu-size-micro)] font-medium uppercase leading-none tracking-[0.08em] text-[var(--bu-text-tertiary)]">
-        {label}
+      <SectionLabel>What happened</SectionLabel>
+      <p className="mt-1 font-sans text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]">
+        {body}
       </p>
+    </section>
+  );
+}
+
+/**
+ * "Why this matters" / "What it connects to" — editorial-voice sections
+ * in serif. Empty sections are suppressed to avoid empty boxes.
+ */
+function ExpandedSerifSection({ label, body }: { label: string; body: string }) {
+  if (!body.trim()) {
+    return null;
+  }
+
+  return (
+    <section>
+      <SectionLabel>{label}</SectionLabel>
       <p className="mt-1 font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]">
         {body}
       </p>
+    </section>
+  );
+}
+
+/**
+ * "What led to this" is the structural-causation layer and must render
+ * even when the underlying data is empty, per work prompt Change 1
+ * acceptance criteria. Empty state uses an italic placeholder so the
+ * absence is visible rather than silently hidden.
+ */
+function WhatLedToThisSection({ body }: { body: string }) {
+  const trimmed = body.trim();
+
+  return (
+    <section>
+      <SectionLabel>What led to this</SectionLabel>
+      {trimmed ? (
+        <p className="mt-1 font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]">
+          {trimmed}
+        </p>
+      ) : (
+        <p className="mt-1 font-heading italic text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-tertiary)]">
+          No structural context yet for this signal.
+        </p>
+      )}
     </section>
   );
 }
