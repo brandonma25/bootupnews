@@ -54,4 +54,4 @@ For an implementation-history map, see [docs/portfolio/PR_CLUSTERS.md](docs/port
 
 ## Current state
 
-Boot Up is an active MVP, not a mature commercial product. The core briefing model, public presentation layer, controlled publication flow, and editorial-review backbone are in place. The next cleanup pass is focused on separating portfolio-facing documentation from internal work history so reviewers can evaluate the product, architecture, and product judgment without wading through operational records.
+Boot Up is an active MVP, not a mature commercial product. The core briefing model, public presentation layer, controlled publication flow, editorial-review backbone, and portfolio-facing documentation layer are in place. Ongoing documentation maintenance should keep README.md, DECISIONS.md, and docs/portfolio/PR_CLUSTERS.md current through event-triggered freshness checks rather than routine per-PR narrative updates.

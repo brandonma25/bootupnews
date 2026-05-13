@@ -118,7 +118,7 @@ Closed PR titles are part of the historical record. Rewriting them would make th
 
 ## Cluster 10 — Repo Cleanup And Portfolio Readiness
 
-**PRs:** Current cleanup branch `cleanup/interviewer-readiness` (not merged at time of writing)
+**PRs:** #230 (`cleanup/interviewer-readiness`)
 
 **What changed:** The cleanup branch rewrote the README, added DECISIONS.md, created a reusable LLM change-classification template, added an archive manifest, routed future governance away from public operational records, quarantined operational documentation folders, scrubbed sensitive public-doc details, and added this implementation-history map.
 

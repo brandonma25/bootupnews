@@ -68,7 +68,7 @@ Boot Up was built as a solo, AI-agent-assisted product system. This file summari
 
 **Trade-off accepted:** Explanation quality becomes a gate, which slows publication when copy is vague, generic, or unsupported.
 
-**Evidence:** PRs #15, #16, #59, #115, #132; `docs/product/prd/prd-12-why-this-matters.md`; `docs/product/prd/prd-35-why-it-matters-template-quality.md`.
+**Evidence:** PRs #15, #16, #59, #115, #132; `docs/product/prd/prd-12-why-this-matters.md`; `docs/product/prd/prd-35-why-it-matters-quality.md`.
 
 **Interview read:** This shows the product valued reader comprehension over content throughput.
 
