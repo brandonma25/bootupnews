@@ -100,14 +100,14 @@ test.describe("homepage", () => {
       }
 
       return {
+        categoriesBeforeHeader: Boolean(categoryButton.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING),
         headerBeforeCards: Boolean(header.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING),
-        cardsBeforeCategories: Boolean(firstCard.compareDocumentPosition(categoryButton) & Node.DOCUMENT_POSITION_FOLLOWING),
       };
     });
 
     expect(structureOrder).toEqual({
+      categoriesBeforeHeader: true,
       headerBeforeCards: true,
-      cardsBeforeCategories: true,
     });
 
     const detailHref = await page.getByRole("link", { name: "Read more →" }).first().getAttribute("href");

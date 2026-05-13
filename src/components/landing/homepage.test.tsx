@@ -248,8 +248,10 @@ describe("LandingHomepage", () => {
     expect(document.getElementById("finance-panel")).toBeNull();
 
     const techLink = screen.getByRole("link", { name: "Technology" });
+    const header = screen.getByRole("heading", { name: "Today's signals" });
     const firstSignal = screen.getByText("Tech signal");
-    expect(Boolean(firstSignal.compareDocumentPosition(techLink) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(techLink.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(header.compareDocumentPosition(firstSignal) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
   });
 
   it("keeps category rows off the homepage and routes category links to dedicated pages", () => {

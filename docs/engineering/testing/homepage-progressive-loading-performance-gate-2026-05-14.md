@@ -13,7 +13,7 @@ This record covers the production load-time remediation for the public homepage.
 - Production route-probe defaults now use current Boot Up homepage markers so route verification can reach the performance gate.
 - Production verification now includes `npm run release:performance` with 3000 ms hard fails for LCP and network idle, plus a 2000 ms visible-content target.
 - App-shell navigation disables eager prefetch for Home, History, Account, Login, and editorial/admin entry links so the signed-out homepage does not spend its first seconds fetching routes the reader has not requested.
-- The visible `BROWSE BY` label is restored; Technology, Finance, and Politics links render below the Signal Card list and route to `/technology`, `/economics`, and `/politics`.
+- The visible `BROWSE BY` label is restored; Technology, Finance, and Politics links render at the top of the homepage and route to `/technology`, `/economics`, and `/politics`.
 - Automatic page-view analytics and PostHog initialization remain enabled but defer briefly after mount; user-intent events such as source clicks and category tab opens still track immediately.
 
 ## Validation Plan
