@@ -8,7 +8,7 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - Google Sheet / Google Work Log records are retired as live source-of-truth systems and may be used only as historical reference inputs.
 - Routine closeout must not update Google Sheets, claim tracker updates, or create public tracker-sync fallback files.
 - LLM coding agents should use `docs/engineering/templates/llm-prompt-template-change-classification.md` before selecting a governance path.
-- Terminology requirement: before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`. Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions. Do not use cluster, signal, story, or card interchangeably.
+- Terminology requirement: before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`. Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions. Do not use cluster, signal, story, or card interchangeably.
 - `docs/product/feature-system.csv` is the repo-side control layer for PRD mapping, build order, and durable governance metadata.
 - The CSV is the product control layer and its schema is locked to exactly 12 columns in this exact order:
   `Layer, Feature Name, Priority, Status, Description, Owner, Dependency, Build Order, Decision, Last Updated, prd_id, prd_file`

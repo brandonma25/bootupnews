@@ -13,7 +13,7 @@ describe("newsletter ingestion config", () => {
 
     expect(config.enabled).toBe(false);
     expect(config.dryRun).toBe(true);
-    expect(config.label).toBe("boot-up-benchmark");
+    expect(config.label).toBe("bootup-news-benchmark");
     expect(canWriteNewsletterIngestionRecords(config)).toBe(false);
     expect(getNewsletterWriteBlockReason(config)).toMatch(/enabled/i);
   });

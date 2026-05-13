@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use this prompt when Boot Up's public narrative docs may need a small update after a meaningful milestone, release, or batch of merged PRs.
+Use this prompt when Bootup News's public narrative docs may need a small update after a meaningful milestone, release, or batch of merged PRs.
 
 This is not a per-PR chore. Most operational evidence belongs in PR bodies, GitHub metadata, or external/private archives.
 

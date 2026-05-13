@@ -2,7 +2,7 @@
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Surface Placement.
-- PR: no PR found for the historical implementation branches listed below; canonical documentation was backfilled in PR #45, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/45`.
+- PR: no PR found for the historical implementation branches listed below; canonical documentation was backfilled in PR #45, `https://github.com/brandonma25/bootupnews/pull/45`.
 - Branch: historical branches listed by this record: `feature/auth-real-session`, `feature/google-auth-config-fix`, `feature/oauth-session-finalization-fix`.
 - Head SHA: not recoverable from GitHub PR metadata for the listed historical branches; PR #45 documentation head SHA `96bdd47ab6db18002ec38035d890f69c41dedd64`.
 - Merge SHA: not recoverable from GitHub PR metadata for the listed historical branches; PR #45 documentation merge SHA `c182403f25f98aa40d82073a3eedb24328ee926c`.

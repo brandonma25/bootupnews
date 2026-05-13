@@ -7,7 +7,7 @@ PR #75 repairs UI drift after the Artifact 10 global style merge, including typo
 ## GitHub Source-of-Truth Metadata
 
 - Affected object level: Card and Surface Placement.
-- PR: #75, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/75`.
+- PR: #75, `https://github.com/brandonma25/bootupnews/pull/75`.
 - Branch: `fix/prd-50-artifact-10-parity-repair`.
 - Head SHA: `8cd81966927df251d803456ca5e2feb74588ee1b`.
 - Merge SHA: `d4150dba5b1e03fcc6eb94baba8b8a163ac19c54`.

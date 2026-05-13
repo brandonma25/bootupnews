@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Boot Up — Editorial composer",
+  title: "Bootup News — Editorial composer",
   robots: {
     index: false,
     follow: false,

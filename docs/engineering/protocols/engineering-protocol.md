@@ -1,4 +1,4 @@
-# Boot Up — Engineering & Product Management Protocol
+# Bootup News — Engineering & Product Management Protocol
 
 ## System Authority
 - `AGENTS.md` = execution rules enforced by Codex
@@ -72,7 +72,7 @@
 - sanitization rule
 
 ## 4a. Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
 - Do not use cluster, signal, story, or card interchangeably.
 - Every substantial PRD or implementation prompt must identify which object level the work modifies: Article, Story Cluster, Signal, Card, or Surface Placement.
@@ -149,7 +149,7 @@ Implementation checklist:
 - Use this exact flow before creating a new branch:
 
 ```bash
-cd "/Users/bm/dev/daily-intelligence-aggregator"
+cd "/Users/bm/dev/bootupnews"
 pwd
 git checkout main
 git pull
@@ -260,7 +260,7 @@ are true:
 ## 10c. Local Repo and Worktree Discipline
 
 - This rule prevents dirty-tree confusion, wrong-branch continuation, duplicate branch ownership, and accidental cross-lane contamination.
-- The canonical local project root is `/Users/bm/dev/daily-intelligence-aggregator`.
+- The canonical local project root is `/Users/bm/dev/bootupnews`.
 - New worktrees for this repo should live under `/Users/bm/dev/worktrees/`.
 - Treat old `/Users/bm/Documents/...` and iCloud wrapper paths as stale unless the user explicitly points back to them and Git identity checks prove they are real checkouts.
 - A branch may have only one owning worktree at a time in normal operation. The owner is the path shown by `git worktree list`.
@@ -316,7 +316,7 @@ Never bypass worktree safety with --force or --ignore-other-worktrees for ordina
 - Local validation passed.
 - Preview validation passed.
 - Docs updated.
-- [ ] Terminology check completed against `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- [ ] Terminology check completed against `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
 - [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
 - [ ] If legacy naming is inconsistent, document it instead of silently expanding it.

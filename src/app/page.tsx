@@ -18,7 +18,7 @@ function readSingleParam(value: string | string[] | undefined) {
 const homepageUrl = buildPublicAppUrl("/");
 
 export const metadata: Metadata = {
-  title: "Boot Up — Today's signals",
+  title: "Bootup News — Today's signals",
   metadataBase: new URL(getPublicAppOrigin()),
   alternates: {
     canonical: homepageUrl,

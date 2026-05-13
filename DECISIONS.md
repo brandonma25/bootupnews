@@ -1,10 +1,10 @@
 # Decisions
 
-Boot Up was built as a solo, AI-agent-assisted product system. This file summarizes durable product and engineering decisions so the implementation history is easier to inspect: what the product chose to optimize for, what it intentionally avoided, and where governance was used to keep fast iteration legible. For a PR-level map of the implementation history, see [docs/portfolio/PR_CLUSTERS.md](docs/portfolio/PR_CLUSTERS.md).
+Bootup News was built as a solo, AI-agent-assisted product system. This file summarizes durable product and engineering decisions so the implementation history is easier to inspect: what the product chose to optimize for, what it intentionally avoided, and where governance was used to keep fast iteration legible. For a PR-level map of the implementation history, see [docs/portfolio/PR_CLUSTERS.md](docs/portfolio/PR_CLUSTERS.md).
 
 ## D01 — Briefing, not feed
 
-**Decision:** Boot Up should present a curated daily intelligence briefing, not an open-ended feed.
+**Decision:** Bootup News should present a curated daily intelligence briefing, not an open-ended feed.
 
 **Context:** The product needed to help a serious reader understand the day quickly, not maximize scrolling, article volume, or source coverage.
 
@@ -40,7 +40,7 @@ Boot Up was built as a solo, AI-agent-assisted product system. This file summari
 
 **Trade-off accepted:** The system needs stronger terminology, transformation logic, and review discipline to keep Article, Story Cluster, Signal, Card, and Surface Placement distinct.
 
-**Evidence:** `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`; `docs/product/prd/prd-37-phase1-pipeline.md`; PR #210 / merge `9463523`.
+**Evidence:** `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`; `docs/product/prd/prd-37-phase1-pipeline.md`; PR #210 / merge `9463523`.
 
 **Interview read:** This shows the product moved from content ingestion toward a clearer information architecture.
 

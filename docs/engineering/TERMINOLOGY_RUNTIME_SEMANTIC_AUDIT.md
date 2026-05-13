@@ -12,7 +12,7 @@ The only intended repository change is this audit document.
 
 ## Required Reading Completed
 
-- `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
+- `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`
 - `docs/engineering/TERMINOLOGY_DRIFT_AUDIT.md`
 - `AGENTS.md`
 - `docs/engineering/protocols/engineering-protocol.md`
@@ -26,17 +26,17 @@ Because `AGENTS.md` also requires protocol reading before substantial repo work,
 
 ## Workspace Decision
 
-The initial `Documents` checkout at `/Users/bm/Documents/daily-intelligence-aggregator-main` reported a bad `HEAD` tree and was not used for audit edits.
+The initial `Documents` checkout at `/Users/bm/Documents/bootupnews-main` reported a bad `HEAD` tree and was not used for audit edits.
 
-The live canonical repo path was verified under `/Users/bm/dev/daily-intelligence-aggregator`. A dedicated docs-only audit worktree was created from `origin/main`:
+The live canonical repo path was verified under `/Users/bm/dev/bootupnews`. A dedicated docs-only audit worktree was created from `origin/main`:
 
-- Worktree: `/Users/bm/dev/worktrees/daily-intelligence-aggregator-terminology-runtime-semantic-audit`
+- Worktree: `/Users/bm/dev/worktrees/bootupnews-terminology-runtime-semantic-audit`
 - Branch: `codex/terminology-runtime-semantic-audit`
 - Base: `origin/main` at `2299994`
 
 ## Canonical Runtime Levels
 
-Canonical terminology from `BOOTUP_CANONICAL_TERMINOLOGY.md` defines this object flow:
+Canonical terminology from `BOOTUPNEWS_CANONICAL_TERMINOLOGY.md` defines this object flow:
 
 `Article -> Story Cluster -> Signal -> Card -> Surface Placement`
 
@@ -246,7 +246,7 @@ The following drift has product or architecture consequences:
 
 Required docs and protocols:
 
-- `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
+- `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`
 - `docs/engineering/TERMINOLOGY_DRIFT_AUDIT.md`
 - `AGENTS.md`
 - `docs/engineering/protocols/engineering-protocol.md`

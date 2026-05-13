@@ -9,7 +9,7 @@ export const DEFAULT_ROUTE_EXPECTATIONS = [
   {
     path: "/",
     expected: [
-      "Boot Up",
+      "Bootup News",
       "Today's signals",
       "BROWSE BY",
       "Technology",
@@ -20,7 +20,7 @@ export const DEFAULT_ROUTE_EXPECTATIONS = [
   },
   {
     path: "/dashboard",
-    expected: ["Boot Up"],
+    expected: ["Bootup News"],
     signedOutExpected: [],
   },
 ];

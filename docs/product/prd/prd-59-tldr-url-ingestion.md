@@ -8,7 +8,7 @@
 
 ## Objective
 
-Feed TLDR article URLs into the existing Boot Up ingestion pipeline without treating TLDR editorial copy as canonical content.
+Feed TLDR article URLs into the existing Bootup News ingestion pipeline without treating TLDR editorial copy as canonical content.
 
 ## Reference Inputs
 
@@ -26,7 +26,7 @@ Feed TLDR article URLs into the existing Boot Up ingestion pipeline without trea
   - `https://tldr.tech/api/rss/crypto`
   - `https://tldr.tech/api/rss/marketing`
 
-The Bullrich repo and feed index remain reference-only inputs for discovery-shape validation. They are not Boot Up editorial sources, canonical publishers, or preferred production runtime feed inputs. The deployed [bullrich.dev/tldr-rss](https://bullrich.dev/tldr-rss/) index remains reference/fallback only.
+The Bullrich repo and feed index remain reference-only inputs for discovery-shape validation. They are not Bootup News editorial sources, canonical publishers, or preferred production runtime feed inputs. The deployed [bullrich.dev/tldr-rss](https://bullrich.dev/tldr-rss/) index remains reference/fallback only.
 
 ## Architecture Decision
 
@@ -34,7 +34,7 @@ TLDR is a discovery source only.
 
 Runtime shape:
 
-`TLDR digest RSS -> digest page fetch -> outbound URL extraction -> URL normalization -> dedupe candidate creation -> existing Boot Up ingestion/normalization/dedup/clustering/ranking pipeline`
+`TLDR digest RSS -> digest page fetch -> outbound URL extraction -> URL normalization -> dedupe candidate creation -> existing Bootup News ingestion/normalization/dedup/clustering/ranking pipeline`
 
 Guardrails:
 

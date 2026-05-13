@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { renderHomepageCategoryPage } from "@/app/category-page";
 
 export const metadata: Metadata = {
-  title: "Boot Up — Finance",
+  title: "Bootup News — Finance",
 };
 
 export default function EconomicsPage() {

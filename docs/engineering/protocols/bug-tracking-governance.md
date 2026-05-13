@@ -12,7 +12,7 @@
 - PR bodies alone are not sufficient durable remediation documentation for meaningful fixes.
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
 - Do not use cluster, signal, story, or card interchangeably.
 - Bug-fix records must state which object level was affected when the defect involves ingestion, clustering, ranking, UI cards, or placement behavior.

@@ -41,7 +41,7 @@ The scheduled route delegates first to the existing `generateDailyBriefing` pipe
 ## Terminology Requirement
 
 - Object level modified: Article ingestion automation, Signal ranking execution, Signal Card editorial snapshot persistence, and non-live Surface Placement review-candidate creation.
-- Article, Story Cluster, Signal, Card, and Surface Placement terminology follows `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Article, Story Cluster, Signal, Card, and Surface Placement terminology follows `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - `signal_posts` remains legacy/runtime storage for editorial and public Surface Placement plus Card copy, not canonical Signal identity.
 
 ## Dependencies / Risks

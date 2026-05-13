@@ -3,12 +3,12 @@
 ## Release Metadata
 - Date: 2026-04-26
 - Branch: `hotfix/prod-homepage-500-ingestion-ssr`
-- PR: #108, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/108`
+- PR: #108, `https://github.com/brandonma25/bootupnews/pull/108`
 
 ## GitHub Source-of-Truth Metadata
 
 - Affected object level: Surface Placement.
-- PR: #108, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/108`.
+- PR: #108, `https://github.com/brandonma25/bootupnews/pull/108`.
 - Branch: `hotfix/prod-homepage-500-ingestion-ssr`.
 - Head SHA: `d3609c1be58aefd765b1f902958492457b0a8704`.
 - Merge SHA: `ff1c7dce7efc4f350ebc043fa5902aaed01185a5`.

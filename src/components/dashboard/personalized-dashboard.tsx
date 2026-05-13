@@ -104,7 +104,7 @@ export default function PersonalizedDashboard({
           title={isSignedIn ? "Full briefing workspace" : "Today's public briefing"}
           description={
             isSignedIn
-              ? "This is the complete Boot Up workspace: confirmed event clusters first, early signals kept separate, visible ranking logic on every card, and the full reading workflow in one place."
+              ? "This is the complete Bootup News workspace: confirmed event clusters first, early signals kept separate, visible ranking logic on every card, and the full reading workflow in one place."
               : "You're viewing the public briefing. Sign in to personalize your intelligence and unlock the complete ranked workspace."
           }
           aside={

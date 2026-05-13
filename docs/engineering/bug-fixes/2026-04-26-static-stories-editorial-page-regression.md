@@ -8,7 +8,7 @@
 ## Fix
 - Exact change: homepage SSR now prefers a persisted `signal_posts` snapshot helper before using honest category-specific placeholders; editorial review reads stored signal rows only; `/account` reads only request auth state, `user_profiles`, and `sources`.
 - Related PRD: existing homepage/editorial/account behavior maps to PRD-17, PRD-49, and PRD-53; no new canonical PRD was required.
-- PR: #109, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/109`
+- PR: #109, `https://github.com/brandonma25/bootupnews/pull/109`
 - Branch: `bugfix/static-stories-editorial-page-regression`
 - Head SHA: `a45fdb6d93d4ea4f220b641dfe194964218b0528`
 - Merge SHA: `ab4536b7a6b05ac9642dc5b4053f0778096cd5b8`

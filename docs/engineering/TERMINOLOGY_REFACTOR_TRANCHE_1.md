@@ -6,7 +6,7 @@ Change type: refactor
 
 Source of truth:
 
-- `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
+- `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`
 - `docs/engineering/TERMINOLOGY_DRIFT_AUDIT.md`
 - `docs/engineering/TERMINOLOGY_RUNTIME_SEMANTIC_AUDIT.md`
 - `docs/engineering/SIGNAL_POSTS_OPERATIONAL_CONTRACT.md`

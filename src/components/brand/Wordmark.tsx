@@ -20,7 +20,7 @@ export function Wordmark({ size = "md", className }: WordmarkProps) {
         className,
       )}
     >
-      Boot Up
+      Bootup News
     </span>
   );
 }

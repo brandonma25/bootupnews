@@ -52,7 +52,7 @@ const reviewData = {
   },
   issue: {
     number: 70,
-    url: "https://github.com/brandonma25/daily-intelligence-aggregator/issues/70",
+    url: "https://github.com/brandonma25/bootupnews/issues/70",
     historyAvailableInApp: false,
     note: "Issue #70 remains the durable multi-day review log.",
   },

@@ -6,7 +6,7 @@
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Surface Placement validation coverage.
-- PR: #88, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/88`.
+- PR: #88, `https://github.com/brandonma25/bootupnews/pull/88`.
 - Branch: `feature/playwright-ui-audit-automation`.
 - Head SHA: `c357ba5814bc0c507da1fadae2db750b59a274ab`.
 - Merge SHA: `f7475c922b9addb76c9dc725638db875ba255cf0`.

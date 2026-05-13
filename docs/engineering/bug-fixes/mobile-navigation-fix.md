@@ -3,11 +3,11 @@
 ## Release Metadata
 - Date: 2026-04-19
 - Branch: `fix/mobile-navigation`
-- PR: #55, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/55`
+- PR: #55, `https://github.com/brandonma25/bootupnews/pull/55`
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Surface Placement.
-- PR: #55, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/55`.
+- PR: #55, `https://github.com/brandonma25/bootupnews/pull/55`.
 - Branch: `fix/mobile-navigation`.
 - Head SHA: `e026ecf8ee49ae55f7a7cb68c06e61a4c3a22f17`.
 - Merge SHA: `967247c1c89124a390673971725dfdc140610f53`.

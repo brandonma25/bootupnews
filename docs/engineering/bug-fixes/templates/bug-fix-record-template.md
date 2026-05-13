@@ -18,7 +18,7 @@
 - Branch cleanup status:
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.
 - [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
 - [ ] If legacy naming is inconsistent, document it instead of silently expanding it.

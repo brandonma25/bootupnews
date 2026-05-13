@@ -10,7 +10,7 @@ Add the Phase 2 database foundation for newsletter ingestion tracking, Story Clu
 
 ## User Problem
 
-Boot Up is a curated 7-story briefing: Top 5 Core plus Next 2 Context, with explicit structural why-it-matters reasoning. The current schema can publish a final slate, but Phase 2 needs durable source evidence, Story Cluster lineage, published-card history, and relationship tracking so future workflows can explain how Signals change and connect over time.
+Bootup News is a curated 7-story briefing: Top 5 Core plus Next 2 Context, with explicit structural why-it-matters reasoning. The current schema can publish a final slate, but Phase 2 needs durable source evidence, Story Cluster lineage, published-card history, and relationship tracking so future workflows can explain how Signals change and connect over time.
 
 ## Corrected Scope
 
@@ -168,7 +168,7 @@ Remaining operational follow-up:
 ## Evidence and Confidence
 
 - Repo evidence used:
-  - `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
+  - `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`
   - Existing Supabase migrations for `pipeline_article_candidates`, `published_slates`, `published_slate_items`, and `mvp_measurement_events`
   - Existing publish code that creates one `published_slates` row plus ordered `published_slate_items` rows at publish time
   - Existing explicit public `signal_posts` select lists in `src/lib/signals-editorial.ts`, `src/lib/homepage-editorial-overrides.ts`, and `src/app/health/rss/route.ts`

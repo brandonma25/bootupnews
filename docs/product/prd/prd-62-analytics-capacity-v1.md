@@ -6,11 +6,11 @@
 
 ## Objective
 
-Add a safe client-side PostHog bridge for Boot Up product analytics while preserving the existing Supabase MVP measurement pipeline, Vercel Analytics, Speed Insights, Sentry, and RSS observability.
+Add a safe client-side PostHog bridge for Bootup News product analytics while preserving the existing Supabase MVP measurement pipeline, Vercel Analytics, Speed Insights, Sentry, and RSS observability.
 
 ## User Problem
 
-Boot Up needs preview and production visibility into which public Signal surfaces readers actually use without making product reading dependent on third-party analytics or leaking sensitive data.
+Bootup News needs preview and production visibility into which public Signal surfaces readers actually use without making product reading dependent on third-party analytics or leaking sensitive data.
 
 ## Scope
 
@@ -19,7 +19,7 @@ Boot Up needs preview and production visibility into which public Signal surface
 - Gate PostHog behind `NEXT_PUBLIC_ENABLE_POSTHOG`, `NEXT_PUBLIC_POSTHOG_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST`, and explicit UX diagnostics switches for session replay, replay sample rate, automatic PostHog pageviews, click autocapture, heatmaps, and dead-click capture.
 - Forward validated MVP measurement events to PostHog with the same event names already used by Supabase storage.
 - Track category tab opens as `category_tab_open` with only the category key, route, and surface so progressive loading can be measured without sending article copy or source URLs.
-- Keep SDK `capture_pageview` disabled so Boot Up can emit sanitized PostHog `$pageview` events through the existing bridge only when BM explicitly enables the pageview stream for broader product analytics.
+- Keep SDK `capture_pageview` disabled so Bootup News can emit sanitized PostHog `$pageview` events through the existing bridge only when BM explicitly enables the pageview stream for broader product analytics.
 - Allow click-only autocapture and heatmaps when explicitly enabled, with admin/auth routes excluded and text/input/attribute masking kept on.
 - Strip query strings, source URL parameters, secrets, email-like fields, cookies, tokens, article bodies, and full Why It Matters copy from forwarded analytics properties.
 - Keep admin and auth routes ineligible for session replay.

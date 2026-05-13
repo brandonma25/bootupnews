@@ -95,7 +95,7 @@ function createDashboardData(items: BriefingItem[]): DashboardData {
     briefing: {
       id: "briefing-1",
       briefingDate: "2026-04-19T08:00:00.000Z",
-      title: "Boot Up",
+      title: "Bootup News",
       intro: "Intro",
       readingWindow: "20 minutes",
       items,

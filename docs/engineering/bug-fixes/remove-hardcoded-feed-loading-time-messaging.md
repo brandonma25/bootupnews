@@ -10,7 +10,7 @@
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Surface Placement.
-- PR: #94, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/94`.
+- PR: #94, `https://github.com/brandonma25/bootupnews/pull/94`.
 - Branch: `fix/v1-production-remediation`.
 - Head SHA: `c6ce9e5cc5e946c2c9c386daf3f1ef51ebc7f996`.
 - Merge SHA: `63f1a748fb55730d305dff3140f70423ad8132c9`.

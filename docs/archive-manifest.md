@@ -1,6 +1,6 @@
 # Archive Manifest
 
-This manifest records the first public documentation cleanup pass for Boot Up's interviewer-facing repository surface.
+This manifest records the first public documentation cleanup pass for Bootup News's interviewer-facing repository surface.
 
 The files listed here were removed from the public browse path after private preservation because they were operational records, stale handoff notes, duplicate prompt-packet artifacts, or stray root files. The cleanup separates portfolio-facing documentation from implementation and operations history while preserving evidence outside the public repository.
 

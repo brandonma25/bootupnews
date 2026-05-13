@@ -1,4 +1,4 @@
-export const DEFAULT_NEWSLETTER_LABEL = "boot-up-benchmark";
+export const DEFAULT_NEWSLETTER_LABEL = "bootup-news-benchmark";
 export const DEFAULT_NEWSLETTER_MAX_EMAILS_PER_RUN = 10;
 export const DEFAULT_NEWSLETTER_SINCE_HOURS = 36;
 

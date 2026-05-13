@@ -5,7 +5,7 @@ Homepage depth surfaces were unintentionally fed from the already-truncated `bri
 ## GitHub Source-of-Truth Metadata
 
 - Affected object level: Signal, Card, and Surface Placement.
-- PR: #105, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/105`.
+- PR: #105, `https://github.com/brandonma25/bootupnews/pull/105`.
 - Branch: `feature/prd-55-homepage-volume-layers`.
 - Head SHA: `13fd964ff5e0f2109cb066fa444e41b978b99e56`.
 - Merge SHA: `9db39d7a4a02cdb41322826e47a39db0e350ce12`.

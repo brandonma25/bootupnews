@@ -5,7 +5,7 @@ import { buildAuthCallbackExchangeUrl, hasAuthReturnParams } from "@/lib/auth";
 import { env, isSupabaseConfigured } from "@/lib/env";
 
 const CANONICAL_HOST = "bootupnews.com";
-const LEGACY_REDIRECT_HOSTS = new Set(["bootupnews.vercel.app", "www.bootupnews.com"]);
+const LEGACY_REDIRECT_HOSTS = new Set(["www.bootupnews.com"]);
 
 function buildCanonicalHostRedirectUrl(requestUrl: URL, host: string) {
   const normalizedHost = host.split(":")[0]?.toLowerCase() ?? "";

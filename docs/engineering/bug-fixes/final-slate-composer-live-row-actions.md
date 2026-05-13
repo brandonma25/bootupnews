@@ -9,14 +9,14 @@
 - Exact change: lock final-slate placement controls for non-persisted, live, already-published, or blocking-decision rows; hide replacement controls for locked rows; keep valid unpublished draft-slate controls enabled; add a server guard preventing remove-from-slate mutations on live or already-published rows.
 - Click-level follow-up: authenticated preview inspection confirmed guarded controls were HTML-disabled, but disabled primary buttons still retained active green styling. The shared button component now renders disabled buttons with neutral disabled styling so guarded actions no longer look clickable.
 - Related PRD: existing PRD-53 signals admin editorial workflow; no new canonical PRD is required.
-- PR: #190, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/190`
+- PR: #190, `https://github.com/brandonma25/bootupnews/pull/190`
 - Branch: `bugfix/final-slate-composer-buttons`
 - Head SHA: `b97a9e7112e695202edaa014a272e1a0ef4224a4`
 - Merge SHA: `9c94a8585a7d2a35a7cf8d3d0f0fde7424ad351a`
 - GitHub source-of-truth status: canonical bug-fix record confirmed and metadata updated on 2026-05-04.
 - External references reviewed, if any: PR #190 metadata and preview validation notes in the PR body.
 - Google Sheet / Work Log reference, if historically relevant: none used as canonical input.
-- Branch cleanup status: branch still appears in local worktree ownership at `/Users/bm/dev/worktrees/daily-intelligence-aggregator-final-slate-composer-buttons`; no deletion was performed in this branch.
+- Branch cleanup status: branch still appears in local worktree ownership at `/Users/bm/dev/worktrees/bootupnews-final-slate-composer-buttons`; no deletion was performed in this branch.
 
 ## Terminology Requirement
 - [x] Confirmed object level before coding: Surface Placement and Card state in the legacy `signal_posts` editorial workflow.

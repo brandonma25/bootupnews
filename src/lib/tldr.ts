@@ -190,7 +190,7 @@ export async function ingestTldrCandidates(
 }
 
 // MIT attribution: this keeps the same high-level extraction shape as Bullrich/tldr-rss
-// (digest RSS -> digest HTML -> linked headlines) while using Boot Up's own pipeline contracts.
+// (digest RSS -> digest HTML -> linked headlines) while using Bootup News's own pipeline contracts.
 export function extractLinksFromDigest(digestHtml: string): TldrDigestLink[] {
   const seenNormalizedUrls = new Set<string>();
   const links: TldrDigestLink[] = [];

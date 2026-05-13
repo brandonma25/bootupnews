@@ -7,8 +7,8 @@
 
 ## Fix
 - Exact change: Delete the three invalid non-live rows, skip missing-source candidates before draft insertion, report skipped candidates with `missing_public_source_url`, block approval/final-slate assignment/final-slate readiness/publish readiness for missing public URLs, and add a database constraint preventing empty or non-http(s) `signal_posts.source_url`.
-- Related PRD: Not required. This is bug-fix / data remediation aligned to the existing Boot Up MVP editorial source-of-truth.
-- PR: `https://github.com/brandonma25/daily-intelligence-aggregator/pull/208`.
+- Related PRD: Not required. This is bug-fix / data remediation aligned to the existing Bootup News MVP editorial source-of-truth.
+- PR: `https://github.com/brandonma25/bootupnews/pull/208`.
 - Branch: `bugfix/source-url-prewrite-guard-20260510`
 - Head SHA: `0349988e60ce0d860c18fd26ca4b07d92ec2f6d5`.
 - Merge SHA: `24cf07e3b8f4f4394c3dd3667eec663de1f0782b`.
@@ -19,7 +19,7 @@
 - Branch cleanup status: Merged remote branch deleted. Local worktree retained for follow-up cleanup.
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - [x] Confirmed object level before coding: Surface Placement + Card copy.
 - [x] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
 - [x] If legacy naming is inconsistent, document it instead of silently expanding it.

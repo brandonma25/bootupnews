@@ -8,7 +8,7 @@
 ## Fix
 - Exact change: Recompute fallback persisted WITM validation with the same Core/Context context fields used by the controlled pipeline report, while still preserving supplied validation metadata when present.
 - Related PRD: No new PRD required; this is controlled operations remediation for the existing Phase 1 editorial cycle validation path.
-- PR: https://github.com/brandonma25/daily-intelligence-aggregator/pull/207.
+- PR: https://github.com/brandonma25/bootupnews/pull/207.
 - Branch: `fix/draft-only-witm-validation-context-20260508`.
 - Head SHA at PR creation: `671931c513ff8001b329af9f126925d9e7fc685d`.
 - Merge SHA: TBD.
@@ -18,7 +18,7 @@
 - Branch cleanup status: pending post-merge cleanup.
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - [x] Confirmed object level before coding: Signal / Surface Placement.
 - [x] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card.
 - [x] Legacy `signal_posts` naming remains treated as Surface Placement plus editorial read-model storage.

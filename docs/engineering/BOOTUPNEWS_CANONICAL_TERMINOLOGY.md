@@ -1,8 +1,8 @@
-# Boot Up Canonical Terminology
+# Bootup News Canonical Terminology
 
 ## Purpose
 
-Boot Up uses a staged intelligence object model. This document defines the canonical terms that future PRDs, implementation prompts, code reviews, and cleanup audits must use when discussing ingestion, grouping, ranking, rendering, and placement.
+Bootup News uses a staged intelligence object model. This document defines the canonical terms that future PRDs, implementation prompts, code reviews, and cleanup audits must use when discussing ingestion, grouping, ranking, rendering, and placement.
 
 The goal is to prevent drift between "article," "story," "cluster," "signal," and "card" language. These terms describe different object levels and must not be used interchangeably.
 
@@ -12,7 +12,7 @@ The goal is to prevent drift between "article," "story," "cluster," "signal," an
 Article -> Story Cluster -> Signal -> Card -> Surface Placement
 ```
 
-Boot Up should conceptually rank Signals, not raw Articles or raw Story Clusters. Cards and surface placements are presentation decisions layered on top of Signal identity.
+Bootup News should conceptually rank Signals, not raw Articles or raw Story Clusters. Cards and surface placements are presentation decisions layered on top of Signal identity.
 
 ## Definitions
 
@@ -39,7 +39,7 @@ It answers:
 - What does it connect to?
 - Why should the user care today?
 
-Signals are the conceptual product objects that Boot Up ranks for user attention.
+Signals are the conceptual product objects that Bootup News ranks for user attention.
 
 ### Card
 

@@ -21,7 +21,7 @@
 ## Fix
 - Exact change: dedupe Home Card key points against title, lead summary, and `whatHappened`; render the signed-out category gate only when the active category tab has content; rename public tabs to `Tech`, `Finance`, and `Politics`; and allow the top published set to populate category tabs whenever no broader non-top depth pool exists.
 - Related PRD: None.
-- PR: https://github.com/brandonma25/daily-intelligence-aggregator/pull/205.
+- PR: https://github.com/brandonma25/bootupnews/pull/205.
 - Branch: `fix/public-card-tabs-remediation-20260508`.
 - Head SHA at PR creation: `cb6520f5a9c24ddf76cd987849a362677ce2bb72`.
 - Merge SHA: TBD.

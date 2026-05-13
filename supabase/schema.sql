@@ -132,7 +132,7 @@ create table if not exists public.newsletter_emails (
   subject text,
   received_at timestamptz not null,
   processed_at timestamptz,
-  label text not null default 'boot-up-benchmark',
+  label text not null default 'bootup-news-benchmark',
   raw_content text,
   content_sha256 text,
   extraction_status text not null default 'pending',

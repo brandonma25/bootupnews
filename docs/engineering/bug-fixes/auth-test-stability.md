@@ -2,7 +2,7 @@
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Surface Placement test coverage; production content objects were not changed.
-- PR: #27, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/27`.
+- PR: #27, `https://github.com/brandonma25/bootupnews/pull/27`.
 - Branch: `fix/auth-test-stability`.
 - Head SHA: `456eb933ee91c84ae0281d272a3149d81c84b004`.
 - Merge SHA: `9cf9c11b8788f8151b0adab2092ddcbc3add46d4`.

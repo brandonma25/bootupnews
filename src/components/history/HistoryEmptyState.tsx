@@ -19,7 +19,7 @@ export function HistoryEmptyState({ className }: HistoryEmptyStateProps) {
         Past briefings
       </h1>
       <p className="mt-3 max-w-xl font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-secondary)]">
-        Nothing here yet. Boot Up tomorrow morning and this is where past briefings will live.
+        Nothing here yet. Bootup News tomorrow morning and this is where past briefings will live.
       </p>
       <div className="mt-5 flex w-full flex-col gap-3 sm:max-w-sm sm:flex-row sm:justify-center">
         <Button asChild variant="secondary" className="min-h-11 w-full sm:w-auto">

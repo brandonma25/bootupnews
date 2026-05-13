@@ -7,7 +7,7 @@
 - 
 
 ## Terminology Requirement
-- Before implementation, read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`.
+- Before implementation, read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`.
 - Use Article, Story Cluster, Signal, Card, and Surface Placement according to the canonical definitions.
 - Do not use cluster, signal, story, or card interchangeably.
 - [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement.

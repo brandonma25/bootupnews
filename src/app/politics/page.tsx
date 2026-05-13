@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { renderHomepageCategoryPage } from "@/app/category-page";
 
 export const metadata: Metadata = {
-  title: "Boot Up — Politics",
+  title: "Bootup News — Politics",
 };
 
 export default function PoliticsPage() {

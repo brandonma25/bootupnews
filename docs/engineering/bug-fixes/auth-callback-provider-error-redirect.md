@@ -6,7 +6,7 @@
 
 ## GitHub Source-of-Truth Metadata
 - Affected object level: Surface Placement.
-- PR: #72, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/72`.
+- PR: #72, `https://github.com/brandonma25/bootupnews/pull/72`.
 - Branch: `fix/auth-callback-provider-error-redirect`.
 - Head SHA: `0ae89ffb21641165bef8ac2cf2f8fe9b1558d99e`.
 - Merge SHA: `96dfd8b949f8fa48bc101f28f4e89709937ac2f8`.

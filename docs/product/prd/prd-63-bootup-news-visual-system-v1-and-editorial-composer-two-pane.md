@@ -1,12 +1,12 @@
-# PRD-63 — Boot Up visual system v1 and editorial composer two pane
+# PRD-63 — Bootup News visual system v1 and editorial composer two pane
 
 - PRD ID: `PRD-63`
-- Canonical file: `docs/product/prd/prd-63-boot-up-visual-system-v1-and-editorial-composer-two-pane.md`
+- Canonical file: `docs/product/prd/prd-63-bootup-news-visual-system-v1-and-editorial-composer-two-pane.md`
 - Feature system row: `docs/product/feature-system.csv`
 
 ## Objective
 
-Align the live product with the locked Boot Up brand direction and introduce the v1 visual system across the primary reader surfaces, while rebuilding the admin editorial composer into a two-pane workflow with the final slate visible beside the candidate pool.
+Align the live product with the locked Bootup News brand direction and introduce the v1 visual system across the primary reader surfaces, while rebuilding the admin editorial composer into a two-pane workflow with the final slate visible beside the candidate pool.
 
 ## User Problem
 
@@ -14,8 +14,8 @@ The live product still presented older Daily Intelligence naming, executive-targ
 
 ## Scope
 
-- Rename user-facing product copy and page metadata to Boot Up.
-- Add Boot Up v1 tokens for color, typography, spacing, radius, borders, and admin status colors.
+- Rename user-facing product copy and page metadata to Bootup News.
+- Add Bootup News v1 tokens for color, typography, spacing, radius, borders, and admin status colors.
 - Load Inter Tight and Source Serif 4 through `next/font/google`.
 - Rework sidebar, homepage, briefing detail, signals list, history, account, and shared shell styling for the light-mode v1 system.
 - Render the homepage Top 5 as a single ranked column with simplified Signal Card faces.
@@ -37,7 +37,7 @@ The live product still presented older Daily Intelligence naming, executive-targ
 ## Implementation Shape / System Impact
 
 - `src/app/globals.css`, `tailwind.config.ts`, and `src/app/layout.tsx` define and apply the v1 visual tokens and font variables.
-- `src/components/brand/Wordmark.tsx` owns the typographic Boot Up wordmark.
+- `src/components/brand/Wordmark.tsx` owns the typographic Bootup News wordmark.
 - `src/components/signals/*` owns DateBadge, TierBadge, EmptyState, and SignalCard presentation contracts.
 - Public routes reuse the shared SignalCard hierarchy and remove old reading-time, category pill, Details, and tag chrome from card faces.
 - `/signals` remains addressable as a secondary list surface and uses compact neutral cards.
@@ -58,7 +58,7 @@ The live product still presented older Daily Intelligence naming, executive-targ
 
 ## Acceptance Criteria
 
-- Sidebar and page metadata use Boot Up naming.
+- Sidebar and page metadata use Bootup News naming.
 - Sidebar tagline reads: For people who want to understand the world, not just consume it.
 - Inter Tight and Source Serif 4 load through `next/font/google`.
 - Body defaults to the sans variable and WITM body copy uses the serif variable.
@@ -66,7 +66,7 @@ The live product still presented older Daily Intelligence naming, executive-targ
 - Signal Card faces contain only tier marker, title, Why this matters preview, source attribution, and Read more.
 - Top Events is removed as a homepage tab and category browse is visually secondary.
 - `/signals` is removed from primary sidebar navigation and remains a secondary direct route.
-- History empty state uses the Boot Up copy and neutral outlined action.
+- History empty state uses the Bootup News copy and neutral outlined action.
 - Editorial composer renders a sticky desktop slot panel and mobile collapsible drawer.
 - Candidate rows show WITM inline and expose inline assignment plus rewrite controls.
 - Rewrite-blocked candidates show warning treatment and disabled assignment.
@@ -75,7 +75,7 @@ The live product still presented older Daily Intelligence naming, executive-targ
 ## Evidence and Confidence
 
 - Repo evidence used: implementation prompt, existing public routes, existing editorial review route, final-slate readiness helpers, and existing authorization gates.
-- Validation record: `docs/engineering/change-records/2026-05-13-boot-up-visual-system-v1.md`.
+- Validation record: `docs/engineering/change-records/2026-05-13-bootup-news-visual-system-v1.md`.
 - Confidence: High for code-level implementation, local tests, local build, route probes, and fixture-backed visual QA. Production validation remains post-merge.
 
 ## Closeout Checklist

@@ -8,7 +8,7 @@ import { isAdminUser } from "@/lib/admin-auth";
 import { getAccountPageState } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "Boot Up — Account",
+  title: "Bootup News — Account",
 };
 
 export default async function AccountPage() {

@@ -14,7 +14,7 @@
 ## Fix
 - Exact change: remove the public `/briefing/[date]` `Why this ranks here` block, suppress the `What happened` section only when it duplicates the lead copy exactly, filter internal `/signals` tag badges, and replace the `/signals` internal header badge with reader-facing `Signals`.
 - Related PRD: none; bug-fix / public surface copy remediation only.
-- PR: #202, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/202`.
+- PR: #202, `https://github.com/brandonma25/bootupnews/pull/202`.
 - Branch: `bugfix/public-surface-copy-remediation`.
 - Implementation SHA: `4a9f348e37236f642dbda22ca1006f2f6441ea10`.
 - Final head SHA: `ca8df01b825bfa32984df9b9f7f62d01ee168f86`.

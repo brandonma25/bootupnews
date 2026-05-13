@@ -7,7 +7,7 @@ test.describe("homepage smoke", () => {
   test("loads the public V1 homepage and respects the current fallback state", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByText("Boot Up").first()).toBeVisible();
+    await expect(page.getByText("Bootup News").first()).toBeVisible();
     await expect(page.getByText("For people who want to understand the world, not just consume it.").first())
       .toBeVisible();
     await expect(page.getByText("BROWSE BY")).toBeVisible();

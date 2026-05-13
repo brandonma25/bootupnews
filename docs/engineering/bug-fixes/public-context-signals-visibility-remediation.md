@@ -9,7 +9,7 @@
 ## GitHub Source-of-Truth Metadata
 
 - Affected object level: Signal and Surface Placement.
-- PR: #148, `https://github.com/brandonma25/daily-intelligence-aggregator/pull/148`.
+- PR: #148, `https://github.com/brandonma25/bootupnews/pull/148`.
 - Branch: `codex/public-context-signals-visibility-remediation`.
 - Head SHA: `1a89fd8252875845f561bfd578fb9e3e8c9a75a6`.
 - Merge SHA: `07dde932c142eb424d0893f63bd4485899b795d3`.
@@ -21,7 +21,7 @@
 ## Source Of Truth
 
 - April 29 controlled manual publish verification: `april_29_controlled_manual_publish_verified`
-- Product Position: Boot Up is a seven-story daily briefing with Top 5 Core Signals plus Next 2 Context Signals.
+- Product Position: Bootup News is a seven-story daily briefing with Top 5 Core Signals plus Next 2 Context Signals.
 - Existing production state after the controlled manual publish: seven `2026-04-29` `signal_posts` rows are `published`, `is_live=true`, and have `published_at` populated.
 
 ## Root Cause

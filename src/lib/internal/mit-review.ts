@@ -9,7 +9,7 @@ import { fetchFeedArticles, type FeedArticle } from "@/lib/rss";
 
 export const MIT_INTERNAL_REVIEW_ROUTE = "/internal/mit-review";
 export const MIT_REVIEW_ISSUE_URL =
-  "https://github.com/brandonma25/daily-intelligence-aggregator/issues/70";
+  "https://github.com/brandonma25/bootupnews/issues/70";
 
 const MIT_SOURCE_ID = "mit-technology-review";
 const MAX_TOP_ITEMS = 5;

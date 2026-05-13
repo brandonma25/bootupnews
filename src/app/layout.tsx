@@ -23,7 +23,7 @@ const enableVercelAnalytics = process.env.VERCEL === "1";
 const enableVercelSpeedInsights = process.env.VERCEL === "1";
 
 export const metadata: Metadata = {
-  title: "Boot Up",
+  title: "Bootup News",
   description:
     "Ranked daily signals for people who want to understand the world, not just consume it.",
 };
