@@ -13,9 +13,11 @@
   --bu-text-secondary: #5C5C5A;
   --bu-text-tertiary: #8A8A85;
 
-  --bu-accent: #DC4A2F;
-  --bu-accent-soft: rgba(220, 74, 47, 0.08);
-  --bu-accent-hover: #C4391F;
+  /* Vermillion accent — darkened from #DC4A2F so the brand red reads as
+     deep vermillion rather than orange-leaning. Hover deepens further. */
+  --bu-accent: #B23A1F;
+  --bu-accent-soft: rgba(178, 58, 31, 0.08);
+  --bu-accent-hover: #9C2F18;
   --bu-accent-on: #FFFFFF;
 
   --bu-status-success-bg: #E8F2E8;

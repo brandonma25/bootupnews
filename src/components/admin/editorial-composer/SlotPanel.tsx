@@ -1,8 +1,10 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { Send } from "lucide-react";
 
 import { publishFinalSlateAction } from "@/app/dashboard/signals/editorial-review/actions";
+import { PublishConfirmDialog } from "@/components/admin/editorial-composer/PublishConfirmDialog";
 import { Button } from "@/components/ui/button";
 import type { EditorialSignalPost } from "@/lib/signals-editorial";
 import { cn } from "@/lib/utils";
@@ -13,13 +15,41 @@ export type ComposerSlot = {
   post: EditorialSignalPost | null;
 };
 
+export type PublishCounts = {
+  /** Candidates currently in the "approved" editorial state. */
+  approved: number;
+  /** Subset of approved that are not yet live (pending publish). */
+  pendingPublish: number;
+  /** Candidates already published / live. */
+  alreadyLive: number;
+};
+
 type SlotPanelProps = {
   slots: ComposerSlot[];
   canPublish: boolean;
   publishDisabledReason?: string | null;
+  /**
+   * Live counts shown above the Publish slate button so the editor can
+   * see, at a glance, what the slate looks like before the confirm
+   * dialog opens. Optional to preserve existing test fixtures.
+   */
+  publishCounts?: PublishCounts;
+  /**
+   * Approved-but-not-yet-published candidates. Drives the confirm
+   * dialog count, tier breakdown, and title list. Optional for
+   * backward compatibility with tests that only exercise the slot
+   * rendering and disabled-state behavior.
+   */
+  pendingPublishCandidates?: EditorialSignalPost[];
 };
 
-export function SlotPanel({ slots, canPublish, publishDisabledReason }: SlotPanelProps) {
+export function SlotPanel({
+  slots,
+  canPublish,
+  publishDisabledReason,
+  publishCounts,
+  pendingPublishCandidates,
+}: SlotPanelProps) {
   const filledCount = slots.filter((slot) => slot.post).length;
   const coreSlots = slots.filter((slot) => slot.tier === "core");
   const contextSlots = slots.filter((slot) => slot.tier === "context");
@@ -38,6 +68,8 @@ export function SlotPanel({ slots, canPublish, publishDisabledReason }: SlotPane
           contextSlots={contextSlots}
           canPublish={canPublish}
           publishDisabledReason={publishDisabledReason}
+          publishCounts={publishCounts}
+          pendingPublishCandidates={pendingPublishCandidates}
         />
       </details>
 
@@ -56,6 +88,8 @@ export function SlotPanel({ slots, canPublish, publishDisabledReason }: SlotPane
           contextSlots={contextSlots}
           canPublish={canPublish}
           publishDisabledReason={publishDisabledReason}
+          publishCounts={publishCounts}
+          pendingPublishCandidates={pendingPublishCandidates}
         />
       </aside>
     </>
@@ -67,11 +101,15 @@ function SlotPanelBody({
   contextSlots,
   canPublish,
   publishDisabledReason,
+  publishCounts,
+  pendingPublishCandidates,
 }: {
   coreSlots: ComposerSlot[];
   contextSlots: ComposerSlot[];
   canPublish: boolean;
   publishDisabledReason?: string | null;
+  publishCounts?: PublishCounts;
+  pendingPublishCandidates?: EditorialSignalPost[];
 }) {
   return (
     <>
@@ -79,16 +117,87 @@ function SlotPanelBody({
         <SlotGroup label="Core · 5 slots" slots={coreSlots} />
         <SlotGroup label="Context · 2 slots" slots={contextSlots} />
       </div>
-      <form action={publishFinalSlateAction} className="mt-[var(--bu-space-5)] space-y-[var(--bu-space-2)]">
-        <Button type="submit" disabled={!canPublish} className="w-full gap-2">
-          <Send className="h-4 w-4" aria-hidden="true" />
-          Publish slate
-        </Button>
-        <p className="text-[var(--bu-size-micro)] leading-5 text-[var(--bu-text-tertiary)]">
-          {publishDisabledReason ?? "Sticky · stays visible on scroll"}
+      {publishCounts ? (
+        <p
+          className="mt-[var(--bu-space-4)] text-[var(--bu-size-micro)] leading-5 text-[var(--bu-text-secondary)]"
+          data-testid="publish-summary"
+        >
+          {publishCounts.approved} approved · {publishCounts.pendingPublish} pending publish · {publishCounts.alreadyLive} already live
         </p>
-      </form>
+      ) : null}
+      <PublishSlateControls
+        canPublish={canPublish}
+        publishDisabledReason={publishDisabledReason}
+        publishCounts={publishCounts}
+        pendingPublishCandidates={pendingPublishCandidates ?? []}
+      />
     </>
+  );
+}
+
+function PublishSlateControls({
+  canPublish,
+  publishDisabledReason,
+  publishCounts,
+  pendingPublishCandidates,
+}: {
+  canPublish: boolean;
+  publishDisabledReason?: string | null;
+  publishCounts?: PublishCounts;
+  pendingPublishCandidates: EditorialSignalPost[];
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const pendingCount = publishCounts?.pendingPublish ?? pendingPublishCandidates.length;
+  const hasPending = pendingCount > 0;
+  const isDisabled = !canPublish || !hasPending;
+  const buttonLabel = hasPending ? `Publish ${pendingCount} candidates` : "Publish slate";
+  const helperText = !hasPending && canPublish
+    ? "No approved candidates pending publish."
+    : publishDisabledReason ?? "Sticky · stays visible on scroll";
+
+  function openConfirm() {
+    if (isDisabled) {
+      return;
+    }
+    setConfirmOpen(true);
+  }
+
+  function handleConfirmPublish() {
+    // Trigger the form submission so publishFinalSlateAction runs with
+    // the existing server-side eligibility gate. Using a ref keeps the
+    // mobile-drawer / desktop-aside double render correct because each
+    // instance owns its own form node.
+    formRef.current?.requestSubmit();
+    setConfirmOpen(false);
+  }
+
+  return (
+    <form
+      ref={formRef}
+      action={publishFinalSlateAction}
+      className="mt-[var(--bu-space-5)] space-y-[var(--bu-space-2)]"
+    >
+      <Button
+        type="button"
+        disabled={isDisabled}
+        onClick={openConfirm}
+        className="w-full gap-2"
+        data-testid="publish-slate-open"
+      >
+        <Send className="h-4 w-4" aria-hidden="true" />
+        {buttonLabel}
+      </Button>
+      <p className="text-[var(--bu-size-micro)] leading-5 text-[var(--bu-text-tertiary)]">
+        {helperText}
+      </p>
+      <PublishConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        pendingPublishCandidates={pendingPublishCandidates}
+        onConfirm={handleConfirmPublish}
+      />
+    </form>
   );
 }
 

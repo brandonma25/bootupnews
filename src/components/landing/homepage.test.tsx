@@ -137,16 +137,52 @@ describe("LandingHomepage", () => {
     expect(cards).toHaveLength(5);
     expect(within(cards[0]).getByText("Core signal · 01")).toBeInTheDocument();
     expect(within(cards[4]).getByText("Core signal · 05")).toBeInTheDocument();
-    expect(within(cards[0]).getByText("Why this matters")).toBeInTheDocument();
-    expect(within(cards[0]).getByTestId("signal-why-this-matters")).toHaveClass("line-clamp-2");
-    expect(within(cards[0]).getByRole("link", { name: "Read more →" })).toHaveAttribute(
-      "href",
-      "/briefing/2026-04-15",
-    );
+    // "Why this matters" appears twice when the card is expanded — once
+    // above the toggle as the collapsed-preview label, once below as
+    // the editorial depth-section label. Both are expected on the
+    // homepage now that cards land expanded by default.
+    expect(within(cards[0]).getAllByText("Why this matters").length).toBeGreaterThan(0);
+    // Per-card inline depth expansion: top events expand in place rather
+    // than linking out, and they now land already expanded on the
+    // homepage so the depth is visible at first glance. The footer
+    // toggle is therefore in its Collapse state.
+    expect(within(cards[0]).queryByRole("link", { name: "Read more →" })).toBeNull();
+    expect(within(cards[0]).getByTestId("signal-card-toggle")).toHaveAccessibleName(/collapse/i);
+    expect(cards[0]).toHaveAttribute("data-signal-expanded", "true");
     expect(within(cards[0]).queryByText(/min read/i)).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Details")).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Tech")).not.toBeInTheDocument();
     expect(within(cards[0]).queryByText("Point one")).not.toBeInTheDocument();
+  });
+
+  it("renders homepage Signal Cards expanded by default and supports collapse / re-expand in place", () => {
+    const data = createData([
+      createItem({
+        id: "top-1",
+        title: "Top event 1",
+        whatHappened: "The source headline appears here as the What happened body.",
+        whyItMatters: "Why this matters body for the top event.",
+      }),
+    ]);
+
+    renderHomepage(data);
+
+    const card = screen.getAllByTestId("signal-card")[0];
+    expect(card).toHaveAttribute("data-signal-expanded", "true");
+    expect(within(card).getByText("What happened")).toBeInTheDocument();
+    expect(within(card).getByText("What led to this")).toBeInTheDocument();
+
+    const toggle = within(card).getByTestId("signal-card-toggle");
+    expect(toggle).toHaveAccessibleName(/collapse/i);
+
+    fireEvent.click(toggle);
+
+    expect(card).toHaveAttribute("data-signal-expanded", "false");
+    expect(within(card).queryByText("What happened")).not.toBeInTheDocument();
+    expect(toggle).toHaveAccessibleName(/expand/i);
+
+    fireEvent.click(toggle);
+    expect(card).toHaveAttribute("data-signal-expanded", "true");
   });
 
   it("uses the supplied homepage model instead of raw briefing items", () => {
@@ -204,7 +240,10 @@ describe("LandingHomepage", () => {
     expect(screen.getByText(/April 15, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Today's signals")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Top Events" })).not.toBeInTheDocument();
-    expect(screen.getByText("Browse by")).toBeInTheDocument();
+    // Browse-by category strip now uses a prominent heading rather than a
+    // micro-caps label. Match via the testid so the assertion survives
+    // future copy tweaks.
+    expect(screen.getByTestId("browse-by-heading")).toHaveTextContent(/browse by/i);
     expect(screen.getByRole("button", { name: "Tech" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Finance" })).toBeInTheDocument();
 

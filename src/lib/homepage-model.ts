@@ -124,8 +124,11 @@ export type HomepageViewModel = {
 };
 
 const TOP_EVENTS_LIMIT = 4;
+// Bumped from 6 to 10 so each Browse-by-category tab exposes a fuller
+// list of category-specific stories on the homepage.
+
 const MIN_PUBLIC_TOP_EVENTS = 3;
-const CATEGORY_TAB_LIMIT = 6;
+const CATEGORY_TAB_LIMIT = 10;
 const DEVELOPING_NOW_EVENT_LIMIT = 10;
 const CATEGORY_PREVIEW_LIMIT = 3;
 const TRENDING_EVENT_LIMIT = 3;

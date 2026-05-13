@@ -4,8 +4,16 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { assignFinalSlateSlotInlineAction } from "@/app/dashboard/signals/editorial-review/actions";
+import {
+  BulkApproveForm,
+  isEligibleForBulkApprove,
+} from "@/components/admin/editorial-composer/BulkApproveForm";
 import { CandidateRow } from "@/components/admin/editorial-composer/CandidateRow";
-import { SlotPanel, type ComposerSlot } from "@/components/admin/editorial-composer/SlotPanel";
+import {
+  SlotPanel,
+  type ComposerSlot,
+  type PublishCounts,
+} from "@/components/admin/editorial-composer/SlotPanel";
 import {
   FINAL_SLATE_RANKS,
   getFinalSlateTierForRank,
@@ -32,6 +40,22 @@ export function EditorialComposerClient({
   const readiness = useMemo(() => validateFinalSlateReadiness(localCandidates), [localCandidates]);
   const slots = useMemo(() => buildSlots(localCandidates), [localCandidates]);
   const openSlots = slots.filter((slot) => !slot.post).map((slot) => slot.rank);
+
+  const bulkApproveCandidates = useMemo(
+    () => localCandidates.filter((candidate) => isEligibleForBulkApprove(candidate, storageReady)),
+    [localCandidates, storageReady],
+  );
+
+  const publishCounts = useMemo<PublishCounts>(
+    () => computePublishCounts(localCandidates),
+    [localCandidates],
+  );
+
+  const pendingPublishCandidates = useMemo(
+    () => localCandidates.filter(isPendingPublishCandidate),
+    [localCandidates],
+  );
+
   const effectivePublishDisabledReason =
     !storageReady
       ? "Publishing is blocked until editorial storage is configured."
@@ -80,6 +104,8 @@ export function EditorialComposerClient({
         slots={slots}
         canPublish={canPublish}
         publishDisabledReason={effectivePublishDisabledReason}
+        publishCounts={publishCounts}
+        pendingPublishCandidates={pendingPublishCandidates}
       />
 
       <div className="min-w-0">
@@ -93,6 +119,8 @@ export function EditorialComposerClient({
             {localCandidates.length} reviewable · {localCandidates.filter((candidate) => !candidate.finalSlateRank).length} unassigned
           </p>
         </div>
+
+        <BulkApproveForm eligibleCandidates={bulkApproveCandidates} />
 
         {inlineError ? (
           <p className="mb-[var(--bu-space-3)] rounded-[var(--bu-radius-md)] bg-[var(--bu-status-danger-bg)] px-3 py-2 text-[var(--bu-size-meta)] text-[var(--bu-status-danger-text)]">
@@ -128,4 +156,38 @@ function buildSlots(candidates: EditorialSignalPost[]): ComposerSlot[] {
     tier: getFinalSlateTierForRank(rank) ?? "core",
     post: candidates.find((candidate) => candidate.finalSlateRank === rank) ?? null,
   }));
+}
+
+function isPendingPublishCandidate(candidate: EditorialSignalPost) {
+  // "Pending publish" = approved by an editor but not yet pushed live.
+  // This is the slice the bulk Publish slate confirm dialog acts on.
+  return (
+    candidate.editorialStatus === "approved" &&
+    candidate.finalSlateRank !== null &&
+    !candidate.isLive &&
+    !candidate.publishedAt
+  );
+}
+
+function isLiveCandidate(candidate: EditorialSignalPost) {
+  // "Already live" = currently published to the public surface. We
+  // intentionally count both the runtime `isLive` flag and the
+  // persisted `publishedAt` timestamp so the summary stays honest if
+  // either signal is set on its own.
+  return (
+    candidate.isLive ||
+    Boolean(candidate.publishedAt) ||
+    candidate.editorialStatus === "published"
+  );
+}
+
+function isApprovedCandidate(candidate: EditorialSignalPost) {
+  return candidate.editorialStatus === "approved";
+}
+
+function computePublishCounts(candidates: EditorialSignalPost[]): PublishCounts {
+  const approved = candidates.filter(isApprovedCandidate).length;
+  const pendingPublish = candidates.filter(isPendingPublishCandidate).length;
+  const alreadyLive = candidates.filter(isLiveCandidate).length;
+  return { approved, pendingPublish, alreadyLive };
 }

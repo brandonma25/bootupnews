@@ -40,6 +40,14 @@ type StructuredEditorialFieldsProps = {
   aiWhyItMatters: string;
   legacyText: string;
   structuredContent: EditorialWhyItMattersContent | null;
+  /**
+   * Vestigial prop. The previous bulk-approve flow scraped this row's
+   * hidden inputs from the DOM when this flag was true. That coupling
+   * was removed when the bulk-approve form moved up to
+   * EditorialComposerClient and started rendering explicit hidden
+   * inputs from React state. The prop is preserved so consumers don't
+   * break; the next scoped cleanup can drop it.
+   */
   eligibleForApproveAll: boolean;
 };
 
@@ -252,7 +260,9 @@ export function StructuredEditorialFields({
   aiWhyItMatters,
   legacyText,
   structuredContent,
-  eligibleForApproveAll,
+  // Vestigial after the bulk-approve refactor; see prop docs above.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  eligibleForApproveAll: _eligibleForApproveAll,
 }: StructuredEditorialFieldsProps) {
   const initialContent =
     structuredContent ?? createEditorialContentFromLegacyText(legacyText || aiWhyItMatters);
@@ -287,14 +297,12 @@ export function StructuredEditorialFields({
         type="hidden"
         name="editedWhyItMatters"
         value={fullEditorialText}
-        data-approve-all-post-id={eligibleForApproveAll ? postId : undefined}
         readOnly
       />
       <input
         type="hidden"
         name="structuredWhyItMatters"
         value={structuredJson}
-        data-approve-all-structured-post-id={eligibleForApproveAll ? postId : undefined}
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
