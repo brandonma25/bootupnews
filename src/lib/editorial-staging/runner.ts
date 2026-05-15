@@ -207,7 +207,7 @@ export async function runEditorialStaging(options: {
   const now = options.now ?? new Date();
   const timestamp = now.toISOString();
   const briefingDate = todayTaipei(now);
-  const notionDbId = process.env.NOTION_EDITORIAL_QUEUE_DB_ID;
+  const notionDbId = process.env.NOTION_EDITORIAL_QUEUE_DB_ID?.trim();
 
   if (!notionDbId) {
     return buildFailureResult(timestamp, briefingDate, "NOTION_EDITORIAL_QUEUE_DB_ID is not configured.");
