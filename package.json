@@ -42,6 +42,7 @@
     "posthog-js": "^1.372.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "^6.12.3",
     "rss-parser": "^3.13.0",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6"
