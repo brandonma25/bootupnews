@@ -166,9 +166,16 @@ async function pushApprovedRow(
     const slotValue = getSelect(props["Slot"]);
     const finalSlateTier = slotValue === "Core" ? "core" : "context";
     const category = getSelect(props["Category"]);
-    const witm = getRichText(props["WITM"]);
-    const wlti = getRichText(props["WLTI"]);
-    const witc = getRichText(props["WITC"]);
+    // WITM: prefer human-edited; fall back to AI draft
+    const witmHuman = getRichText(props["WITM (Human)"]);
+    const witmAi    = getRichText(props["WITM (AI Draft)"]);
+    const witm      = witmHuman || witmAi;
+    // WITC + WLTI: separate AI draft and human columns → signal_posts
+    const witcAi    = getRichText(props["WITC (AI Draft)"]);
+    const witcHuman = getRichText(props["WITC (Human)"]);
+    const wltiAi    = getRichText(props["WLTI (AI Draft)"]);
+    const wltiHuman = getRichText(props["WLTI (Human)"]);
+    const editorialSource = getSelect(props["Editorial Source"]);
     const sourceUrl = getUrl(props["Source URL"]);
     const source = getRichText(props["Source"]);
     const articleBody = getRichText(props["Article Body"]);
@@ -187,8 +194,9 @@ async function pushApprovedRow(
       tags: category ? [category] : [],
       signal_score: null,
       selection_reason: "Editorial queue push — approved via Notion workflow.",
-      ai_why_it_matters: witm || "",
-      edited_why_it_matters: null,
+      // WITM — write AI draft to ai_why_it_matters; human override to edited_why_it_matters
+      ai_why_it_matters: witmAi || witm || "",
+      edited_why_it_matters: witmHuman || null,
       published_why_it_matters: null,
       why_it_matters_validation_status: witm
         ? "passed"
@@ -218,20 +226,20 @@ async function pushApprovedRow(
       witm_draft_generated_by: null,
       witm_draft_generated_at: null,
       witm_draft_model: null,
+      // WITC + WLTI provenance columns (new)
+      ai_what_it_connects_to: witcAi || null,
+      human_what_it_connects_to: witcHuman || null,
+      ai_what_led_to_it: wltiAi || null,
+      human_what_led_to_it: wltiHuman || null,
+      editorial_content_source: editorialSource?.toLowerCase() || null,
       created_at: now,
       updated_at: now,
     };
 
-    // Log non-mapped Notion fields that have no signal_posts column
-    const unmappedFields: string[] = [];
-    if (wlti) unmappedFields.push("WLTI (what_led_to_it — no column in signal_posts)");
-    if (witc) unmappedFields.push("WITC (what_it_connects_to — no column in signal_posts)");
-    if (newsletterCoOccurrence > 0) unmappedFields.push("Newsletter Co-occurrence (no column in signal_posts)");
-
-    if (unmappedFields.length > 0) {
-      logServerEvent("warn", "Editorial push: some Notion fields have no signal_posts mapping", {
+    if (newsletterCoOccurrence > 0) {
+      logServerEvent("info", "Editorial push: newsletter co-occurrence present (no signal_posts column)", {
         headline: headline.slice(0, 60),
-        unmappedFields,
+        newsletterCoOccurrence,
       });
     }
 
