@@ -24,7 +24,7 @@ export async function writeEditorialQueueRow(input: {
   notionDbId: string;
 }): Promise<void> {
   const { candidate, briefingDate, notionDbId } = input;
-  const token = process.env.NOTION_TOKEN;
+  const token = process.env.NOTION_TOKEN?.trim();
 
   if (!token) {
     throw new Error("NOTION_TOKEN is not configured.");
@@ -64,6 +64,14 @@ export async function writeEditorialQueueRow(input: {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "(no body)");
-    throw new Error(`Notion write failed (${response.status}): ${text.slice(0, 500)}`);
+    let parsed: unknown;
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+    console.error("[notion-writer] write failed", {
+      status: response.status,
+      headline: input.candidate.headline.slice(0, 80),
+      notionDbId: input.notionDbId,
+      responseBody: parsed,
+    });
+    throw new Error(`Notion write failed (${response.status}): ${text}`);
   }
 }

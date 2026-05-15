@@ -286,7 +286,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const notionDbId = process.env.NOTION_EDITORIAL_QUEUE_DB_ID;
+  const notionDbId = process.env.NOTION_EDITORIAL_QUEUE_DB_ID?.trim();
   if (!notionDbId) {
     return NextResponse.json({ error: "NOTION_EDITORIAL_QUEUE_DB_ID is not configured." }, { status: 500 });
   }
