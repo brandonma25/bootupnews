@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runDailyNewsCron = vi.fn();
 const runNewsletterIngestion = vi.fn();
+const runEditorialStaging = vi.fn();
 const logServerEvent = vi.fn();
 
 vi.mock("@/lib/cron/fetch-news", () => ({
@@ -10,6 +11,10 @@ vi.mock("@/lib/cron/fetch-news", () => ({
 
 vi.mock("@/lib/newsletter-ingestion/runner", () => ({
   runNewsletterIngestion,
+}));
+
+vi.mock("@/lib/editorial-staging/runner", () => ({
+  runEditorialStaging,
 }));
 
 vi.mock("@/lib/observability", () => ({
@@ -44,6 +49,13 @@ describe("/api/cron/fetch-editorial-inputs", () => {
         message: "Newsletter ingestion processed Gmail newsletter candidates without publishing.",
       },
     });
+    runEditorialStaging.mockResolvedValue({
+      success: true,
+      timestamp: "2026-05-12T10:15:02.000Z",
+      summary: {
+        message: "Editorial staging completed.",
+      },
+    });
   });
 
   it("rejects unauthorized requests without triggering either fetch path", async () => {
@@ -68,7 +80,7 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     expect(runNewsletterIngestion).not.toHaveBeenCalled();
   });
 
-  it("runs RSS first, then the env-gated newsletter ingestion path", async () => {
+  it("runs newsletter first, then RSS, then editorial staging", async () => {
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     const response = await GET(buildRequest("local-cron-secret"));
     const body = await response.json();
@@ -83,14 +95,21 @@ describe("/api/cron/fetch-editorial-inputs", () => {
         newsletter: {
           success: true,
         },
+        editorialStaging: {
+          success: true,
+        },
       },
     });
     expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
     expect(runNewsletterIngestion).toHaveBeenCalledWith({
       writeCandidates: true,
     });
+    // Newsletter runs before RSS so rank slots are reserved before the RSS snapshot fills them
+    expect(runNewsletterIngestion.mock.invocationCallOrder[0]).toBeLessThan(
+      runDailyNewsCron.mock.invocationCallOrder[0],
+    );
     expect(runDailyNewsCron.mock.invocationCallOrder[0]).toBeLessThan(
-      runNewsletterIngestion.mock.invocationCallOrder[0],
+      runEditorialStaging.mock.invocationCallOrder[0],
     );
   });
 

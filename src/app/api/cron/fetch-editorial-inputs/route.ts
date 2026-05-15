@@ -2,17 +2,22 @@ import { NextResponse } from "next/server";
 
 import { runDailyNewsCron, type DailyNewsCronRunResult } from "@/lib/cron/fetch-news";
 import { runNewsletterIngestion, type NewsletterIngestionRunResult } from "@/lib/newsletter-ingestion/runner";
+import { runEditorialStaging, type EditorialStagingRunResult } from "@/lib/editorial-staging/runner";
 import { errorContext, logServerEvent } from "@/lib/observability";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type EditorialInputTaskName = "rss" | "newsletter";
+type EditorialInputTaskName = "rss" | "newsletter" | "editorial_staging";
 
 type EditorialInputTaskResult = {
   success: boolean;
   timestamp: string | null;
-  summary: DailyNewsCronRunResult["summary"] | NewsletterIngestionRunResult["summary"] | null;
+  summary:
+    | DailyNewsCronRunResult["summary"]
+    | NewsletterIngestionRunResult["summary"]
+    | EditorialStagingRunResult["summary"]
+    | null;
 };
 
 function isAuthorized(request: Request) {
@@ -22,7 +27,7 @@ function isAuthorized(request: Request) {
   return Boolean(cronSecret) && authHeader === `Bearer ${cronSecret}`;
 }
 
-async function runTask<T extends DailyNewsCronRunResult | NewsletterIngestionRunResult>(
+async function runTask<T extends DailyNewsCronRunResult | NewsletterIngestionRunResult | EditorialStagingRunResult>(
   name: EditorialInputTaskName,
   task: () => Promise<T>,
 ): Promise<EditorialInputTaskResult> {
@@ -74,12 +79,16 @@ export async function GET(request: Request) {
     route: "/api/cron/fetch-editorial-inputs",
   });
 
-  const rss = await runTask("rss", () => runDailyNewsCron());
+  // Newsletter must run before RSS so that reserveNewsletterCandidateRanksForRssSnapshot
+  // can push newsletter rows to high rank slots and leave low ranks free for the RSS snapshot.
+  // If RSS runs first it fills all 20 rank slots, leaving no room for newsletter promotion.
   const newsletter = await runTask("newsletter", () =>
     runNewsletterIngestion({
       writeCandidates: true,
     }),
   );
+  const rss = await runTask("rss", () => runDailyNewsCron());
+  const editorialStaging = await runTask("editorial_staging", () => runEditorialStaging());
   const success = rss.success && newsletter.success;
   const timestamp = new Date().toISOString();
 
@@ -87,6 +96,7 @@ export async function GET(request: Request) {
     route: "/api/cron/fetch-editorial-inputs",
     rssSuccess: rss.success,
     newsletterSuccess: newsletter.success,
+    editorialStagingSuccess: editorialStaging.success,
   });
 
   return NextResponse.json(
@@ -99,6 +109,7 @@ export async function GET(request: Request) {
           : "Combined editorial input cron completed with one or more failures.",
         rss,
         newsletter,
+        editorialStaging,
       },
     },
     { status: success ? 200 : 500 },

@@ -250,14 +250,20 @@ async function processWritableRun(input: {
       }
 
       for (const story of extraction.stories) {
-        promotions.push(
-          await promoteNewsletterStoryToCandidate({
-            db: input.db,
-            extractionId: story.id,
-            briefingDate: input.briefingDate,
-            now: input.now,
-          }),
-        );
+        const promotion = await promoteNewsletterStoryToCandidate({
+          db: input.db,
+          extractionId: story.id,
+          briefingDate: input.briefingDate,
+          now: input.now,
+        });
+        promotions.push(promotion);
+
+        if (promotion.status === "skipped") {
+          logServerEvent("warn", "Newsletter ingestion: story promotion skipped", {
+            reason: promotion.reason,
+            extractionId: promotion.extractionId,
+          });
+        }
       }
     } catch (error) {
       failedEmailCount += 1;
@@ -268,11 +274,32 @@ async function processWritableRun(input: {
     }
   }
 
+  const promotionSummary = summarizePromotions(promotions);
+
+  if (promotions.length > 0) {
+    const skipReasonBreakdown = promotions
+      .filter((p) => p.status === "skipped")
+      .reduce<Record<string, number>>((acc, p) => {
+        if (p.status === "skipped") {
+          acc[p.reason] = (acc[p.reason] ?? 0) + 1;
+        }
+        return acc;
+      }, {});
+
+    logServerEvent("info", "Newsletter ingestion: promotion summary", {
+      briefingDate: input.briefingDate,
+      promotedCandidateCount: promotionSummary.promotedCandidateCount,
+      linkedExistingCandidateCount: promotionSummary.linkedExistingCandidateCount,
+      skippedPromotionCount: promotionSummary.skippedPromotionCount,
+      skipReasonBreakdown,
+    });
+  }
+
   return {
     storedEmailCount,
     extractedStoryCount,
     failedEmailCount,
-    ...summarizePromotions(promotions),
+    ...promotionSummary,
   };
 }
 
