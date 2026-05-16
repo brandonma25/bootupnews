@@ -275,7 +275,7 @@ async function pushApprovedRow(
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
+  const token = url.searchParams.get("token")?.trim();
   const pushSecret = process.env.EDITORIAL_PUSH_SECRET?.trim();
 
   if (!pushSecret || token !== pushSecret) {
