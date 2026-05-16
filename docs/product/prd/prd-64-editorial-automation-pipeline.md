@@ -15,7 +15,6 @@
 - Deduplicate RSS and newsletter candidates using Jaccard similarity before staging.
 - Score and write deduplicated candidates to a Notion Editorial Queue database.
 - Send a Resend completion email after each staging run summarising what was written.
-- Expose a `GET /api/editorial/test-stage` endpoint to trigger staging manually.
 - Expose a `GET /api/editorial/push-approved?token=` endpoint to promote approved Notion rows into `signal_posts`.
 - Extend the `fetch-editorial-inputs` cron to run editorial staging as a third sequential task after newsletter and RSS.
 
@@ -34,5 +33,4 @@
 - `src/lib/editorial-staging/notion-writer.ts` — writes staged rows to Notion via REST API
 - `src/lib/editorial-staging/email.ts` — sends Resend completion email
 - `src/lib/editorial-staging/runner.ts` — orchestrates Steps B–G
-- `src/app/api/editorial/test-stage/route.ts` — manual trigger endpoint
 - `src/app/api/editorial/push-approved/route.ts` — approval promotion endpoint

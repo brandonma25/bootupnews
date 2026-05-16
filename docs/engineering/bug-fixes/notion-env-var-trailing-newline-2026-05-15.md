@@ -22,8 +22,7 @@
 
 ## Validation
 - Human checks:
-  - Hit `/api/editorial/test-stage` after deploy; confirm `notionRowsWritten` equals `candidateCount`.
-  - Verify rows appear in Notion Editorial Queue database.
+  - Verify rows appear in Notion Editorial Queue database after next cron run.
 - GitHub PR checks:
   - `feature-system-csv-validation`
   - `release-governance-gate`
@@ -33,4 +32,4 @@
 
 ## Remaining Risks / Follow-up
 - None. The fix is defensive (`.trim()` is a no-op when the value has no whitespace) and does not change any observable behaviour for correctly-formatted env vars.
-- Delete `/api/editorial/test-stage` route after workflow is validated end-to-end.
+- `/api/editorial/test-stage` route deleted in chore/remove-test-stage-endpoint (post-validation cleanup).
