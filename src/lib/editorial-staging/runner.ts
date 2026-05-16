@@ -26,6 +26,7 @@ export type EditorialStagingRunSummary = {
   contextCount: number;
   categoryBreakdown: Record<string, number>;
   notionRowsWritten: number;
+  notionErrors: string[];
 };
 
 export type EditorialStagingRunResult = {
@@ -197,6 +198,7 @@ function buildFailureResult(
       contextCount: 0,
       categoryBreakdown: {},
       notionRowsWritten: 0,
+      notionErrors: [],
     },
   };
 }
@@ -257,12 +259,15 @@ export async function runEditorialStaging(options: {
 
   // Step F: Write to Notion Editorial Queue
   let notionRowsWritten = 0;
+  const notionErrors: string[] = [];
 
   for (const candidate of selected) {
     try {
       await writeEditorialQueueRow({ candidate, briefingDate, notionDbId });
       notionRowsWritten += 1;
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      notionErrors.push(`[${candidate.headline.slice(0, 40)}] ${msg}`);
       logServerEvent("error", "Editorial staging: Notion row write failed", {
         headline: candidate.headline.slice(0, 60),
         slot: candidate.slot,
@@ -320,6 +325,7 @@ export async function runEditorialStaging(options: {
       contextCount,
       categoryBreakdown,
       notionRowsWritten,
+      notionErrors,
     },
   };
 }

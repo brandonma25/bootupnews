@@ -39,6 +39,7 @@ export async function writeEditorialQueueRow(input: {
     "Briefing Date": { date: { start: briefingDate } },
     "Status": { select: { name: "raw" } },
     "Pushed to Supabase": { checkbox: false },
+    "Editorial Source": { select: { name: "AI" } },
   };
 
   if (candidate.url) {
