@@ -39,7 +39,12 @@ export default async function Page({ searchParams }: PageProps) {
     searchParams ? searchParams : Promise.resolve(undefined),
   ]);
   const data = await applyHomepageEditorialOverridesToDashboardData(pageState.data);
-  const authState = readSingleParam(resolvedSearchParams?.auth);
+  const rawAuthState = readSingleParam(resolvedSearchParams?.auth);
+  // If the user is already authenticated, suppress the callback-error — this
+  // happens when Safari replays the OAuth redirect chain after a successful
+  // session exchange, causing a duplicate "State has already been used" error
+  // that lands back on the homepage with ?auth=callback-error.
+  const authState = pageState.viewer && rawAuthState === "callback-error" ? undefined : rawAuthState;
   const debugParam = readSingleParam(resolvedSearchParams?.debug);
   const debugEnabled = isHomepageDebugConfigured || /^(1|true|yes|on)$/i.test(debugParam ?? "");
   const homepageViewModel = buildHomepageViewModel(data, null, { includeCategoryTabEvents: false });
