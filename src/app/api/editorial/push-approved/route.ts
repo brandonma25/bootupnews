@@ -58,7 +58,7 @@ async function notionRequest(
   method: string,
   body?: unknown,
 ): Promise<unknown> {
-  const token = process.env.NOTION_TOKEN;
+  const token = process.env.NOTION_TOKEN?.trim();
   if (!token) throw new Error("NOTION_TOKEN is not configured.");
 
   const response = await fetch(`https://api.notion.com/v1${path}`, {
@@ -188,8 +188,8 @@ async function pushApprovedRow(
       briefing_date: briefingDate,
       rank,
       title: headline,
-      source_name: source || null,
-      source_url: sourceUrl || null,
+      source_name: source || "",
+      source_url: sourceUrl || "",
       summary: articleBody || "",
       tags: category ? [category] : [],
       signal_score: null,
