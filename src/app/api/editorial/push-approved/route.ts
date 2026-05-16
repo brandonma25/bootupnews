@@ -189,7 +189,7 @@ async function pushApprovedRow(
       rank,
       title: headline,
       source_name: source || "",
-      source_url: sourceUrl || "",
+      source_url: sourceUrl || null,
       summary: articleBody || "",
       tags: category ? [category] : [],
       signal_score: null,
