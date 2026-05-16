@@ -254,6 +254,14 @@ export async function runEditorialStaging(options: {
   // Step D: Dedup across both batches
   const dedupedPool = deduplicateCandidates(newsletterCandidates, rssCandidates);
 
+  logServerEvent("info", "Editorial staging: candidate pool after dedup", {
+    briefingDate,
+    rssInputCount: rssCandidates.length,
+    newsletterInputCount: newsletterCandidates.length,
+    dedupedPoolSize: dedupedPool.length,
+    poolHeadlines: dedupedPool.slice(0, 10).map((c) => c.headline.slice(0, 60)),
+  });
+
   // Step E: Score and select top 7
   const selected = scoreAndSelect(dedupedPool);
 
