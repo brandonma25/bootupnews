@@ -34,3 +34,6 @@
 - `src/lib/editorial-staging/email.ts` — sends Resend completion email
 - `src/lib/editorial-staging/runner.ts` — orchestrates Steps B–G
 - `src/app/api/editorial/push-approved/route.ts` — approval promotion endpoint
+
+## Schema Notes
+- `signal_posts.source_url`: NOT NULL dropped (migration `20260516120000_source_url_drop_not_null.sql`). The column has a CHECK constraint requiring `https?://` format when non-null; Notion-originated editorial rows may have no source URL, so NULL is the correct representation. The CHECK still enforces format for any non-null value.
