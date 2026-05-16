@@ -283,13 +283,13 @@ async function pushApprovedRow(
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const pushSecret = process.env.EDITORIAL_PUSH_SECRET?.trim();
+  const provided = url.searchParams.get("token")?.trim();
+  const expected = process.env.EDITORIAL_PUSH_SECRET?.trim();
 
-  if (!pushSecret || token !== pushSecret) {
+  if (!expected || provided !== expected) {
     logServerEvent("warn", "Editorial push: unauthorized request rejected", {
       route: "/api/editorial/push-approved",
-      hasSecret: Boolean(pushSecret),
+      hasSecret: Boolean(expected),
     });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
