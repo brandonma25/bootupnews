@@ -11,7 +11,6 @@
 4. The push endpoint reads approved rows from Notion and inserts them into `signal_posts`.
 
 ## Endpoints
-- `GET /api/editorial/test-stage` — manually triggers the staging runner. Protected by `CRON_SECRET`.
 - `GET /api/editorial/push-approved?token=<EDITORIAL_PUSH_SECRET>` — promotes approved Notion rows to `signal_posts`.
 
 ## Required Environment Variables
@@ -19,14 +18,13 @@
 - `NOTION_EDITORIAL_QUEUE_DB_ID` — Notion Editorial Queue database ID (`56caed793822497e8e58e8dc2291d395`).
 - `RESEND_API_KEY` — Resend API key for staging completion emails.
 - `EDITORIAL_PUSH_SECRET` — Secret token for the push-approved endpoint.
-- `CRON_SECRET` — Existing cron secret; also gates the test-stage endpoint.
+- `CRON_SECRET` — Existing cron secret for the fetch-editorial-inputs cron route.
 
 ## Key Files
 - `src/lib/editorial-staging/runner.ts` — orchestrates Steps B–G
 - `src/lib/editorial-staging/dedup.ts` — Jaccard dedup
 - `src/lib/editorial-staging/notion-writer.ts` — Notion REST API writer
 - `src/lib/editorial-staging/email.ts` — Resend completion email
-- `src/app/api/editorial/test-stage/route.ts` — manual trigger endpoint
 - `src/app/api/editorial/push-approved/route.ts` — approval promotion endpoint
 
 ## Operating Notes
