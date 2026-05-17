@@ -20,6 +20,11 @@
 - Rollback escape hatch: setting `ALLOW_VERCEL_CRON_FALLBACK=true` in Vercel re-enables the legacy `Authorization: Bearer <CRON_SECRET>` header path so the `crons` block can be re-added to `vercel.json` during a cron-job.org outage. Default is `false` — header-only auth is the normal path.
 - Historical: Vercel Hobby Cron was the previous trigger source (`crons` array in `vercel.json`). Decommissioned in PRD-65 phase 2 because Hobby's ±59 min firing window allowed the two daily runs to overlap and double-write Notion. The `crons` array is intentionally absent from `vercel.json`; do not re-add it without flipping the fallback flag.
 
+## Schedule Management (cron-job.org)
+- Source of truth: [`scripts/cron-jobs.config.ts`](../../../scripts/cron-jobs.config.ts). Never edit cron-job.org via its web UI for routine changes — the config file drifts and the sync script will revert.
+- Apply changes with `npm run cron:sync` (idempotent: a re-run with no config change writes zero). Preview with `npm run cron:sync:dry-run`. Use `npm run cron:sync:prune` to delete `bootup-*` jobs that are no longer in the config.
+- Runbook for first-time setup, env-var contract, rollback, and operator handoff: [`docs/CRON_SETUP.md`](../../CRON_SETUP.md).
+
 ## Required Environment Variables
 - `NOTION_TOKEN` — Notion integration token from notion.so/my-integrations.
 - `NOTION_EDITORIAL_QUEUE_DB_ID` — Notion Editorial Queue database ID (`56caed793822497e8e58e8dc2291d395`).
