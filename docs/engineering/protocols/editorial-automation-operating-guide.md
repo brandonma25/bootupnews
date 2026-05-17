@@ -44,3 +44,12 @@
 - Newsletter ingestion must run before RSS in the cron so that newsletter candidates can reserve rank slots before the RSS snapshot fills them.
 - Editorial staging is non-critical: cron success is determined by RSS and newsletter task results only.
 - A failed `NOTION_TOKEN` will cause staging to fail silently; check Vercel logs if Notion rows stop appearing.
+
+## Idempotency Contract (Branch C / Step E3 Notion writes)
+- Each write keys on `Headline + Briefing Date`. The runner queries the Editorial Queue database before each write and chooses one of three actions:
+  - **`inserted`** — no matching row exists. POST creates the row at `Status=raw`.
+  - **`updated`** — matching row exists at `Status=raw`. PATCH overwrites the AI-generated fields. The PATCH body intentionally omits `Status` so a write can never demote a row that may be about to be promoted.
+  - **`skipped_human_edited`** — matching row exists at any non-raw Status (including the defensive "unset" case). No write happens. BM's edits are preserved.
+- Every write logs `editorial_queue_row.action = <action>` on the event payload for operational visibility.
+- The run summary surfaces `notionRowsInserted`, `notionRowsUpdated`, and `notionRowsSkippedHumanEdited`. `notionRowsWritten` is defined as inserts + updates; skips are not counted as writes.
+- Result: a re-run with the same source set produces zero duplicates. cron-job.org transient retries and any future trigger overlap are safe at this layer.
