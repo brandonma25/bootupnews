@@ -8,5 +8,10 @@
       "path": "/api/cron/fetch-editorial-inputs",
       "schedule": "45 11 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/cron/fetch-editorial-inputs/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }
