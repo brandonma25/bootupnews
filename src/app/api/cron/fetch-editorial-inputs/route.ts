@@ -4,6 +4,7 @@ import { runDailyNewsCron, type DailyNewsCronRunResult } from "@/lib/cron/fetch-
 import { runNewsletterIngestion, type NewsletterIngestionRunResult } from "@/lib/newsletter-ingestion/runner";
 import { runEditorialStaging, type EditorialStagingRunResult } from "@/lib/editorial-staging/runner";
 import { errorContext, logServerEvent } from "@/lib/observability";
+import { writePipelineLogEntry } from "@/lib/observability/pipeline-log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -109,6 +110,50 @@ export async function GET(request: Request) {
     newsletterSuccess: newsletter.success,
     editorialStagingSuccess: editorialStaging.success,
   });
+
+  // Pipeline Log write — best-effort, never fails the cron.
+  const stagingSummary = editorialStaging.summary as
+    | { briefingDate?: string; notionRowsInserted?: number; notionRowsUpdated?: number; notionRowsSkippedHumanEdited?: number; notionErrors?: string[] }
+    | null;
+  const briefingDateForLog =
+    typeof stagingSummary?.briefingDate === "string" ? stagingSummary.briefingDate : null;
+  const inserted = stagingSummary?.notionRowsInserted ?? 0;
+  const updated = stagingSummary?.notionRowsUpdated ?? 0;
+  const skipped = stagingSummary?.notionRowsSkippedHumanEdited ?? 0;
+  const stagingErrors = stagingSummary?.notionErrors ?? [];
+
+  const pipelineLogStatus = success
+    ? stagingErrors.length > 0
+      ? "warn"
+      : "ok"
+    : "fail";
+
+  const pipelineLogMessage = success
+    ? `Ingestion completed: RSS=${rss.success ? "ok" : "fail"}, newsletter=${newsletter.success ? "ok" : "fail"}, editorial staging inserted=${inserted} updated=${updated} skipped=${skipped}${stagingErrors.length > 0 ? `; staging errors=${stagingErrors.length}` : ""}.`
+    : `Ingestion failed: RSS=${rss.success ? "ok" : "fail"}, newsletter=${newsletter.success ? "ok" : "fail"}.`;
+
+  if (briefingDateForLog) {
+    await writePipelineLogEntry({
+      runType: "ingestion",
+      status: pipelineLogStatus,
+      rowCount: inserted + updated,
+      message: pipelineLogMessage,
+      briefingDate: briefingDateForLog,
+      sourceHealth: {
+        rssSuccess: rss.success,
+        newsletterSuccess: newsletter.success,
+        editorialStagingSuccess: editorialStaging.success,
+        notionRowsInserted: inserted,
+        notionRowsUpdated: updated,
+        notionRowsSkippedHumanEdited: skipped,
+        stagingErrorCount: stagingErrors.length,
+      },
+    });
+  } else {
+    logServerEvent("warn", "Pipeline log skipped: no briefingDate from editorial staging", {
+      route: "/api/cron/fetch-editorial-inputs",
+    });
+  }
 
   return NextResponse.json(
     {

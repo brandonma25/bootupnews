@@ -89,18 +89,31 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 - Repo evidence used: existing `/api/cron/fetch-editorial-inputs` route shape and tests (PRD-60), Branch C editorial-staging runner (PRD-64), Notion client patterns under `src/lib/`, existing Sentry init, the audit performed in Phase 0 of this initiative listing all `/api/cron/*` routes and their trigger sources.
 - Confidence: high for repo-side configuration, header-auth migration, idempotency contract, and health endpoint shape; medium for cron-job.org execution timing in production (cannot be proven from a preview deploy — requires the user's external account setup); medium for Notion rate-limit behavior under back-to-back retries (the idempotency guard exists precisely to handle this safely).
 
+## Phase Status
+
+| Phase | Status | Landed in |
+| --- | --- | --- |
+| Phase 0 — Cron-endpoint audit | Done (analysis only, no code) | n/a |
+| Phase 1 — Raise function timeout to 60 s | Done | [#246](https://github.com/brandonma25/bootupnews/pull/246) |
+| Phase 2 — Decouple from Vercel Cron + `x-cron-secret` auth | Done | [#247](https://github.com/brandonma25/bootupnews/pull/247) |
+| Cron-job.org sync tooling | Done | [#248](https://github.com/brandonma25/bootupnews/pull/248) |
+| Phase 3 — Branch C E3 idempotency | Done | [#249](https://github.com/brandonma25/bootupnews/pull/249) |
+| Phase 4 — `/api/cron/health` + Notion Pipeline Log + Source Health Log writer | In Review | this PR |
+| Phase 4.5 — Source circuit breaker + Sentry filter | Pending | — |
+| Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | Pending | — |
+
 ## Closeout Checklist
 
-- Scope completed:
-- [ ] Terminology check completed: Article, Story Cluster, Signal, Card, and Surface Placement are used according to the canonical terminology document.
-- [ ] PRD clearly states which object level the feature modifies.
-- [ ] PRD does not describe UI cards as signals unless referring to the underlying Signal object.
-- Tests run:
-- Local validation complete:
-- Preview validation complete, if applicable:
-- Production sanity check complete, only after preview is good:
-- PRD summary stored in repo:
-- Bug-fix report stored in repo, if applicable: n/a (new feature)
-- `docs/product/feature-system.csv` updated if PRD/feature metadata changed:
-- Public documentation or PR evidence complete when durable reviewer-facing context is needed:
-- Google Sheet / Google Work Log not treated as canonical or updated for routine completion:
+- Scope completed: Phases 0–4 + sync tooling; Phase 4.5 + Phase 5 outstanding.
+- [x] Terminology check completed: Article, Story Cluster, Signal, Card, and Surface Placement are used according to the canonical terminology document.
+- [x] PRD clearly states which object level the feature modifies.
+- [x] PRD does not describe UI cards as signals unless referring to the underlying Signal object.
+- Tests run: vitest unit suite (full repo 98 files / 714 tests) + targeted phase test files; lint and build clean per-phase.
+- Local validation complete: per-phase, see each phase's PR.
+- Preview validation complete, if applicable: Vercel preview deployed for each phase PR; cron-job.org execution requires production deployment.
+- Production sanity check complete, only after preview is good: pending Phase 5 close; operator wires cron-job.org jobs against production after Phase 4 deploys.
+- PRD summary stored in repo: yes (this file).
+- Bug-fix report stored in repo, if applicable: n/a (new feature).
+- `docs/product/feature-system.csv` updated if PRD/feature metadata changed: yes (PRD-65 row added in Phase 2 branch).
+- Public documentation or PR evidence complete when durable reviewer-facing context is needed: protocol updates land per phase in `docs/engineering/protocols/editorial-automation-operating-guide.md`; schema docs added at `docs/notion-pipeline-log-schema.md` and `docs/notion-source-health-schema.md` in Phase 4; ARCHITECTURE / CRON_SETUP / OBSERVABILITY land in Phase 5.
+- Google Sheet / Google Work Log not treated as canonical or updated for routine completion: confirmed.
