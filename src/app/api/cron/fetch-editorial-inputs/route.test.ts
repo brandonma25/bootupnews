@@ -4,6 +4,7 @@ const runDailyNewsCron = vi.fn();
 const runNewsletterIngestion = vi.fn();
 const runEditorialStaging = vi.fn();
 const logServerEvent = vi.fn();
+const writePipelineLogEntry = vi.fn();
 
 vi.mock("@/lib/cron/fetch-news", () => ({
   runDailyNewsCron,
@@ -22,6 +23,10 @@ vi.mock("@/lib/observability", () => ({
     errorMessage: error instanceof Error ? error.message : String(error),
   }),
   logServerEvent,
+}));
+
+vi.mock("@/lib/observability/pipeline-log", () => ({
+  writePipelineLogEntry,
 }));
 
 type RequestAuth = { header?: "x-cron-secret" | "authorization"; secret?: string };
@@ -67,8 +72,14 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       timestamp: "2026-05-12T10:15:02.000Z",
       summary: {
         message: "Editorial staging completed.",
+        briefingDate: "2026-05-12",
+        notionRowsInserted: 7,
+        notionRowsUpdated: 0,
+        notionRowsSkippedHumanEdited: 0,
+        notionErrors: [],
       },
     });
+    writePipelineLogEntry.mockResolvedValue({ written: true, pageId: "log-1" });
   });
 
   it("rejects unauthorized requests without triggering either fetch path", async () => {
@@ -161,6 +172,36 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     expect(runDailyNewsCron.mock.invocationCallOrder[0]).toBeLessThan(
       runEditorialStaging.mock.invocationCallOrder[0],
     );
+  });
+
+  it("writes a Pipeline Log entry on completion with status=ok when all branches succeed", async () => {
+    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+    await GET(buildRequest("local-cron-secret"));
+
+    expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
+    expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
+      runType: "ingestion",
+      status: "ok",
+      rowCount: 7,
+      briefingDate: "2026-05-12",
+    });
+  });
+
+  it("writes Pipeline Log status=fail when a branch fails", async () => {
+    runDailyNewsCron.mockResolvedValue({
+      success: false,
+      timestamp: "2026-05-12T10:15:00.000Z",
+      summary: { message: "RSS failed." },
+    });
+
+    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+    await GET(buildRequest("local-cron-secret"));
+
+    expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
+    expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
+      runType: "ingestion",
+      status: "fail",
+    });
   });
 
   it("still attempts newsletter ingestion when the RSS path fails closed", async () => {
