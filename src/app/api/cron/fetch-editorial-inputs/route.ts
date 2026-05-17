@@ -22,9 +22,20 @@ type EditorialInputTaskResult = {
 
 function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const authHeader = request.headers.get("authorization")?.trim() ?? "";
+  if (!cronSecret) return false;
 
-  return Boolean(cronSecret) && authHeader === `Bearer ${cronSecret}`;
+  const headerSecret = request.headers.get("x-cron-secret")?.trim() ?? "";
+  if (headerSecret === cronSecret) return true;
+
+  // Rollback escape hatch: honor the legacy Vercel Cron `Authorization: Bearer`
+  // header only when ALLOW_VERCEL_CRON_FALLBACK is explicitly enabled. Default
+  // auth is x-cron-secret header only.
+  if (process.env.ALLOW_VERCEL_CRON_FALLBACK === "true") {
+    const authHeader = request.headers.get("authorization")?.trim() ?? "";
+    if (authHeader === `Bearer ${cronSecret}`) return true;
+  }
+
+  return false;
 }
 
 async function runTask<T extends DailyNewsCronRunResult | NewsletterIngestionRunResult | EditorialStagingRunResult>(
