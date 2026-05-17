@@ -52,6 +52,28 @@ For the durable product and engineering trade-offs behind the build, see [DECISI
 
 For an implementation-history map, see [docs/portfolio/PR_CLUSTERS.md](docs/portfolio/PR_CLUSTERS.md).
 
+## Operating the pipeline
+
+The ingestion pipeline is triggered externally by [cron-job.org](https://cron-job.org), runs in Vercel serverless functions, and writes editorial candidates to Notion for review. Three docs cover the day-to-day:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — pipeline diagram and external triggering diagram (Mermaid).
+- [docs/CRON_SETUP.md](docs/CRON_SETUP.md) — cron-job.org account setup, the sync script (`npm run cron:sync`), email alerts, rollback procedure.
+- [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — where to look when something breaks; Source Health vs Pipeline Health.
+
+Notion database schemas (operator creates these manually):
+
+- [docs/notion-pipeline-log-schema.md](docs/notion-pipeline-log-schema.md) — one row per ingestion run / health check.
+- [docs/notion-source-health-schema.md](docs/notion-source-health-schema.md) — per-source-per-day RSS fetch outcomes; feeds the circuit breaker.
+
+PRD-65 environment variables (set in Vercel production):
+
+- `CRON_SECRET` — shared with cron-job.org's `x-cron-secret` header; mismatched → endpoint returns 401.
+- `ALLOW_VERCEL_CRON_FALLBACK` — rollback escape hatch; leave unset/`false` in normal operation.
+- `NOTION_PIPELINE_LOG_DB_ID` — Pipeline Log database ID; unset = best-effort no-op, cron still runs.
+- `NOTION_SOURCE_HEALTH_LOG_DB_ID` — Source Health Log database ID; unset = circuit breaker permissively falls through, cron still runs.
+
+The full reliability initiative is documented in [PRD-65](docs/product/prd/prd-65-pipeline-reliability-external-cron-migration.md). The change history of this migration is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Current state
 
 Bootup News is an active MVP, not a mature commercial product. The core briefing model, public presentation layer, controlled publication flow, editorial-review backbone, and portfolio-facing documentation layer are in place. Ongoing documentation maintenance should keep README.md, DECISIONS.md, and docs/portfolio/PR_CLUSTERS.md current through event-triggered freshness checks rather than routine per-PR narrative updates.
