@@ -50,16 +50,34 @@ A health check with `Row Count >= 7` but `missing.length > 0` returns
 ## Phase 4.5 — circuit breaker integration
 
 The Branch B RSS fetch step (R2) consults this database before fetching each
-source:
+source. Implementation lives in
+[`src/lib/observability/rss-circuit-breaker.ts`](../src/lib/observability/rss-circuit-breaker.ts)
+and is invoked from [`src/lib/rss.ts`](../src/lib/rss.ts) inside
+`fetchFeedArticles`.
 
-- Sum `Fail Count` for the source over the trailing 24 hours.
-- If `>= 5`, skip the source for this run. Write a Source Health Log entry
-  with `Last Outcome = skipped_circuit_breaker`. Do **not** report to Sentry.
-- Auto-reset: a source skipped continuously for 24 hours is re-attempted on
-  the next run regardless of past failure count.
+- The pre-fetch gate reads today's row for the source and inspects `Fail Count`.
+- If `Fail Count >= 5`, skip the fetch. Write a Source Health Log entry for the
+  same `(Source, Date)` with `Last Outcome = skipped_circuit_breaker`, then
+  throw `RssCircuitBreakerSkipError`. The skip is **not** reported to Sentry —
+  circuit-breaker skips bypass `captureRssFailure` entirely.
+- Auto-reset: the Source Health Log is keyed on Taipei-day. Each new day starts
+  at `Fail Count = 0`, so a skipped source is automatically retried on the next
+  day's first ingestion run. The scheduled runs at 18:15 and 19:45 Taipei
+  produce a worst-case skip window of ~22 hours — close enough to the spec's
+  24-hour auto-reset; daily rollover is the canonical reset mechanism.
+- After each fetch attempt, the fetch path writes the outcome:
+  - **`success`** — updates `Last Successful Fetch` and increments `Success Count`.
+  - **`fail`** — increments `Fail Count`; leaves `Last Successful Fetch` untouched. The underlying error still reports to Sentry **unless** it matches the `Feed request retry exhausted for *` pattern (those are now dropped by the `beforeSend` filter and tracked here instead).
+  - **`skipped_circuit_breaker`** — does not increment either counter.
 
-This contract is implemented in PRD-65 Phase 4.5. Phase 4 ships the schema,
-the writer, and the data flow; the consumer is wired up in 4.5.
+### Permissive failure contract
+
+The circuit breaker must never silently disable ingestion when the
+observability layer is degraded. If `NOTION_SOURCE_HEALTH_LOG_DB_ID` is unset,
+the Notion query fails, or any unexpected exception is raised inside the
+gate, the gate returns `skip: false` and the fetch proceeds normally. The
+degradation surfaces as warn-level log lines; the editorial pipeline keeps
+running.
 
 ## Operational notes
 

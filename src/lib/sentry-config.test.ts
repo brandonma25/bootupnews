@@ -43,3 +43,62 @@ describe("Sentry configuration", () => {
     expect(readSentryReplaysSessionSampleRate()).toBe(0);
   });
 });
+
+describe("isFilteredRssNoiseEvent (PRD-65 Phase 4.5)", () => {
+  it("drops events whose exception.values[].value starts with 'Feed request retry exhausted for '", async () => {
+    const { isFilteredRssNoiseEvent } = await import("@/lib/sentry-config");
+    const event = {
+      exception: {
+        values: [
+          {
+            type: "RssError",
+            value: "Feed request retry exhausted for Reuters: timeout",
+          },
+        ],
+      },
+    };
+    expect(isFilteredRssNoiseEvent(event)).toBe(true);
+  });
+
+  it("drops events whose top-level message matches the pattern (captureMessage path)", async () => {
+    const { isFilteredRssNoiseEvent } = await import("@/lib/sentry-config");
+    expect(
+      isFilteredRssNoiseEvent({ message: "Feed request retry exhausted for FlakyFeed" }),
+    ).toBe(true);
+  });
+
+  it("does not drop other RssError variants", async () => {
+    const { isFilteredRssNoiseEvent } = await import("@/lib/sentry-config");
+    const event = {
+      exception: {
+        values: [
+          {
+            type: "RssError",
+            value: "Feed returned zero articles for Reuters",
+          },
+        ],
+      },
+    };
+    expect(isFilteredRssNoiseEvent(event)).toBe(false);
+  });
+
+  it("does not drop unrelated errors", async () => {
+    const { isFilteredRssNoiseEvent } = await import("@/lib/sentry-config");
+    const event = {
+      exception: {
+        values: [
+          { type: "TypeError", value: "Cannot read property 'foo' of undefined" },
+        ],
+      },
+    };
+    expect(isFilteredRssNoiseEvent(event)).toBe(false);
+  });
+
+  it("returns false on malformed or missing event payload", async () => {
+    const { isFilteredRssNoiseEvent } = await import("@/lib/sentry-config");
+    expect(isFilteredRssNoiseEvent(null)).toBe(false);
+    expect(isFilteredRssNoiseEvent(undefined)).toBe(false);
+    expect(isFilteredRssNoiseEvent({})).toBe(false);
+    expect(isFilteredRssNoiseEvent({ exception: { values: [{}] } })).toBe(false);
+  });
+});

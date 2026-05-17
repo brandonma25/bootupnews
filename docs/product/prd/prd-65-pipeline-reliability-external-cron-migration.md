@@ -98,13 +98,13 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 | Phase 2 — Decouple from Vercel Cron + `x-cron-secret` auth | Done | [#247](https://github.com/brandonma25/bootupnews/pull/247) |
 | Cron-job.org sync tooling | Done | [#248](https://github.com/brandonma25/bootupnews/pull/248) |
 | Phase 3 — Branch C E3 idempotency | Done | [#249](https://github.com/brandonma25/bootupnews/pull/249) |
-| Phase 4 — `/api/cron/health` + Notion Pipeline Log + Source Health Log writer | In Review | this PR |
-| Phase 4.5 — Source circuit breaker + Sentry filter | Pending | — |
+| Phase 4 — `/api/cron/health` + Notion Pipeline Log + Source Health Log writer | Done | [#250](https://github.com/brandonma25/bootupnews/pull/250) |
+| Phase 4.5 — Source circuit breaker + Sentry filter | In Review | this PR |
 | Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | Pending | — |
 
 ## Closeout Checklist
 
-- Scope completed: Phases 0–4 + sync tooling; Phase 4.5 + Phase 5 outstanding.
+- Scope completed: Phases 0–4.5 + sync tooling; Phase 5 outstanding.
 - [x] Terminology check completed: Article, Story Cluster, Signal, Card, and Surface Placement are used according to the canonical terminology document.
 - [x] PRD clearly states which object level the feature modifies.
 - [x] PRD does not describe UI cards as signals unless referring to the underlying Signal object.
