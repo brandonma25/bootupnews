@@ -170,6 +170,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * PRD-65 Phase 4.5 — drop "Feed request retry exhausted" events from Sentry.
+ * These now flow into the Notion Source Health Log instead. Other RssError
+ * variants continue to report normally (only this single post-retry-exhaustion
+ * message pattern is filtered).
+ *
+ * Exported for unit testing.
+ */
+const RSS_RETRY_EXHAUSTED_PATTERN = /^Feed request retry exhausted for /;
+
+export function isFilteredRssNoiseEvent(event: unknown): boolean {
+  if (!isRecord(event)) return false;
+
+  const exception = (event as { exception?: unknown }).exception;
+  if (isRecord(exception)) {
+    const values = (exception as { values?: unknown }).values;
+    if (Array.isArray(values)) {
+      for (const v of values) {
+        if (isRecord(v)) {
+          const value = (v as { value?: unknown }).value;
+          if (typeof value === "string" && RSS_RETRY_EXHAUSTED_PATTERN.test(value)) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  const message = (event as { message?: unknown }).message;
+  if (typeof message === "string" && RSS_RETRY_EXHAUSTED_PATTERN.test(message)) {
+    return true;
+  }
+
+  return false;
+}
+
 export function sanitizeSentryEvent<T>(event: T): T {
   if (!isRecord(event)) {
     return event;

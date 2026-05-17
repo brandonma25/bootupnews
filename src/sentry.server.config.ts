@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 
 import {
+  isFilteredRssNoiseEvent,
   readSentryDsn,
   readSentryEnvironment,
   readSentryRelease,
@@ -21,6 +22,11 @@ if (dsn) {
     enableLogs: true,
     maxBreadcrumbs: 50,
     beforeSend(event) {
+      // PRD-65 Phase 4.5 — drop post-retry-exhaustion RSS feed events.
+      // These are now tracked in the Notion Source Health Log instead.
+      if (isFilteredRssNoiseEvent(event)) {
+        return null;
+      }
       return sanitizeSentryEvent(event);
     },
     beforeBreadcrumb(breadcrumb) {

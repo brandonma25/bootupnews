@@ -34,7 +34,7 @@
 - `CRON_SECRET` — Shared secret for the `/api/cron/fetch-editorial-inputs` route. Required in Vercel env and on every cron-job.org job's custom header.
 - `ALLOW_VERCEL_CRON_FALLBACK` — Rollback flag. Defaults to unset/`false`. Set to `"true"` only to temporarily re-enable the legacy Vercel Cron `Authorization: Bearer` header during a cron-job.org outage.
 - `NOTION_PIPELINE_LOG_DB_ID` — Notion database ID for the Pipeline Log (one row per ingestion run and per health check). Schema: [`docs/notion-pipeline-log-schema.md`](../../notion-pipeline-log-schema.md). If unset, the ingestion and health endpoints log a warning and continue — pipeline-log writes are best-effort and never fail the cron.
-- `NOTION_SOURCE_HEALTH_LOG_DB_ID` — Notion database ID for the Source Health Log (per-source-per-day RSS fetch outcomes). Schema: [`docs/notion-source-health-schema.md`](../../notion-source-health-schema.md). The Phase 4 writer is in place; the Phase 4.5 circuit breaker reads from this database.
+- `NOTION_SOURCE_HEALTH_LOG_DB_ID` — Notion database ID for the Source Health Log (per-source-per-day RSS fetch outcomes). Schema: [`docs/notion-source-health-schema.md`](../../notion-source-health-schema.md). Read by the Phase 4.5 circuit breaker before every fetch and written after every fetch. If unset, the circuit breaker permissively falls through (`skip: false`) and the fetch path proceeds — observability degradation must never block ingestion.
 
 ## Key Files
 - `src/lib/editorial-staging/runner.ts` — orchestrates Steps B–G
@@ -42,7 +42,10 @@
 - `src/lib/editorial-staging/notion-writer.ts` — Notion REST API writer
 - `src/lib/editorial-staging/email.ts` — Resend completion email
 - `src/lib/observability/pipeline-log.ts` — Pipeline Log writer (Phase 4)
-- `src/lib/observability/source-health-log.ts` — Source Health Log writer (Phase 4; consumed by Phase 4.5 circuit breaker)
+- `src/lib/observability/source-health-log.ts` — Source Health Log writer (Phase 4)
+- `src/lib/observability/rss-circuit-breaker.ts` — RSS circuit breaker (Phase 4.5)
+- `src/lib/rss.ts` — `fetchFeedArticles` invokes the circuit breaker pre-fetch and records per-source outcomes
+- `src/lib/sentry-config.ts` — `isFilteredRssNoiseEvent` drops `Feed request retry exhausted for *` events from Sentry
 - `src/app/api/cron/health/route.ts` — health-check endpoint (Phase 4)
 - `src/app/api/editorial/push-approved/route.ts` — approval promotion endpoint
 
@@ -64,4 +67,14 @@
 - The ingestion endpoint writes one row to the Notion Pipeline Log on every completion (success or failure). `Status` is `ok` when every branch succeeded, `warn` when staging surfaced row-level errors but the cron still returned 200, `fail` otherwise. Body includes per-branch success flags, the `inserted/updated/skipped` row counts from Branch C, and the row total for the day.
 - The health endpoint writes one Pipeline Log row per invocation, capturing today's row count, the expected sources, and any missing sources. `fail` (HTTP 500) when row count < 7; `warn` (HTTP 200) when row count ≥ 7 but at least one expected source is missing; `ok` (HTTP 200) otherwise.
 - Both writers are best-effort. Missing `NOTION_PIPELINE_LOG_DB_ID`, missing `NOTION_TOKEN`, or any Notion API failure produces a warn-level log entry and a `{ written: false, reason }` result — the underlying cron or health check is never failed by a log write.
-- The Source Health Log writer (`src/lib/observability/source-health-log.ts`) is keyed on `(Source, Date)` and follows the same insert-or-update idempotency contract as Branch C E3. The Branch B fetch path will call this writer in Phase 4.5 alongside the circuit breaker.
+- The Source Health Log writer (`src/lib/observability/source-health-log.ts`) is keyed on `(Source, Date)` and follows the same insert-or-update idempotency contract as Branch C E3. The Branch B fetch path calls this writer on every fetch attempt — `success` increments `Success Count` and updates `Last Successful Fetch`; `fail` increments `Fail Count`; `skipped_circuit_breaker` does not increment either counter and bypasses Sentry.
+
+## RSS Circuit Breaker (Branch B Step R2)
+- Threshold: today's `Fail Count` for a source ≥ 5 → skip the next fetch for that source. Implementation: [`src/lib/observability/rss-circuit-breaker.ts`](../../../src/lib/observability/rss-circuit-breaker.ts).
+- Auto-reset: daily rollover at Taipei midnight. Each new day's row starts at `Fail Count = 0`, so a skipped source is automatically retried on the next day's first ingestion run (~22 h window between the last 19:45 Taipei run and the next 18:15 Taipei run).
+- Skip behavior:
+  - Writes a Source Health Log entry with `Last Outcome = skipped_circuit_breaker`.
+  - Throws `RssCircuitBreakerSkipError` so the caller's existing per-source failure path records the skip in the failure list without a network call.
+  - Does **not** call `captureRssFailure` — Sentry stays quiet for known-flaky sources.
+- Sentry noise filter: `sentry.server.config.ts` runs `isFilteredRssNoiseEvent` in `beforeSend` and drops events whose exception message matches `^Feed request retry exhausted for `. Those failures are now tracked exclusively in the Source Health Log. All other `RssError` variants continue to report normally.
+- Permissive failure contract: if `NOTION_SOURCE_HEALTH_LOG_DB_ID` is unset or the Notion query fails, the circuit breaker returns `skip: false` and the fetch proceeds. Observability degradation must never silently disable ingestion.

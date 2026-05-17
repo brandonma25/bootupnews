@@ -10,6 +10,11 @@ import {
   type RssFailureType,
   type RssPhase,
 } from "@/lib/observability/rss";
+import {
+  RssCircuitBreakerSkipError,
+  checkCircuitBreaker,
+  recordFetchOutcome,
+} from "@/lib/observability/rss-circuit-breaker";
 import { getUrlHost } from "@/lib/sentry-config";
 import type { SourceExtractionMethod } from "@/lib/source-accessibility-types";
 import { fetchTldrFeed, isTldrFeedUrl, type TldrDiscoveryMetadata } from "@/lib/tldr";
@@ -51,6 +56,24 @@ export async function fetchFeedArticles(
       "rss.feed_name": sourceName,
     },
     async () => {
+      // PRD-65 Phase 4.5 circuit breaker — skip the fetch entirely if this
+      // source has failed >= CIRCUIT_BREAKER_THRESHOLD times today. The skip
+      // is recorded in the Source Health Log so operators can see it; no
+      // Sentry event is emitted because skipped fetches are not failures.
+      const decision = await checkCircuitBreaker(sourceName);
+      if (decision.skip) {
+        await recordFetchOutcome({
+          sourceName,
+          outcome: "skipped_circuit_breaker",
+          notes: `Skipped: ${decision.failCount} failures earlier today exceed the circuit-breaker threshold.`,
+        });
+        throw new RssCircuitBreakerSkipError(
+          sourceName,
+          decision.briefingDate,
+          decision.failCount,
+        );
+      }
+
       try {
         const articles = await fetchFeedArticlesUnchecked(feedUrl, sourceName, requestOptions);
 
@@ -66,8 +89,21 @@ export async function fetchFeedArticles(
         }
 
         recordRssFetchSuccess({ feedUrl, feedName: sourceName, feedId: requestOptions.feedId });
+        await recordFetchOutcome({ sourceName, outcome: "success" });
         return articles;
       } catch (error) {
+        // Circuit-breaker skips are not failures — bypass Sentry and the
+        // source-health failure recording (the skip was already logged
+        // above before the throw).
+        if (error instanceof RssCircuitBreakerSkipError) {
+          throw error;
+        }
+
+        await recordFetchOutcome({
+          sourceName,
+          outcome: "fail",
+          notes: error instanceof Error ? error.message : String(error),
+        });
         captureRssFailure(error, {
           failureType: classifyRssFailure(error),
           phase: error instanceof Error && error.name === "RssError" && "phase" in error
