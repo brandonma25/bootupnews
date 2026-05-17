@@ -25,7 +25,11 @@ export type EditorialStagingRunSummary = {
   coreCount: number;
   contextCount: number;
   categoryBreakdown: Record<string, number>;
+  /** Total Notion writes that mutated state — inserts + updates. Skips are not counted. */
   notionRowsWritten: number;
+  notionRowsInserted: number;
+  notionRowsUpdated: number;
+  notionRowsSkippedHumanEdited: number;
   notionErrors: string[];
 };
 
@@ -198,6 +202,9 @@ function buildFailureResult(
       contextCount: 0,
       categoryBreakdown: {},
       notionRowsWritten: 0,
+      notionRowsInserted: 0,
+      notionRowsUpdated: 0,
+      notionRowsSkippedHumanEdited: 0,
       notionErrors: [],
     },
   };
@@ -265,14 +272,29 @@ export async function runEditorialStaging(options: {
   // Step E: Score and select top 7
   const selected = scoreAndSelect(dedupedPool);
 
-  // Step F: Write to Notion Editorial Queue
-  let notionRowsWritten = 0;
+  // Step F: Write to Notion Editorial Queue (idempotent — insert | update | skip)
+  let notionRowsInserted = 0;
+  let notionRowsUpdated = 0;
+  let notionRowsSkippedHumanEdited = 0;
   const notionErrors: string[] = [];
 
   for (const candidate of selected) {
     try {
-      await writeEditorialQueueRow({ candidate, briefingDate, notionDbId });
-      notionRowsWritten += 1;
+      const result = await writeEditorialQueueRow({ candidate, briefingDate, notionDbId });
+      if (result.action === "inserted") notionRowsInserted += 1;
+      else if (result.action === "updated") notionRowsUpdated += 1;
+      else notionRowsSkippedHumanEdited += 1;
+
+      logServerEvent("info", "editorial_queue_row write", {
+        briefingDate,
+        headline: candidate.headline.slice(0, 60),
+        slot: candidate.slot,
+        editorial_queue_row: {
+          action: result.action,
+          pageId: result.pageId,
+          ...(result.existingStatus ? { existingStatus: result.existingStatus } : {}),
+        },
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       notionErrors.push(`[${candidate.headline.slice(0, 40)}] ${msg}`);
@@ -283,6 +305,8 @@ export async function runEditorialStaging(options: {
       });
     }
   }
+
+  const notionRowsWritten = notionRowsInserted + notionRowsUpdated;
 
   const coreCount = selected.filter((c) => c.slot === "Core").length;
   const contextCount = selected.filter((c) => c.slot === "Context").length;
@@ -320,6 +344,9 @@ export async function runEditorialStaging(options: {
     coreCount,
     contextCount,
     notionRowsWritten,
+    notionRowsInserted,
+    notionRowsUpdated,
+    notionRowsSkippedHumanEdited,
   });
 
   return {
@@ -333,6 +360,9 @@ export async function runEditorialStaging(options: {
       contextCount,
       categoryBreakdown,
       notionRowsWritten,
+      notionRowsInserted,
+      notionRowsUpdated,
+      notionRowsSkippedHumanEdited,
       notionErrors,
     },
   };
