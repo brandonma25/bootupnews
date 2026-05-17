@@ -15,6 +15,19 @@ playbook.
 
 ---
 
+## 0. Account setup (one-time)
+
+If you don't already have a cron-job.org account:
+
+1. Go to <https://cron-job.org/en/signup/> and create a free account.
+2. Verify the email — the account is required for failure-alert emails to land.
+3. Generate an API key at <https://console.cron-job.org/settings> → **API**. The free tier allows 100 API requests/day, which is well above the ~10/day a routine `npm run cron:sync` uses (one read per `bootup-*` job + one detail read per job + at most one write per job).
+4. Note the timezone setting in **Settings → Account**. Job schedules in this repo are declared in `Etc/UTC` regardless of the account default, but the timezone setting affects how the dashboard displays execution timestamps.
+
+No upgrade is required. The free tier covers Boot Up's three scheduled jobs comfortably.
+
+---
+
 ## 1. Prerequisites
 
 Set all four of these before running the sync script. The script will refuse
@@ -123,17 +136,20 @@ script's diff is incomplete for some field.
 
 ---
 
-## 4. Enabling the health-check job (after Phase 4)
+## 4. Enabling the health-check job
 
-The config has a commented-out block for `bootup-health-check-1215-utc`. The
-endpoint it targets (`/api/cron/health`) does not yet exist. **Do not
-uncomment until PRD-65 Phase 4 ships the health endpoint.** Once it's live:
+The [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts) config has a commented-out block for `bootup-health-check-1215-utc`. As of PRD-65 Phase 4 the endpoint it targets (`/api/cron/health`) is live and ready to use:
 
-1. Uncomment the block in [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts).
-2. `npm run cron:sync:dry-run` → confirm one new `create`.
-3. `npm run cron:sync` to apply.
-4. Use cron-job.org's "Test run" — expect HTTP 200 when the day's row count
-   ≥ 7, HTTP 500 otherwise.
+1. Confirm `NOTION_EDITORIAL_QUEUE_DB_ID` and `CRON_SECRET` are set in Vercel production env. (`NOTION_PIPELINE_LOG_DB_ID` is recommended but optional — the endpoint logs a warning and continues when it's unset.)
+2. Uncomment the `bootup-health-check-1215-utc` block in [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts).
+3. `npm run cron:sync:dry-run` → confirm one new `create`.
+4. `npm run cron:sync` to apply.
+5. Use cron-job.org's "Test run" button on the new job:
+   - **HTTP 200, `status: "ok"`** — day's row count ≥ 7 and every expected source contributed.
+   - **HTTP 200, `status: "warn"`** — row count ≥ 7 but at least one expected source is missing. No alert email; investigate when convenient.
+   - **HTTP 500, `status: "fail"`** — row count < 7 (or the Notion query itself failed). An alert email will fire to the account holder.
+
+The job is scheduled at 12:15 UTC (= 20:15 Taipei), 30 minutes after the second ingestion run. That gives the pipeline time to complete and any retries to settle before the check fires.
 
 ---
 
@@ -163,21 +179,48 @@ cron-job.org, remove the `crons` block, unset `ALLOW_VERCEL_CRON_FALLBACK`.
 
 ## 6. Monitoring
 
-- **cron-job.org dashboard** — <https://console.cron-job.org>. Each job has an
-  execution history showing status code, duration, and response excerpt for
-  every fire.
-- **Failure email alerts** — when `notifyOnFailure: true` (the default in
-  config), cron-job.org emails the account holder on any non-2xx response.
-  These arrive within minutes of a failed run.
-- **Vercel function logs** — when the cron-job.org log shows a non-200,
-  inspect the matching Vercel function invocation for the underlying error.
-- **API rate limit** — cron-job.org's REST API allows 100 requests/day on the
-  free tier. A normal sync uses about 1 read + N reads (per `bootup-*` job)
-  + up to N writes, so well under the cap. Don't run the sync in a tight
-  loop.
+### cron-job.org dashboard
 
-PRD-65 Phase 4 will add a Notion Pipeline Log database for long-term
-operational history that survives beyond cron-job.org's retention.
+<https://console.cron-job.org> is the primary operational dashboard. Every job has:
+
+- **Execution history** — table of recent fires with timestamp, HTTP status code, duration, and a response excerpt. The free tier retains the last ~25 executions per job; longer-term history lives in the Notion Pipeline Log (see [OBSERVABILITY.md](OBSERVABILITY.md)).
+- **Test run button** — fires the job immediately, regardless of schedule. Useful for verifying changes right after `npm run cron:sync` and for ad-hoc re-runs.
+- **Enable/disable toggle** — manual emergency stop. Prefer flipping `enabled: false` in [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts) and re-syncing so the change is in git.
+
+### Reading an execution row
+
+Each execution row shows:
+- **Status code** — green for 2xx, red for everything else. HTTP 200 is the happy path for ingestion; HTTP 200 *or* 500 are both expected outcomes for the health check (500 = row count below threshold).
+- **Duration** — wall-clock time from request to response. Ingestion runs typically take 8–25 seconds. A run pushing the 60-second Vercel function ceiling is a warning sign — inspect the Vercel function log.
+- **Response excerpt** — the first ~500 bytes of the response body. For ingestion, this is the combined JSON summary; for health checks, the `{ status, row_count, ... }` payload. A response that's just `Unauthorized` means the `x-cron-secret` header doesn't match `CRON_SECRET` in Vercel prod env.
+
+### Email failure alerts
+
+Each job in [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts) has `notifyOnFailure: true`. The sync script translates that to `notification.onFailure: true` (and `onDisable: true`) in the cron-job.org API. Behavior:
+
+- cron-job.org emails the account holder on any non-2xx response **or** if a job is auto-disabled after repeated failures.
+- The email subject is `Job ‹title› failed` and the body includes the HTTP status, response excerpt, and a link back to the job page.
+- Emails are sent to the address verified during account signup. To change it, update **Settings → Account** in the cron-job.org dashboard.
+- **Test the alert path once after first setup**: temporarily change one job's URL to a path that returns 404 (e.g. `/api/does-not-exist`), sync, wait for the next scheduled fire (or click "Test run"), confirm the email arrives, then revert.
+- Health-check `fail` (HTTP 500) is the canonical alert trigger. `warn` and `ok` both return HTTP 200 and do not alert.
+
+### Where else to look
+
+When the cron-job.org log shows a non-200, the underlying cause lives elsewhere — see [OBSERVABILITY.md](OBSERVABILITY.md) for the full decision tree:
+
+- **Vercel function logs** — for the actual error, stack trace, and any branch-level failure detail.
+- **Notion Pipeline Log database** — long-term operational history beyond cron-job.org's ~25-execution retention. Filter by `Run Type=ingestion` for run-by-run results, or `Status=fail` for the failure series.
+- **Notion Source Health Log** — per-source-per-day fetch outcomes. Sentry no longer receives `Feed request retry exhausted for *` events for known-flaky sources; they appear here instead.
+
+### API rate limit
+
+cron-job.org's REST API allows **100 requests/day** on the free tier. A normal `npm run cron:sync` uses about:
+
+- 1 read (`GET /jobs`)
+- N reads (`GET /jobs/{id}` per `bootup-*` job — currently 2–3)
+- Up to N writes (`PUT`/`PATCH`/`DELETE`)
+
+So a full sync is ~6–10 API calls. Far under the cap. Don't run the sync in a tight loop or from CI on every push.
 
 ---
 

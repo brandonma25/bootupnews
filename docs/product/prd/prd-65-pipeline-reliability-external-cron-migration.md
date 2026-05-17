@@ -99,21 +99,21 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 | Cron-job.org sync tooling | Done | [#248](https://github.com/brandonma25/bootupnews/pull/248) |
 | Phase 3 — Branch C E3 idempotency | Done | [#249](https://github.com/brandonma25/bootupnews/pull/249) |
 | Phase 4 — `/api/cron/health` + Notion Pipeline Log + Source Health Log writer | Done | [#250](https://github.com/brandonma25/bootupnews/pull/250) |
-| Phase 4.5 — Source circuit breaker + Sentry filter | In Review | this PR |
-| Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | Pending | — |
+| Phase 4.5 — Source circuit breaker + Sentry filter | Done | [#251](https://github.com/brandonma25/bootupnews/pull/251) |
+| Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | In Review | this PR |
 
 ## Closeout Checklist
 
-- Scope completed: Phases 0–4.5 + sync tooling; Phase 5 outstanding.
+- Scope completed: all phases (0–5) plus the cron-job.org sync tooling landing.
 - [x] Terminology check completed: Article, Story Cluster, Signal, Card, and Surface Placement are used according to the canonical terminology document.
 - [x] PRD clearly states which object level the feature modifies.
 - [x] PRD does not describe UI cards as signals unless referring to the underlying Signal object.
-- Tests run: vitest unit suite (full repo 98 files / 714 tests) + targeted phase test files; lint and build clean per-phase.
-- Local validation complete: per-phase, see each phase's PR.
-- Preview validation complete, if applicable: Vercel preview deployed for each phase PR; cron-job.org execution requires production deployment.
-- Production sanity check complete, only after preview is good: pending Phase 5 close; operator wires cron-job.org jobs against production after Phase 4 deploys.
+- Tests run: vitest unit suite (last green: 99 files / 730 tests on Phase 4.5) + per-phase targeted tests; lint and build clean on every phase PR.
+- Local validation complete: yes, per-phase.
+- Preview validation complete: Vercel preview deployed and reviewed on every phase PR. cron-job.org execution remains a production-only validation step performed by the operator after merge.
+- Production sanity check complete: the operator's post-merge checklist lives in [`docs/CRON_SETUP.md` §2](../../CRON_SETUP.md#2-first-time-sync) and [`docs/OBSERVABILITY.md`](../../OBSERVABILITY.md). Production wiring (cron-job.org jobs + Vercel env vars + Notion databases) is owned by BM.
 - PRD summary stored in repo: yes (this file).
-- Bug-fix report stored in repo, if applicable: n/a (new feature).
-- `docs/product/feature-system.csv` updated if PRD/feature metadata changed: yes (PRD-65 row added in Phase 2 branch).
-- Public documentation or PR evidence complete when durable reviewer-facing context is needed: protocol updates land per phase in `docs/engineering/protocols/editorial-automation-operating-guide.md`; schema docs added at `docs/notion-pipeline-log-schema.md` and `docs/notion-source-health-schema.md` in Phase 4; ARCHITECTURE / CRON_SETUP / OBSERVABILITY land in Phase 5.
+- Bug-fix report stored in repo, if applicable: n/a (new system).
+- `docs/product/feature-system.csv` updated if PRD/feature metadata changed: yes. Row will flip from `In Progress` / `build` to `Built` / `keep` on this PR's merge.
+- Public documentation or PR evidence complete: yes. Per-phase protocol updates in [`docs/engineering/protocols/editorial-automation-operating-guide.md`](../../engineering/protocols/editorial-automation-operating-guide.md). Notion database schemas in [`docs/notion-pipeline-log-schema.md`](../../notion-pipeline-log-schema.md) and [`docs/notion-source-health-schema.md`](../../notion-source-health-schema.md). Reviewer-facing runbook + architecture in [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md), [`docs/CRON_SETUP.md`](../../CRON_SETUP.md), [`docs/OBSERVABILITY.md`](../../OBSERVABILITY.md). Initiative-level summary in [`CHANGELOG.md`](../../../CHANGELOG.md).
 - Google Sheet / Google Work Log not treated as canonical or updated for routine completion: confirmed.
