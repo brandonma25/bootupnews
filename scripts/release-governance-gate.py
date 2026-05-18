@@ -19,6 +19,7 @@ from governance_common import (
     run_git,
     validate_new_prd_alignment,
     validate_prd_csv_consistency,
+    validate_prd_index_consistency,
     classify_changes,
     is_canonical_prd,
 )
@@ -157,6 +158,17 @@ def main() -> int:
         return fail(
             "PRD and CSV consistency checks failed.",
             "\n".join(consistency_errors),
+        )
+
+    prd_index_errors = validate_prd_index_consistency(repo_root, sorted(changes))
+    if prd_index_errors:
+        return fail(
+            "PRD operational-history index update missing.",
+            "\n".join(prd_index_errors)
+            + "\n\nHow to fix: each referenced PRD must be modified in the same PR "
+            + "as the bug-fix or incident record. The PRD's 'Related operational "
+            + "history' section gets a new entry; the record's 'PRD index entry' "
+            + "section pre-computes the line to copy.",
         )
 
     context = classify_changes(changes, branch, args.pr_title, repo_root)

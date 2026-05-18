@@ -12,7 +12,14 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from governance_common import Change, classify_changes, find_missing_doc_groups, load_changes
+from governance_common import (
+    Change,
+    classify_changes,
+    extract_prd_references,
+    find_missing_doc_groups,
+    load_changes,
+    validate_prd_index_consistency,
+)
 GATE_SPEC = importlib.util.spec_from_file_location(
     "release_governance_gate", SCRIPT_DIR / "release-governance-gate.py"
 )
@@ -247,6 +254,228 @@ class GovernanceGateVelocityTests(unittest.TestCase):
         self.assertEqual(context.classification, "docs-only")
         self.assertEqual(context.gate_tier, "baseline")
         self.assertEqual(find_missing_doc_groups(context), [])
+
+
+BUG_FIX_TEMPLATE = """# Test Bug — Bug-Fix Record
+
+- **Date:** 2026-05-18
+- **PR:** [#999](url)
+- **Related PRD:** {related_prd}
+
+## Symptom
+
+Something broke.
+"""
+
+INCIDENT_TEMPLATE = """# Test Incident — Incident Record
+
+- **Date identified:** 2026-05-18
+- **Category:** Process
+- **Severity:** Low
+- **Related PRD:** {related_prd}
+
+## What happened
+
+Something process-level broke.
+"""
+
+
+class PRDIndexConsistencyTests(unittest.TestCase):
+    """Tests for validate_prd_index_consistency() — PR 4 of docs overhaul."""
+
+    def _setup_repo_with_prd(
+        self,
+        temp_dir: str,
+        prd_id: str = "PRD-37",
+    ) -> tuple[Path, str]:
+        """Creates a temp repo with one PRD file. Returns (repo_root, prd_relpath)."""
+        repo_root = Path(temp_dir)
+        number = prd_id.removeprefix("PRD-")
+        padded = number.zfill(2) if len(number) == 1 else number
+        prd_relpath = f"docs/product/prd/prd-{padded}-test-feature.md"
+        write_file(repo_root, prd_relpath, f"# {prd_id} — Test Feature\n")
+        return repo_root, prd_relpath
+
+    def test_single_prd_satisfied_returns_no_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root, prd_relpath = self._setup_repo_with_prd(temp_dir)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd="PRD-37"))
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path, prd_relpath])
+            self.assertEqual(errors, [])
+
+    def test_single_prd_missing_returns_one_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root, prd_relpath = self._setup_repo_with_prd(temp_dir)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd="PRD-37"))
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("PRD-37", errors[0])
+            self.assertIn(prd_relpath, errors[0])
+
+    def test_multi_prd_partial_returns_error_for_missing_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root, prd_37_path = self._setup_repo_with_prd(temp_dir, "PRD-37")
+            _, prd_53_path = self._setup_repo_with_prd(temp_dir, "PRD-53")
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd="PRD-37, PRD-53"))
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path, prd_37_path])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("PRD-53", errors[0])
+            self.assertIn(prd_53_path, errors[0])
+
+    def test_multi_prd_all_satisfied_returns_no_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root, prd_37_path = self._setup_repo_with_prd(temp_dir, "PRD-37")
+            _, prd_53_path = self._setup_repo_with_prd(temp_dir, "PRD-53")
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd="PRD-37, PRD-53"))
+
+            errors = validate_prd_index_consistency(
+                repo_root, [bug_path, prd_37_path, prd_53_path]
+            )
+            self.assertEqual(errors, [])
+
+    def test_none_value_returns_no_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root, _ = self._setup_repo_with_prd(temp_dir)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd="None"))
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path])
+            self.assertEqual(errors, [])
+
+    def test_empty_value_treated_as_none(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            content = (
+                "# Test Bug — Bug-Fix Record\n\n"
+                "- **Date:** 2026-05-18\n"
+                "- **PR:** [#999](url)\n\n"
+                "## Symptom\n\nSomething broke.\n"
+            )
+            write_file(repo_root, bug_path, content)
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path])
+            self.assertEqual(errors, [])
+
+    def test_incident_record_uses_same_logic(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root, prd_relpath = self._setup_repo_with_prd(temp_dir)
+            incident_path = "docs/engineering/incidents/2026-05-18-test-incident.md"
+            write_file(repo_root, incident_path, INCIDENT_TEMPLATE.format(related_prd="PRD-37"))
+
+            errors_satisfied = validate_prd_index_consistency(
+                repo_root, [incident_path, prd_relpath]
+            )
+            self.assertEqual(errors_satisfied, [])
+
+            errors_missing = validate_prd_index_consistency(repo_root, [incident_path])
+            self.assertEqual(len(errors_missing), 1)
+            self.assertIn("PRD-37", errors_missing[0])
+
+    def test_deleted_file_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/engineering/bug-fixes").mkdir(parents=True, exist_ok=True)
+            errors = validate_prd_index_consistency(
+                repo_root, ["docs/engineering/bug-fixes/never-existed.md"]
+            )
+            self.assertEqual(errors, [])
+
+    def test_template_file_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            template_path = "docs/engineering/bug-fixes/templates/old-template.md"
+            write_file(repo_root, template_path, BUG_FIX_TEMPLATE.format(related_prd="PRD-37"))
+
+            errors = validate_prd_index_consistency(repo_root, [template_path])
+            self.assertEqual(errors, [])
+
+    def test_invalid_prd_reference_returns_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "docs/product/prd").mkdir(parents=True, exist_ok=True)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd="PRD-9999"))
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("PRD-9999", errors[0])
+            self.assertIn("no matching PRD file", errors[0])
+
+    def test_unfilled_placeholder_returns_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd="PRD-XX"))
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("placeholder", errors[0])
+            self.assertIn("PRD-XX", errors[0])
+
+    def test_unfilled_placeholder_with_guidance_still_detected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            placeholder_with_guidance = (
+                "PRD-XX (use comma-separated list for multi-PRD: `PRD-37, PRD-53`. "
+                "Use `None` for feature-independent fixes such as infrastructure, "
+                "observability, or CI tooling.)"
+            )
+            write_file(
+                repo_root, bug_path, BUG_FIX_TEMPLATE.format(related_prd=placeholder_with_guidance)
+            )
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("placeholder", errors[0])
+
+    def test_prose_mentioning_prd_xx_is_not_placeholder(self) -> None:
+        """Legacy-format records like 'No PRD-XX assigned; this is...' should
+        NOT trigger placeholder detection — the literal token check ensures
+        prose that incidentally contains 'PRD-XX' is treated as a non-PRD value
+        (no IDs to enforce), not as an unfilled template."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            bug_path = "docs/engineering/bug-fixes/test-bug.md"
+            write_file(
+                repo_root,
+                bug_path,
+                BUG_FIX_TEMPLATE.format(
+                    related_prd="No PRD-XX assigned; this is a closure of existing spec."
+                ),
+            )
+
+            errors = validate_prd_index_consistency(repo_root, [bug_path])
+            self.assertEqual(errors, [])
+
+    def test_extract_prd_references_parses_simple_value(self) -> None:
+        prds, placeholder = extract_prd_references(
+            BUG_FIX_TEMPLATE.format(related_prd="PRD-37")
+        )
+        self.assertEqual(prds, ["PRD-37"])
+        self.assertFalse(placeholder)
+
+    def test_extract_prd_references_parses_comma_separated(self) -> None:
+        prds, placeholder = extract_prd_references(
+            BUG_FIX_TEMPLATE.format(related_prd="PRD-37, PRD-53, PRD-42")
+        )
+        self.assertEqual(prds, ["PRD-37", "PRD-53", "PRD-42"])
+        self.assertFalse(placeholder)
+
+    def test_extract_prd_references_handles_none(self) -> None:
+        prds, placeholder = extract_prd_references(
+            BUG_FIX_TEMPLATE.format(related_prd="None")
+        )
+        self.assertEqual(prds, [])
+        self.assertFalse(placeholder)
 
 
 if __name__ == "__main__":

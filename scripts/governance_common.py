@@ -38,6 +38,9 @@ DOC_LANE_PREFIXES = {
     "docs/engineering/incidents/": "incident",
     "docs/engineering/protocols/": "protocol",
     "docs/engineering/templates/": "template",
+    # Legacy lanes — retained so the classifier recognizes any straggler files
+    # and routes them to a non-canonical bucket. `change-records/` was deleted
+    # in PR 1 of the docs overhaul; `testing/` is historical.
     "docs/engineering/change-records/": "legacy-change-record",
     "docs/engineering/testing/": "legacy-testing",
 }
@@ -549,3 +552,123 @@ def inspect_branch_freshness(
     merge_base = run_git(repo_root, "merge-base", head_ref, base_ref)
     base_sha = run_git(repo_root, "rev-parse", base_ref)
     return merge_base == base_sha, merge_base, base_sha
+
+
+RELATED_PRD_RE = re.compile(r"^(?:- )?\*\*Related PRD:\*\*\s+(.+?)$", re.MULTILINE)
+
+
+def extract_prd_references(file_content: str) -> tuple[list[str], bool]:
+    """Parse the **Related PRD:** field from a bug-fix or incident record.
+
+    Returns (prd_ids, has_placeholder):
+      prd_ids: list of valid PRD-XX references (empty for None / empty / no match).
+      has_placeholder: True if the field still contains the literal 'PRD-XX'
+                       template placeholder, indicating the template was not
+                       filled in.
+    """
+    match = RELATED_PRD_RE.search(file_content)
+    if not match:
+        return [], False
+
+    raw = match.group(1).strip()
+
+    if " (" in raw:
+        raw = raw.split(" (")[0].strip()
+
+    # Token-level placeholder check — only flag if a comma-separated token is
+    # literally "PRD-XX" (the unreplaced template default). This avoids false
+    # positives on prose that incidentally mentions "PRD-XX" (e.g., legacy
+    # records explaining 'No PRD-XX assigned; this is a closure of...').
+    tokens = [t.strip() for t in raw.split(",")]
+    has_placeholder = "PRD-XX" in tokens
+
+    if raw.lower() in ("none", "n/a", "-", ""):
+        return [], False
+
+    prd_ids = [t for t in tokens if re.match(r"^PRD-\d+$", t)]
+
+    return prd_ids, has_placeholder
+
+
+def resolve_prd_file_path(repo_root: Path, prd_id: str) -> Path | None:
+    """PRD-37 -> docs/product/prd/prd-37-*.md. Returns None if not found."""
+    prd_dir = repo_root / "docs/product/prd"
+    if not prd_dir.is_dir():
+        return None
+    number = prd_id.removeprefix("PRD-")
+    padded = number.zfill(2) if len(number) == 1 else number
+    matches = list(prd_dir.glob(f"prd-{padded}-*.md"))
+    return matches[0] if matches else None
+
+
+def validate_prd_index_consistency(
+    repo_root: Path,
+    changed_paths: list[str],
+) -> list[str]:
+    """For each bug-fix or incident record changed in this PR, verify that any
+    referenced PRD files were also modified in this PR.
+
+    Returns list of error messages; empty list means consistent.
+
+    Skip cases (no error):
+    - Templates (paths containing '/templates/')
+    - READMEs (paths ending in README.md)
+    - Deleted files (no longer exist on disk)
+    - Records with Related PRD: None / empty / missing
+
+    Fail cases (error returned):
+    - Record still has literal 'PRD-XX' placeholder (template not filled in)
+    - Record references PRD-N but no matching prd-N-*.md file exists
+    - Record references PRD-N but the resolved PRD file is not in changed_paths
+    """
+    errors: list[str] = []
+
+    for changed_path in changed_paths:
+        is_bug_fix = (
+            changed_path.startswith("docs/engineering/bug-fixes/")
+            and changed_path.endswith(".md")
+        )
+        is_incident = (
+            changed_path.startswith("docs/engineering/incidents/")
+            and changed_path.endswith(".md")
+        )
+
+        if not (is_bug_fix or is_incident):
+            continue
+        if "/templates/" in changed_path or changed_path.endswith("README.md"):
+            continue
+
+        file_path = repo_root / changed_path
+        if not file_path.exists():
+            continue
+
+        content = file_path.read_text(encoding="utf-8")
+        referenced_prds, has_placeholder = extract_prd_references(content)
+
+        if has_placeholder:
+            errors.append(
+                f"{changed_path}: Related PRD field still contains template "
+                f"placeholder 'PRD-XX'. Replace with actual PRD reference "
+                f"(e.g., 'PRD-37') or 'None' for feature-independent fixes."
+            )
+            continue
+
+        for prd_id in referenced_prds:
+            prd_file = resolve_prd_file_path(repo_root, prd_id)
+            if prd_file is None:
+                errors.append(
+                    f"{changed_path} references {prd_id} but no matching PRD file "
+                    f"was found in docs/product/prd/. Either fix the reference or "
+                    f"remove it."
+                )
+                continue
+
+            prd_relative = str(prd_file.relative_to(repo_root))
+            if prd_relative not in changed_paths:
+                errors.append(
+                    f"{changed_path} references {prd_id} but {prd_relative} was "
+                    f"not modified in this PR. Add the index entry from this "
+                    f"record's 'PRD index entry' section to {prd_relative}."
+                )
+
+    return errors
