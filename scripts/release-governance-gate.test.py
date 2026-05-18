@@ -98,7 +98,7 @@ class GovernanceGateVelocityTests(unittest.TestCase):
         )
         missing = find_missing_doc_groups(context)
 
-        self.assertIn(("protocol", "template", "governance-root"), missing)
+        self.assertIn(("protocol", "template", "adr", "governance-root"), missing)
         message = format_missing_doc_failure(context, missing)
         self.assertIn("Hotspot file(s) touched", message)
         self.assertIn("docs/product/feature-system.csv", message)
@@ -146,7 +146,7 @@ class GovernanceGateVelocityTests(unittest.TestCase):
         )
 
         self.assertIn("legacy-change-record", context.doc_lanes_updated)
-        self.assertIn(("protocol", "template", "governance-root"), find_missing_doc_groups(context))
+        self.assertIn(("protocol", "template", "adr", "governance-root"), find_missing_doc_groups(context))
 
     def test_new_source_policy_file_without_prd_has_actionable_message(self) -> None:
         changes = {

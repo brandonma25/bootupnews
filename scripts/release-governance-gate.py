@@ -78,7 +78,7 @@ def format_missing_doc_failure(context: GovernanceContext, missing_doc_groups: l
         + (bullet_list(context.doc_lanes_updated) if context.doc_lanes_updated else "- none"),
     ]
 
-    if any(set(group) == {"protocol", "template", "governance-root"} for group in missing_doc_groups):
+    if any(set(group) == {"protocol", "template", "adr", "governance-root"} for group in missing_doc_groups):
         base.append(
             "Fastest valid fix: this PR changes a governance hotspot. Add or update one governance-facing "
             "artifact, usually the PR body/checklist, `docs/engineering/templates/llm-prompt-template-change-classification.md`, "

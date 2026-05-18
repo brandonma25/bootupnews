@@ -38,6 +38,7 @@ DOC_LANE_PREFIXES = {
     "docs/engineering/incidents/": "incident",
     "docs/engineering/protocols/": "protocol",
     "docs/engineering/templates/": "template",
+    "docs/adr/": "adr",
     # Legacy lanes — retained so the classifier recognizes any straggler files
     # and routes them to a non-canonical bucket. `change-records/` was deleted
     # in PR 1 of the docs overhaul; `testing/` is historical.
@@ -47,6 +48,7 @@ DOC_LANE_PREFIXES = {
 RELEVANT_DOC_PREFIXES = tuple(DOC_LANE_PREFIXES)
 RELEVANT_DOC_FILES = (
     "AGENTS.md",
+    "DECISIONS.md",
     "docs/product/documentation-rules.md",
 )
 HOTSPOT_FILES = [
@@ -326,6 +328,7 @@ def detect_prd_exception(repo_root: Path | None, changed_paths: list[str]) -> tu
             "incident",
             "protocol",
             "template",
+            "adr",
             "governance-root",
         }
         if not is_stable_governance_doc:
@@ -443,12 +446,13 @@ def required_doc_groups(context: GovernanceContext) -> list[tuple[str, ...]]:
                 "incident",
                 "protocol",
                 "template",
+                "adr",
                 "governance-root",
             )
         )
 
     if context.gate_tier == "hotspot" and context.non_test_monitored:
-        groups.append(("protocol", "template", "governance-root"))
+        groups.append(("protocol", "template", "adr", "governance-root"))
 
     return groups
 
