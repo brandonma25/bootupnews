@@ -166,15 +166,25 @@ async function pushApprovedRow(
     const slotValue = getSelect(props["Slot"]);
     const finalSlateTier = slotValue === "Core" ? "core" : "context";
     const category = getSelect(props["Category"]);
-    // WITM: prefer human-edited; fall back to AI draft
-    const witmHuman = getRichText(props["WITM (Human)"]);
-    const witmAi    = getRichText(props["WITM (AI Draft)"]);
+    // Notion field name migration: v1 (WITM/WLTI/WITC) → v2 (The Signal /
+    // Before This / The Ripple). The Notion schema no longer has v1 columns,
+    // so reading them returns null and downstream Supabase columns get
+    // empty strings. Local variable names retain the v1 prefix (witmAi,
+    // wltiAi, witcAi) because the Supabase column names (ai_why_it_matters,
+    // ai_what_led_to_it, ai_what_it_connects_to) are still v1-based —
+    // changing those is a separate downstream migration.
+    //
+    // Mapping:
+    //   The Signal   = WITM (Why It Matters)
+    //   Before This  = WLTI (What Led To It)
+    //   The Ripple   = WITC (What It Connects To)
+    const witmHuman = getRichText(props["The Signal (Human)"]);
+    const witmAi    = getRichText(props["The Signal (AI Draft)"]);
     const witm      = witmHuman || witmAi;
-    // WITC + WLTI: separate AI draft and human columns → signal_posts
-    const witcAi    = getRichText(props["WITC (AI Draft)"]);
-    const witcHuman = getRichText(props["WITC (Human)"]);
-    const wltiAi    = getRichText(props["WLTI (AI Draft)"]);
-    const wltiHuman = getRichText(props["WLTI (Human)"]);
+    const witcAi    = getRichText(props["The Ripple (AI Draft)"]);
+    const witcHuman = getRichText(props["The Ripple (Human)"]);
+    const wltiAi    = getRichText(props["Before This (AI Draft)"]);
+    const wltiHuman = getRichText(props["Before This (Human)"]);
     const editorialSource = getSelect(props["Editorial Source"]);
     const sourceUrl = getUrl(props["Source URL"]);
     const source = getRichText(props["Source"]);
