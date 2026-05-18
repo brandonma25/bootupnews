@@ -66,7 +66,16 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       },
       () => generateDailyBriefing(demoTopics, sources, { suppliedByManifest: sourcePlan.suppliedByManifest }),
     );
-    const briefingDate = briefing.briefingDate.slice(0, 10);
+    // Use Taipei date so RSS signal_posts.briefing_date aligns with
+    // editorial-staging's Taipei-based candidate lookup. Without this the
+    // briefingDate would be UTC, and staging would miss today's RSS data
+    // whenever the cron ran during the UTC/Taipei date overlap window.
+    const briefingDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
     const baseSummary = {
       briefingDate,
       insertedSignalPostCount: 0,
