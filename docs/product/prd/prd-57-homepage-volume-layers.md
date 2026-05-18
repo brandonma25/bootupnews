@@ -45,7 +45,7 @@ When public source supply is healthy, the homepage prioritizes the Top 5 Signals
 
 ## Evidence and Confidence
 
-- Repo evidence used: `src/lib/homepage-model.ts`, `src/components/landing/homepage.tsx`, `src/components/home/CategoryTabStrip.tsx`, `src/lib/homepage-category-articles.ts`, `src/app/api/home/category-articles/route.ts`, `src/lib/homepage-taxonomy.ts`, `docs/product/prd/prd-17-homepage-intelligence-surface.md`, `docs/product/prd/prd-36-signal-display-cap.md`, `docs/product/prd/prd-46-home-category-tabs.md`, `docs/product/prd/prd-54-public-source-manifest.md`, `docs/engineering/bug-fixes/phase1/post-cluster-surfacing-quality.md`, `docs/engineering/bug-fixes/phase1/homepage-semantic-dedup-and-explanations.md`
+- Repo evidence used: `src/lib/homepage-model.ts`, `src/components/landing/homepage.tsx`, `src/components/home/CategoryTabStrip.tsx`, `src/lib/homepage-category-articles.ts`, `src/app/api/home/category-articles/route.ts`, `src/lib/homepage-taxonomy.ts`, `docs/product/prd/prd-17-homepage-intelligence-surface.md`, `docs/product/prd/prd-36-signal-display-cap.md`, `docs/product/prd/prd-46-home-category-tabs.md`, `docs/product/prd/prd-54-public-source-manifest.md`, `docs/engineering/bug-fixes/phase1-post-cluster-surfacing-quality.md`, `docs/engineering/bug-fixes/phase1-homepage-semantic-dedup-and-explanations.md`
 - Confidence: Medium-high. The surface and invariants are well defined, and the implementation is scoped to additive view-model and UI work.
 
 ## Closeout Checklist

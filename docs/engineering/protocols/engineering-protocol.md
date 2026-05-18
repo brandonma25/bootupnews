@@ -45,19 +45,7 @@
 - Evidence and confidence note for backfilled or historically reconstructed PRDs
 
 ## 3a. Documentation Routing Standard
-- Optimize for truthful minimum documentation. Do not preserve misleading folder placement just because it already exists.
-- Product control docs stay at `docs/product/`.
-- Product briefs for meaningful feature work live at `docs/product/briefs/`.
-- Canonical numbered PRDs live at `docs/product/prd/`.
-- Meaningful defect records live at `docs/engineering/bug-fixes/`.
-- Meaningful governance, process, release, or workflow failures live at `docs/engineering/incidents/`.
-- Rules, checklists, templates, and standards live at `docs/engineering/protocols/`.
-- Reusable engineering and governance templates live at `docs/engineering/templates/`.
-- Audits, migrations, validation reports, execution notes, branch cleanup, and closeout evidence should usually live in PR bodies, GitHub metadata, or external/private archives unless a stable public artifact is explicitly needed.
-- `docs/bugs/` and `docs/changes/` are deprecated and non-canonical. Do not add new records there.
-- Durable history in deprecated folders must be migrated or consolidated into the canonical lane, leaving at most a redirect note.
-- "Meaningful" means the work materially changes behavior, implementation shape, operational expectations, or future maintenance understanding. Small copy tweaks and tiny mechanical edits do not need standalone docs.
-- If a work item needs more than one supporting doc, choose the smallest truthful set instead of duplicating the same narrative in multiple places.
+- See `docs/product/documentation-rules.md` for the canonical folder routing taxonomy. That file is the single source; this section previously duplicated it.
 
 ## 4. LLM Coding Agent Prompt Standard
 - Every substantial implementation prompt should use `docs/engineering/templates/llm-prompt-template-change-classification.md` or include equivalent fields:
@@ -197,7 +185,7 @@ git push origin --delete feature/<name>
 - Merge only after validation and docs updates are complete.
 
 ## 10a. Governance Hotspot Workflow
-- Treat `docs/product/feature-system.csv`, `AGENTS.md`, `docs/engineering/protocols/engineering-protocol.md`, `docs/engineering/protocols/prd-template.md`, and `docs/product/documentation-rules.md` as serialized hotspot files.
+- Treat `docs/product/feature-system.csv`, `AGENTS.md`, `docs/engineering/protocols/engineering-protocol.md`, `docs/engineering/templates/PRD-template.md`, and `docs/product/documentation-rules.md` as serialized hotspot files.
 - Hotspot changes should be short-lived and should sync with `origin/main` immediately before PR creation and again before merge.
 - Avoid parallel hotspot branches when possible; if overlap exists, prefer rebasing or stacking on the latest branch instead of letting both drift.
 - If a hotspot PR becomes stale, it should usually be superseded by port-forwarding the still-needed logic into a fresh branch from `main` instead of force-merging the stale branch.

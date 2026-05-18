@@ -40,7 +40,7 @@
 - `docs/product/feature-system.csv`
 - `AGENTS.md`
 - `docs/engineering/protocols/engineering-protocol.md`
-- `docs/engineering/protocols/prd-template.md`
+- `docs/engineering/templates/PRD-template.md`
 - `docs/product/documentation-rules.md`
 
 ## Classification Rules

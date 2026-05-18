@@ -25,9 +25,9 @@ landings under the same [PRD-65](docs/product/prd/prd-65-pipeline-reliability-ex
 
 - **The cron trigger is no longer Vercel.** It is cron-job.org, configured from a tracked file in this repo. To change schedules: edit [`scripts/cron-jobs.config.ts`](scripts/cron-jobs.config.ts), run `npm run cron:sync:dry-run`, then `npm run cron:sync`.
 - **Failure alerts arrive by email.** Each cron-job.org job has `notifyOnFailure: true`; a non-2xx response triggers an email within minutes. The health-check job at 12:15 UTC is the canonical alert for "the day's queue is below threshold".
-- **Two new Notion databases.** [`Pipeline Log`](docs/notion-pipeline-log-schema.md) and [`Source Health Log`](docs/notion-source-health-schema.md). BM creates each manually in Notion; database IDs go in Vercel production env as `NOTION_PIPELINE_LOG_DB_ID` and `NOTION_SOURCE_HEALTH_LOG_DB_ID`. Both writers are best-effort — missing env vars produce a warn log and never fail the cron.
+- **Two new Notion databases.** [`Pipeline Log`](docs/engineering/reports/notion-pipeline-log-schema.md) and [`Source Health Log`](docs/engineering/reports/notion-source-health-schema.md). BM creates each manually in Notion; database IDs go in Vercel production env as `NOTION_PIPELINE_LOG_DB_ID` and `NOTION_SOURCE_HEALTH_LOG_DB_ID`. Both writers are best-effort — missing env vars produce a warn log and never fail the cron.
 - **Sentry should be much quieter for routine RSS issues.** Post-retry-exhaustion feed errors no longer reach Sentry; they live in the Source Health Log instead. A new Sentry issue now means a genuinely new failure mode, not just a flaky feed.
-- **Rollback path is real.** If cron-job.org has an outage: set `ALLOW_VERCEL_CRON_FALLBACK=true` in Vercel, re-add the `crons` block to `vercel.json` on a hotfix branch, redeploy. Reverse when cron-job.org is healthy. See [`docs/CRON_SETUP.md` §5](docs/CRON_SETUP.md#5-rollback).
+- **Rollback path is real.** If cron-job.org has an outage: set `ALLOW_VERCEL_CRON_FALLBACK=true` in Vercel, re-add the `crons` block to `vercel.json` on a hotfix branch, redeploy. Reverse when cron-job.org is healthy. See [`docs/engineering/CRON_SETUP.md` §5](docs/engineering/CRON_SETUP.md#5-rollback).
 
 ### Constraint compliance
 

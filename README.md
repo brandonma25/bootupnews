@@ -56,14 +56,14 @@ For an implementation-history map, see [docs/portfolio/PR_CLUSTERS.md](docs/port
 
 The ingestion pipeline is triggered externally by [cron-job.org](https://cron-job.org), runs in Vercel serverless functions, and writes editorial candidates to Notion for review. Three docs cover the day-to-day:
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — pipeline diagram and external triggering diagram (Mermaid).
-- [docs/CRON_SETUP.md](docs/CRON_SETUP.md) — cron-job.org account setup, the sync script (`npm run cron:sync`), email alerts, rollback procedure.
-- [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — where to look when something breaks; Source Health vs Pipeline Health.
+- [docs/engineering/ARCHITECTURE.md](docs/engineering/ARCHITECTURE.md) — pipeline diagram and external triggering diagram (Mermaid).
+- [docs/engineering/CRON_SETUP.md](docs/engineering/CRON_SETUP.md) — cron-job.org account setup, the sync script (`npm run cron:sync`), email alerts, rollback procedure.
+- [docs/engineering/OBSERVABILITY.md](docs/engineering/OBSERVABILITY.md) — where to look when something breaks; Source Health vs Pipeline Health.
 
 Notion database schemas (operator creates these manually):
 
-- [docs/notion-pipeline-log-schema.md](docs/notion-pipeline-log-schema.md) — one row per ingestion run / health check.
-- [docs/notion-source-health-schema.md](docs/notion-source-health-schema.md) — per-source-per-day RSS fetch outcomes; feeds the circuit breaker.
+- [docs/engineering/reports/notion-pipeline-log-schema.md](docs/engineering/reports/notion-pipeline-log-schema.md) — one row per ingestion run / health check.
+- [docs/engineering/reports/notion-source-health-schema.md](docs/engineering/reports/notion-source-health-schema.md) — per-source-per-day RSS fetch outcomes; feeds the circuit breaker.
 
 PRD-65 environment variables (set in Vercel production):
 

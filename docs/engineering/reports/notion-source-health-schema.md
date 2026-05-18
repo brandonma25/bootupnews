@@ -51,8 +51,8 @@ A health check with `Row Count >= 7` but `missing.length > 0` returns
 
 The Branch B RSS fetch step (R2) consults this database before fetching each
 source. Implementation lives in
-[`src/lib/observability/rss-circuit-breaker.ts`](../src/lib/observability/rss-circuit-breaker.ts)
-and is invoked from [`src/lib/rss.ts`](../src/lib/rss.ts) inside
+[`src/lib/observability/rss-circuit-breaker.ts`](../../../src/lib/observability/rss-circuit-breaker.ts)
+and is invoked from [`src/lib/rss.ts`](../../../src/lib/rss.ts) inside
 `fetchFeedArticles`.
 
 - The pre-fetch gate reads today's row for the source and inspects `Fail Count`.
