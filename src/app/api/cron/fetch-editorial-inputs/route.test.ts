@@ -6,6 +6,7 @@ const runEditorialStaging = vi.fn();
 const logServerEvent = vi.fn();
 const writePipelineLogEntry = vi.fn();
 const sentryCaptureException = vi.fn();
+const sentryFlush = vi.fn(async () => true);
 
 let capturedAfterCallback: (() => void | Promise<void>) | null = null;
 
@@ -21,6 +22,7 @@ vi.mock("next/server", async (importOriginal) => {
 
 vi.mock("@sentry/nextjs", () => ({
   captureException: sentryCaptureException,
+  flush: sentryFlush,
 }));
 
 vi.mock("@/lib/cron/fetch-news", () => ({
@@ -309,6 +311,12 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       // Pipeline log is NOT written when the pipeline times out — there is no
       // briefingDate available because editorial-staging never ran.
       expect(writePipelineLogEntry).not.toHaveBeenCalled();
+
+      // Sentry must be flushed before the after() callback returns, otherwise
+      // the captured timeout event may be lost when Vercel freezes the function
+      // instance ~5s later at the 60s maxDuration wall.
+      expect(sentryFlush).toHaveBeenCalled();
+      expect(sentryFlush.mock.calls[0][0]).toBe(2_000);
     } finally {
       vi.useRealTimers();
     }

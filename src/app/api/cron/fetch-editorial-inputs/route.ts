@@ -155,6 +155,11 @@ async function executePipelineWork() {
           internalTimeoutMs: error.timeoutMs,
         },
       });
+      // The 55s internal wall fires ~5s before the 60s Vercel function kill,
+      // and Sentry's nextjs SDK buffers events in memory. Force a flush so
+      // captured timeout/error events ship before the function instance
+      // is frozen. Failure to flush is swallowed — never blocks shutdown.
+      await Sentry.flush(2_000).catch(() => { /* best-effort */ });
       logServerEvent("error", "Ingestion pipeline hit internal timeout", {
         route: "/api/cron/fetch-editorial-inputs",
         stage: error.stage,
@@ -172,6 +177,7 @@ async function executePipelineWork() {
         failure_type: "ingestion_pipeline_unexpected_error",
       },
     });
+    await Sentry.flush(2_000).catch(() => { /* best-effort */ });
     logServerEvent("error", "Ingestion pipeline failed unexpectedly", {
       route: "/api/cron/fetch-editorial-inputs",
       ...errorContext(error),
