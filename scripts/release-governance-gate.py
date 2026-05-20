@@ -19,6 +19,7 @@ from governance_common import (
     run_git,
     validate_new_prd_alignment,
     validate_prd_csv_consistency,
+    validate_prd_index_consistency,
     classify_changes,
     is_canonical_prd,
 )
@@ -77,7 +78,7 @@ def format_missing_doc_failure(context: GovernanceContext, missing_doc_groups: l
         + (bullet_list(context.doc_lanes_updated) if context.doc_lanes_updated else "- none"),
     ]
 
-    if any(set(group) == {"protocol", "template", "governance-root"} for group in missing_doc_groups):
+    if any(set(group) == {"protocol", "template", "adr", "governance-root"} for group in missing_doc_groups):
         base.append(
             "Fastest valid fix: this PR changes a governance hotspot. Add or update one governance-facing "
             "artifact, usually the PR body/checklist, `docs/engineering/templates/llm-prompt-template-change-classification.md`, "
@@ -157,6 +158,17 @@ def main() -> int:
         return fail(
             "PRD and CSV consistency checks failed.",
             "\n".join(consistency_errors),
+        )
+
+    prd_index_errors = validate_prd_index_consistency(repo_root, sorted(changes))
+    if prd_index_errors:
+        return fail(
+            "PRD operational-history index update missing.",
+            "\n".join(prd_index_errors)
+            + "\n\nHow to fix: each referenced PRD must be modified in the same PR "
+            + "as the bug-fix or incident record. The PRD's 'Related operational "
+            + "history' section gets a new entry; the record's 'PRD index entry' "
+            + "section pre-computes the line to copy.",
         )
 
     context = classify_changes(changes, branch, args.pr_title, repo_root)

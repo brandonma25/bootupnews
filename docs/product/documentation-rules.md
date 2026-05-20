@@ -2,6 +2,8 @@
 
 This repository uses a controlled documentation system. The goal is to keep docs useful, short, and non-duplicated.
 
+> **Canonical source.** This file is the canonical source for folder routing taxonomy. `AGENTS.md`, `docs/engineering/protocols/engineering-protocol.md`, and CI scripts (`scripts/governance_common.py`) reference this file. Update routing rules here, not in the references.
+
 ## Core Rules
 - Public repo documentation is the canonical source of truth for product framing, durable decisions, canonical PRDs, feature governance metadata, standing process rules, and portfolio-facing architecture/process artifacts.
 - PR bodies, GitHub metadata, and external/private archives are the preferred home for per-run operational evidence, validation transcripts, branch-cleanup details, and closeout records.
