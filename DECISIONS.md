@@ -169,3 +169,17 @@ Bootup News was built as a solo, AI-agent-assisted product system. This file sum
 **Evidence:** PRs #22, #31, #51, #191, #194; `AGENTS.md`; `.github/pull_request_template.md`; `docs/product/documentation-rules.md`; `docs/engineering/templates/llm-prompt-template-change-classification.md`; `scripts/release-governance-gate.py`.
 
 **Interview read:** This shows the project used AI as leverage while still preserving human-owned judgment, traceability, and release discipline.
+
+## D13 — Enforce PRD operational-history index at the CI gate
+
+**Decision:** Bug-fix and incident records that name a `Related PRD` must modify the referenced PRD file(s) in the same PR, or the release governance gate fails. Implemented as `validate_prd_index_consistency()` in `scripts/governance_common.py` and run before classification-based branching so docs-only bug-fix PRs are not skipped. `Related PRD: None` opts out for feature-independent fixes.
+
+**Context:** PR #255 introduced templates that document a structured "Related operational history" index at the bottom of every PRD, indexing bug fixes, incidents, amendments, and multi-PR initiatives. Without CI enforcement, agents can satisfy template checklists without actually updating the referenced PRD, and the spec-to-history connective tissue erodes silently. The gap matters most at the Phase 1 → Phase 2 transition, where doc-drift risk is highest.
+
+**Rejected alternative:** Reviewer-only enforcement at merge time, or a periodic post-merge audit script. Both defer detection past the point where the originating PR diff can be amended cleanly, and both re-introduce the silent-drift problem the index system was designed to eliminate.
+
+**Trade-off accepted:** Typo-fixes to existing bug-fix records will fail the gate unless the referenced PRD is also touched in the same PR. Older records pre-dating the new `- **Related PRD:**` template format are silently skipped because the regex matches only the new bullet-asterisks format.
+
+**Evidence:** PRs [#255](https://github.com/brandonma25/bootupnews/pull/255), [#257](https://github.com/brandonma25/bootupnews/pull/257); `docs/adr/002-prd-index-ci-enforcement.md`; `scripts/governance_common.py` (`validate_prd_index_consistency`, `extract_prd_references`, `resolve_prd_file_path`); `scripts/release-governance-gate.py`; `scripts/release-governance-gate.test.py` (16 new tests); `AGENTS.md` §5 and §10.
+
+**Interview read:** This shows the governance gate is a backstop for spec-author oversight, not just for agent oversight. The CI failure on PR #257 caught a real gap in the v4 spec — the fix is this ADR itself, which the gate then accepted as a valid documentation lane. That sequence is the system working as designed.

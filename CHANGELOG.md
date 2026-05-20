@@ -3,6 +3,41 @@
 Project-level changelog. Per-PR detail lives in GitHub PR metadata; this file
 records durable, reviewer-facing milestones — usually multi-PR initiatives.
 
+## 2026-05-18 — Documentation architecture overhaul
+
+Resolved structural drift in the docs system: scattered templates consolidated to a single canonical location, three governance bugs fixed (PR template terminology reference, missing incidents folder, change-records folder lane mismatch), AGENTS.md redesigned to retire the 9-document required-reading list, new ADR and incident templates introduced, folder structure flattened where single-file subfolders existed, PRD operational-history index system introduced with CI enforcement.
+
+| Phase | Summary | PR |
+| --- | --- | --- |
+| PR 1 | Governance bug fixes: PR template terminology, incidents folder, change-records resolution | [#254](https://github.com/brandonma25/bootupnews/pull/254) |
+| PR 2 | New templates (PRD, bug-fix, ADR, incident) + redesigned AGENTS.md + read-order doc + PRD operational-history index system | [#255](https://github.com/brandonma25/bootupnews/pull/255) |
+| PR 3 | Folder consolidation, deprecation of superseded templates, routing taxonomy deduplication | [#256](https://github.com/brandonma25/bootupnews/pull/256) |
+| PR 4 | CI enforcement of PRD operational-history index consistency | [#257](https://github.com/brandonma25/bootupnews/pull/257) |
+
+### What changed for contributors
+
+- **One templates folder.** `docs/engineering/templates/` is now the canonical home. Previous locations (`docs/engineering/protocols/`, `docs/engineering/bug-fixes/templates/`, `docs/product/briefs/templates/`) are emptied.
+- **PRD template upgraded.** Senior-PM sections added: options considered, what we're NOT building, failure modes accepted, post-ship reflection. Existing PRDs not retrofitted.
+- **PRD operational-history index.** Each PRD now has a "Related operational history" section near the bottom indexing bug fixes, incidents, amendments, and multi-PR initiatives that touched the feature. Bug-fix and incident templates pre-compute the index entry line to copy.
+- **CI enforces the index.** When a bug-fix or incident record names `Related PRD: PRD-XX`, the referenced PRD must be updated in the same PR. Multi-PRD references require all referenced PRDs to be updated. `Related PRD: None` skips the check.
+- **AGENTS.md retired the 9-doc required-reading list.** Essential rules embedded inline; deep specifics referenced by file path. Combined required pre-read reduced from ~1500 lines to ~280.
+- **Two new templates:** `ADR-template.md` for durable architectural decisions, `incident-template.md` for process/governance/workflow failures.
+- **Folder routing taxonomy has one canonical source:** `docs/product/documentation-rules.md`. Other files reference it rather than duplicating.
+
+### Constraint compliance
+
+This overhaul did not modify:
+- Source code (`src/`) — except 3 doc comments updated to point to relocated schema files
+- Database schema or migrations (`supabase/`)
+- CI workflow definitions (`.github/workflows/`)
+- Feature PRD content (templates changed; existing PRDs untouched — retrofit deferred)
+- Product behavior or public surfaces
+
+### What this does NOT solve
+
+- Semantic quality of PRD index entries. The CI gate is structural. An agent can satisfy the gate with a low-signal index line. Reviewer at merge time is the quality gate.
+- Retroactive index population for existing bug-fix and incident records. Forward-looking system; retroactive sweep is a separate decision.
+
 ## 2026-05-17 — Pipeline reliability & external cron migration (PRD-65)
 
 Migrated the editorial ingestion pipeline off Vercel Hobby Cron to external
