@@ -83,3 +83,7 @@ The scheduled route delegates first to the existing `generateDailyBriefing` pipe
 - Production sanity check complete: pending merge/deploy.
 - GitHub documentation closeout completed in the canonical lane: pending PR review.
 - Google Sheet / Work Log not treated as canonical or updated for routine closeout: yes.
+
+## Bug fixes touching this feature
+
+- 2026-05-20 — Ingestion cron timeout — decouple cron-job.org wall via Next.js `after()`. Three-stage sequential pipeline (`runNewsletterIngestion` → `runDailyNewsCron` → `runEditorialStaging`) was hitting cron-job.org's 30-second external HTTP timeout. Handler converted to fire-and-forget: returns HTTP 202 in <1 s and runs the pipeline via `after()` inside the 60-second Vercel `maxDuration` window. Hard internal timeout at 55 seconds captures a tagged Sentry `IngestionTimeoutInternal` event with the offending stage so timeouts remain loud after the external wall is removed. Authoritative success signals shift to the 12:15 UTC `/api/cron/health` check and the Notion Pipeline Log. See `docs/engineering/bug-fixes/2026-05-20-ingestion-cron-timeout-after-pattern.md`.
