@@ -4,7 +4,7 @@ import { errorContext, logServerEvent } from "@/lib/observability";
  * Pipeline Log writer (PRD-65 Phase 4).
  *
  * Writes a single row to the Notion Pipeline Log database per cron invocation.
- * Schema is documented in `docs/notion-pipeline-log-schema.md`. The database
+ * Schema is documented in `docs/engineering/reports/notion-pipeline-log-schema.md`. The database
  * must be created manually in Notion by BM and its ID set as the
  * `NOTION_PIPELINE_LOG_DB_ID` Vercel env var.
  *
@@ -27,7 +27,7 @@ export type PipelineLogEntry = {
   message: string;
   briefingDate: string;
   /**
-   * JSON-encoded source-health snapshot. See docs/notion-pipeline-log-schema.md
+   * JSON-encoded source-health snapshot. See docs/engineering/reports/notion-pipeline-log-schema.md
    * for the expected shape. Writer accepts either a pre-encoded string or an
    * object — objects are JSON.stringified at write time.
    */

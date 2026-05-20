@@ -84,13 +84,13 @@ docs/
 │   ├── protocols/         ← Operating rules, checklists, process standards
 │   ├── bug-fixes/         ← One .md per bug (flat, dated)
 │   ├── incidents/         ← Process / governance / workflow failures
-│   ├── reports/           ← Point-in-time diagnostic reports
+│   ├── reports/           ← Point-in-time diagnostic reports (incl. notion-*-schema.md)
+│   ├── ARCHITECTURE.md, CRON_SETUP.md, OBSERVABILITY.md
+│   ├── archive-manifest.md
 │   └── BOOTUPNEWS_CANONICAL_TERMINOLOGY.md
 ├── adr/                   ← Long-form ADRs (cross-referenced from DECISIONS.md)
 ├── portfolio/             ← PR_CLUSTERS.md, portfolio artifacts
-├── audits/                ← Source and architecture audits
-├── ARCHITECTURE.md, CRON_SETUP.md, OBSERVABILITY.md
-└── notion-*-schema.md     ← Notion database schemas
+└── audits/                ← Source and architecture audits
 ```
 
 **Routing rules:**

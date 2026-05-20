@@ -24,7 +24,7 @@
 ## Schedule Management (cron-job.org)
 - Source of truth: [`scripts/cron-jobs.config.ts`](../../../scripts/cron-jobs.config.ts). Never edit cron-job.org via its web UI for routine changes — the config file drifts and the sync script will revert.
 - Apply changes with `npm run cron:sync` (idempotent: a re-run with no config change writes zero). Preview with `npm run cron:sync:dry-run`. Use `npm run cron:sync:prune` to delete `bootup-*` jobs that are no longer in the config.
-- Runbook for first-time setup, env-var contract, rollback, and operator handoff: [`docs/CRON_SETUP.md`](../../CRON_SETUP.md).
+- Runbook for first-time setup, env-var contract, rollback, and operator handoff: [`docs/engineering/CRON_SETUP.md`](../CRON_SETUP.md).
 
 ## Required Environment Variables
 - `NOTION_TOKEN` — Notion integration token from notion.so/my-integrations.
@@ -33,8 +33,8 @@
 - `EDITORIAL_PUSH_SECRET` — Secret token for the push-approved endpoint.
 - `CRON_SECRET` — Shared secret for the `/api/cron/fetch-editorial-inputs` route. Required in Vercel env and on every cron-job.org job's custom header.
 - `ALLOW_VERCEL_CRON_FALLBACK` — Rollback flag. Defaults to unset/`false`. Set to `"true"` only to temporarily re-enable the legacy Vercel Cron `Authorization: Bearer` header during a cron-job.org outage.
-- `NOTION_PIPELINE_LOG_DB_ID` — Notion database ID for the Pipeline Log (one row per ingestion run and per health check). Schema: [`docs/notion-pipeline-log-schema.md`](../../notion-pipeline-log-schema.md). If unset, the ingestion and health endpoints log a warning and continue — pipeline-log writes are best-effort and never fail the cron.
-- `NOTION_SOURCE_HEALTH_LOG_DB_ID` — Notion database ID for the Source Health Log (per-source-per-day RSS fetch outcomes). Schema: [`docs/notion-source-health-schema.md`](../../notion-source-health-schema.md). Read by the Phase 4.5 circuit breaker before every fetch and written after every fetch. If unset, the circuit breaker permissively falls through (`skip: false`) and the fetch path proceeds — observability degradation must never block ingestion.
+- `NOTION_PIPELINE_LOG_DB_ID` — Notion database ID for the Pipeline Log (one row per ingestion run and per health check). Schema: [`docs/engineering/reports/notion-pipeline-log-schema.md`](../reports/notion-pipeline-log-schema.md). If unset, the ingestion and health endpoints log a warning and continue — pipeline-log writes are best-effort and never fail the cron.
+- `NOTION_SOURCE_HEALTH_LOG_DB_ID` — Notion database ID for the Source Health Log (per-source-per-day RSS fetch outcomes). Schema: [`docs/engineering/reports/notion-source-health-schema.md`](../reports/notion-source-health-schema.md). Read by the Phase 4.5 circuit breaker before every fetch and written after every fetch. If unset, the circuit breaker permissively falls through (`skip: false`) and the fetch path proceeds — observability degradation must never block ingestion.
 
 ## Key Files
 - `src/lib/editorial-staging/runner.ts` — orchestrates Steps B–G

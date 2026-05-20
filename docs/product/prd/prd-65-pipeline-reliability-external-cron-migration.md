@@ -28,7 +28,7 @@ The editor needs ingestion to fire on a tight, predictable schedule, retry clean
 - Add a separate Notion "Source Health Log" database tracking per-source-per-day fetch outcomes. The ingestion endpoint writes one row per source per run.
 - Add a circuit breaker in Branch B Step R2 (RSS fetch): skip a source whose Source Health Log shows 5 or more failures in the past 24 hours; auto-reset after 24 hours; do not report skipped sources to Sentry.
 - Add a Sentry `beforeSend` filter dropping `Feed request retry exhausted for *` events. Those failures are now tracked in Source Health Log instead.
-- Document the new architecture (`/docs/ARCHITECTURE.md`), the `cron-job.org` runbook (`/docs/CRON_SETUP.md`), the observability story (`/docs/OBSERVABILITY.md`), and the two new Notion database schemas.
+- Document the new architecture (`/docs/engineering/ARCHITECTURE.md`), the `cron-job.org` runbook (`/docs/engineering/CRON_SETUP.md`), the observability story (`/docs/engineering/OBSERVABILITY.md`), and the two new Notion database schemas.
 
 ## Non-Goals
 
@@ -81,7 +81,7 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 - Status is `warn` (not `fail`) when row count ≥ 7 but one or more expected sources contributed zero articles.
 - A source with 5 or more failures in the past 24 hours is skipped on the next run, logged to Source Health Log as `skipped_circuit_breaker`, and not reported to Sentry. Skipped sources auto-reset after 24 hours.
 - Sentry no longer receives `Feed request retry exhausted for *` events; other `RssError` variants continue to report normally.
-- `/docs/ARCHITECTURE.md`, `/docs/CRON_SETUP.md`, `/docs/OBSERVABILITY.md`, `/docs/notion-pipeline-log-schema.md`, and `/docs/notion-source-health-schema.md` exist; `README.md` links to them; `CHANGELOG.md` has an entry for this migration.
+- `/docs/engineering/ARCHITECTURE.md`, `/docs/engineering/CRON_SETUP.md`, `/docs/engineering/OBSERVABILITY.md`, `/docs/engineering/reports/notion-pipeline-log-schema.md`, and `/docs/engineering/reports/notion-source-health-schema.md` exist; `README.md` links to them; `CHANGELOG.md` has an entry for this migration.
 - `.env.example` documents `CRON_SECRET`, `ALLOW_VERCEL_CRON_FALLBACK`, `NOTION_PIPELINE_LOG_DB_ID`, and `NOTION_SOURCE_HEALTH_LOG_DB_ID` with comments.
 
 ## Evidence and Confidence
@@ -111,9 +111,9 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 - Tests run: vitest unit suite (last green: 99 files / 730 tests on Phase 4.5) + per-phase targeted tests; lint and build clean on every phase PR.
 - Local validation complete: yes, per-phase.
 - Preview validation complete: Vercel preview deployed and reviewed on every phase PR. cron-job.org execution remains a production-only validation step performed by the operator after merge.
-- Production sanity check complete: the operator's post-merge checklist lives in [`docs/CRON_SETUP.md` §2](../../CRON_SETUP.md#2-first-time-sync) and [`docs/OBSERVABILITY.md`](../../OBSERVABILITY.md). Production wiring (cron-job.org jobs + Vercel env vars + Notion databases) is owned by BM.
+- Production sanity check complete: the operator's post-merge checklist lives in [`docs/engineering/CRON_SETUP.md` §2](../../engineering/CRON_SETUP.md#2-first-time-sync) and [`docs/engineering/OBSERVABILITY.md`](../../engineering/OBSERVABILITY.md). Production wiring (cron-job.org jobs + Vercel env vars + Notion databases) is owned by BM.
 - PRD summary stored in repo: yes (this file).
 - Bug-fix report stored in repo, if applicable: n/a (new system).
 - `docs/product/feature-system.csv` updated if PRD/feature metadata changed: yes. Row will flip from `In Progress` / `build` to `Built` / `keep` on this PR's merge.
-- Public documentation or PR evidence complete: yes. Per-phase protocol updates in [`docs/engineering/protocols/editorial-automation-operating-guide.md`](../../engineering/protocols/editorial-automation-operating-guide.md). Notion database schemas in [`docs/notion-pipeline-log-schema.md`](../../notion-pipeline-log-schema.md) and [`docs/notion-source-health-schema.md`](../../notion-source-health-schema.md). Reviewer-facing runbook + architecture in [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md), [`docs/CRON_SETUP.md`](../../CRON_SETUP.md), [`docs/OBSERVABILITY.md`](../../OBSERVABILITY.md). Initiative-level summary in [`CHANGELOG.md`](../../../CHANGELOG.md).
+- Public documentation or PR evidence complete: yes. Per-phase protocol updates in [`docs/engineering/protocols/editorial-automation-operating-guide.md`](../../engineering/protocols/editorial-automation-operating-guide.md). Notion database schemas in [`docs/engineering/reports/notion-pipeline-log-schema.md`](../../engineering/reports/notion-pipeline-log-schema.md) and [`docs/engineering/reports/notion-source-health-schema.md`](../../engineering/reports/notion-source-health-schema.md). Reviewer-facing runbook + architecture in [`docs/engineering/ARCHITECTURE.md`](../../engineering/ARCHITECTURE.md), [`docs/engineering/CRON_SETUP.md`](../../engineering/CRON_SETUP.md), [`docs/engineering/OBSERVABILITY.md`](../../engineering/OBSERVABILITY.md). Initiative-level summary in [`CHANGELOG.md`](../../../CHANGELOG.md).
 - Google Sheet / Google Work Log not treated as canonical or updated for routine completion: confirmed.

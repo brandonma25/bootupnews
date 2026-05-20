@@ -4,8 +4,8 @@ Operational runbook for the Boot Up ingestion cron jobs.
 
 The canonical scheduler for the Boot Up ingestion pipeline is
 [cron-job.org](https://cron-job.org). Job configuration lives in
-[`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts) and is applied
-to cron-job.org by [`scripts/sync-cron-jobs.ts`](../scripts/sync-cron-jobs.ts).
+[`scripts/cron-jobs.config.ts`](../../scripts/cron-jobs.config.ts) and is applied
+to cron-job.org by [`scripts/sync-cron-jobs.ts`](../../scripts/sync-cron-jobs.ts).
 Edit the config, run `npm run cron:sync`, and the diff is reconciled
 idempotently — no clicking through a web UI.
 
@@ -105,7 +105,7 @@ production env — re-set them so both match, then re-run `npm run cron:sync`.
 
 The config file is the source of truth. To change anything:
 
-1. Edit [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts).
+1. Edit [`scripts/cron-jobs.config.ts`](../../scripts/cron-jobs.config.ts).
 2. Run `npm run cron:sync:dry-run` and confirm the diff is what you expect.
 3. Run `npm run cron:sync` to apply.
 4. Commit the config change in a normal PR for review.
@@ -138,10 +138,10 @@ script's diff is incomplete for some field.
 
 ## 4. Enabling the health-check job
 
-The [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts) config has a commented-out block for `bootup-health-check-1215-utc`. As of PRD-65 Phase 4 the endpoint it targets (`/api/cron/health`) is live and ready to use:
+The [`scripts/cron-jobs.config.ts`](../../scripts/cron-jobs.config.ts) config has a commented-out block for `bootup-health-check-1215-utc`. As of PRD-65 Phase 4 the endpoint it targets (`/api/cron/health`) is live and ready to use:
 
 1. Confirm `NOTION_EDITORIAL_QUEUE_DB_ID` and `CRON_SECRET` are set in Vercel production env. (`NOTION_PIPELINE_LOG_DB_ID` is recommended but optional — the endpoint logs a warning and continues when it's unset.)
-2. Uncomment the `bootup-health-check-1215-utc` block in [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts).
+2. Uncomment the `bootup-health-check-1215-utc` block in [`scripts/cron-jobs.config.ts`](../../scripts/cron-jobs.config.ts).
 3. `npm run cron:sync:dry-run` → confirm one new `create`.
 4. `npm run cron:sync` to apply.
 5. Use cron-job.org's "Test run" button on the new job:
@@ -185,7 +185,7 @@ cron-job.org, remove the `crons` block, unset `ALLOW_VERCEL_CRON_FALLBACK`.
 
 - **Execution history** — table of recent fires with timestamp, HTTP status code, duration, and a response excerpt. The free tier retains the last ~25 executions per job; longer-term history lives in the Notion Pipeline Log (see [OBSERVABILITY.md](OBSERVABILITY.md)).
 - **Test run button** — fires the job immediately, regardless of schedule. Useful for verifying changes right after `npm run cron:sync` and for ad-hoc re-runs.
-- **Enable/disable toggle** — manual emergency stop. Prefer flipping `enabled: false` in [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts) and re-syncing so the change is in git.
+- **Enable/disable toggle** — manual emergency stop. Prefer flipping `enabled: false` in [`scripts/cron-jobs.config.ts`](../../scripts/cron-jobs.config.ts) and re-syncing so the change is in git.
 
 ### Reading an execution row
 
@@ -196,7 +196,7 @@ Each execution row shows:
 
 ### Email failure alerts
 
-Each job in [`scripts/cron-jobs.config.ts`](../scripts/cron-jobs.config.ts) has `notifyOnFailure: true`. The sync script translates that to `notification.onFailure: true` (and `onDisable: true`) in the cron-job.org API. Behavior:
+Each job in [`scripts/cron-jobs.config.ts`](../../scripts/cron-jobs.config.ts) has `notifyOnFailure: true`. The sync script translates that to `notification.onFailure: true` (and `onDisable: true`) in the cron-job.org API. Behavior:
 
 - cron-job.org emails the account holder on any non-2xx response **or** if a job is auto-disabled after repeated failures.
 - The email subject is `Job ‹title› failed` and the body includes the HTTP status, response excerpt, and a link back to the job page.

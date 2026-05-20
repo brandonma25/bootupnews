@@ -7,7 +7,7 @@ import { errorContext, logServerEvent } from "@/lib/observability";
  * outcomes for the Branch B RSS path. The Phase 4.5 circuit breaker reads
  * this database to decide whether to skip a flaky source.
  *
- * Schema is documented in `docs/notion-source-health-schema.md`. The database
+ * Schema is documented in `docs/engineering/reports/notion-source-health-schema.md`. The database
  * must be created manually in Notion by BM and its ID set as the
  * `NOTION_SOURCE_HEALTH_LOG_DB_ID` Vercel env var.
  *

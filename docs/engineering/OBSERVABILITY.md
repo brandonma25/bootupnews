@@ -63,9 +63,9 @@ Operate top-down: the email alert points at the cron-job.org execution row → t
 
 Two different questions, two different logs:
 
-- **Pipeline Health** answers *"did the pipeline complete and produce 7 rows today?"* — the [Notion Pipeline Log](notion-pipeline-log-schema.md) captures one row per ingestion run plus one row per health check. `Status` is one of `ok` / `warn` / `fail`. This is what cron-job.org's email alert is tied to.
-- **Source Health** answers *"did every expected source contribute today?"* — the [Notion Source Health Log](notion-source-health-schema.md) captures one row per `(Source, Date)`. `Last Outcome` is one of `success` / `fail` / `skipped_circuit_breaker`. A failing source produces a Pipeline Log `warn` (HTTP 200, no alert) as long as the total row count is still ≥ 7.
-- **Sentry** answers *"are unexpected errors occurring?"* — only events that are **not** already tracked in the Source Health Log surface here. The `beforeSend` filter in [`src/sentry.server.config.ts`](../src/sentry.server.config.ts) drops events whose exception message matches `^Feed request retry exhausted for ` because those are routine feed-flakiness signals tracked authoritatively in the Source Health Log. Other `RssError` variants and all non-RSS errors continue to report normally.
+- **Pipeline Health** answers *"did the pipeline complete and produce 7 rows today?"* — the [Notion Pipeline Log](reports/notion-pipeline-log-schema.md) captures one row per ingestion run plus one row per health check. `Status` is one of `ok` / `warn` / `fail`. This is what cron-job.org's email alert is tied to.
+- **Source Health** answers *"did every expected source contribute today?"* — the [Notion Source Health Log](reports/notion-source-health-schema.md) captures one row per `(Source, Date)`. `Last Outcome` is one of `success` / `fail` / `skipped_circuit_breaker`. A failing source produces a Pipeline Log `warn` (HTTP 200, no alert) as long as the total row count is still ≥ 7.
+- **Sentry** answers *"are unexpected errors occurring?"* — only events that are **not** already tracked in the Source Health Log surface here. The `beforeSend` filter in [`src/sentry.server.config.ts`](../../src/sentry.server.config.ts) drops events whose exception message matches `^Feed request retry exhausted for ` because those are routine feed-flakiness signals tracked authoritatively in the Source Health Log. Other `RssError` variants and all non-RSS errors continue to report normally.
 
 A useful mental model:
 

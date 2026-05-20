@@ -18,7 +18,7 @@ After those five, you have a complete picture of the product, the reasoning, and
 
 | Topic | Files |
 |---|---|
-| Pipeline operations | `docs/ARCHITECTURE.md`, `docs/CRON_SETUP.md`, `docs/OBSERVABILITY.md` |
+| Pipeline operations | `docs/engineering/ARCHITECTURE.md`, `docs/engineering/CRON_SETUP.md`, `docs/engineering/OBSERVABILITY.md` |
 | Product specs | `docs/product/prd/` (one canonical PRD per feature) |
 | Product control plane | `docs/product/feature-system.csv`, `docs/product/documentation-rules.md` |
 | Operating standards | `docs/engineering/protocols/` |
@@ -28,7 +28,7 @@ After those five, you have a complete picture of the product, the reasoning, and
 | Process / governance incidents | `docs/engineering/incidents/` (also indexed at the bottom of each related PRD) |
 | Source and architecture audits | `docs/audits/` |
 | Terminology authority | `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md` |
-| Notion database schemas | `docs/notion-*-schema.md` |
+| Notion database schemas | `docs/engineering/reports/notion-*-schema.md` |
 
 ## Relationships between top-level docs
 

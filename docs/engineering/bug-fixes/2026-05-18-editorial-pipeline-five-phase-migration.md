@@ -51,7 +51,7 @@ The original 5-phase plan plus the pre-flight audit (Phase 0) and the mid-flight
 **Tasks finished:**
 - Added `functions["src/app/api/cron/fetch-editorial-inputs/route.ts"].maxDuration = 60`
 - Removed the `"crons"` array
-- Documented rollback procedure in `docs/CRON_SETUP.md`
+- Documented rollback procedure in `docs/engineering/CRON_SETUP.md`
 
 **Results:**
 - Slow runs no longer at risk of hitting Vercel's plan-default ceiling
@@ -106,7 +106,7 @@ The original 5-phase plan plus the pre-flight audit (Phase 0) and the mid-flight
 - Total response time well under 5 seconds even with Notion network round-trip
 
 **Blockers and reasons:**
-- None. The Pipeline Log Notion database does not yet exist; the optional write gracefully no-ops. BM creates the database manually per [docs/notion-pipeline-log-schema.md](../../notion-pipeline-log-schema.md), then sets `NOTION_PIPELINE_LOG_DB_ID` in Vercel.
+- None. The Pipeline Log Notion database does not yet exist; the optional write gracefully no-ops. BM creates the database manually per [docs/engineering/reports/notion-pipeline-log-schema.md](../reports/notion-pipeline-log-schema.md), then sets `NOTION_PIPELINE_LOG_DB_ID` in Vercel.
 
 ---
 
@@ -123,7 +123,7 @@ The original 5-phase plan plus the pre-flight audit (Phase 0) and the mid-flight
 
 **Results:**
 - Production verification: post-deploy cron run reported `feedFailureCount: 1` (Reuters Business presumably), no Sentry alert created, function completed in 42s instead of the previous 74.5s.
-- Cross-run history will accumulate in Source Health Log once BM creates the Notion database per [docs/notion-source-health-schema.md](../../notion-source-health-schema.md).
+- Cross-run history will accumulate in Source Health Log once BM creates the Notion database per [docs/engineering/reports/notion-source-health-schema.md](../reports/notion-source-health-schema.md).
 
 **Blockers and reasons:**
 - None during implementation. One design trade-off: the breaker resets on every cold start, so a source that fails repeatedly over hours could still be retried each new function instance. Acceptable because the typical fix-cycle for a feed is days, not hours, and the in-memory check is essentially free.
@@ -161,10 +161,10 @@ The original 5-phase plan plus the pre-flight audit (Phase 0) and the mid-flight
 **Objective:** Make the new pipeline operationally understandable. Capture rollback paths, observability surfaces, and Notion schemas in repo docs so future-BM (or a future engineer) can pick this up without re-reading commits.
 
 **Tasks finished:**
-- Updated [docs/CRON_SETUP.md](../../CRON_SETUP.md): corrected auth header (Bearer, not the spec's mentioned `x-cron-secret`); added 3-job cron-job.org inventory; refined rollback notes
-- Created [docs/notion-pipeline-log-schema.md](../../notion-pipeline-log-schema.md): manual setup steps and field schema for the Pipeline Log database
-- Created [docs/notion-source-health-schema.md](../../notion-source-health-schema.md): manual setup steps and field schema for the Source Health Log database
-- Created [docs/OBSERVABILITY.md](../../OBSERVABILITY.md): four-tier observability model (cron-job.org → Vercel logs → Pipeline Log → Source Health Log), decision tree for "today's run looks broken", Sentry filtering note, env var inventory
+- Updated [docs/engineering/CRON_SETUP.md](../CRON_SETUP.md): corrected auth header (Bearer, not the spec's mentioned `x-cron-secret`); added 3-job cron-job.org inventory; refined rollback notes
+- Created [docs/engineering/reports/notion-pipeline-log-schema.md](../reports/notion-pipeline-log-schema.md): manual setup steps and field schema for the Pipeline Log database
+- Created [docs/engineering/reports/notion-source-health-schema.md](../reports/notion-source-health-schema.md): manual setup steps and field schema for the Source Health Log database
+- Created [docs/engineering/OBSERVABILITY.md](../OBSERVABILITY.md): four-tier observability model (cron-job.org → Vercel logs → Pipeline Log → Source Health Log), decision tree for "today's run looks broken", Sentry filtering note, env var inventory
 
 **Results:**
 - Every new endpoint and database has a referenceable doc
@@ -237,11 +237,11 @@ The original 5-phase plan plus the pre-flight audit (Phase 0) and the mid-flight
 
 These cannot be automated from this branch and require BM action:
 
-1. **Create Pipeline Log database in Notion** per [docs/notion-pipeline-log-schema.md](../../notion-pipeline-log-schema.md). Add `NOTION_PIPELINE_LOG_DB_ID` to Vercel env vars (Production scope).
-2. **Create Source Health Log database in Notion** per [docs/notion-source-health-schema.md](../../notion-source-health-schema.md). Add `NOTION_SOURCE_HEALTH_DB_ID` to Vercel env vars (Production scope).
+1. **Create Pipeline Log database in Notion** per [docs/engineering/reports/notion-pipeline-log-schema.md](../reports/notion-pipeline-log-schema.md). Add `NOTION_PIPELINE_LOG_DB_ID` to Vercel env vars (Production scope).
+2. **Create Source Health Log database in Notion** per [docs/engineering/reports/notion-source-health-schema.md](../reports/notion-source-health-schema.md). Add `NOTION_SOURCE_HEALTH_DB_ID` to Vercel env vars (Production scope).
 3. **Review the dedup dry-run output** (15 rows on 2026-05-16) and run `npm run notion:dedup:execute` if satisfied.
 4. **Redeploy Vercel** after env var changes so the optional Notion writers activate.
-5. **Add the third cron-job.org job** for the 12:15 UTC health check per [docs/CRON_SETUP.md](../../CRON_SETUP.md). (The `scripts/cron-jobs.config.ts` file does not exist in the repo yet — the cron-job.org job config lives in cron-job.org itself.)
+5. **Add the third cron-job.org job** for the 12:15 UTC health check per [docs/engineering/CRON_SETUP.md](../CRON_SETUP.md). (The `scripts/cron-jobs.config.ts` file does not exist in the repo yet — the cron-job.org job config lives in cron-job.org itself.)
 6. **Decide whether `CRONJOB_API_KEY`** (the orphan env var discovered during Phase 0) should be removed from Vercel. It is referenced by no code in this repo.
 
 ---
