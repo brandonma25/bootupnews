@@ -49,12 +49,12 @@ Detailed contracts:
 
 ```mermaid
 flowchart LR
-    SCHED["cron-job.org<br/>(scheduler)"] -->|"10:15 UTC<br/>(18:15 Taipei)"| ING1["GET /api/cron/fetch-editorial-inputs<br/>x-cron-secret"]
-    SCHED -->|"11:45 UTC<br/>(19:45 Taipei)"| ING2["GET /api/cron/fetch-editorial-inputs<br/>x-cron-secret"]
+    SCHED["cron-job.org<br/>(scheduler)"] -->|"12:00 UTC<br/>(20:00 Taipei)"| ING["GET /api/cron/fetch-editorial-inputs<br/>x-cron-secret"]
     SCHED -->|"12:15 UTC<br/>(20:15 Taipei)"| HEAL["GET /api/cron/health<br/>x-cron-secret"]
 
-    ING1 --> PIPE["Ingestion pipeline<br/>(see Pipeline overview)"]
-    ING2 --> PIPE
+    ING --> LOCK{"cron_runs lock<br/>(briefing_date PK)"}
+    LOCK -->|"first call:<br/>acquired"| PIPE["Ingestion pipeline<br/>(see Pipeline overview)"]
+    LOCK -->|"duplicate call:<br/>HTTP 200 status=skipped"| NOOP[/No pipeline work/]
     PIPE --> PLOG["Notion Pipeline Log<br/>run_type=ingestion"]
 
     HEAL --> QUERY["Query Notion<br/>Editorial Queue<br/>for today's rows"]
@@ -74,9 +74,8 @@ flowchart LR
 
 | UTC | Taipei | Job | Purpose |
 | --- | --- | --- | --- |
-| 10:15 | 18:15 | `bootup-ingestion-1015-utc` | First ingestion run (early evening, gives time for re-runs before editor review) |
-| 11:45 | 19:45 | `bootup-ingestion-1145-utc` | Second ingestion run (catches any sources slow to publish in the first window) |
-| 12:15 | 20:15 | `bootup-health-check-1215-utc` | Health check 30 minutes after the second ingestion run; HTTP 500 triggers an email alert |
+| 12:00 | 20:00 | `bootup-ingestion-1200-utc` | Sole ingestion run; cross-run idempotency via `cron_runs(briefing_date PK)` so a duplicate cronjob.org fire (or a Vercel Hobby double-delivery during the rollback escape hatch) no-ops with `HTTP 200 status=skipped` |
+| 12:15 | 20:15 | `bootup-health-check-1215-utc` | Health check 15 minutes after the ingestion run; HTTP 500 triggers an email alert |
 
 Source-of-truth for the schedule is [`scripts/cron-jobs.config.ts`](../../scripts/cron-jobs.config.ts). Apply changes with `npm run cron:sync` (see [`docs/engineering/CRON_SETUP.md`](CRON_SETUP.md)).
 

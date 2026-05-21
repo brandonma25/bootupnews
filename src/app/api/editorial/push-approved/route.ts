@@ -138,7 +138,7 @@ type PushRowResult = {
   headline: string;
   notionPageId: string;
   supabaseId: string | null;
-  status: "inserted" | "failed";
+  status: "inserted" | "skipped_existing" | "failed";
   error?: string;
 };
 
@@ -253,17 +253,50 @@ async function pushApprovedRow(
       });
     }
 
-    const insertResult = await db
+    // Upsert on (briefing_date, source_url) so re-pushing an already-pushed
+    // approved row (or a different Notion row that points at the same article)
+    // does not duplicate. Backing index: signal_posts_briefing_date_source_url_key
+    // (migration 20260521120000). ignoreDuplicates returns the empty array
+    // when the row already exists; we then look up the existing supabase id
+    // so the Notion writeback still records the correct Supabase Row ID.
+    const upsertResult = await db
       .from("signal_posts")
-      .insert(insertPayload)
-      .select("id")
-      .single();
+      .upsert(insertPayload, {
+        onConflict: "briefing_date,source_url",
+        ignoreDuplicates: true,
+      })
+      .select("id");
 
-    if (insertResult.error) {
-      throw new Error(`signal_posts insert failed: ${insertResult.error.message}`);
+    if (upsertResult.error) {
+      throw new Error(`signal_posts upsert failed: ${upsertResult.error.message}`);
     }
 
-    const supabaseId = (insertResult.data as { id: string }).id;
+    const upsertRows = (upsertResult.data ?? []) as Array<{ id: string }>;
+    let supabaseId: string;
+    let status: "inserted" | "skipped_existing";
+
+    if (upsertRows.length > 0) {
+      supabaseId = upsertRows[0].id;
+      status = "inserted";
+    } else {
+      // ignoreDuplicates returned 0 rows → the (briefing_date, source_url)
+      // pair already exists. Look it up so we can still mirror Supabase Row ID
+      // back to Notion and flip Pushed to Supabase=true.
+      const existing = await db
+        .from("signal_posts")
+        .select("id")
+        .eq("briefing_date", briefingDate)
+        .eq("source_url", sourceUrl)
+        .maybeSingle();
+
+      if (existing.error || !existing.data) {
+        throw new Error(
+          `signal_posts upsert reported no insert and existing lookup failed: ${existing.error?.message ?? "no row found"}`,
+        );
+      }
+      supabaseId = (existing.data as { id: string }).id;
+      status = "skipped_existing";
+    }
 
     await markNotionRowPushed(page.id, supabaseId);
 
@@ -271,7 +304,7 @@ async function pushApprovedRow(
       headline,
       notionPageId: page.id,
       supabaseId,
-      status: "inserted",
+      status,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -341,12 +374,14 @@ export async function GET(request: Request) {
   }
 
   const pushed = rows.filter((r) => r.status === "inserted").length;
+  const skipped = rows.filter((r) => r.status === "skipped_existing").length;
   const failed = rows.filter((r) => r.status === "failed").length;
 
   logServerEvent("info", "Editorial push: completed", {
     route: "/api/editorial/push-approved",
     briefingDate,
     pushed,
+    skipped,
     failed,
   });
 
@@ -354,6 +389,7 @@ export async function GET(request: Request) {
     success: true,
     briefing_date: briefingDate,
     pushed,
+    skipped,
     failed,
     rows: rows.map((r) => ({
       headline: r.headline,

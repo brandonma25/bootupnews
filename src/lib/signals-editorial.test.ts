@@ -463,6 +463,30 @@ function createSupabaseMock(
 
           return builder;
         },
+        // The upsert mock mirrors insert because the test fixtures never seed
+        // pre-existing rows that would actually conflict on
+        // (briefing_date, source_url). Real conflict behavior is covered by the
+        // route-level cron run-lock test (the partial unique index is enforced
+        // by Postgres, not this mock).
+        upsert(values: Partial<TestRow> | Array<Partial<TestRow>>, _options?: unknown) {
+          operation = "insert";
+          const insertError = options.insertErrors?.[tableName];
+
+          if (insertError) {
+            selectError = { message: insertError };
+            return builder;
+          }
+
+          insertedRows = [];
+          const normalizedValues = Array.isArray(values) ? values : [values];
+          normalizedValues.forEach((value, index) => {
+            const row = createInsertedRow(tableName, value as Record<string, unknown>, index);
+            tableRows.push(row);
+            insertedRows.push(row);
+          });
+
+          return builder;
+        },
         update(values: Record<string, unknown>) {
           operation = "update";
           updateValues = values;
