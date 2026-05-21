@@ -12,7 +12,7 @@
 - [ ] If this is not feature work, no new canonical PRD was created
 
 ## Terminology
-- [ ] Read `docs/engineering/BOOTUP_CANONICAL_TERMINOLOGY.md`
+- [ ] Read `docs/engineering/BOOTUPNEWS_CANONICAL_TERMINOLOGY.md`
 - [ ] Confirmed object level before coding: Article, Story Cluster, Signal, Card, or Surface Placement
 - [ ] No new variable, file, function, component, or database terminology blurs Cluster vs Signal vs Card
 - [ ] If legacy naming is inconsistent, documented it instead of silently expanding it

@@ -5,6 +5,25 @@ const runNewsletterIngestion = vi.fn();
 const runEditorialStaging = vi.fn();
 const logServerEvent = vi.fn();
 const writePipelineLogEntry = vi.fn();
+const sentryCaptureException = vi.fn();
+const sentryFlush = vi.fn(async () => true);
+
+let capturedAfterCallback: (() => void | Promise<void>) | null = null;
+
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => {
+      capturedAfterCallback = cb;
+    },
+  };
+});
+
+vi.mock("@sentry/nextjs", () => ({
+  captureException: sentryCaptureException,
+  flush: sentryFlush,
+}));
 
 vi.mock("@/lib/cron/fetch-news", () => ({
   runDailyNewsCron,
@@ -47,10 +66,16 @@ function buildRequest(auth: RequestAuth | string = {}): Request {
   });
 }
 
+async function runCapturedAfter() {
+  if (!capturedAfterCallback) return;
+  await capturedAfterCallback();
+}
+
 describe("/api/cron/fetch-editorial-inputs", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.resetAllMocks();
+    capturedAfterCallback = null;
     process.env.CRON_SECRET = "local-cron-secret";
     delete process.env.ALLOW_VERCEL_CRON_FALLBACK;
     runDailyNewsCron.mockResolvedValue({
@@ -82,13 +107,14 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     writePipelineLogEntry.mockResolvedValue({ written: true, pageId: "log-1" });
   });
 
-  it("rejects unauthorized requests without triggering either fetch path", async () => {
+  it("rejects unauthorized requests without scheduling the pipeline", async () => {
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     const response = await GET(buildRequest("wrong-secret"));
     const body = await response.json();
 
     expect(response.status).toBe(401);
     expect(body.success).toBe(false);
+    expect(capturedAfterCallback).toBeNull();
     expect(runDailyNewsCron).not.toHaveBeenCalled();
     expect(runNewsletterIngestion).not.toHaveBeenCalled();
   });
@@ -100,6 +126,7 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     const response = await GET(buildRequest("local-cron-secret"));
 
     expect(response.status).toBe(401);
+    expect(capturedAfterCallback).toBeNull();
     expect(runDailyNewsCron).not.toHaveBeenCalled();
     expect(runNewsletterIngestion).not.toHaveBeenCalled();
   });
@@ -111,6 +138,7 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     );
 
     expect(response.status).toBe(401);
+    expect(capturedAfterCallback).toBeNull();
     expect(runDailyNewsCron).not.toHaveBeenCalled();
     expect(runNewsletterIngestion).not.toHaveBeenCalled();
   });
@@ -123,7 +151,9 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       buildRequest({ header: "authorization", secret: "local-cron-secret" }),
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
+    expect(capturedAfterCallback).not.toBeNull();
+    await runCapturedAfter();
     expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
     expect(runNewsletterIngestion).toHaveBeenCalledTimes(1);
   });
@@ -137,35 +167,34 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     );
 
     expect(response.status).toBe(401);
+    expect(capturedAfterCallback).toBeNull();
     expect(runDailyNewsCron).not.toHaveBeenCalled();
     expect(runNewsletterIngestion).not.toHaveBeenCalled();
   });
 
-  it("runs newsletter first, then RSS, then editorial staging", async () => {
+  it("responds 202 immediately and runs newsletter, then RSS, then editorial staging via after()", async () => {
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     const response = await GET(buildRequest("local-cron-secret"));
     const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
     expect(body).toMatchObject({
       success: true,
       summary: {
-        rss: {
-          success: true,
-        },
-        newsletter: {
-          success: true,
-        },
-        editorialStaging: {
-          success: true,
-        },
+        message: expect.stringContaining("Ingestion accepted"),
       },
     });
+    // Pipeline has not yet run — it's only scheduled.
+    expect(runDailyNewsCron).not.toHaveBeenCalled();
+    expect(runNewsletterIngestion).not.toHaveBeenCalled();
+    expect(runEditorialStaging).not.toHaveBeenCalled();
+
+    await runCapturedAfter();
+
+    expect(runNewsletterIngestion).toHaveBeenCalledWith({ writeCandidates: true });
     expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
-    expect(runNewsletterIngestion).toHaveBeenCalledWith({
-      writeCandidates: true,
-    });
-    // Newsletter runs before RSS so rank slots are reserved before the RSS snapshot fills them
+    expect(runEditorialStaging).toHaveBeenCalledTimes(1);
+    // Newsletter runs before RSS so rank slots are reserved before the RSS snapshot fills them.
     expect(runNewsletterIngestion.mock.invocationCallOrder[0]).toBeLessThan(
       runDailyNewsCron.mock.invocationCallOrder[0],
     );
@@ -177,6 +206,7 @@ describe("/api/cron/fetch-editorial-inputs", () => {
   it("writes a Pipeline Log entry on completion with status=ok when all branches succeed", async () => {
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     await GET(buildRequest("local-cron-secret"));
+    await runCapturedAfter();
 
     expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
     expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
@@ -196,6 +226,7 @@ describe("/api/cron/fetch-editorial-inputs", () => {
 
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     await GET(buildRequest("local-cron-secret"));
+    await runCapturedAfter();
 
     expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
     expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
@@ -214,27 +245,87 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     });
 
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
-    const response = await GET(buildRequest("local-cron-secret"));
-    const body = await response.json();
+    await GET(buildRequest("local-cron-secret"));
+    await runCapturedAfter();
 
-    expect(response.status).toBe(500);
-    expect(body.summary.rss.success).toBe(false);
-    expect(body.summary.newsletter.success).toBe(true);
     expect(runNewsletterIngestion).toHaveBeenCalledTimes(1);
+    expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
+    expect(writePipelineLogEntry.mock.calls[0][0].status).toBe("fail");
   });
 
-  it("returns a sanitized failure summary when a fetch path throws", async () => {
+  it("a thrown task error is caught by runTask and reported via the pipeline log without crashing the after() callback", async () => {
     runDailyNewsCron.mockRejectedValue(new Error("rss explosion"));
 
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     const response = await GET(buildRequest("local-cron-secret"));
-    const body = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(body.summary.rss.summary).toEqual({
-      message: "rss task failed before completion.",
-    });
-    expect(body.summary.newsletter.success).toBe(true);
+    expect(response.status).toBe(202);
+    // Should not throw out of after():
+    await expect(runCapturedAfter()).resolves.not.toThrow();
+
+    // logServerEvent should record the per-task failure.
+    const errorLog = logServerEvent.mock.calls.find(
+      ([level, message]) => level === "error" && typeof message === "string" && message.includes("task failed before completion"),
+    );
+    expect(errorLog).toBeTruthy();
+    expect(writePipelineLogEntry.mock.calls[0][0].status).toBe("fail");
+  });
+
+  it("captures IngestionTimeoutInternal to Sentry when the pipeline exceeds the internal budget", async () => {
+    vi.useFakeTimers();
+    try {
+      // Stall the very first stage (newsletter) so the internal timeout fires
+      // while stageRef.current === "newsletter".
+      runNewsletterIngestion.mockImplementation(
+        () => new Promise(() => {
+          /* never resolves */
+        }),
+      );
+
+      const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+      const response = await GET(buildRequest("local-cron-secret"));
+      expect(response.status).toBe(202);
+
+      // Kick the after callback; the real pipeline never resolves, so the
+      // internal 55s timeout has to win the race.
+      const afterPromise = runCapturedAfter();
+      // Advance past 55s to trip the internal timeout.
+      await vi.advanceTimersByTimeAsync(56_000);
+      await afterPromise;
+
+      expect(sentryCaptureException).toHaveBeenCalledTimes(1);
+      const [capturedError, captureContext] = sentryCaptureException.mock.calls[0];
+      expect(capturedError).toBeInstanceOf(Error);
+      expect((capturedError as Error).name).toBe("IngestionTimeoutInternal");
+      expect(captureContext).toMatchObject({
+        level: "error",
+        tags: {
+          route: "/api/cron/fetch-editorial-inputs",
+          stage: "newsletter",
+          failure_type: "ingestion_timeout_internal",
+        },
+        extra: {
+          internalTimeoutMs: 55_000,
+        },
+      });
+      // Pipeline log is NOT written when the pipeline times out — there is no
+      // briefingDate available because editorial-staging never ran.
+      expect(writePipelineLogEntry).not.toHaveBeenCalled();
+
+      // Sentry must be flushed before the after() callback returns, otherwise
+      // the captured timeout event may be lost when Vercel freezes the function
+      // instance ~5s later at the 60s maxDuration wall.
+      expect(sentryFlush).toHaveBeenCalled();
+      expect(sentryFlush.mock.calls[0][0]).toBe(2_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not leak CRON_SECRET in the 202 response body", async () => {
+    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+    const response = await GET(buildRequest("local-cron-secret"));
+    const body = await response.json();
     expect(JSON.stringify(body)).not.toContain("local-cron-secret");
   });
 });

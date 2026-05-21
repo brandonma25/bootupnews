@@ -2,6 +2,8 @@
 
 This repository uses a controlled documentation system. The goal is to keep docs useful, short, and non-duplicated.
 
+> **Canonical source.** This file is the canonical source for folder routing taxonomy. `AGENTS.md`, `docs/engineering/protocols/engineering-protocol.md`, and CI scripts (`scripts/governance_common.py`) reference this file. Update routing rules here, not in the references.
+
 ## Core Rules
 - Public repo documentation is the canonical source of truth for product framing, durable decisions, canonical PRDs, feature governance metadata, standing process rules, and portfolio-facing architecture/process artifacts.
 - PR bodies, GitHub metadata, and external/private archives are the preferred home for per-run operational evidence, validation transcripts, branch-cleanup details, and closeout records.
@@ -32,8 +34,8 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - Incident records belong in `docs/engineering/incidents/` only when they capture a meaningful governance, process, release, or workflow failure.
 - Validation notes, audits, migrations, consolidations, normalization passes, and repo-structure cleanup should usually stay in PR bodies, GitHub metadata, or external/private archives unless a stable public artifact is explicitly needed.
 - Rules, checklists, and templates belong in `docs/engineering/protocols/`.
-- `docs/bugs/` and `docs/changes/` are deprecated and non-canonical. Do not create new records there.
-- Existing `docs/bugs/` or `docs/changes/` files that contain durable history must be migrated, consolidated, or replaced with redirect notes pointing to the canonical GitHub doc path.
+- `docs/bugs/`, `docs/changes/`, and `docs/engineering/change-records/` are deprecated and non-canonical. Do not create new records there.
+- Existing `docs/bugs/`, `docs/changes/`, or `docs/engineering/change-records/` files that contain durable history must be migrated, consolidated, or replaced with redirect notes pointing to the canonical GitHub doc path. (The single `change-records/` entry was migrated to `docs/engineering/incidents/` in the docs overhaul PR 1.)
 - Governance tier ownership lives in `docs/engineering/protocols/governance-gate-map.md`.
 - Bug-fix requirement details live in `docs/engineering/protocols/bug-tracking-governance.md`.
 
@@ -51,6 +53,7 @@ This repository uses a controlled documentation system. The goal is to keep docs
 - No checklists stored as testing notes when they are actually operating standards.
 - No new `docs/bugs/` records.
 - No new `docs/changes/` records.
+- No new `docs/engineering/change-records/` records.
 - No routine tracker-sync fallback files for normal closeout.
 - No new public operational logs for routine validation, branch cleanup, or closeout.
 
@@ -97,6 +100,8 @@ This repository uses a controlled documentation system. The goal is to keep docs
   Deprecated legacy bug reports; migrate durable content into `docs/engineering/bug-fixes/`
 - `docs/changes/`:
   Deprecated legacy PR/change notes; migrate durable content into the correct canonical lane
+- `docs/engineering/change-records/`:
+  Deprecated; migrate durable content into `docs/engineering/incidents/` or the relevant canonical lane
 
 ## Meaningful Documentation Threshold
 - Use the smallest truthful documentation set that preserves future understanding.

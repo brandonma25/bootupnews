@@ -56,4 +56,4 @@
 - If the defect is tightly tied to a canonical PRD, `prd-XX-<slug>.md` is acceptable when it makes the relationship clearer.
 
 ## Template
-- Use `docs/engineering/bug-fixes/templates/bug-fix-record-template.md` for new meaningful bug-fix records.
+- Use `docs/engineering/templates/bug-fix-template.md` for new meaningful bug-fix records.
