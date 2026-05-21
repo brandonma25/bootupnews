@@ -37,3 +37,31 @@
 
 ## Schema Notes
 - `signal_posts.source_url`: NOT NULL dropped (migration `20260516120000_source_url_drop_not_null.sql`). The column has a CHECK constraint requiring `https?://` format when non-null; Notion-originated editorial rows may have no source URL, so NULL is the correct representation. The CHECK still enforces format for any non-null value.
+
+## Related operational history
+
+- 2026-05-22 — v2 bridge + writeback hardening (Path-A Task 4, PR [#263](https://github.com/brandonma25/bootupnews/pull/263)). `push-approved` previously hardcoded `selection_reason`, left `final_slate_rank` unset, never stamped `witm_draft_generated_by`/`witm_draft_model`, didn't normalize Notion's `\[ \] \$` markdown escapes, and used the same `ignoreDuplicates: true` upsert option PR #260 chose for the legacy ingestion path — which meant the legacy daily cron's `deterministic_template` row at the same `(briefing_date, source_url)` would silently win and the v2 push would be silently dropped (the editorial bodies the editor approved would never reach `signal_posts`). This PR replaces the upsert with a select-then-decide flow:
+  - **Read existing row at `(briefing_date, source_url)`.** Pull `id, rank, final_slate_rank, final_slate_tier, witm_draft_generated_by, is_live` for the decision.
+  - **`skipped_live`** — existing row is `is_live=true`. Refuse to overwrite; do NOT writeback Notion's Pushed flag so the operator notices the inconsistency.
+  - **`skipped_existing_v2`** — existing row is already `witm_draft_generated_by='llm'`. Leave content untouched but DO writeback Notion so the row's Pushed flag flips true and the bridge isn't re-attempted next call.
+  - **`overwrote_template`** — existing row is `deterministic_template` (legacy cron's stamp) or NULL provenance. UPDATE in place: keep the existing `rank` and `final_slate_rank` (legacy's slot wins; the editor's `Slot` tier overrides `final_slate_tier` if it differs), replace all three editorial layers + provenance with the v2 LLM payload, writeback Notion. This closes the silent-drop trap PR #262's operational-history entry called out.
+  - **`inserted`** — no existing row. Allocate an unused display `rank` (1-20) and an unused `final_slate_rank` within the tier (Core: 1-5, Context: 6-7); fail closed with `no_rank_slot` if the tier is full.
+  - **Kill-flag enforcement** stays in the Notion query: only `Status=approved AND Pushed to Supabase=false` rows are candidates, so rejected/held/killed rows never reach the bridge.
+- Mapping shape:
+  - `title ← Headline`
+  - `ai_why_it_matters ← The Signal (Human if present else AI Draft)`
+  - `edited_why_it_matters ← The Signal (Human)`
+  - `ai_what_led_to_it ← Before This (Human|AI Draft)`
+  - `human_what_led_to_it ← Before This (Human)`
+  - `ai_what_it_connects_to ← The Ripple (Human|AI Draft)`
+  - `human_what_it_connects_to ← The Ripple (Human)`
+  - `selection_reason ← Hook (Human|AI Draft)`, falls back to `"Editorial queue push — approved via Notion workflow (Hook empty)"` so the column stays non-NULL
+  - `source_name / source_url ← Source / Source URL` (URL required; row skipped with `skipped_missing_source_url` otherwise)
+  - `final_slate_tier + final_slate_rank ← Slot` set as a paired write (Core→1-5, Context→6-7, CHECK-bound)
+  - `editorial_content_source ← lower(Editorial Source)` ∈ {ai, human, ai+human}
+  - `witm_draft_generated_by = 'llm'` — the load-bearing distinguisher from Task 3's `deterministic_template` rows
+  - `witm_draft_model ← env EDITORIAL_DRAFTER_MODEL_ID || 'claude-opus-4-7'`
+  - `editorial_status = 'needs_review'` (NOT Notion's raw/grounded/held/rejected)
+  - `is_live = false`
+  - `\[ → [`, `\] → ]`, `\$ → $` normalized inbound on every editorial text field
+- Test coverage in `src/app/api/editorial/push-approved/route.test.ts` includes the required OVERWRITE TEST (seed a `deterministic_template` row at `(D, U)`; push approved v2 card for same `(D, U)`; assert the row now has `witm_draft_generated_by='llm'` and the v2 three-layer content, not the template text), plus skip-live, skip-existing-v2, markdown-normalization, Hook fallback, tier-full, missing-Source-URL, kill-flag query shape, and model-id env override cases.
