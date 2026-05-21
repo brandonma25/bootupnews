@@ -106,7 +106,7 @@ ALTER TABLE public.signal_posts
     )
   );
 
--- ---------- Step 3: verify ----------
+-- ---------- Step 3: verify existing data ----------
 DO $$
 DECLARE
   bad_count int;
@@ -116,6 +116,70 @@ BEGIN
   WHERE (final_slate_tier IS NULL) <> (final_slate_rank IS NULL);
   IF bad_count > 0 THEN
     RAISE EXCEPTION 'Post-migration sanity failed: % half-paired row(s) remain.', bad_count;
+  END IF;
+END
+$$;
+
+-- ---------- Step 4: negative CHECK test ----------
+-- Issue #265 ask: "add a negative migration test that the tightened CHECK
+-- rejects tier-set-rank-null". The PL/pgSQL nested BEGIN/EXCEPTION/END
+-- creates an implicit savepoint, so a check_violation rolls back just the
+-- INSERT and execution continues at the handler. If the INSERT succeeds,
+-- the constraint is broken — we clean up the row and ABORT the migration
+-- with a clear error so a future schema regression cannot ship silently.
+DO $$
+DECLARE
+  test_id uuid;
+  rejected boolean := false;
+BEGIN
+  BEGIN
+    INSERT INTO public.signal_posts (
+      briefing_date, rank, title,
+      final_slate_tier, final_slate_rank
+    ) VALUES (
+      -- briefing_date 1970-01-01 + rank 1 cannot collide with any real
+      -- briefing because no operator ever sets that date. source_url is
+      -- left NULL (its NOT NULL was dropped in 20260516120000) so we
+      -- don't need a unique URL placeholder either.
+      DATE '1970-01-01', 1, '__NEG_TEST_TIER_SET_RANK_NULL__',
+      'core', NULL  -- half-pair: must be rejected by the tightened CHECK
+    )
+    RETURNING id INTO test_id;
+  EXCEPTION
+    WHEN check_violation THEN
+      rejected := true;
+  END;
+
+  IF NOT rejected THEN
+    DELETE FROM public.signal_posts WHERE id = test_id;
+    RAISE EXCEPTION 'Negative CHECK test FAILED: signal_posts_final_slate_placement_check accepted a tier-set-rank-NULL half-pair. The tightening did not take. Investigate before applying further migrations.';
+  END IF;
+END
+$$;
+
+-- Symmetric negative case: rank set, tier NULL — also a half-pair.
+DO $$
+DECLARE
+  test_id uuid;
+  rejected boolean := false;
+BEGIN
+  BEGIN
+    INSERT INTO public.signal_posts (
+      briefing_date, rank, title,
+      final_slate_tier, final_slate_rank
+    ) VALUES (
+      DATE '1970-01-02', 1, '__NEG_TEST_RANK_SET_TIER_NULL__',
+      NULL, 3
+    )
+    RETURNING id INTO test_id;
+  EXCEPTION
+    WHEN check_violation THEN
+      rejected := true;
+  END;
+
+  IF NOT rejected THEN
+    DELETE FROM public.signal_posts WHERE id = test_id;
+    RAISE EXCEPTION 'Negative CHECK test FAILED: signal_posts_final_slate_placement_check accepted a rank-set-tier-NULL half-pair.';
   END IF;
 END
 $$;
