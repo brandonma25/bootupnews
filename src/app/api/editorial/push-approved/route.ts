@@ -8,6 +8,15 @@ export const runtime = "nodejs";
 
 const NOTION_API_VERSION = "2022-06-28";
 
+/**
+ * The model id stamped onto v2 LLM bridge rows. Set per deploy when the
+ * drafter model changes; defaults to the current Claude Opus generation so
+ * a fresh environment still produces a useful provenance value.
+ */
+const DEFAULT_DRAFTER_MODEL_ID = "claude-opus-4-7";
+
+type SupabaseClient = NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
+
 type NotionPage = {
   id: string;
   properties: Record<string, NotionProperty>;
@@ -22,11 +31,40 @@ type NotionProperty =
   | { type: "date"; date: { start: string } | null }
   | { type: "checkbox"; checkbox: boolean };
 
+type FinalSlateTier = "core" | "context";
+
+const CORE_RANK_MIN = 1;
+const CORE_RANK_MAX = 5;
+const CONTEXT_RANK_MIN = 6;
+const CONTEXT_RANK_MAX = 7;
+const DISPLAY_RANK_MIN = 1;
+const DISPLAY_RANK_MAX = 20;
+
+/**
+ * Strip the Notion-side markdown escapes that leak through the rich_text
+ * plain_text view ("\[" → "[", "\]" → "]", "\$" → "$"). The editor uses
+ * these to render `[A]` / `[R]` markers and `$NVDA` mentions; without
+ * normalization they survive into signal_posts and appear as visible
+ * backslashes in the rendered Card. The brief names \[ and \$ explicitly;
+ * \] is the symmetric companion to \[ and is normalized in the same pass
+ * so marker pairs come through unbroken.
+ */
+function normalizeNotionMarkdown(text: string): string {
+  return text
+    .replace(/\\\[/g, "[")
+    .replace(/\\\]/g, "]")
+    .replace(/\\\$/g, "$");
+}
+
 function getRichText(prop: NotionProperty | undefined): string {
   if (!prop) return "";
   if (prop.type === "title") return prop.title.map((t) => t.plain_text).join("") || "";
   if (prop.type === "rich_text") return prop.rich_text.map((t) => t.plain_text).join("") || "";
   return "";
+}
+
+function getRichTextNormalized(prop: NotionProperty | undefined): string {
+  return normalizeNotionMarkdown(getRichText(prop));
 }
 
 function getSelect(prop: NotionProperty | undefined): string | null {
@@ -83,6 +121,11 @@ async function queryNotionForApprovedRows(
   dbId: string,
   briefingDate: string,
 ): Promise<NotionPage[]> {
+  // Kill-flag enforcement lives entirely in this filter: only Status=approved
+  // rows whose Pushed flag is still false make it past the query, so
+  // rejected / held / killed / draft / needs_review rows are never even
+  // candidates for the bridge. Re-running the bridge after writeback flips
+  // Pushed=true is therefore a no-op for the same row.
   const result = (await notionRequest(`/databases/${dbId}/query`, "POST", {
     filter: {
       and: [
@@ -110,8 +153,13 @@ async function markNotionRowPushed(
   });
 }
 
-async function getNextAvailableRank(
-  db: NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>,
+/**
+ * Find an unused display rank (1-20) for this briefing_date. The display rank
+ * is the broad ranking surface; final_slate_rank (1-7) is the editor-curated
+ * slot — see `getNextAvailableFinalSlateRank`. Both must be set on insert.
+ */
+async function getNextAvailableDisplayRank(
+  db: SupabaseClient,
   briefingDate: string,
 ): Promise<number | null> {
   const result = await db
@@ -121,96 +169,234 @@ async function getNextAvailableRank(
 
   if (result.error) return null;
 
-  const usedRanks = new Set(
+  const used = new Set(
     ((result.data ?? []) as Array<{ rank: number | null }>)
       .map((r) => r.rank)
       .filter((r): r is number => typeof r === "number"),
   );
 
-  for (let rank = 20; rank >= 1; rank -= 1) {
-    if (!usedRanks.has(rank)) return rank;
+  for (let rank = DISPLAY_RANK_MAX; rank >= DISPLAY_RANK_MIN; rank -= 1) {
+    if (!used.has(rank)) return rank;
   }
-
   return null;
 }
+
+/**
+ * Find an unused final_slate_rank within the requested tier. Core occupies
+ * 1-5, Context occupies 6-7 — paired with final_slate_tier and enforced by
+ * the signal_posts_final_slate_placement_check CHECK constraint.
+ *
+ * Returns null when the tier is full; the caller should fail closed.
+ */
+async function getNextAvailableFinalSlateRank(
+  db: SupabaseClient,
+  briefingDate: string,
+  tier: FinalSlateTier,
+): Promise<number | null> {
+  const result = await db
+    .from("signal_posts")
+    .select("final_slate_rank")
+    .eq("briefing_date", briefingDate)
+    .not("final_slate_rank", "is", null);
+
+  if (result.error) return null;
+
+  const used = new Set(
+    ((result.data ?? []) as Array<{ final_slate_rank: number | null }>)
+      .map((r) => r.final_slate_rank)
+      .filter((r): r is number => typeof r === "number"),
+  );
+
+  const [min, max] = tier === "core"
+    ? [CORE_RANK_MIN, CORE_RANK_MAX]
+    : [CONTEXT_RANK_MIN, CONTEXT_RANK_MAX];
+
+  for (let rank = min; rank <= max; rank += 1) {
+    if (!used.has(rank)) return rank;
+  }
+  return null;
+}
+
+type ExistingSignalPostRow = {
+  id: string;
+  rank: number | null;
+  final_slate_rank: number | null;
+  final_slate_tier: FinalSlateTier | null;
+  witm_draft_generated_by: string | null;
+  is_live: boolean | null;
+};
+
+/**
+ * Read the (briefing_date, source_url) row if any — the load step of the
+ * select-then-decide upsert pattern. We need provenance + is_live to decide
+ * whether the bridge is allowed to overwrite this row.
+ */
+async function loadExistingSignalPostRow(
+  db: SupabaseClient,
+  briefingDate: string,
+  sourceUrl: string,
+): Promise<ExistingSignalPostRow | null> {
+  const result = await db
+    .from("signal_posts")
+    .select("id, rank, final_slate_rank, final_slate_tier, witm_draft_generated_by, is_live")
+    .eq("briefing_date", briefingDate)
+    .eq("source_url", sourceUrl)
+    .maybeSingle();
+
+  if (result.error || !result.data) return null;
+  return result.data as ExistingSignalPostRow;
+}
+
+type PushRowStatus =
+  | "inserted"
+  | "overwrote_template"
+  | "skipped_existing_v2"
+  | "skipped_live"
+  | "skipped_missing_source_url"
+  | "skipped_missing_slot"
+  | "no_rank_slot"
+  | "failed";
 
 type PushRowResult = {
   headline: string;
   notionPageId: string;
   supabaseId: string | null;
-  status: "inserted" | "skipped_existing" | "failed";
+  status: PushRowStatus;
   error?: string;
 };
 
+type EditorialContentSource = "ai" | "human" | "ai+human" | null;
+
+/**
+ * Normalize the Notion `Editorial Source` select into the
+ * signal_posts.editorial_content_source CHECK enum. Returns null when the
+ * select is empty so the column stays nullable rather than carrying junk.
+ */
+function normalizeEditorialContentSource(value: string | null): EditorialContentSource {
+  if (!value) return null;
+  const lower = value.toLowerCase();
+  if (lower === "ai" || lower === "human" || lower === "ai+human") return lower;
+  return null;
+}
+
 async function pushApprovedRow(
-  db: NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>,
+  db: SupabaseClient,
   page: NotionPage,
   briefingDate: string,
+  drafterModelId: string,
 ): Promise<PushRowResult> {
   const props = page.properties;
-  const headline = getRichText(props["Headline"]);
+  const headline = getRichTextNormalized(props["Headline"]);
 
   try {
-    const rank = await getNextAvailableRank(db, briefingDate);
+    // ---------- Read Notion props (with markdown normalization) ----------
+    // Three-layer editorial content. Human override wins over AI draft.
+    const witmHuman = getRichTextNormalized(props["The Signal (Human)"]);
+    const witmAi    = getRichTextNormalized(props["The Signal (AI Draft)"]);
+    const witm      = witmHuman || witmAi;
+    const wltiHuman = getRichTextNormalized(props["Before This (Human)"]);
+    const wltiAi    = getRichTextNormalized(props["Before This (AI Draft)"]);
+    const witcHuman = getRichTextNormalized(props["The Ripple (Human)"]);
+    const witcAi    = getRichTextNormalized(props["The Ripple (AI Draft)"]);
+    const hookHuman = getRichTextNormalized(props["Hook (Human)"]);
+    const hookAi    = getRichTextNormalized(props["Hook (AI Draft)"]);
+    const hook      = hookHuman || hookAi;
 
-    if (!rank) {
+    const editorialSource = normalizeEditorialContentSource(getSelect(props["Editorial Source"]));
+    const sourceUrl = getUrl(props["Source URL"]);
+    const sourceName = getRichTextNormalized(props["Source"]);
+    const articleBody = getRichTextNormalized(props["Article Body"]);
+    const category = getSelect(props["Category"]);
+    const slotValue = getSelect(props["Slot"]);
+    const newsletterCoOccurrence = getNumber(props["Newsletter Co-occurrence"]) ?? 0;
+
+    // ---------- Validate the minimum required shape ----------
+    if (!sourceUrl) {
       return {
         headline,
         notionPageId: page.id,
         supabaseId: null,
-        status: "failed",
-        error: "No available rank slots for briefing date.",
+        status: "skipped_missing_source_url",
+        error: "Notion row has no Source URL; cannot key signal_posts upsert.",
+      };
+    }
+    if (slotValue !== "Core" && slotValue !== "Context") {
+      return {
+        headline,
+        notionPageId: page.id,
+        supabaseId: null,
+        status: "skipped_missing_slot",
+        error: `Notion row has Slot=${JSON.stringify(slotValue)}; expected "Core" or "Context".`,
+      };
+    }
+    const finalSlateTier: FinalSlateTier = slotValue === "Core" ? "core" : "context";
+
+    // ---------- Load existing row to decide insert vs overwrite vs skip ----------
+    const existing = await loadExistingSignalPostRow(db, briefingDate, sourceUrl);
+
+    // SKIP-LIVE: never clobber a live row. This shouldn't happen under the
+    // normal flow (publish gate runs AFTER editorial review which runs AFTER
+    // the bridge) but a hand-edited live row must not be overwritten by an
+    // approved Notion re-push. Notion writeback is intentionally NOT called
+    // here so the operator notices the inconsistency.
+    if (existing?.is_live === true) {
+      logServerEvent("warn", "Editorial push: skipped — existing row is live", {
+        headline: headline.slice(0, 60),
+        notionPageId: page.id,
+        existingId: existing.id,
+      });
+      return {
+        headline,
+        notionPageId: page.id,
+        supabaseId: existing.id,
+        status: "skipped_live",
+        error: "Refusing to overwrite a row that is already live. Investigate manually.",
       };
     }
 
-    const slotValue = getSelect(props["Slot"]);
-    const finalSlateTier = slotValue === "Core" ? "core" : "context";
-    const category = getSelect(props["Category"]);
-    // Notion field name migration: v1 (WITM/WLTI/WITC) → v2 (The Signal /
-    // Before This / The Ripple). The Notion schema no longer has v1 columns,
-    // so reading them returns null and downstream Supabase columns get
-    // empty strings. Local variable names retain the v1 prefix (witmAi,
-    // wltiAi, witcAi) because the Supabase column names (ai_why_it_matters,
-    // ai_what_led_to_it, ai_what_it_connects_to) are still v1-based —
-    // changing those is a separate downstream migration.
-    //
-    // Mapping:
-    //   The Signal   = WITM (Why It Matters)
-    //   Before This  = WLTI (What Led To It)
-    //   The Ripple   = WITC (What It Connects To)
-    const witmHuman = getRichText(props["The Signal (Human)"]);
-    const witmAi    = getRichText(props["The Signal (AI Draft)"]);
-    const witm      = witmHuman || witmAi;
-    const witcAi    = getRichText(props["The Ripple (AI Draft)"]);
-    const witcHuman = getRichText(props["The Ripple (Human)"]);
-    const wltiAi    = getRichText(props["Before This (AI Draft)"]);
-    const wltiHuman = getRichText(props["Before This (Human)"]);
-    const editorialSource = getSelect(props["Editorial Source"]);
-    const sourceUrl = getUrl(props["Source URL"]);
-    const source = getRichText(props["Source"]);
-    const articleBody = getRichText(props["Article Body"]);
-    const newsletterCoOccurrence = getNumber(props["Newsletter Co-occurrence"]) ?? 0;
+    // SKIP-V2: re-push of a row the bridge already wrote (provenance='llm').
+    // Writeback IS called so the Notion row's Pushed flag flips true,
+    // preventing future re-attempts. The Supabase content is left untouched.
+    if (existing?.witm_draft_generated_by === "llm") {
+      await markNotionRowPushed(page.id, existing.id);
+      logServerEvent("info", "Editorial push: skipped — v2 row already exists; flipped Notion writeback", {
+        headline: headline.slice(0, 60),
+        notionPageId: page.id,
+        existingId: existing.id,
+      });
+      return {
+        headline,
+        notionPageId: page.id,
+        supabaseId: existing.id,
+        status: "skipped_existing_v2",
+      };
+    }
 
+    // ---------- Build the v2 payload (shared between INSERT and UPDATE) ----------
     const now = new Date().toISOString();
-
-    // Core insert — columns verified against signal_posts schema
-    const insertPayload: Record<string, unknown> = {
-      briefing_date: briefingDate,
-      rank,
+    const v2Payload: Record<string, unknown> = {
       title: headline,
-      source_name: source || "",
-      source_url: sourceUrl || null,
+      source_name: sourceName || "",
       summary: articleBody || "",
       tags: category ? [category] : [],
       signal_score: null,
-      selection_reason: "Editorial queue push — approved via Notion workflow.",
-      // WITM — write AI draft to ai_why_it_matters; human override to edited_why_it_matters
+      // Hook → selection_reason. Falls back to a structured note when Notion's
+      // Hook field is empty so the column stays non-NULL (CHECK constraint).
+      selection_reason: hook || "Editorial queue push — approved via Notion workflow (Hook empty).",
+      // Three editorial layers — AI draft fields plus the Human override
+      // mirror columns. Empty strings stay empty so the public surface can
+      // tell "not drafted" from "drafted to empty".
       ai_why_it_matters: witmAi || witm || "",
       edited_why_it_matters: witmHuman || null,
       published_why_it_matters: null,
-      why_it_matters_validation_status: witm
-        ? "passed"
-        : "requires_human_rewrite",
+      ai_what_led_to_it: wltiAi || null,
+      human_what_led_to_it: wltiHuman || null,
+      ai_what_it_connects_to: witcAi || null,
+      human_what_it_connects_to: witcHuman || null,
+      // Validation status carries the legacy auto-default until Task 6 lands
+      // the 'not_run' enum value. If WITM is blank we explicitly require
+      // human rewrite so the publish gate refuses to promote it.
+      why_it_matters_validation_status: witm ? "passed" : "requires_human_rewrite",
       why_it_matters_validation_failures: witm ? [] : ["incomplete_sentence"],
       why_it_matters_validation_details: witm
         ? []
@@ -233,16 +419,14 @@ async function pushApprovedRow(
       is_live: false,
       context_material: articleBody || null,
       source_cluster_id: null,
-      witm_draft_generated_by: null,
-      witm_draft_generated_at: null,
-      witm_draft_model: null,
-      // WITC + WLTI provenance columns (new)
-      ai_what_it_connects_to: witcAi || null,
-      human_what_it_connects_to: witcHuman || null,
-      ai_what_led_to_it: wltiAi || null,
-      human_what_led_to_it: wltiHuman || null,
-      editorial_content_source: editorialSource?.toLowerCase() || null,
-      created_at: now,
+      // Provenance stamps that distinguish v2 LLM bridge rows from the legacy
+      // deterministic_template rows written by the daily cron (Task 3). The
+      // legacy writer stamps witm_draft_generated_by='deterministic_template';
+      // we stamp 'llm' so any post-deploy query can tell the two paths apart.
+      witm_draft_generated_by: "llm",
+      witm_draft_generated_at: now,
+      witm_draft_model: drafterModelId,
+      editorial_content_source: editorialSource,
       updated_at: now,
     };
 
@@ -253,58 +437,97 @@ async function pushApprovedRow(
       });
     }
 
-    // Upsert on (briefing_date, source_url) so re-pushing an already-pushed
-    // approved row (or a different Notion row that points at the same article)
-    // does not duplicate. Backing index: signal_posts_briefing_date_source_url_key
-    // (migration 20260521120000). ignoreDuplicates returns the empty array
-    // when the row already exists; we then look up the existing supabase id
-    // so the Notion writeback still records the correct Supabase Row ID.
-    const upsertResult = await db
-      .from("signal_posts")
-      .upsert(insertPayload, {
-        onConflict: "briefing_date,source_url",
-        ignoreDuplicates: true,
-      })
-      .select("id");
-
-    if (upsertResult.error) {
-      throw new Error(`signal_posts upsert failed: ${upsertResult.error.message}`);
-    }
-
-    const upsertRows = (upsertResult.data ?? []) as Array<{ id: string }>;
-    let supabaseId: string;
-    let status: "inserted" | "skipped_existing";
-
-    if (upsertRows.length > 0) {
-      supabaseId = upsertRows[0].id;
-      status = "inserted";
-    } else {
-      // ignoreDuplicates returned 0 rows → the (briefing_date, source_url)
-      // pair already exists. Look it up so we can still mirror Supabase Row ID
-      // back to Notion and flip Pushed to Supabase=true.
-      const existing = await db
+    // ---------- Branch: OVERWRITE existing template/null-provenance row, or INSERT new ----------
+    if (existing) {
+      // Overwrite path. existing.witm_draft_generated_by is 'deterministic_template'
+      // (the legacy cron's stamp) or NULL (pre-Task-3 historic rows). We
+      // preserve the existing display rank and final_slate_rank/tier — the
+      // legacy writer's choice still represents the slot for this URL. If
+      // the legacy assigned a different tier than the editor picked, the
+      // editor's pick wins (final_slate_tier in v2Payload).
+      const updateResult = await db
         .from("signal_posts")
+        .update(v2Payload)
+        .eq("id", existing.id)
         .select("id")
-        .eq("briefing_date", briefingDate)
-        .eq("source_url", sourceUrl)
-        .maybeSingle();
+        .single();
 
-      if (existing.error || !existing.data) {
+      if (updateResult.error || !updateResult.data) {
         throw new Error(
-          `signal_posts upsert reported no insert and existing lookup failed: ${existing.error?.message ?? "no row found"}`,
+          `signal_posts overwrite failed: ${updateResult.error?.message ?? "no row returned"}`,
         );
       }
-      supabaseId = (existing.data as { id: string }).id;
-      status = "skipped_existing";
+
+      const supabaseId = (updateResult.data as { id: string }).id;
+      await markNotionRowPushed(page.id, supabaseId);
+
+      logServerEvent("info", "Editorial push: overwrote legacy template row", {
+        headline: headline.slice(0, 60),
+        notionPageId: page.id,
+        supabaseId,
+        previousProvenance: existing.witm_draft_generated_by,
+      });
+
+      return {
+        headline,
+        notionPageId: page.id,
+        supabaseId,
+        status: "overwrote_template",
+      };
     }
 
+    // INSERT path — no existing row. Allocate a fresh display rank AND a
+    // fresh final_slate_rank within the tier. Both are required: rank is
+    // NOT NULL; final_slate_rank pairs with final_slate_tier via CHECK
+    // constraint and is the operator-visible slot.
+    const displayRank = await getNextAvailableDisplayRank(db, briefingDate);
+    if (!displayRank) {
+      return {
+        headline,
+        notionPageId: page.id,
+        supabaseId: null,
+        status: "no_rank_slot",
+        error: `No available display rank (1-${DISPLAY_RANK_MAX}) for briefing_date ${briefingDate}.`,
+      };
+    }
+    const finalSlateRank = await getNextAvailableFinalSlateRank(db, briefingDate, finalSlateTier);
+    if (!finalSlateRank) {
+      return {
+        headline,
+        notionPageId: page.id,
+        supabaseId: null,
+        status: "no_rank_slot",
+        error: `No available final_slate_rank for tier=${finalSlateTier} on briefing_date ${briefingDate}.`,
+      };
+    }
+
+    const insertResult = await db
+      .from("signal_posts")
+      .insert({
+        ...v2Payload,
+        briefing_date: briefingDate,
+        source_url: sourceUrl,
+        rank: displayRank,
+        final_slate_rank: finalSlateRank,
+        created_at: now,
+      })
+      .select("id")
+      .single();
+
+    if (insertResult.error || !insertResult.data) {
+      throw new Error(
+        `signal_posts insert failed: ${insertResult.error?.message ?? "no row returned"}`,
+      );
+    }
+
+    const supabaseId = (insertResult.data as { id: string }).id;
     await markNotionRowPushed(page.id, supabaseId);
 
     return {
       headline,
       notionPageId: page.id,
       supabaseId,
-      status,
+      status: "inserted",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -348,10 +571,13 @@ export async function GET(request: Request) {
   }
 
   const briefingDate = todayTaipei(new Date());
+  const drafterModelId =
+    process.env.EDITORIAL_DRAFTER_MODEL_ID?.trim() || DEFAULT_DRAFTER_MODEL_ID;
 
   logServerEvent("info", "Editorial push: started", {
     route: "/api/editorial/push-approved",
     briefingDate,
+    drafterModelId,
   });
 
   let approvedPages: NotionPage[];
@@ -369,28 +595,38 @@ export async function GET(request: Request) {
   const rows: PushRowResult[] = [];
 
   for (const page of approvedPages) {
-    const result = await pushApprovedRow(db, page, briefingDate);
+    const result = await pushApprovedRow(db, page, briefingDate, drafterModelId);
     rows.push(result);
   }
 
-  const pushed = rows.filter((r) => r.status === "inserted").length;
-  const skipped = rows.filter((r) => r.status === "skipped_existing").length;
-  const failed = rows.filter((r) => r.status === "failed").length;
+  const counts = rows.reduce<Record<PushRowStatus, number>>(
+    (acc, r) => {
+      acc[r.status] = (acc[r.status] ?? 0) + 1;
+      return acc;
+    },
+    {
+      inserted: 0,
+      overwrote_template: 0,
+      skipped_existing_v2: 0,
+      skipped_live: 0,
+      skipped_missing_source_url: 0,
+      skipped_missing_slot: 0,
+      no_rank_slot: 0,
+      failed: 0,
+    },
+  );
 
   logServerEvent("info", "Editorial push: completed", {
     route: "/api/editorial/push-approved",
     briefingDate,
-    pushed,
-    skipped,
-    failed,
+    drafterModelId,
+    ...counts,
   });
 
   return NextResponse.json({
     success: true,
     briefing_date: briefingDate,
-    pushed,
-    skipped,
-    failed,
+    counts,
     rows: rows.map((r) => ({
       headline: r.headline,
       supabase_id: r.supabaseId,
