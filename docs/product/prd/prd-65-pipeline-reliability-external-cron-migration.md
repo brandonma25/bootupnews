@@ -100,7 +100,8 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 | Phase 3 — Branch C E3 idempotency | Done | [#249](https://github.com/brandonma25/bootupnews/pull/249) |
 | Phase 4 — `/api/cron/health` + Notion Pipeline Log + Source Health Log writer | Done | [#250](https://github.com/brandonma25/bootupnews/pull/250) |
 | Phase 4.5 — Source circuit breaker + Sentry filter | Done | [#251](https://github.com/brandonma25/bootupnews/pull/251) |
-| Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | In Review | this PR |
+| Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | Done | [#252](https://github.com/brandonma25/bootupnews/pull/252) |
+| Phase 6 — Activate `bootup-health-check-1215-utc` in `scripts/cron-jobs.config.ts` | In Review | this PR |
 
 ## Closeout Checklist
 
