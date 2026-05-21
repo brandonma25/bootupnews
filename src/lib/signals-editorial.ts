@@ -1313,7 +1313,14 @@ async function persistSignalPostCandidates(
 
   const now = new Date().toISOString();
 
-  const insertResult = await client.from("signal_posts").insert(
+  // Upsert on (briefing_date, source_url) so a second ingestion run (e.g. the
+  // rollback escape hatch dual-trigger, or any future re-fire) is a no-op
+  // rather than a duplicate insert. The partial unique index backing this
+  // conflict target is signal_posts_briefing_date_source_url_key (migration
+  // 20260521120000). All rows in missingCandidates are pre-filtered by
+  // isValidPublicSourceUrl(), so source_url is non-null and matches the
+  // partial index predicate.
+  const insertResult = await client.from("signal_posts").upsert(
     missingCandidates.map((post) => ({
       briefing_date: briefingDate,
       rank: post.rank,
@@ -1344,6 +1351,7 @@ async function persistSignalPostCandidates(
       created_at: now,
       updated_at: now,
     })),
+    { onConflict: "briefing_date,source_url", ignoreDuplicates: true },
   ).select("id");
 
   if (insertResult.error) {

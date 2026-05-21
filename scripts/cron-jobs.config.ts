@@ -43,27 +43,24 @@ const BASE = process.env.BOOTUP_PRODUCTION_URL;
 // run time and prints a clear error listing every missing variable.
 
 export const cronJobs: CronJobConfig[] = [
+  // Sole authoritative ingestion trigger at 20:00 Asia/Taipei (= 12:00 UTC).
+  // Path-A Task 1 collapsed the previous 10:15 + 11:45 UTC dual-trigger into a
+  // single run; cross-run idempotency lives in the cron_runs guard table (see
+  // migration 20260521120000_cron_runs_and_source_url_idempotency.sql). Apply
+  // this change to cron-job.org with `npm run cron:sync:prune` so the two
+  // legacy ingestion jobs are removed alongside the create.
   {
-    title: "bootup-ingestion-1015-utc",
+    title: "bootup-ingestion-1200-utc",
     url: `${BASE ?? "<BOOTUP_PRODUCTION_URL>"}/api/cron/fetch-editorial-inputs`,
     method: "GET",
-    schedule: { timezone: "Etc/UTC", hours: [10], minutes: [15] },
-    headers: { "x-cron-secret": SECRET ?? "" },
-    enabled: true,
-    notifyOnFailure: true,
-  },
-  {
-    title: "bootup-ingestion-1145-utc",
-    url: `${BASE ?? "<BOOTUP_PRODUCTION_URL>"}/api/cron/fetch-editorial-inputs`,
-    method: "GET",
-    schedule: { timezone: "Etc/UTC", hours: [11], minutes: [45] },
+    schedule: { timezone: "Etc/UTC", hours: [12], minutes: [0] },
     headers: { "x-cron-secret": SECRET ?? "" },
     enabled: true,
     notifyOnFailure: true,
   },
 
   // Health-check job — PRD-65 Phase 4 shipped /api/cron/health (see CHANGELOG).
-  // Fires 30 minutes after the second ingestion run; a non-2xx response
+  // Fires 15 minutes after the single ingestion run; a non-2xx response
   // triggers an email alert via cron-job.org's notifyOnFailure.
   {
     title: "bootup-health-check-1215-utc",

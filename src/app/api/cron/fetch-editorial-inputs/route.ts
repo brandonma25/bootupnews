@@ -6,6 +6,84 @@ import { runNewsletterIngestion, type NewsletterIngestionRunResult } from "@/lib
 import { runEditorialStaging, type EditorialStagingRunResult } from "@/lib/editorial-staging/runner";
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { writePipelineLogEntry } from "@/lib/observability/pipeline-log";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+
+const CRON_NAME = "fetch-editorial-inputs";
+
+/**
+ * Briefing-date the run-lock keys on. Mirrors the Taipei-calendar logic in
+ * src/lib/editorial-staging/runner.ts so a run-lock claim and the editorial
+ * staging step that follows always agree on which day is "today".
+ */
+function todayTaipei(now: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+type RunLockResult =
+  | { acquired: true; briefingDate: string; reason?: "lock_check_failed" }
+  | { acquired: false; briefingDate: string; reason: "already_ran" };
+
+/**
+ * Claim the run-lock for today's briefing_date. Returns acquired=true on a
+ * fresh row, acquired=false when a prior run already claimed it, or
+ * acquired=true with reason='lock_check_failed' as a best-effort fallthrough
+ * when the lock table itself is unreachable — we prefer one duplicate run over
+ * a missed run.
+ */
+async function tryAcquireRunLock(briefingDate: string): Promise<RunLockResult> {
+  const client = createSupabaseServiceRoleClient();
+  if (!client) {
+    logServerEvent("warn", "Run-lock skipped: Supabase service role client unavailable", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+    });
+    return { acquired: true, briefingDate, reason: "lock_check_failed" };
+  }
+
+  const result = await client
+    .from("cron_runs")
+    .insert({ briefing_date: briefingDate, cron_name: CRON_NAME })
+    .select("briefing_date");
+
+  if (result.error) {
+    // Postgres unique_violation = 23505. Supabase surfaces this as `code`.
+    const code = (result.error as { code?: string }).code;
+    if (code === "23505") {
+      return { acquired: false, briefingDate, reason: "already_ran" };
+    }
+    logServerEvent("warn", "Run-lock acquire failed; running anyway (best-effort)", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+      error: result.error.message,
+      code,
+    });
+    return { acquired: true, briefingDate, reason: "lock_check_failed" };
+  }
+
+  return { acquired: true, briefingDate };
+}
+
+/**
+ * Mark the run-lock terminal. Best-effort — never throws or blocks the cron.
+ * No-op when the lock was never acquired (lock_check_failed fallthrough).
+ */
+async function finalizeRunLock(briefingDate: string, status: "ok" | "fail" | "timeout"): Promise<void> {
+  try {
+    const client = createSupabaseServiceRoleClient();
+    if (!client) return;
+    await client
+      .from("cron_runs")
+      .update({ finished_at: new Date().toISOString(), status })
+      .eq("briefing_date", briefingDate);
+  } catch {
+    /* best-effort */
+  }
+}
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -124,11 +202,12 @@ async function runIngestionPipeline(stageRef: { current: EditorialInputTaskName 
   return { newsletter, rss, editorialStaging };
 }
 
-async function executePipelineWork() {
+async function executePipelineWork(briefingDate: string) {
   const stageRef: { current: EditorialInputTaskName } = { current: "newsletter" };
 
   logServerEvent("info", "Combined editorial input cron pipeline started", {
     route: "/api/cron/fetch-editorial-inputs",
+    briefingDate,
     internalTimeoutMs: INTERNAL_PIPELINE_TIMEOUT_MS,
   });
 
@@ -165,6 +244,7 @@ async function executePipelineWork() {
         stage: error.stage,
         internalTimeoutMs: error.timeoutMs,
       });
+      await finalizeRunLock(briefingDate, "timeout");
       return;
     }
 
@@ -182,6 +262,7 @@ async function executePipelineWork() {
       route: "/api/cron/fetch-editorial-inputs",
       ...errorContext(error),
     });
+    await finalizeRunLock(briefingDate, "fail");
     return;
   }
 
@@ -238,6 +319,12 @@ async function executePipelineWork() {
       route: "/api/cron/fetch-editorial-inputs",
     });
   }
+
+  // Use the lock's briefingDate (from todayTaipei at request time) rather than
+  // briefingDateForLog so the finalize keys to the same row that tryAcquireRunLock
+  // claimed. They will agree under normal operation; this guards against drift
+  // if editorial staging ever resolves a different Taipei calendar day.
+  await finalizeRunLock(briefingDate, pipelineLogStatus === "fail" ? "fail" : "ok");
 }
 
 export async function GET(request: Request) {
@@ -260,22 +347,55 @@ export async function GET(request: Request) {
   }
 
   const acceptedAt = new Date().toISOString();
+  const briefingDate = todayTaipei(new Date(acceptedAt));
+
+  // Run-lock claim happens synchronously, BEFORE after() schedules the pipeline.
+  // The second cronjob.org HTTP fire (or a Vercel Hobby double-delivery during
+  // the rollback escape hatch) must see the existing claim immediately and
+  // no-op — otherwise both runs would race past the gate and produce
+  // duplicate ingestion work. Finalize happens inside executePipelineWork.
+  const lock = await tryAcquireRunLock(briefingDate);
+
+  if (!lock.acquired) {
+    logServerEvent("info", "Combined editorial input cron skipped (already ran today)", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+      acceptedAt,
+      reason: lock.reason,
+    });
+    return NextResponse.json(
+      {
+        success: true,
+        timestamp: acceptedAt,
+        briefing_date: briefingDate,
+        status: "skipped",
+        reason: lock.reason,
+        summary: {
+          message: `Ingestion skipped: a run for briefing_date=${briefingDate} already started today.`,
+        },
+      },
+      { status: 200 },
+    );
+  }
 
   logServerEvent("info", "Combined editorial input cron accepted (running async via after())", {
     route: "/api/cron/fetch-editorial-inputs",
+    briefingDate,
     acceptedAt,
+    lockReason: lock.reason ?? "acquired",
   });
 
   // Run the ingestion pipeline after the response is sent. Vercel keeps the
   // function alive up to its maxDuration (60s in vercel.json) for `after()`
   // work, which gives the pipeline its full budget without making
   // cron-job.org wait — the 30s external HTTP timeout no longer applies.
-  after(executePipelineWork);
+  after(() => executePipelineWork(briefingDate));
 
   return NextResponse.json(
     {
       success: true,
       timestamp: acceptedAt,
+      briefing_date: briefingDate,
       summary: {
         message: "Ingestion accepted; running asynchronously. Observe completion via Sentry, Notion Pipeline Log, and the 12:15 UTC /api/cron/health check.",
       },

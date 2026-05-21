@@ -72,11 +72,11 @@ production:    https://bootupnews.com
 api key:       <len=…>
 cron secret:   <len=…>
 
-TITLE                       ACTION  DETAIL
---------------------------------------------------------------
-bootup-ingestion-1015-utc   create  would create GET https://…/api/cron/fetch-editorial-inputs @ 10:15 Etc/UTC
-bootup-ingestion-1145-utc   create  would create GET https://…/api/cron/fetch-editorial-inputs @ 11:45 Etc/UTC
-Would create 2 jobs: bootup-ingestion-1015-utc, bootup-ingestion-1145-utc
+TITLE                            ACTION  DETAIL
+-------------------------------------------------------------------
+bootup-ingestion-1200-utc        create  would create GET https://…/api/cron/fetch-editorial-inputs @ 12:00 Etc/UTC
+bootup-health-check-1215-utc     create  would create GET https://…/api/cron/health             @ 12:15 Etc/UTC
+Would create 2 jobs: bootup-ingestion-1200-utc, bootup-health-check-1215-utc
 
 summary: created=0 updated=0 skipped=0 orphans=0 pruned=0 failed=0
 ```
@@ -89,15 +89,35 @@ If output looks right, apply for real:
 npm run cron:sync
 ```
 
-After this, sign in to <https://console.cron-job.org> and confirm both jobs
-appear in the dashboard, are enabled, and have the schedules
-`15 10 * * *` and `45 11 * * *` in UTC.
+After this, sign in to <https://console.cron-job.org> and confirm the ingestion
+and health-check jobs appear in the dashboard, are enabled, and have the
+schedules `0 12 * * *` and `15 12 * * *` in UTC.
+
+### Migrating from the legacy two-ingestion schedule
+
+If the account previously hosted the pre-PRD-65-followup pair
+(`bootup-ingestion-1015-utc` + `bootup-ingestion-1145-utc`), run the sync with
+the `--prune` flag so they are removed alongside the single
+`bootup-ingestion-1200-utc` create:
+
+```bash
+npm run cron:sync:prune
+```
+
+Expected diff: `delete 2 jobs (1015, 1145), create 1 job (1200)`. The new
+schedule's cross-run idempotency lives in the Supabase `cron_runs` table
+(migration `20260521120000_cron_runs_and_source_url_idempotency.sql`), so a
+duplicate cronjob.org fire on the same briefing_date no-ops with
+`HTTP 200 status=skipped` rather than running the pipeline twice.
 
 **Test each job once.** Use the "Test run" button on each cron-job.org job
-page. Expected response: **HTTP 200** from
-`/api/cron/fetch-editorial-inputs`. If you get **HTTP 401**, the
-`x-cron-secret` value on cron-job.org doesn't match `CRON_SECRET` in Vercel
-production env — re-set them so both match, then re-run `npm run cron:sync`.
+page. Expected response: **HTTP 202** from `/api/cron/fetch-editorial-inputs`
+on the first call of the day (ingestion accepted and scheduled), then
+**HTTP 200 with `status: "skipped"`** on any subsequent call for the same
+briefing_date (the `cron_runs` row already exists, so the run-lock declines).
+If you get **HTTP 401**, the `x-cron-secret` value on cron-job.org doesn't
+match `CRON_SECRET` in Vercel production env — re-set them so both match,
+then re-run `npm run cron:sync`.
 
 ---
 
@@ -162,13 +182,15 @@ temporarily:
 2. Re-add the `crons` block to `vercel.json` on a hotfix branch:
    ```json
    "crons": [
-     { "path": "/api/cron/fetch-editorial-inputs", "schedule": "15 10 * * *" },
-     { "path": "/api/cron/fetch-editorial-inputs", "schedule": "45 11 * * *" }
+     { "path": "/api/cron/fetch-editorial-inputs", "schedule": "0 12 * * *" }
    ]
    ```
 3. Merge and redeploy. Vercel Cron will now fire on its own ±59 min window
    schedule, sending the legacy `Authorization: Bearer <CRON_SECRET>` header,
-   which the endpoint accepts when the fallback flag is set.
+   which the endpoint accepts when the fallback flag is set. The Supabase
+   `cron_runs` run-lock still protects against Vercel double-delivery —
+   the second call within the briefing_date returns HTTP 200 status=skipped
+   without running the pipeline.
 4. On cron-job.org, disable the jobs (set `enabled: false` in config and
    re-sync) so the two schedulers don't double-fire.
 

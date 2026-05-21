@@ -7,6 +7,7 @@ const logServerEvent = vi.fn();
 const writePipelineLogEntry = vi.fn();
 const sentryCaptureException = vi.fn();
 const sentryFlush = vi.fn(async () => true);
+const createSupabaseServiceRoleClient = vi.fn();
 
 let capturedAfterCallback: (() => void | Promise<void>) | null = null;
 
@@ -47,6 +48,46 @@ vi.mock("@/lib/observability", () => ({
 vi.mock("@/lib/observability/pipeline-log", () => ({
   writePipelineLogEntry,
 }));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createSupabaseServiceRoleClient,
+}));
+
+/**
+ * Build a tiny supabase-client double exposing only the surface the cron route
+ * uses: `client.from('cron_runs').insert(...).select(...)` and
+ * `.from('cron_runs').update(...).eq(...)`.
+ *
+ * `lockAcquired === true`  → insert succeeds (fresh row).
+ * `lockAcquired === false` → insert rejects with Postgres unique_violation
+ *                            code 23505 (lock already held).
+ * `lockAcquired === 'error'` → insert rejects with a generic DB error
+ *                              (fall-through best-effort path).
+ */
+function buildSupabaseLockClient(lockAcquired: true | false | "error") {
+  const insertResult =
+    lockAcquired === true
+      ? { data: [{ briefing_date: "2026-05-12" }], error: null }
+      : lockAcquired === false
+        ? { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint \"cron_runs_pkey\"" } }
+        : { data: null, error: { code: "08006", message: "connection reset" } };
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "cron_runs") {
+        return {
+          insert: vi.fn(() => ({
+            select: vi.fn(async () => insertResult),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(async () => ({ data: null, error: null })),
+          })),
+        };
+      }
+      throw new Error(`Unexpected supabase table in test: ${table}`);
+    }),
+  };
+}
 
 type RequestAuth = { header?: "x-cron-secret" | "authorization"; secret?: string };
 
@@ -105,6 +146,8 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       },
     });
     writePipelineLogEntry.mockResolvedValue({ written: true, pageId: "log-1" });
+    // Default: lock acquires cleanly. Individual tests override.
+    createSupabaseServiceRoleClient.mockReturnValue(buildSupabaseLockClient(true));
   });
 
   it("rejects unauthorized requests without scheduling the pipeline", async () => {
@@ -327,5 +370,68 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     const response = await GET(buildRequest("local-cron-secret"));
     const body = await response.json();
     expect(JSON.stringify(body)).not.toContain("local-cron-secret");
+  });
+
+  describe("run-lock (cron_runs)", () => {
+    it("first call acquires the lock and schedules the pipeline via after()", async () => {
+      createSupabaseServiceRoleClient.mockReturnValue(buildSupabaseLockClient(true));
+
+      const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+      const response = await GET(buildRequest("local-cron-secret"));
+      const body = await response.json();
+
+      expect(response.status).toBe(202);
+      expect(body.success).toBe(true);
+      expect(body.status).toBeUndefined(); // "skipped" only appears on the no-op response.
+      expect(typeof body.briefing_date).toBe("string");
+      expect(capturedAfterCallback).not.toBeNull();
+    });
+
+    it("second call within the same briefing_date no-ops with HTTP 200 status=skipped and does NOT schedule after()", async () => {
+      createSupabaseServiceRoleClient.mockReturnValue(buildSupabaseLockClient(false));
+
+      const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+      const response = await GET(buildRequest("local-cron-secret"));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        success: true,
+        status: "skipped",
+        reason: "already_ran",
+      });
+      expect(typeof body.briefing_date).toBe("string");
+      // Critical: the pipeline must NOT be scheduled on the no-op branch,
+      // otherwise the second cronjob.org fire still produces a duplicate run.
+      expect(capturedAfterCallback).toBeNull();
+      expect(runDailyNewsCron).not.toHaveBeenCalled();
+      expect(runNewsletterIngestion).not.toHaveBeenCalled();
+      expect(runEditorialStaging).not.toHaveBeenCalled();
+    });
+
+    it("falls through and runs the pipeline (best-effort) when the lock table is unreachable", async () => {
+      // A generic DB error (not Postgres unique_violation 23505) means we cannot
+      // tell whether a prior run claimed today's slot. We prefer one duplicate
+      // run over a missed run, so we proceed.
+      createSupabaseServiceRoleClient.mockReturnValue(buildSupabaseLockClient("error"));
+
+      const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+      const response = await GET(buildRequest("local-cron-secret"));
+
+      expect(response.status).toBe(202);
+      expect(capturedAfterCallback).not.toBeNull();
+      await runCapturedAfter();
+      expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
+      expect(runNewsletterIngestion).toHaveBeenCalledTimes(1);
+      expect(runEditorialStaging).toHaveBeenCalledTimes(1);
+
+      const warnLog = logServerEvent.mock.calls.find(
+        ([level, message]) =>
+          level === "warn" &&
+          typeof message === "string" &&
+          message.includes("Run-lock acquire failed"),
+      );
+      expect(warnLog).toBeTruthy();
+    });
   });
 });

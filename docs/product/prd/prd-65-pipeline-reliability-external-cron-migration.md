@@ -101,7 +101,30 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 | Phase 4 — `/api/cron/health` + Notion Pipeline Log + Source Health Log writer | Done | [#250](https://github.com/brandonma25/bootupnews/pull/250) |
 | Phase 4.5 — Source circuit breaker + Sentry filter | Done | [#251](https://github.com/brandonma25/bootupnews/pull/251) |
 | Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | Done | [#252](https://github.com/brandonma25/bootupnews/pull/252) |
-| Phase 6 — Activate `bootup-health-check-1215-utc` in `scripts/cron-jobs.config.ts` | In Review | this PR |
+| Phase 6 — Activate `bootup-health-check-1215-utc` in `scripts/cron-jobs.config.ts` | Done | [#258](https://github.com/brandonma25/bootupnews/pull/258) |
+| Phase 7 (Path-A Task 1) — Consolidate ingestion to one 12:00 UTC trigger + Supabase `cron_runs` run-lock + `(briefing_date, source_url)` upsert | In Review | this PR |
+
+### Phase 7 — Operational history (Path-A Task 1, 2026-05-21)
+
+The dual-ingestion schedule (10:15 + 11:45 UTC) shipped in Phase 4 was the
+root cause of the 5–7× duplicate-rows-per-article symptom in the Notion
+Editorial Queue: both runs succeeded daily, and the Notion writes were not
+cross-run idempotent. Path A of the May 21 execution handoff collapsed the
+schedule to a single canonical run at 20:00 Asia/Taipei (= `0 12 * * *` UTC)
+and introduced a Supabase `cron_runs(briefing_date PK)` guard table that the
+cron handler claims with `INSERT … ON CONFLICT DO NOTHING` before scheduling
+`after(executePipelineWork)`. A second cronjob.org HTTP fire — or a Vercel
+Hobby double-delivery during the rollback escape hatch — sees the existing
+claim and responds `HTTP 200 status=skipped` without scheduling pipeline
+work. As a second line of defense, both `signal_posts` writer paths
+(`persistSignalPostCandidates` and `/api/editorial/push-approved`) now
+upsert on `(briefing_date, source_url)`; the partial unique index that backs
+this is created in the same migration, alongside a small cleanup that
+removed 7 legacy garbage rows on 2026-05-17 (Axios webfont CDN URLs +
+Politico tracking redirectors the pre-`isValidPublicSourceUrl` writer
+captured as "stories"). The health-check job at 12:15 UTC stays as-is and
+gives the single ingestion 15 minutes to settle before the alertable check
+fires.
 
 ## Closeout Checklist
 
