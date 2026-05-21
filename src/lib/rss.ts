@@ -32,9 +32,82 @@ export type FeedArticle = {
   extractionMethod?: SourceExtractionMethod;
 };
 
+// BOOT-UP-WEB-5 — Task 2.B. rss-parser delegates to xml2js → sax-js. In
+// strict mode (the default), sax rejects France24's RSS body with
+// "Attribute without value" at line 8 col 93. xml2js's `strict: false`
+// recovers from that construct but is too lenient for the test surface —
+// it'll happily parse `<rss><channel><` and let rss-parser fail downstream
+// with "Feed not recognized as RSS 1 or 2", which changes the error
+// classification. So we keep STRICT as the default parser and use the
+// lenient parser as a one-shot retry: if strict throws, try lenient before
+// giving up. This preserves correct classification for genuinely broken
+// feeds while recovering the France24 edge case.
 const parser = new Parser();
+const tolerantParser = new Parser({ xml2js: { strict: false } });
 const DEFAULT_FEED_TIMEOUT_MS = 4_500;
 const DEFAULT_FEED_RETRY_COUNT = 2;
+
+/**
+ * Parse RSS XML with strict-first, tolerant-retry semantics. Strict parsing
+ * keeps the rss.test.ts classification suite green; tolerant retry handles
+ * France24's "Attribute without value" body without quarantining the feed.
+ * Both attempts run inside the same `rss.parse` span so observability is
+ * preserved.
+ */
+/**
+ * Narrow-scope tolerant retry. We only run the lenient parser when the
+ * strict failure is the SPECIFIC sax error France24 hits ("Attribute
+ * without value") because the lenient parser can hang or silently produce
+ * garbage on truly truncated or non-XML payloads. Restricting the retry to
+ * this one diagnostic message:
+ *   - keeps the test suite's other negative cases (truncated `<rss><channel><`,
+ *     etc.) reaching the original strict-mode rejection on the fast path, and
+ *   - still recovers the live France24 body that today emits exactly this
+ *     error at line 8 col 93 (BOOT-UP-WEB-5).
+ *
+ * If a different malformed-attribute pattern shows up in production we can
+ * either widen this regex or pre-sanitize the body. The
+ * `rss_parse_invalid_xml` Sentry tag remains the visibility surface.
+ */
+const TOLERANT_RETRY_MESSAGE_PATTERN = /Attribute without value/i;
+
+async function parseRssXmlWithFallback(xml: string) {
+  try {
+    return await parser.parseString(xml);
+  } catch (strictError) {
+    const message = strictError instanceof Error ? strictError.message : String(strictError);
+    if (!TOLERANT_RETRY_MESSAGE_PATTERN.test(message)) {
+      throw strictError;
+    }
+    try {
+      return await tolerantParser.parseString(xml);
+    } catch {
+      // Tolerant retry failed too — surface the original strict error so
+      // downstream classification (`rss_parse_invalid_xml`) stays accurate.
+      throw strictError;
+    }
+  }
+}
+
+/**
+ * Browser-shaped fetch headers used by every RSS feed request. The
+ * `Daily-Intelligence-Aggregator/1.0` UA we used previously is benign for
+ * most feeds but recognizable to Cloudflare / Akamai bot-protection layers
+ * that gate non-browser UAs (BOOT-UP-WEB-2 — Foreign Affairs returns 403 on
+ * the legacy UA from Vercel's IAD1 IPs). A real-browser UA + the
+ * `Accept` / `Accept-Language` pair gets past the simple checks; for
+ * publishers that gate on IP ranges, the circuit breaker still trips.
+ */
+const RSS_FETCH_DEFAULT_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 BootUpNews/1.0 " +
+    "(+https://bootupnews.com)",
+  Accept:
+    "application/rss+xml, application/atom+xml, application/xml;q=0.9, " +
+    "text/xml;q=0.9, */*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+};
 
 type FeedRequestOptions = {
   timeoutMs?: number;
@@ -104,6 +177,13 @@ export async function fetchFeedArticles(
           outcome: "fail",
           notes: error instanceof Error ? error.message : String(error),
         });
+        // Per-source isolation lives one level up in
+        // src/lib/pipeline/ingestion/index.ts (the Promise.all over sources
+        // catches and continues). That outer catch records the same failure
+        // to Sentry at level="warning" so it shows up as advisory, not
+        // page-out-able. We mirror level="warning" here so the rss.ts inner
+        // capture doesn't generate a duplicate level="error" event — both
+        // surfaces flow into the same Sentry issue at the same severity.
         captureRssFailure(error, {
           failureType: classifyRssFailure(error),
           phase: error instanceof Error && error.name === "RssError" && "phase" in error
@@ -115,6 +195,7 @@ export async function fetchFeedArticles(
           retryCount: requestOptions.retryCount,
           timeoutMs: requestOptions.timeoutMs,
           parser: "rss-parser",
+          level: "warning",
         });
         throw error;
       }
@@ -142,7 +223,7 @@ async function fetchFeedArticlesUnchecked(
   const response = await requestFeed(feedUrl, {
     ...requestOptions,
     headers: {
-      "User-Agent": "Daily-Intelligence-Aggregator/1.0",
+      ...RSS_FETCH_DEFAULT_HEADERS,
       ...requestOptions.headers,
     },
   }, sourceName);
@@ -171,7 +252,7 @@ async function fetchFeedArticlesUnchecked(
         "rss.feed_host": getUrlHost(feedUrl),
         "rss.feed_name": sourceName,
       },
-      () => parser.parseString(xml),
+      () => parseRssXmlWithFallback(xml),
     );
   } catch (error) {
     throw createRssError(
@@ -270,7 +351,7 @@ export async function fetchApiArticles(
   const response = await requestFeed(url.toString(), {
     ...requestOptions,
     headers: {
-      "User-Agent": "Daily-Intelligence-Aggregator/1.0",
+      ...RSS_FETCH_DEFAULT_HEADERS,
       ...requestOptions.headers,
     },
   }, sourceName);
@@ -315,7 +396,7 @@ async function fetchLegacyNewsApiArticles(
     ...requestOptions,
     headers: {
       "X-Api-Key": env.newsApiKey,
-      "User-Agent": "Daily-Intelligence-Aggregator/1.0",
+      ...RSS_FETCH_DEFAULT_HEADERS,
       ...requestOptions.headers,
     },
   }, sourceName);

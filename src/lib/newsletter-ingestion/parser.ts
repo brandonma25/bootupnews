@@ -1,3 +1,8 @@
+import {
+  classifyUrlForArticleEligibility,
+  type JunkRejection,
+} from "@/lib/url-filtering";
+
 export type NewsletterStoryCategory = "Finance" | "Tech" | "Politics";
 
 export type NewsletterStoryExtractionInput = {
@@ -15,6 +20,17 @@ export type ParsedNewsletterStory = {
   extractionConfidence: number;
 };
 
+/**
+ * Result of a parse call. `stories` is the cleaned story list; `junkRejections`
+ * captures URLs that were structurally not articles (Axios webfont CSS, Politico
+ * tracking redirectors, etc.) so the promotion path can roll them up into a
+ * single Source Health Log entry per source per run.
+ */
+export type NewsletterParseResult = {
+  stories: ParsedNewsletterStory[];
+  junkRejections: JunkRejection[];
+};
+
 type NewsletterFormat = "morning_brew" | "semafor" | "tldr" | "ap_wire" | "1440" | "unknown";
 
 const MAX_STORIES_PER_EMAIL = 8;
@@ -24,6 +40,23 @@ const MIN_SNIPPET_LENGTH = 30;
 const URL_PATTERN = /https?:\/\/[^\s)<>"']+/giu;
 const NOISE_PATTERN =
   /\b(?:unsubscribe|sponsored|advertisement|view in browser|manage preferences|privacy policy|share this newsletter|forwarded this email|download the app|subscribe now)\b/i;
+
+/**
+ * Match a `<style>...</style>` block OR a raw `@font-face { … }` / `@media { … }`
+ * CSS-at-rule construct that appears in newsletter HTML bodies. The Axios
+ * extraction failure on 2026-05-17 traced to inline `@font-face` blocks whose
+ * `src: url('https://static.axios.com/fonts/...woff2')` declarations were
+ * harvested as candidate article URLs by `extractFirstUrl`. Pre-stripping
+ * removes the entire CSS context before block-splitting runs.
+ */
+const STYLE_BLOCK_PATTERN = /<style\b[\s\S]*?<\/style>/giu;
+const CSS_AT_RULE_PATTERN = /@(?:font-face|media|supports|keyframes|charset|import|page)\b[^{;]*\{[\s\S]*?\}/giu;
+
+/**
+ * Lines that look like CSS source rather than story content. Used to reject
+ * a parsed "block" whose only headline candidate is a CSS declaration.
+ */
+const CSS_LIKE_LINE_PATTERN = /\b(?:src\s*:|url\s*\(|format\s*\(|font-family\s*:|font-style\s*:|font-weight\s*:|@font-face|@media|@import)/iu;
 
 function normalizeText(value: string | null | undefined) {
   return value
@@ -104,10 +137,38 @@ function normalizeUrl(value: string | null | undefined) {
   }
 }
 
-function extractFirstUrl(value: string) {
-  const match = value.match(URL_PATTERN)?.[0] ?? null;
+/**
+ * Find the first URL in `value` that looks like a real article. URLs that
+ * `classifyUrlForArticleEligibility` rejects (asset extensions, tracking
+ * hostnames, marketing wrappers, utility paths) are appended to `rejections`
+ * and skipped over so we never silently store a webfont URL as a story.
+ *
+ * Returns `null` when no candidate in the block passes the filter — the
+ * caller drops the block.
+ */
+function extractFirstArticleUrl(value: string, rejections: JunkRejection[]) {
+  const matches = value.match(URL_PATTERN) ?? [];
 
-  return normalizeUrl(match);
+  for (const match of matches) {
+    const normalized = normalizeUrl(match);
+    if (!normalized) continue;
+    const verdict = classifyUrlForArticleEligibility(normalized);
+    if (verdict.ok) return normalized;
+    rejections.push({ url: normalized, reason: verdict.reason, detail: verdict.detail });
+  }
+
+  return null;
+}
+
+/**
+ * Strip `<style>...</style>` blocks AND raw CSS at-rules from a newsletter
+ * body before block splitting. The Axios 2026-05-17 case was the parser
+ * picking up the first URL inside an inline `@font-face` declaration.
+ */
+function stripInlineCss(rawContent: string): string {
+  return rawContent
+    .replace(STYLE_BLOCK_PATTERN, "\n")
+    .replace(CSS_AT_RULE_PATTERN, "\n");
 }
 
 function isLikelyHeadline(line: string) {
@@ -119,6 +180,16 @@ function isLikelyHeadline(line: string) {
     return false;
   }
 
+  // CSS source lines are not headlines (`src: url('...woff2')`,
+  // `url('...ttf') format('truetype')`, `@font-face`, …). The Axios
+  // 2026-05-17 garbage rows had titles like
+  //   "src: url('https://static.axios.com/fonts/atizatext-bold-webfont.eot');"
+  // because the headline-picker accepted CSS declarations that happened to
+  // pass the alphanumeric check.
+  if (CSS_LIKE_LINE_PATTERN.test(line)) {
+    return false;
+  }
+
   if (/^(read more|learn more|source|by the numbers|what happened|why it matters)$/iu.test(line)) {
     return false;
   }
@@ -127,7 +198,10 @@ function isLikelyHeadline(line: string) {
 }
 
 function splitCandidateBlocks(rawContent: string) {
-  const lines = normalizeText(rawContent)
+  // Strip `<style>` and CSS at-rules BEFORE line-splitting so `@font-face`
+  // blocks don't survive as multi-line CSS that the block-splitter then
+  // treats as story content.
+  const lines = normalizeText(stripInlineCss(rawContent))
     .split("\n")
     .map(normalizeLine)
     .filter(Boolean);
@@ -177,7 +251,11 @@ function confidenceForFormat(format: NewsletterFormat, story: {
   return Math.max(0.2, Math.min(0.94, Number((base[format] + sourceBonus + categoryBonus + snippetBonus).toFixed(2))));
 }
 
-function buildStoryFromBlock(block: string[], format: NewsletterFormat): ParsedNewsletterStory | null {
+function buildStoryFromBlock(
+  block: string[],
+  format: NewsletterFormat,
+  rejections: JunkRejection[],
+): ParsedNewsletterStory | null {
   const headline = block.find(isLikelyHeadline) ?? "";
   const headlineIndex = block.indexOf(headline);
   const snippetLines = block
@@ -191,7 +269,14 @@ function buildStoryFromBlock(block: string[], format: NewsletterFormat): ParsedN
   }
 
   const blockText = block.join(" ");
-  const sourceUrl = extractFirstUrl(blockText);
+  // Filtering-aware URL extraction: skip URLs that fail the
+  // article-eligibility predicate (Axios webfonts, Politico ss/c trackers,
+  // etc.). When nothing in the block looks article-like, drop the story
+  // entirely rather than store a junk URL as the source.
+  const sourceUrl = extractFirstArticleUrl(blockText, rejections);
+  if (!sourceUrl) {
+    return null;
+  }
   const category = inferCategory(`${headline} ${snippet}`);
   const sourceDomain = getSourceDomain(sourceUrl);
 
@@ -227,12 +312,31 @@ function dedupeStories(stories: ParsedNewsletterStory[]) {
   return deduped;
 }
 
+/**
+ * Backwards-compatible parser entrypoint: returns the story list only.
+ * Callers that need junk-rejection telemetry (the promotion path that writes
+ * the Source Health Log) should use `parseNewsletterStoriesDetailed` instead.
+ */
 export function parseNewsletterStories(input: NewsletterStoryExtractionInput) {
+  return parseNewsletterStoriesDetailed(input).stories;
+}
+
+/**
+ * Telemetry-aware parser entrypoint. Returns the cleaned stories AND the
+ * URL-rejection log so the caller can fold counts into Source Health.
+ */
+export function parseNewsletterStoriesDetailed(
+  input: NewsletterStoryExtractionInput,
+): NewsletterParseResult {
   const format = detectNewsletterFormat(input);
+  const junkRejections: JunkRejection[] = [];
   const stories = splitCandidateBlocks(input.rawContent)
-    .map((block) => buildStoryFromBlock(block, format))
+    .map((block) => buildStoryFromBlock(block, format, junkRejections))
     .filter((story): story is ParsedNewsletterStory => Boolean(story))
     .filter((story) => story.extractionConfidence >= (format === "1440" ? 0.48 : 0.55));
 
-  return dedupeStories(stories).slice(0, MAX_STORIES_PER_EMAIL);
+  return {
+    stories: dedupeStories(stories).slice(0, MAX_STORIES_PER_EMAIL),
+    junkRejections,
+  };
 }

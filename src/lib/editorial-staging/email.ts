@@ -1,5 +1,7 @@
 import { Resend } from "resend";
 
+import { EDITORIAL_TARGET_ITEM_COUNT } from "@/lib/cron/fetch-news";
+
 export async function sendEditorialCompletionEmail(input: {
   briefingDate: string;
   candidateCount: number;
@@ -17,9 +19,15 @@ export async function sendEditorialCompletionEmail(input: {
   const { briefingDate, candidateCount, coreCount, contextCount, categoryBreakdown, notionDbId } =
     input;
   const isEmpty = candidateCount === 0;
+  // Task 2.C — surface degraded-mode runs in the subject so the editor knows
+  // at a glance the queue is short of target without opening Notion.
+  const isDegraded =
+    !isEmpty && candidateCount < EDITORIAL_TARGET_ITEM_COUNT;
   const subject = isEmpty
     ? `Boot Up Editorial Queue Ready — [EMPTY] ${briefingDate}`
-    : `Boot Up Editorial Queue Ready — ${briefingDate}`;
+    : isDegraded
+      ? `Boot Up Editorial Queue Ready — [DEGRADED ${candidateCount}/${EDITORIAL_TARGET_ITEM_COUNT}] ${briefingDate}`
+      : `Boot Up Editorial Queue Ready — ${briefingDate}`;
 
   const notionUrl = `https://notion.so/${notionDbId.replace(/-/g, "")}`;
 
@@ -27,9 +35,13 @@ export async function sendEditorialCompletionEmail(input: {
     .map((cat) => `  ${cat}: ${categoryBreakdown[cat] ?? 0}`)
     .join("\n");
 
+  const candidateLine = isDegraded
+    ? `Candidates staged: ${candidateCount} (below target of ${EDITORIAL_TARGET_ITEM_COUNT}) — degraded run, see Source Health Log for upstream feed failures.`
+    : `Candidates staged: ${candidateCount}`;
+
   const body = [
     `Briefing date: ${briefingDate}`,
-    `Candidates staged: ${candidateCount}`,
+    candidateLine,
     `  Core: ${coreCount}`,
     `  Context: ${contextCount}`,
     `Category breakdown:`,

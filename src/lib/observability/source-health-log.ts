@@ -23,7 +23,24 @@ import { errorContext, logServerEvent } from "@/lib/observability";
 const NOTION_API_VERSION = "2022-06-28";
 const NOTION_PAGES_URL = "https://api.notion.com/v1/pages";
 
-export type SourceHealthOutcome = "success" | "fail" | "skipped_circuit_breaker";
+/**
+ * SourceHealthOutcome values:
+ * - `success` — fetch + parse + at least one story extracted. Increments Success Count.
+ * - `fail` — fetch or parse fully failed. Increments Fail Count and feeds the circuit breaker.
+ * - `skipped_circuit_breaker` — fetch was deliberately not attempted because the
+ *   circuit breaker tripped earlier. Does NOT increment either counter.
+ * - `junk_filtered` — fetch + parse succeeded structurally but the URL filter
+ *   rejected N candidate URLs as non-articles (asset extensions, tracking
+ *   wrappers, etc.). Does NOT increment either counter — junk-only emails
+ *   should not trip the circuit breaker, which is gated on real fetch
+ *   failures, but operators still need to see the junk count per source.
+ *   Notes field carries the per-reason breakdown.
+ */
+export type SourceHealthOutcome =
+  | "success"
+  | "fail"
+  | "skipped_circuit_breaker"
+  | "junk_filtered";
 
 export type SourceHealthEntry = {
   /** Source display name; the natural key alongside `date`. */
@@ -123,8 +140,10 @@ function buildProperties(
 
   const successDelta = entry.outcome === "success" ? 1 : 0;
   const failDelta = entry.outcome === "fail" ? 1 : 0;
-  // Circuit-breaker skips do not increment either counter — they are pure
-  // signals of "we deliberately did not try", not feed outcomes.
+  // Neither `skipped_circuit_breaker` nor `junk_filtered` increments either
+  // counter. The skip is a pure signal of "we deliberately did not try", and
+  // junk-URL filtering is a parse-time content quality signal that must not
+  // feed the circuit breaker — that's gated on real fetch failures only.
 
   const properties: Record<string, unknown> = {
     Date: { date: { start: entry.date } },
