@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { parseRawNewsletterEmail } from "@/lib/newsletter-ingestion/email-content";
-import { parseNewsletterStories } from "@/lib/newsletter-ingestion/parser";
+import {
+  parseNewsletterStories,
+  parseNewsletterStoriesDetailed,
+} from "@/lib/newsletter-ingestion/parser";
 
 function encodeRawEmail(raw: string) {
   return Buffer.from(raw, "utf8").toString("base64url");
@@ -124,5 +127,83 @@ describe("newsletter story extraction parser", () => {
       subject: "Malformed",
       rawContent: "unsubscribe\nview in browser\nsponsored",
     })).toEqual([]);
+  });
+
+  // Task 2 (PRD-13) regression fixtures. Both shapes were observed live on
+  // 2026-05-17 and produced 7 rows of junk in signal_posts before they were
+  // deduped by the migration in PR #260.
+  describe("junk-URL filtering at ingest", () => {
+    it("drops Axios @font-face CSS blocks instead of storing webfont URLs as stories", () => {
+      const cssBody = [
+        "<style>",
+        "@font-face {",
+        "  font-family: 'AtizaText';",
+        "  src: url('https://static.axios.com/fonts/atizatext-bold-webfont.eot');",
+        "  src: url('https://static.axios.com/fonts/atizatext-bold-webfont.eot?#iefix') format('embedded-opentype'),",
+        "       url('https://static.axios.com/fonts/atizatext-bold-webfont.woff2') format('woff2'),",
+        "       url('https://static.axios.com/fonts/atizatext-bold-webfont.ttf') format('truetype'),",
+        "       url('https://static.axios.com/fonts/atizatext-bold-webfont.svg#atizatext') format('svg');",
+        "}",
+        "</style>",
+      ].join("\n");
+
+      const result = parseNewsletterStoriesDetailed({
+        sender: "Axios AM <morning@axios.com>",
+        subject: "Axios AM — 2026-05-17",
+        rawContent: cssBody,
+      });
+
+      // No webfont URL survives as a story.
+      expect(result.stories.every((story) =>
+        !/static\.axios\.com\/fonts\//.test(story.sourceUrl ?? ""),
+      )).toBe(true);
+      // And the stripped CSS leaves no parseable content at all in this fixture.
+      expect(result.stories).toEqual([]);
+    });
+
+    it("rejects Politico /ss/c/ tracking redirector URLs (BOOT-UP-WEB junk fixture)", () => {
+      const politicoBody = [
+        "POLITICO Playbook PM",
+        "So five years on, does he stand by his impeachment vote?",
+        "Cassidy said this and that and the other thing, with a long quote running for several lines so it qualifies as a real snippet for the parser. Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+        "Read the rest at https://url4027.email.politico.com/ss/c/u001.6g0Zd3AyneOViJYBXgbV65ZWHEH5gWGSDKLrcKzwr3-LpIGJKOF/4qo/W9PWa790RNuioZrdfZ4GBA/h9/h001.BII4nWKUIO44a9tBS2FXH1qF8kI3UUNKahTeEuR2vyo",
+      ].join("\n");
+
+      const result = parseNewsletterStoriesDetailed({
+        sender: "POLITICO Playbook <playbook@politico.com>",
+        subject: "POLITICO Playbook PM",
+        rawContent: politicoBody,
+      });
+
+      // The only URL in the block is a tracker → no story should be emitted
+      // (we don't store a tracker URL as the source-of-record).
+      expect(result.stories.every((story) =>
+        !/url\d+\.email\.politico\.com\/ss\/c\//.test(story.sourceUrl ?? ""),
+      )).toBe(true);
+      expect(result.junkRejections.length).toBeGreaterThan(0);
+      expect(result.junkRejections[0].reason).toMatch(/tracking_host|marketing_hostname/);
+    });
+
+    it("still extracts a story when a real article URL appears alongside trackers", () => {
+      const mixedBody = [
+        "AI chip export controls expand",
+        "U.S. officials widened restrictions on advanced accelerators, forcing cloud vendors and chip suppliers to reassess shipments across the supply chain.",
+        "More: https://example.com/articles/chips-expansion",
+        "Tracking pixel: https://url4027.email.politico.com/ss/c/abc/redirect",
+      ].join("\n");
+
+      const result = parseNewsletterStoriesDetailed({
+        sender: "Morning Brew <crew@morningbrew.com>",
+        subject: "Morning Brew",
+        rawContent: mixedBody,
+      });
+
+      expect(result.stories).toHaveLength(1);
+      expect(result.stories[0].sourceUrl).toBe("https://example.com/articles/chips-expansion");
+      // The tracker that appeared AFTER the chosen article URL is not iterated
+      // (extractFirstArticleUrl returns on the first match), so it is not
+      // recorded in junkRejections in this fixture. Acceptable: we only count
+      // rejections we actually had to skip past.
+    });
   });
 });

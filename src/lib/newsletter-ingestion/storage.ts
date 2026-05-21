@@ -2,8 +2,14 @@ import { createHash } from "node:crypto";
 
 import { parseRawNewsletterEmail } from "@/lib/newsletter-ingestion/email-content";
 import type { GmailApiClient, GmailMessageRef } from "@/lib/newsletter-ingestion/gmail";
-import { parseNewsletterStories, type ParsedNewsletterStory } from "@/lib/newsletter-ingestion/parser";
+import {
+  parseNewsletterStoriesDetailed,
+  type ParsedNewsletterStory,
+} from "@/lib/newsletter-ingestion/parser";
+import { logServerEvent } from "@/lib/observability";
+import { writeSourceHealthEntry } from "@/lib/observability/source-health-log";
 import type { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { summarizeJunkRejections } from "@/lib/url-filtering";
 
 export type NewsletterDbClient = NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>;
 
@@ -221,11 +227,40 @@ export async function extractStoriesFromEmail(input: {
       throw new Error("newsletter_emails.raw_content was empty.");
     }
 
-    const stories = parseNewsletterStories({
+    // Task 2.D — telemetry-aware parser run. junkRejections counts URLs the
+    // parser refused to store as stories (Axios webfont @font-face CSS,
+    // Politico /ss/c/ tracking redirectors, etc.). We roll them up into a
+    // Source Health Log entry so operators can see which sender is leaking
+    // junk and tune the filter / sender format detection.
+    const { stories, junkRejections } = parseNewsletterStoriesDetailed({
       sender: email.sender,
       subject: email.subject ?? "",
       rawContent,
     });
+
+    if (junkRejections.length > 0) {
+      const summary = summarizeJunkRejections(junkRejections);
+      const sourceLabel = email.sender || "unknown-newsletter";
+      const today = new Date().toISOString().slice(0, 10);
+      const reasonsLabel = Object.entries(summary.byReason)
+        .filter(([, count]) => count > 0)
+        .map(([reason, count]) => `${reason}=${count}`)
+        .join(", ");
+      logServerEvent("info", "Newsletter parser rejected junk URLs", {
+        newsletterEmailId: input.newsletterEmailId,
+        sender: sourceLabel,
+        rejectionCount: summary.count,
+        byReason: summary.byReason,
+      });
+      // Best-effort — never blocks ingestion. The writer's failure contract
+      // already swallows env / Notion errors.
+      await writeSourceHealthEntry({
+        source: sourceLabel,
+        date: today,
+        outcome: "junk_filtered",
+        notes: `Rejected ${summary.count} junk URLs at parse: ${reasonsLabel}.`,
+      }).catch(() => { /* swallowed by writer */ });
+    }
 
     if (stories.length === 0) {
       await updateNewsletterEmailStatus(input.db, input.newsletterEmailId, {

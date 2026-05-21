@@ -31,7 +31,8 @@
     "release:docs": "node scripts/release/generate-release-docs.mjs",
     "release:pr-summary": "node scripts/release/generate-pr-summary.mjs",
     "notion:dedup": "tsx scripts/deduplicate-notion-queue.ts",
-    "notion:dedup:execute": "tsx scripts/deduplicate-notion-queue.ts --execute"
+    "notion:dedup:execute": "tsx scripts/deduplicate-notion-queue.ts --execute",
+    "source-health:summary": "tsx scripts/source-health-summary.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.50.0",

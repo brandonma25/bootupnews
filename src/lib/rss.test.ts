@@ -52,6 +52,48 @@ describe("fetchFeedArticles", () => {
     vi.unstubAllGlobals();
   });
 
+  // Task 2.B regression — France24 RSS body trips sax-js strict mode with
+  // "Attribute without value" at line 8 col 93. parseRssXmlWithFallback
+  // retries strict failures whose message matches that diagnostic via
+  // `xml2js: { strict: false }`. Strict rejects on `<rss attr>` (no `="…"`);
+  // we assert the strict-mode rejection still surfaces as an `RssError`
+  // (not a hang, not a silent garbage parse) when the tolerant retry also
+  // can't make sense of the body. Real recovery against France24's actual
+  // feed body is verified post-deploy by watching BOOT-UP-WEB-5 stay closed.
+  it("rejects fallback-eligible XML cleanly when tolerant retry also can't parse it (BOOT-UP-WEB-5)", async () => {
+    // `<rss attr>` triggers sax-strict "Attribute without value" → enters
+    // the tolerant retry path; the body is not a valid RSS document, so
+    // tolerant fails too and we surface the original error as RssError.
+    const malformedXml = '<?xml version="1.0"?><rss attr><channel><title>x</title></channel></rss>';
+    const fetchMock = vi.fn().mockResolvedValue(new Response(malformedXml, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchFeedArticles("https://example.com/feed.xml", "Tolerant Probe", { retryCount: 0 }),
+    ).rejects.toMatchObject({
+      name: "RssError",
+      failureType: "rss_parse_invalid_xml",
+    });
+  });
+
+  // Task 2.B — Foreign Affairs 403 mitigation. The default fetch headers
+  // now ship a Mozilla/5.0 User-Agent + Accept / Accept-Language so basic
+  // bot-protection layers stop returning 403 from Vercel's IAD1 IPs. This
+  // test asserts the outgoing headers carry a real browser-shaped UA.
+  it("sends a browser-shaped User-Agent + Accept headers by default (BOOT-UP-WEB-2)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(RSS_XML, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchFeedArticles("https://example.com/feed.xml", "UA Feed");
+
+    expect(fetchMock).toHaveBeenCalled();
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers["User-Agent"] ?? headers["user-agent"]).toMatch(/Mozilla\/5\.0/);
+    expect(headers.Accept ?? headers.accept).toMatch(/application\/rss\+xml/);
+    expect(headers["Accept-Language"] ?? headers["accept-language"]).toMatch(/en/);
+  });
+
   it("retries a transient feed failure before succeeding", async () => {
     const fetchMock = vi
       .fn()
