@@ -379,6 +379,63 @@ describe("/api/editorial/push-approved", () => {
     expect(writebackBody.properties["Supabase Row ID"].rich_text[0].text.content).toBe("legacy-1");
   });
 
+  // Issue #265 regression — the actual production shape: legacy writer leaves
+  // final_slate_rank=NULL. Pre-fix, the OVERWRITE path only updated tier and
+  // left rank=NULL, producing a tier-set-rank-null half-pair the schema CHECK
+  // accepted due to NULL three-valued logic. The fix allocates a fresh rank
+  // in the editor's tier range, so the result is always paired.
+  it("OVERWRITE allocates final_slate_rank when the legacy row left it NULL (issue #265)", async () => {
+    const briefingDate = todayTaipei();
+    const sourceUrl = "https://example.com/legacy-null-rank";
+    const legacyRow: FakeSignalRow = {
+      id: "legacy-null-rank-1",
+      briefing_date: briefingDate,
+      rank: 7,
+      final_slate_rank: null,            // ← the actual production bug shape
+      final_slate_tier: null,
+      witm_draft_generated_by: "deterministic_template",
+      is_live: false,
+      source_url: sourceUrl,
+      title: "Templated row with NULL final_slate_rank",
+      ai_why_it_matters: "(Signal: Weak) Templated body.",
+      witm_draft_model: "heuristic_template_v1",
+      editorial_content_source: "ai",
+      editorial_status: "needs_review",
+    };
+    const supabase = buildSupabaseStub({ rows: [legacyRow], nextId: 100 });
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
+
+    notionQueryResponse = {
+      results: [
+        buildNotionPage({
+          pageId: "notion-issue-265",
+          headline: "Editor approval for the legacy-null-rank URL",
+          sourceUrl,
+          sourceName: "Reuters",
+          slot: "Core",
+          signalAi: "Real LLM Signal.",
+          beforeAi: "Real LLM Before This.",
+          rippleAi: "Real LLM Ripple.",
+          hookAi: "Real LLM Hook.",
+          editorialSource: "AI",
+        }),
+      ],
+    };
+
+    const { GET } = await import("@/app/api/editorial/push-approved/route");
+    const response = await GET(buildRequest());
+    const body = await response.json();
+    expect(body.counts.overwrote_template).toBe(1);
+
+    const row = supabase._state.rows[0];
+    expect(row.id).toBe("legacy-null-rank-1");
+    // The fix: tier AND rank are now BOTH set, as a paired write.
+    expect(row.final_slate_tier).toBe("core");
+    expect(typeof row.final_slate_rank).toBe("number");
+    expect(row.final_slate_rank).toBeGreaterThanOrEqual(1);
+    expect(row.final_slate_rank).toBeLessThanOrEqual(5);
+  });
+
   it("SKIPS overwrite when the existing row is is_live=true and does NOT writeback Notion", async () => {
     const briefingDate = todayTaipei();
     const sourceUrl = "https://example.com/live-article";

@@ -102,7 +102,8 @@ The change is structural at the edges (scheduling, auth, observability) and ligh
 | Phase 4.5 — Source circuit breaker + Sentry filter | Done | [#251](https://github.com/brandonma25/bootupnews/pull/251) |
 | Phase 5 — ARCHITECTURE / CRON_SETUP (full) / OBSERVABILITY docs + CHANGELOG | Done | [#252](https://github.com/brandonma25/bootupnews/pull/252) |
 | Phase 6 — Activate `bootup-health-check-1215-utc` in `scripts/cron-jobs.config.ts` | Done | [#258](https://github.com/brandonma25/bootupnews/pull/258) |
-| Phase 7 (Path-A Task 1) — Consolidate ingestion to one 12:00 UTC trigger + Supabase `cron_runs` run-lock + `(briefing_date, source_url)` upsert | In Review | this PR |
+| Phase 7 (Path-A Task 1) — Consolidate ingestion to one 12:00 UTC trigger + Supabase `cron_runs` run-lock + `(briefing_date, source_url)` upsert | Done | [#260](https://github.com/brandonma25/bootupnews/pull/260) |
+| Phase 7.1 — Run-lock hardening (reclaim stale/fail/timeout + fail-closed on null service-role client) | In Review | this PR |
 
 ### Phase 7 — Operational history (Path-A Task 1, 2026-05-21)
 
@@ -125,6 +126,56 @@ Politico tracking redirectors the pre-`isValidPublicSourceUrl` writer
 captured as "stories"). The health-check job at 12:15 UTC stays as-is and
 gives the single ingestion 15 minutes to settle before the alertable check
 fires.
+
+### Phase 7.1 — Run-lock hardening (issue #264, 2026-05-22)
+
+Phase 7's first-pass run-lock had two defects surfaced during operator
+verification on 2026-05-21:
+
+1. **Fail-closed-and-stuck.** `tryAcquireRunLock` returned `acquired=false`
+   on any PK conflict regardless of the existing row's status, so a single
+   row with `status='fail'` / `status='timeout'` / stale `status='running'`
+   stranded the entire `briefing_date` — every subsequent fire (including
+   the next scheduled cron) returned `HTTP 200 status=skipped` and the day
+   silently produced no editorial queue. For a daily product that runs
+   unattended, one transient failure could cause a no-briefing day with no
+   alert.
+2. **Silent fall-through on Supabase blip.** When
+   `createSupabaseServiceRoleClient()` returned null (env mid-propagation
+   during a deploy swap), the route logged a warning and proceeded WITHOUT
+   the lock. During the 15:10:56Z fire on 2026-05-21, this caused two
+   concurrent ingestion attempts to both pass the gate. The single-execution
+   guarantee silently evaporated during any service-role configuration blip.
+
+Fix:
+
+- **Status-aware reclaim** in `tryAcquireRunLock`. On PK conflict, SELECT
+  the existing row's `status` and `started_at`. Branch:
+  - `status IN ('fail','timeout')` → DELETE the carrion, retry INSERT,
+    return `{ acquired: true, reason: "reclaimed_fail" | "reclaimed_timeout" }`.
+  - `status='running'` AND age > `RUN_LOCK_STALE_MS` (70 s) → reclaim as
+    stale (matches `INTERNAL_PIPELINE_TIMEOUT_MS=55 000` + a 15 s buffer for
+    Sentry flush and writeback; anything older is from a dead function
+    instance).
+  - `status='running'` AND fresh → return
+    `{ acquired: false, reason: "in_progress" }` so the second call no-ops.
+  - `status='ok'` → return
+    `{ acquired: false, reason: "already_completed" }`.
+- **Fail-closed on null service-role client.** When the client is null,
+  the route now `Sentry.captureMessage(..., level: "error")`, flushes, and
+  returns HTTP **503** without scheduling the pipeline. cron-job.org's
+  `notifyOnFailure` flag will email the operator. Documented policy choice:
+  a missed run is recoverable on the next scheduler trigger; a concurrent
+  double-run produces duplicate Notion writes and corrupts downstream
+  tier/rank accounting.
+- **Non-conflict insert errors** are now also fail-closed (HTTP 503) for the
+  same reason — without a successful claim we can't safely run.
+
+Test coverage in `src/app/api/cron/fetch-editorial-inputs/route.test.ts`
+(five new cases): reclaim 'fail', reclaim stale 'running', reject fresh
+'running' as `in_progress`, reject 'ok' as `already_completed`, and null
+service-role client never schedules the pipeline + emits Sentry + returns
+HTTP 503.
 
 ## Closeout Checklist
 

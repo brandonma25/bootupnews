@@ -24,48 +24,177 @@ function todayTaipei(now: Date): string {
   }).format(now);
 }
 
+type LockAcquireReason =
+  | "fresh"               // PK insert succeeded — no prior row for today
+  | "reclaimed_fail"      // prior row was status='fail', reclaimed
+  | "reclaimed_timeout"   // prior row was status='timeout', reclaimed
+  | "reclaimed_stale";    // prior row was status='running' but older than RUN_LOCK_STALE_MS
+
+type LockDenyReason =
+  | "in_progress"        // a fresh 'running' row exists — another instance is mid-flight
+  | "already_completed"  // prior 'ok' row exists — today's ingestion is done
+  | "service_unavailable" // Supabase service-role client is null AND we cannot fail-open safely
+  | "lock_check_failed";  // Lock table unreachable in a way we can't classify — fail closed
+
 type RunLockResult =
-  | { acquired: true; briefingDate: string; reason?: "lock_check_failed" }
-  | { acquired: false; briefingDate: string; reason: "already_ran" };
+  | { acquired: true; briefingDate: string; reason: LockAcquireReason }
+  | { acquired: false; briefingDate: string; reason: LockDenyReason };
 
 /**
- * Claim the run-lock for today's briefing_date. Returns acquired=true on a
- * fresh row, acquired=false when a prior run already claimed it, or
- * acquired=true with reason='lock_check_failed' as a best-effort fallthrough
- * when the lock table itself is unreachable — we prefer one duplicate run over
- * a missed run.
+ * A 'running' row older than this many ms is treated as stale — the function
+ * instance that claimed it died before reaching `finalizeRunLock`. The
+ * internal pipeline timeout (INTERNAL_PIPELINE_TIMEOUT_MS = 55_000) plus a
+ * 15s buffer for Sentry flush + writeback covers every legitimate in-flight
+ * run; anything older is recoverable carrion.
+ */
+const RUN_LOCK_STALE_MS = 70_000;
+
+type ExistingLockRow = {
+  status: "running" | "ok" | "fail" | "timeout";
+  started_at: string;
+};
+
+/**
+ * Claim the run-lock for today's briefing_date.
+ *
+ * Semantics (issue #264 — fail-closed-and-stuck fix):
+ *   - No prior row → INSERT and return { acquired: true, reason: "fresh" }.
+ *   - Prior row with status IN ('fail','timeout') → DELETE the carrion and
+ *     re-INSERT, returning { acquired: true, reason: "reclaimed_fail" |
+ *     "reclaimed_timeout" }. The dead run no longer strands the day.
+ *   - Prior row with status='running' AND older than RUN_LOCK_STALE_MS →
+ *     treat as a stranded claim from a dead function instance; reclaim it.
+ *   - Prior row with status='running' AND fresh → another instance is mid-flight;
+ *     return { acquired: false, reason: "in_progress" } so the caller no-ops.
+ *   - Prior row with status='ok' → today's ingestion is already done;
+ *     return { acquired: false, reason: "already_completed" }.
+ *
+ * Service-role-client unavailability is FAIL-CLOSED, not fall-through. A
+ * missed run is recoverable on the next scheduler trigger; a silent
+ * concurrent double-run produces duplicate Notion writes and corrupts
+ * downstream tier/rank accounting. (Documented choice — flip back to
+ * fail-open only with an explicit policy change.)
  */
 async function tryAcquireRunLock(briefingDate: string): Promise<RunLockResult> {
   const client = createSupabaseServiceRoleClient();
   if (!client) {
-    logServerEvent("warn", "Run-lock skipped: Supabase service role client unavailable", {
+    logServerEvent("error", "Run-lock UNAVAILABLE: Supabase service role client returned null — failing closed", {
       route: "/api/cron/fetch-editorial-inputs",
       briefingDate,
     });
-    return { acquired: true, briefingDate, reason: "lock_check_failed" };
+    Sentry.captureMessage(
+      "Cron ingestion failed closed: createSupabaseServiceRoleClient returned null. " +
+      "A missed run is preferable to an unlocked concurrent run.",
+      {
+        level: "error",
+        tags: {
+          route: "/api/cron/fetch-editorial-inputs",
+          failure_type: "run_lock_service_unavailable",
+        },
+      },
+    );
+    await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+    return { acquired: false, briefingDate, reason: "service_unavailable" };
   }
 
-  const result = await client
+  return await attemptClaim(client, briefingDate, /* allowReclaim */ true);
+}
+
+async function attemptClaim(
+  client: NonNullable<ReturnType<typeof createSupabaseServiceRoleClient>>,
+  briefingDate: string,
+  allowReclaim: boolean,
+): Promise<RunLockResult> {
+  const insertResult = await client
     .from("cron_runs")
     .insert({ briefing_date: briefingDate, cron_name: CRON_NAME })
     .select("briefing_date");
 
-  if (result.error) {
-    // Postgres unique_violation = 23505. Supabase surfaces this as `code`.
-    const code = (result.error as { code?: string }).code;
-    if (code === "23505") {
-      return { acquired: false, briefingDate, reason: "already_ran" };
-    }
-    logServerEvent("warn", "Run-lock acquire failed; running anyway (best-effort)", {
-      route: "/api/cron/fetch-editorial-inputs",
-      briefingDate,
-      error: result.error.message,
-      code,
-    });
-    return { acquired: true, briefingDate, reason: "lock_check_failed" };
+  if (!insertResult.error) {
+    return { acquired: true, briefingDate, reason: "fresh" };
   }
 
-  return { acquired: true, briefingDate };
+  const code = (insertResult.error as { code?: string }).code;
+  if (code !== "23505") {
+    // Non-conflict insert error — fail closed for the same reason as a null
+    // client: a missed run is safer than an unlocked one.
+    logServerEvent("error", "Run-lock acquire failed with non-conflict error — failing closed", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+      error: insertResult.error.message,
+      code,
+    });
+    return { acquired: false, briefingDate, reason: "lock_check_failed" };
+  }
+
+  // PK conflict. Inspect the existing row's status to decide.
+  const existingResult = await client
+    .from("cron_runs")
+    .select("status, started_at")
+    .eq("briefing_date", briefingDate)
+    .maybeSingle();
+
+  if (existingResult.error || !existingResult.data) {
+    // The row vanished between our insert attempt and the select (race with
+    // another instance reclaiming). Try once more without reclaim to avoid
+    // an infinite loop; whichever instance lost the race no-ops.
+    logServerEvent("warn", "Run-lock conflict but existing row not readable — failing closed", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+      error: existingResult.error?.message,
+    });
+    return { acquired: false, briefingDate, reason: "lock_check_failed" };
+  }
+
+  const existing = existingResult.data as ExistingLockRow;
+  const ageMs = Date.now() - Date.parse(existing.started_at);
+
+  if (existing.status === "ok") {
+    return { acquired: false, briefingDate, reason: "already_completed" };
+  }
+
+  const isStaleRunning = existing.status === "running" && ageMs > RUN_LOCK_STALE_MS;
+
+  if (!allowReclaim || (existing.status === "running" && !isStaleRunning)) {
+    return { acquired: false, briefingDate, reason: "in_progress" };
+  }
+
+  // Reclaim path: 'fail' / 'timeout' / stale 'running'.
+  const reclaimReason: LockAcquireReason =
+    existing.status === "fail" ? "reclaimed_fail"
+    : existing.status === "timeout" ? "reclaimed_timeout"
+    : "reclaimed_stale";
+
+  const deleteResult = await client
+    .from("cron_runs")
+    .delete()
+    .eq("briefing_date", briefingDate)
+    .eq("status", existing.status);
+
+  if (deleteResult.error) {
+    logServerEvent("error", "Run-lock reclaim DELETE failed — failing closed", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+      previousStatus: existing.status,
+      error: deleteResult.error.message,
+    });
+    return { acquired: false, briefingDate, reason: "lock_check_failed" };
+  }
+
+  // Re-attempt the INSERT (no further reclaim — if another instance also
+  // reclaimed in the window, they win, we no-op).
+  const reclaimed = await attemptClaim(client, briefingDate, /* allowReclaim */ false);
+  if (reclaimed.acquired) {
+    logServerEvent("warn", "Run-lock reclaimed stale row", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+      previousStatus: existing.status,
+      previousAgeMs: ageMs,
+      reason: reclaimReason,
+    });
+    return { acquired: true, briefingDate, reason: reclaimReason };
+  }
+  return reclaimed;
 }
 
 /**
@@ -357,24 +486,36 @@ export async function GET(request: Request) {
   const lock = await tryAcquireRunLock(briefingDate);
 
   if (!lock.acquired) {
-    logServerEvent("info", "Combined editorial input cron skipped (already ran today)", {
+    // Two kinds of deny:
+    //   - "already_completed" / "in_progress" are normal idempotency outcomes
+    //     (HTTP 200 with status=skipped) — the operator does NOT need to be
+    //     paged; the next scheduler trigger or completed run handles it.
+    //   - "service_unavailable" / "lock_check_failed" are infrastructure
+    //     errors we already paged on internally (Sentry). Return HTTP 503 so
+    //     the cron-job.org notifyOnFailure email fires.
+    const isInfraError =
+      lock.reason === "service_unavailable" || lock.reason === "lock_check_failed";
+    const httpStatus = isInfraError ? 503 : 200;
+    const message = isInfraError
+      ? `Ingestion failed closed: run-lock unavailable (reason=${lock.reason}). A missed run is preferable to an unlocked concurrent run; the next scheduler trigger will retry.`
+      : `Ingestion skipped: a run for briefing_date=${briefingDate} is ${lock.reason === "already_completed" ? "already completed" : "currently in progress"}.`;
+    logServerEvent(isInfraError ? "error" : "info", "Combined editorial input cron not scheduled", {
       route: "/api/cron/fetch-editorial-inputs",
       briefingDate,
       acceptedAt,
       reason: lock.reason,
+      httpStatus,
     });
     return NextResponse.json(
       {
-        success: true,
+        success: !isInfraError,
         timestamp: acceptedAt,
         briefing_date: briefingDate,
-        status: "skipped",
+        status: isInfraError ? "fail_closed" : "skipped",
         reason: lock.reason,
-        summary: {
-          message: `Ingestion skipped: a run for briefing_date=${briefingDate} already started today.`,
-        },
+        summary: { message },
       },
-      { status: 200 },
+      { status: httpStatus },
     );
   }
 
@@ -382,7 +523,7 @@ export async function GET(request: Request) {
     route: "/api/cron/fetch-editorial-inputs",
     briefingDate,
     acceptedAt,
-    lockReason: lock.reason ?? "acquired",
+    lockReason: lock.reason,
   });
 
   // Run the ingestion pipeline after the response is sent. Vercel keeps the

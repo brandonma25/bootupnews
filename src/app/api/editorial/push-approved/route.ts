@@ -227,6 +227,29 @@ type ExistingSignalPostRow = {
 };
 
 /**
+ * Decide the final_slate_rank to use on the OVERWRITE path (issue #265). The
+ * editor's chosen tier wins (final_slate_tier in v2Payload), so the rank must
+ * fall in that tier's range. If the existing row already has a rank in the
+ * tier's range, reuse it (idempotent re-push). Otherwise allocate fresh via
+ * the same helper INSERT uses. Returns null when the tier is exhausted.
+ */
+async function resolveFinalSlateRankForOverwrite(
+  db: SupabaseClient,
+  briefingDate: string,
+  tier: FinalSlateTier,
+  existingRank: number | null,
+): Promise<number | null> {
+  const [min, max] = tier === "core"
+    ? [CORE_RANK_MIN, CORE_RANK_MAX]
+    : [CONTEXT_RANK_MIN, CONTEXT_RANK_MAX];
+
+  if (typeof existingRank === "number" && existingRank >= min && existingRank <= max) {
+    return existingRank;
+  }
+  return await getNextAvailableFinalSlateRank(db, briefingDate, tier);
+}
+
+/**
  * Read the (briefing_date, source_url) row if any — the load step of the
  * select-then-decide upsert pattern. We need provenance + is_live to decide
  * whether the bridge is allowed to overwrite this row.
@@ -441,13 +464,38 @@ async function pushApprovedRow(
     if (existing) {
       // Overwrite path. existing.witm_draft_generated_by is 'deterministic_template'
       // (the legacy cron's stamp) or NULL (pre-Task-3 historic rows). We
-      // preserve the existing display rank and final_slate_rank/tier — the
-      // legacy writer's choice still represents the slot for this URL. If
-      // the legacy assigned a different tier than the editor picked, the
-      // editor's pick wins (final_slate_tier in v2Payload).
+      // preserve the existing display rank (legacy's slot wins for the broad
+      // 1-20 surface), but final_slate_rank MUST be allocated to pair with
+      // the editor's chosen tier — the legacy writer historically leaves
+      // final_slate_rank NULL, and the schema CHECK previously passed
+      // tier-set-rank-null due to Postgres NULL three-valued logic
+      // (issue #265). Resolution:
+      //   - If the existing final_slate_rank is non-null AND already lives in
+      //     the editor's tier range, keep it (re-push idempotency).
+      //   - Otherwise allocate a fresh slot via the same helper as INSERT.
+      //   - If the tier is full, fail closed with no_rank_slot.
+      const finalSlateRankForOverwrite = await resolveFinalSlateRankForOverwrite(
+        db,
+        briefingDate,
+        finalSlateTier,
+        existing.final_slate_rank,
+      );
+      if (finalSlateRankForOverwrite === null) {
+        return {
+          headline,
+          notionPageId: page.id,
+          supabaseId: existing.id,
+          status: "no_rank_slot",
+          error: `Overwrite blocked: no available final_slate_rank for tier=${finalSlateTier} on briefing_date ${briefingDate}.`,
+        };
+      }
+      const overwritePayload = {
+        ...v2Payload,
+        final_slate_rank: finalSlateRankForOverwrite,
+      };
       const updateResult = await db
         .from("signal_posts")
-        .update(v2Payload)
+        .update(overwritePayload)
         .eq("id", existing.id)
         .select("id")
         .single();
