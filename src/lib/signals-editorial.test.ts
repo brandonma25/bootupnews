@@ -36,6 +36,13 @@ type SignalPostRow = {
   approved_at: string | null;
   published_at: string | null;
   is_live: boolean;
+  // Task 3 — Provenance stamps written by persistSignalPostCandidates so the
+  // legacy heuristic-template path is distinguishable from future v2 LLM
+  // bridge rows by witm_draft_generated_by alone.
+  witm_draft_generated_by?: "deterministic_template" | "llm" | "human" | null;
+  witm_draft_generated_at?: string | null;
+  witm_draft_model?: string | null;
+  editorial_content_source?: "ai" | "human" | "ai+human" | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -139,6 +146,13 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     approved_at: overrides.approved_at ?? null,
     published_at: overrides.published_at ?? null,
     is_live: overrides.is_live ?? false,
+    // Task 3 — Provenance stamps. Default to null on the mock so existing
+    // tests don't have to thread them; new assertions inspect the inserted
+    // payload to verify the writer set them correctly.
+    witm_draft_generated_by: overrides.witm_draft_generated_by ?? null,
+    witm_draft_generated_at: overrides.witm_draft_generated_at ?? null,
+    witm_draft_model: overrides.witm_draft_model ?? null,
+    editorial_content_source: overrides.editorial_content_source ?? null,
     created_at: overrides.created_at ?? null,
     updated_at: overrides.updated_at ?? null,
   };
@@ -1857,6 +1871,33 @@ describe("signals editorial workflow", () => {
       "Existing Signal 5",
     ]);
     expect(rows.every((row) => row.is_live === true)).toBe(true);
+  });
+
+  // Task 3 — legacy template generator provenance stamps. Every row written by
+  // the legacy heuristic-template path (persistSignalPostCandidates) must
+  // carry deterministic_template provenance so post-deploy queries can tell
+  // legacy boilerplate from future v2 LLM bridge rows by witm_draft_generated_by
+  // alone. See PRD-11 operational history (2026-05-22 entry).
+  it("stamps every legacy-path row with deterministic_template provenance", async () => {
+    const rows: SignalPostRow[] = [];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-05-22",
+      items: Array.from({ length: 7 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.insertedCount).toBe(7);
+    expect(rows).toHaveLength(7);
+
+    for (const row of rows) {
+      expect(row.witm_draft_generated_by).toBe("deterministic_template");
+      expect(row.witm_draft_model).toBe("heuristic_template_v1");
+      expect(typeof row.witm_draft_generated_at).toBe("string");
+      expect(row.editorial_content_source).toBe("ai");
+    }
   });
 
   it("blocks individual row publishing so the Top 5 gate cannot be bypassed", async () => {

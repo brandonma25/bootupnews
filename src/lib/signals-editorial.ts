@@ -1320,6 +1320,36 @@ async function persistSignalPostCandidates(
   // 20260521120000). All rows in missingCandidates are pre-filtered by
   // isValidPublicSourceUrl(), so source_url is non-null and matches the
   // partial index predicate.
+  //
+  // Task 3 — Legacy template generator provenance stamps. The witm_draft_*
+  // columns were left NULL on every legacy-path row in production, making the
+  // boilerplate output indistinguishable from the (future) v2 LLM bridge
+  // rows. Stamping them at write time means any post-deploy query can tell
+  // legacy heuristic copy from v2 LLM copy by provenance alone, and the v2
+  // bridge (Task 4) gets a deterministic predicate to overwrite legacy rows
+  // when the editor approves a real draft.
+  //
+  // Per-column rationale:
+  //   - witm_draft_generated_by='deterministic_template' — CHECK constraint
+  //     allows {llm, deterministic_template, human}; this is the legacy bucket.
+  //   - witm_draft_model='heuristic_template_v1' — free-text identifier for
+  //     the summarizer + why-it-matters template builder
+  //     (src/lib/why-it-matters.ts → buildEventTypeSpecificWhyThisMatters,
+  //     summarizer.ts → generateWhyThisMattersHeuristically).
+  //   - editorial_content_source='ai' — closest fit under the
+  //     {ai, human, ai+human} CHECK. The heuristic is structurally an
+  //     AI-shaped synthetic generator (not human-edited); 'ai' will be the
+  //     same value the v2 LLM bridge uses, so callers must combine it with
+  //     witm_draft_generated_by to distinguish the two paths.
+  //   - why_it_matters_validation_status: see Task 6 — still defaults to
+  //     'passed' from the CHECK default because the legacy validator's
+  //     enum doesn't yet model "not_run". Task 6 lands the enum change.
+  //
+  // The legacy path NEVER overwrites a v2 bridge row: the upsert uses
+  // ignoreDuplicates, so any existing (briefing_date, source_url) row —
+  // whether legacy or v2 — wins. Task 4 will need to invert this for the
+  // bridge so v2 rows can overwrite stale deterministic_template rows when
+  // BM approves a real draft for the same article URL.
   const insertResult = await client.from("signal_posts").upsert(
     missingCandidates.map((post) => ({
       briefing_date: briefingDate,
@@ -1348,6 +1378,11 @@ async function persistSignalPostCandidates(
       reviewed_at: null,
       published_at: null,
       is_live: false,
+      // Task 3 provenance stamps — see comment block above for rationale.
+      witm_draft_generated_by: "deterministic_template",
+      witm_draft_generated_at: now,
+      witm_draft_model: "heuristic_template_v1",
+      editorial_content_source: "ai",
       created_at: now,
       updated_at: now,
     })),
