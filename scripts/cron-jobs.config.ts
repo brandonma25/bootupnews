@@ -62,16 +62,16 @@ export const cronJobs: CronJobConfig[] = [
     notifyOnFailure: true,
   },
 
-  // Health-check job — uncomment after PRD-65 Phase 4 ships /api/cron/health.
-  // Until then this endpoint does not exist and the job would 404.
-  //
-  // {
-  //   title: "bootup-health-check-1215-utc",
-  //   url: `${BASE ?? "<BOOTUP_PRODUCTION_URL>"}/api/cron/health`,
-  //   method: "GET",
-  //   schedule: { timezone: "Etc/UTC", hours: [12], minutes: [15] },
-  //   headers: { "x-cron-secret": SECRET ?? "" },
-  //   enabled: true,
-  //   notifyOnFailure: true,
-  // },
+  // Health-check job — PRD-65 Phase 4 shipped /api/cron/health (see CHANGELOG).
+  // Fires 30 minutes after the second ingestion run; a non-2xx response
+  // triggers an email alert via cron-job.org's notifyOnFailure.
+  {
+    title: "bootup-health-check-1215-utc",
+    url: `${BASE ?? "<BOOTUP_PRODUCTION_URL>"}/api/cron/health`,
+    method: "GET",
+    schedule: { timezone: "Etc/UTC", hours: [12], minutes: [15] },
+    headers: { "x-cron-secret": SECRET ?? "" },
+    enabled: true,
+    notifyOnFailure: true,
+  },
 ];
