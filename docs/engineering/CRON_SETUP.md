@@ -244,6 +244,18 @@ cron-job.org's REST API allows **100 requests/day** on the free tier. A normal `
 
 So a full sync is ~6–10 API calls. Far under the cap. Don't run the sync in a tight loop or from CI on every push.
 
+#### Burst-rate gotcha (observed 2026-05-22)
+
+On a sync that simultaneously creates jobs AND prunes orphans, the call ordering can interleave reads and writes tightly enough to trip an apparent **per-window write throttle** that returns `HTTP 429` even when the daily 100-request cap is nowhere near exhausted. Observed during the first real consolidation: 2 creates + 3 deletes interleaved with their pre-flight reads → the second write (`PUT /jobs` for the health-check job) bounced with `HTTP 429: null`; a single direct `PUT /jobs` from `curl` a few seconds later succeeded immediately. The summary line reports this accurately as `created=N failed=1`.
+
+Practical workarounds:
+
+- **Retry the sync once.** A second `npm run cron:sync` (no further config changes) will see the missed job as a `create` again and complete it; the script is idempotent on success.
+- **Or fix the single missed job by hand.** Use a direct `PUT /jobs` with the job body you can pull from the dry-run output. This costs 1 API call instead of the sync's 3–5.
+- **Cooling-off:** the per-window throttle clears in well under a minute; you don't need to wait until the daily reset.
+
+Don't infer "the cron is broken" from a `failed=1` line on a high-churn sync — it usually means one write hit the burst limit, not a config error. Always verify final state via a direct `GET https://api.cron-job.org/jobs` with the same `Authorization: Bearer $CRONJOB_API_KEY` header.
+
 ---
 
 ## 7. Why infrastructure-as-code

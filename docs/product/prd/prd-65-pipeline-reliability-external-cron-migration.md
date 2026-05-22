@@ -177,6 +177,29 @@ Test coverage in `src/app/api/cron/fetch-editorial-inputs/route.test.ts`
 service-role client never schedules the pipeline + emits Sentry + returns
 HTTP 503.
 
+### Phase 7.2 — cron-job.org consolidation actually applied (2026-05-22)
+
+PR #266 shipped the run-lock fix but the live cron-job.org state was still
+diverged from the repo config: three legacy jobs (`bootup-ingestion-1015-utc`,
+`bootup-ingestion-1145-utc`, an undocumented `bootup-health-check-1100-utc`
+that the As-Built had silently aged out of sync) kept firing, and the two
+config-defined jobs (`bootup-ingestion-1200-utc`, `bootup-health-check-1215-utc`)
+didn't exist yet. The first `npm run cron:sync:prune` consumed the new
+`CRONJOB_API_KEY` operator value, deleted all three orphans, created the
+ingestion job, and **bounced off cron-job.org's burst-write throttle on the
+second create with `HTTP 429: null`** — the summary correctly reported
+`created=1 failed=1`. A direct `PUT /jobs` from `curl` a few seconds later
+created the health-check job (jobId 7646665) without further issue.
+
+Final live state confirmed via `GET https://api.cron-job.org/jobs`:
+
+| UTC | Job | Endpoint | jobId | Header |
+| --- | --- | --- | --- | --- |
+| 12:00 | `bootup-ingestion-1200-utc` | `/api/cron/fetch-editorial-inputs` | 7646662 | rotated `x-cron-secret` ✓ |
+| 12:15 | `bootup-health-check-1215-utc` | `/api/cron/health` | 7646665 | rotated `x-cron-secret` ✓ |
+
+Operational lesson captured in [`docs/engineering/CRON_SETUP.md` §6 → Burst-rate gotcha](../../engineering/CRON_SETUP.md#burst-rate-gotcha-observed-2026-05-22): high-churn syncs (multiple creates + multiple deletes) can interleave reads and writes tightly enough to trip an apparent per-window throttle even when the daily 100-request cap is nowhere near exhausted. The script's `failed=N` summary line accurately reflects this; the workaround is either re-running the sync (idempotent) or a single direct `PUT` for the missed job.
+
 ## Closeout Checklist
 
 - Scope completed: all phases (0–5) plus the cron-job.org sync tooling landing.
