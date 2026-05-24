@@ -81,7 +81,13 @@ export function SignalCard({
 
   const displayRank = rank ?? signal.finalSlateRank ?? signal.rank ?? 1;
   const displayTier = tier ?? resolveSignalTier(signal, displayRank);
-  const whyItMatters = getWhyItMattersText(signal);
+  // #278 MVP render hygiene: strip editorial citation markers ([A], [A1],
+  // [P2], [F1], [V3]…) from the displayed prose so readers see clean
+  // text. The markers stay in stored `published_*` columns and in the
+  // structured payload — this is a render-only transform. The full
+  // reader-verifiable-citations feature (footnotes/hover sources) is
+  // tracked separately as a post-MVP follow-up.
+  const whyItMatters = stripCitationMarkers(getWhyItMattersText(signal));
   const sourceAttribution = getSourceAttribution(signal);
   const relatedCoverage = getRelatedCoverage(signal);
   // #274 follow-up: the foldback shows EXACTLY three editorial layers
@@ -95,13 +101,11 @@ export function SignalCard({
   // array (that was the v1-era hack that surfaced empty state for cards
   // with real layer content). Empty/whitespace published_* shows the
   // layer's intentional empty state.
-  const beforeThisBody = readLayerBody(
-    signal.publishedWhatLedToIt,
-    signal.publishedWhatLedToItStructured,
+  const beforeThisBody = stripCitationMarkers(
+    readLayerBody(signal.publishedWhatLedToIt, signal.publishedWhatLedToItStructured),
   );
-  const theRippleBody = readLayerBody(
-    signal.publishedWhatItConnectsTo,
-    signal.publishedWhatItConnectsToStructured,
+  const theRippleBody = stripCitationMarkers(
+    readLayerBody(signal.publishedWhatItConnectsTo, signal.publishedWhatItConnectsToStructured),
   );
 
   const readMoreClassName = cn(
@@ -346,6 +350,34 @@ function readLayerBody(
     }
   }
   return (publishedText ?? "").trim();
+}
+
+/**
+ * MVP render-only strip of editorial citation markers from prose so the
+ * public card surface reads as clean text (issue #278). Removes any
+ * bracketed single uppercase letter optionally followed by digits — the
+ * canonical shape used across the editorial framework: `[A]`, `[A1]`,
+ * `[A12]`, `[P1]`, `[F2]`, `[V3]`, etc. After removal, collapse the
+ * whitespace artifacts the markers leave behind:
+ *   - `"slipped [A]. Community"` (a marker before a period leaves
+ *     a stray `" ."`) → `"slipped. Community"`.
+ *   - any resulting double space → single space.
+ *
+ * Exported so unit tests can pin the contract without rendering the
+ * whole component. NEVER mutates stored data — the markers stay in
+ * `published_*` columns and in the structured payload. The full
+ * reader-verifiable-citations feature (footnote rendering with source
+ * URLs) is a separate post-MVP follow-up.
+ */
+export function stripCitationMarkers(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/\[[A-Z]\d*\]/g, "")
+    // marker-before-punctuation artifacts: `" ."`, `" ,"`, `" ;"`, etc.
+    .replace(/\s+([.,;:!?)])/g, "$1")
+    // collapse double-spaces left by mid-sentence markers
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 function resolveSignalTier(signal: SignalCardSignal, rank: number): SignalTier {
