@@ -64,6 +64,29 @@ The change is additive at the schema and writer layers, surgical at the editor a
 - Full vitest suite: 806/806 passed across 102 files. `npm run build` green. `tsc --noEmit` clean on production code.
 - Post-deploy editor action: BM opens each card in `/dashboard/signals/editorial-review`, fills the Before This + The Ripple textareas (content drafted in `ai_*` can be copied or rewritten), saves + approves + publishes. Foldback then shows all three layers instead of empty state.
 
+## Lineage
+
+**Closes:** issue #274 — "Build publish pipeline for Before This + The Ripple; fix foldback layer order and v2 labels."
+
+**Headline child of:** issue #271 — editorial review cockpit consolidation (Option B). #274 is explicitly enumerated as a child task in #271.
+
+**Related blocker:** issue #270 / PR #273 — `fix(witm-validator): citation markers + decimals/abbreviations no longer false-fail`. The publish gate this PRD extends still routes through `validateWhyItMatters`; PR #273 unblocked the WITM rule so the slate can publish at all.
+
+**Descends from (PRDs):**
+- **PRD-53** — `prd-53-signals-admin-editorial-layer.md`. Built `src/lib/signals-editorial.ts` and `publishApprovedSignals`. This PRD adds the new-layer columns to the publish gate without rewriting it.
+- **PRD-63** — `prd-63-bootup-news-visual-system-v1-and-editorial-composer-two-pane.md`. Built `EditorialComposerClient` and `StructuredEditorialFields`. This PRD extends the latter with two new textareas; no rebuild of the surrounding two-pane shell.
+- **PRD-64** — `prd-64-editorial-automation-pipeline.md`. Built `push-approved/route.ts` (the Notion → Supabase bridge) and the `ai_*` / `human_*` raw-input columns. This PRD layers `edited_*` / `published_*` on top so the editor can review and the publish gate can promote.
+
+**Descends from (PRs):**
+- **#100** "[codex] Signals admin editorial layer" — born `signals-editorial.ts` + the editorial-review route.
+- **#150** "PRD-53 minimal final-slate composer" — born the slate-composition + `publishApprovedSignals`.
+- **#229** "feature: brand identity visual system v1 + editorial composer two-pane" — born the current `EditorialComposerClient` / `StructuredEditorialFields`.
+- **#237** "feat: editorial automation pipeline" — born the bridge that writes `ai_*` / `human_*` for all three layers.
+- **#263** "fix(editorial): v2 bridge writeback with select-then-decide upsert (Path A Task 4)" — most recent substantive change to the bridge.
+- **#266** "fix(cron,editorial): run-lock hardening + bridge `final_slate_rank` pairing + CHECK tighten" — most recent hardening of the publish-adjacent surface.
+
+**Surfaced by:** first real end-to-end editorial cycle, 2026-05-24.
+
 ## Operational History
 
 - 2026-05-24: PR #275 — initial implementation. Schema migration applied; publish gate, composer UI, and foldback render landed. Did not backfill pre-existing rows; the editor populates layer content via the new textareas as part of normal review.
