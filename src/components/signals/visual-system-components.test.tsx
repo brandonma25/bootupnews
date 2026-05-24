@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DateBadge } from "@/components/signals/DateBadge";
-import { SignalCard } from "@/components/signals/SignalCard";
+import { SignalCard, stripCitationMarkers } from "@/components/signals/SignalCard";
 import { TierBadge } from "@/components/signals/TierBadge";
 
 describe("Bootup News visual system components", () => {
@@ -302,5 +302,100 @@ describe("Bootup News visual system components", () => {
     expect(sourceLink).toHaveAttribute("href", "https://www.reuters.com/story");
     expect(sourceLink).toHaveAttribute("target", "_blank");
     expect(sourceLink).toHaveAccessibleName(/read source/i);
+  });
+
+  // #278 — MVP render hygiene: editorial citation markers ([A], [A1],
+  // [P2], [F1], [V3]…) are stripped from the displayed prose so readers
+  // see clean text. This is render-only; the markers stay in the stored
+  // published_* columns. The full reader-verifiable-citations feature
+  // (footnotes/hover sources) is a separate post-MVP follow-up.
+  describe("stripCitationMarkers (#278)", () => {
+    it("matches the brief's contract example", () => {
+      // From the brief: stripCitationMarkers("X slipped [A]. Y rose [A1] and [P2].")
+      // === "X slipped. Y rose and."
+      expect(
+        stripCitationMarkers("X slipped [A]. Y rose [A1] and [P2]."),
+      ).toBe("X slipped. Y rose and.");
+    });
+
+    it("removes every editorial-shape marker — [A], [A1], [A12], [P#], [F#], [V#]", () => {
+      const input =
+        "Rates moved [A]. Spreads tightened [A1] and widened [A12]. Policy [P1] and [P2], fiscal [F3], FX [V1].";
+      const output = stripCitationMarkers(input);
+      expect(output).not.toMatch(/\[[A-Z]\d*\]/);
+    });
+
+    it("collapses double spaces and ' .' artifacts left by mid-sentence markers", () => {
+      const input =
+        "Memory chips [A] and helium [A1] are climbing [P2].  Markets [F1] reacted [V3] .";
+      const output = stripCitationMarkers(input);
+      expect(output).not.toMatch(/ {2,}/);
+      expect(output).not.toMatch(/ \./);
+      expect(output).not.toMatch(/\[[A-Z]\d*\]/);
+    });
+
+    it("leaves lowercase-bracket tokens and non-citation brackets untouched", () => {
+      // The validator's UNRESOLVED_VARIABLE_PATTERN catches genuine
+      // placeholders like [topic] (lowercase, multi-letter) before
+      // publish. We don't strip those — they should never reach prod
+      // text. But if they do, leaving them in lets the bug surface
+      // visibly rather than getting silently scrubbed.
+      expect(stripCitationMarkers("Edge case [topic] survives.")).toBe(
+        "Edge case [topic] survives.",
+      );
+      // Bracket with digits-first (e.g. citation reference style) is not
+      // an editorial marker — leave untouched.
+      expect(stripCitationMarkers("Reference [1] cited.")).toBe("Reference [1] cited.");
+    });
+
+    it("handles empty input and pure-marker input safely", () => {
+      expect(stripCitationMarkers("")).toBe("");
+      expect(stripCitationMarkers("[A] [B] [C]")).toBe("");
+    });
+  });
+
+  // #278 — the SignalCard render must strip citation markers from all
+  // three editorial layer bodies. The stored prop values can contain
+  // [A] / [A1] / [P2] etc.; the rendered DOM must not.
+  it("strips citation markers from The Signal, Before This, and The Ripple in the rendered card (#278)", () => {
+    render(
+      <SignalCard
+        rank={1}
+        defaultExpanded
+        signal={{
+          id: "signal-citation-marker-strip",
+          title: "Card with citation markers in all three layers",
+          publishedWhyItMatters:
+            "Memory-chip prices climbed [A]. Helium supply tightened [A1].",
+          publishedWhatLedToIt:
+            "Strait closure triggered the supply shock [P1] and [P2].",
+          publishedWhatItConnectsTo:
+            "Fed will reassess rate path next quarter [F1] [V3].",
+          sourceName: "Reuters",
+          sourceUrl: "https://www.reuters.com/story",
+        }}
+      />,
+    );
+
+    // Labels are intact.
+    expect(screen.getByText("The Signal")).toBeInTheDocument();
+    expect(screen.getByText("Before This")).toBeInTheDocument();
+    expect(screen.getByText("The Ripple")).toBeInTheDocument();
+
+    // No editorial marker shape survives anywhere in the rendered DOM.
+    const card = screen.getByTestId("signal-card");
+    expect(card.textContent ?? "").not.toMatch(/\[[A-Z]\d*\]/);
+
+    // Each layer body still reads as clean prose — the prefix before the
+    // first marker is preserved.
+    expect(
+      screen.getByText(/Memory-chip prices climbed\. Helium supply tightened\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Strait closure triggered the supply shock and\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Fed will reassess rate path next quarter\./),
+    ).toBeInTheDocument();
   });
 });
