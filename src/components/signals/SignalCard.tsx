@@ -84,8 +84,13 @@ export function SignalCard({
   const whyItMatters = getWhyItMattersText(signal);
   const sourceAttribution = getSourceAttribution(signal);
   const relatedCoverage = getRelatedCoverage(signal);
-  const whatHappenedBody = (signal.whatHappened || signal.summary || "").trim();
-  // #274 Before This + The Ripple. Read ONLY published_* — never fall back
+  // #274 follow-up: the foldback shows EXACTLY three editorial layers
+  // (The Signal → Before This → The Ripple). The leftover "What happened"
+  // section and the standalone top WITM preview were removed; both made
+  // the same WITM text appear twice in DOM. The collapsed card face now
+  // surfaces only the title + footer + a teaser preview of The Signal,
+  // and the full Signal body appears once — inside the foldback.
+  // Before This + The Ripple. Read ONLY published_* — never fall back
   // to ai_*/edited_*/human_* and never re-mine the WITM payload's sections
   // array (that was the v1-era hack that surfaced empty state for cards
   // with real layer content). Empty/whitespace published_* shows the
@@ -136,18 +141,19 @@ export function SignalCard({
         {signal.title}
       </h2>
 
-      {whyItMatters ? (
+      {/* Collapsed/compact card-face teaser. Hidden when expanded so the
+          full Signal body only appears once — inside the foldback below.
+          No v1 "Why this matters" label here; the foldback owns the
+          labeled rendering. */}
+      {!isExpanded && whyItMatters ? (
         <section className="mt-3">
-          <p className="text-[var(--bu-size-micro)] font-medium uppercase leading-none tracking-[0.08em] text-[var(--bu-text-tertiary)]">
-            Why this matters
-          </p>
           <p
             className={cn(
-              "mt-1 font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]",
-              !isExpanded && !compact && "line-clamp-2",
+              "font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]",
+              !compact && "line-clamp-2",
               compact && "line-clamp-2 text-[var(--bu-size-meta)] leading-[1.5]",
             )}
-            data-testid="signal-why-this-matters"
+            data-testid="signal-card-teaser"
           >
             {whyItMatters}
           </p>
@@ -208,14 +214,15 @@ export function SignalCard({
 
       {isExpanded ? (
         <div className="mt-4 border-t border-[var(--bu-border-subtle)] pt-4">
-          {/* #274 Editorial framework §2 cause-then-trajectory order in the
-              foldback: factual "What happened" first (sans, factual reporting),
-              then the three editorial layers in serif:
+          {/* Foldback shows EXACTLY the three editorial layers in
+              cause-then-trajectory order (editorial framework §2):
                 The Signal → Before This → The Ripple.
-              v2 labels here only; codebase-wide v1→v2 rename of
+              "What happened" was removed in this follow-up — it duplicated
+              source-headline material already implied by the title and
+              footer attribution, and crowded the editorial voice. v2
+              labels here only; codebase-wide v1→v2 rename of
               validator/server-action/type identifiers is parked in #271. */}
           <div className="space-y-4">
-            <WhatHappenedSection body={whatHappenedBody} />
             <ExpandedSerifSection label="The Signal" body={whyItMatters} />
             <LayerWithEmptyState
               label="Before This"
@@ -266,26 +273,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <p className="text-[var(--bu-size-micro)] font-medium uppercase leading-none tracking-[0.08em] text-[var(--bu-text-tertiary)]">
       {children}
     </p>
-  );
-}
-
-/**
- * "What happened" body is the source-headline treatment — rendered in
- * sans, not serif, to signal factual reporting rather than editorial
- * judgment. See work prompt Change 1 typography rules.
- */
-function WhatHappenedSection({ body }: { body: string }) {
-  if (!body.trim()) {
-    return null;
-  }
-
-  return (
-    <section>
-      <SectionLabel>What happened</SectionLabel>
-      <p className="mt-1 font-sans text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]">
-        {body}
-      </p>
-    </section>
   );
 }
 

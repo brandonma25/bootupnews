@@ -100,12 +100,21 @@ describe("BriefingDetailView", () => {
     expect(screen.queryByText(/confirmed-event rail/i)).not.toBeInTheDocument();
   });
 
-  it("does not duplicate the lead paragraph in the What happened section", () => {
+  // #274 follow-up: the "What happened" section was removed from the
+  // foldback entirely. The brief reasoning: the source-headline material
+  // it carried was already implied by the title + footer attribution,
+  // and crowded the editorial voice. The detail surface now shows only
+  // the three editorial layers (The Signal / Before This / The Ripple).
+  it("does not render the 'What happened' label and does not duplicate the lead paragraph", () => {
     const item = createItem();
 
     render(<BriefingDetailView data={createData()} viewer={null} />);
 
-    expect(screen.getAllByText(item.whatHappened)).toHaveLength(1);
-    expect(screen.getByText("What happened")).toBeInTheDocument();
+    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
+    // The lead paragraph (item.whatHappened) is no longer rendered on
+    // detail cards. Either zero occurrences (current behavior) or one
+    // (if a future change re-introduces a different surface) is fine;
+    // two would still be a duplication regression.
+    expect(screen.queryAllByText(item.whatHappened).length).toBeLessThanOrEqual(1);
   });
 });

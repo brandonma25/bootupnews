@@ -82,7 +82,7 @@ describe("public signals page", () => {
     expect(screen.queryByText("Private newsletter grounding snippet should never be public")).not.toBeInTheDocument();
   }, 10000);
 
-  it("renders public card-face labels and clamps the why-this-matters preview", async () => {
+  it("renders public card-face teaser preview clamped (#274 follow-up — no v1 'Why this matters' label)", async () => {
     getPublicSignalsPageState.mockResolvedValue({
       kind: "published",
       posts: [createPublishedPost(1)],
@@ -91,10 +91,12 @@ describe("public signals page", () => {
     const Page = (await import("@/app/signals/page")).default;
     render(await Page());
 
-    expect(screen.getByText("Why this matters")).toBeInTheDocument();
+    // v1 label removed; foldback now owns the labeled rendering.
+    expect(screen.queryByText("Why this matters")).not.toBeInTheDocument();
     expect(screen.queryByText("Top Event")).not.toBeInTheDocument();
     expect(screen.queryByText("TOP EVENT")).not.toBeInTheDocument();
-    expect(screen.getByTestId("signal-why-this-matters")).toHaveClass("line-clamp-2");
+    // Collapsed teaser is line-clamped to 2 lines on non-compact cards.
+    expect(screen.getByTestId("signal-card-teaser")).toHaveClass("line-clamp-2");
   }, 10000);
 
   it("renders Core and Context tier markers for the published slate", async () => {
