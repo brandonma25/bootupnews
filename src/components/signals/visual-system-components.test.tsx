@@ -42,7 +42,11 @@ describe("Bootup News visual system components", () => {
     );
 
     expect(screen.getByText("Core signal · 01")).toBeInTheDocument();
-    expect(screen.getByText("Why this matters")).toBeInTheDocument();
+    // #274 follow-up: collapsed card face shows the unlabeled teaser
+    // preview (testid signal-card-teaser). The v1 "Why this matters"
+    // label was removed — the foldback owns the labeled rendering.
+    expect(screen.queryByText("Why this matters")).not.toBeInTheDocument();
+    expect(screen.getByTestId("signal-card-teaser")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Read more →" })).toHaveAttribute(
       "href",
       "/briefing/2026-05-13",
@@ -71,13 +75,24 @@ describe("Bootup News visual system components", () => {
 
     const { rerender } = render(<SignalCard signal={signal} rank={2} />);
 
-    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
+    // Collapsed: no foldback labels, no supporting coverage. Teaser
+    // preview is the only WITM-derived rendering.
+    expect(screen.queryByText("The Signal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Before This")).not.toBeInTheDocument();
+    expect(screen.queryByText("The Ripple")).not.toBeInTheDocument();
     expect(screen.queryByText("Supporting coverage")).not.toBeInTheDocument();
+    expect(screen.getByTestId("signal-card-teaser")).toBeInTheDocument();
 
     rerender(<SignalCard signal={signal} rank={2} expanded />);
 
-    expect(screen.getByText("What happened")).toBeInTheDocument();
+    // Expanded: foldback shows the three editorial layers + supporting
+    // coverage. The teaser is hidden so WITM appears only once in DOM.
+    expect(screen.getByText("The Signal")).toBeInTheDocument();
+    expect(screen.getByText("Before This")).toBeInTheDocument();
+    expect(screen.getByText("The Ripple")).toBeInTheDocument();
     expect(screen.getByText("Supporting coverage")).toBeInTheDocument();
+    expect(screen.queryByTestId("signal-card-teaser")).not.toBeInTheDocument();
+    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
   });
 
   it("opens its own depth in place when defaultExpanded is provided", () => {
@@ -94,8 +109,10 @@ describe("Bootup News visual system components", () => {
 
     const card = screen.getByTestId("signal-card");
     expect(card).toHaveAttribute("data-signal-expanded", "false");
-    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
+    // Collapsed: foldback labels absent; teaser visible.
+    expect(screen.queryByText("The Signal")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Read more →" })).toBeNull();
+    expect(screen.getByTestId("signal-card-teaser")).toBeInTheDocument();
 
     const toggle = screen.getByTestId("signal-card-toggle");
     expect(toggle).toHaveAccessibleName(/expand/i);
@@ -103,7 +120,13 @@ describe("Bootup News visual system components", () => {
     fireEvent.click(toggle);
 
     expect(card).toHaveAttribute("data-signal-expanded", "true");
-    expect(screen.getByText("What happened")).toBeInTheDocument();
+    // Expanded: foldback shows "The Signal" + Before This + The Ripple.
+    // Teaser is hidden so WITM only appears once in DOM.
+    expect(screen.getByText("The Signal")).toBeInTheDocument();
+    expect(screen.getByText("Before This")).toBeInTheDocument();
+    expect(screen.getByText("The Ripple")).toBeInTheDocument();
+    expect(screen.queryByTestId("signal-card-teaser")).not.toBeInTheDocument();
+    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
     expect(toggle).toHaveAccessibleName(/collapse/i);
   });
 
@@ -121,15 +144,19 @@ describe("Bootup News visual system components", () => {
 
     const card = screen.getByTestId("signal-card");
     expect(card).toHaveAttribute("data-signal-expanded", "true");
-    expect(screen.getByText("What happened")).toBeInTheDocument();
+    expect(screen.getByText("The Signal")).toBeInTheDocument();
     expect(screen.getByTestId("signal-card-toggle")).toHaveAccessibleName(/collapse/i);
   });
 
-  it("renders What happened in sans and the other depth sections in serif", () => {
+  // #274 follow-up: the foldback's editorial layers are all serif. The
+  // factual "What happened" layer was removed entirely; the sans-vs-
+  // serif typography differentiation is no longer relevant because the
+  // foldback now renders ONLY editorial-voice content.
+  it("renders all three foldback layers in serif (editorial voice)", () => {
     const signal = {
-      id: "signal-sans-vs-serif",
-      title: "Typography differentiation",
-      whatHappened: "Factual source-headline body for the What happened layer.",
+      id: "signal-serif",
+      title: "Typography uniformity in the foldback",
+      whatHappened: "Factual source-headline body — must NOT appear in foldback.",
       whyItMatters: "Editorial reasoning lives in serif voice.",
       sourceName: "Reuters",
       sourceUrl: "https://www.reuters.com/story",
@@ -137,22 +164,15 @@ describe("Bootup News visual system components", () => {
 
     render(<SignalCard signal={signal} rank={1} defaultExpanded />);
 
-    // What happened body — sans treatment for the factual layer.
-    const whatHappenedBody = screen.getByText(
-      /Factual source-headline body for the What happened layer/,
-    );
-    expect(whatHappenedBody).toHaveClass("font-sans");
-    expect(whatHappenedBody).not.toHaveClass("font-heading");
+    // The Signal body (from whyItMatters) — exactly one rendering, serif.
+    const signalBodies = screen.getAllByText("Editorial reasoning lives in serif voice.");
+    expect(signalBodies).toHaveLength(1);
+    expect(signalBodies[0]).toHaveClass("font-heading");
 
-    // Why this matters body appears in two places when expanded: the
-    // preview (line-clamped, above the footer) and the depth section
-    // (full, below the footer). Both must use the editorial serif
-    // family so the brand voice stays consistent across modes.
-    const whyItMattersBodies = screen.getAllByText("Editorial reasoning lives in serif voice.");
-    expect(whyItMattersBodies.length).toBeGreaterThan(0);
-    for (const body of whyItMattersBodies) {
-      expect(body).toHaveClass("font-heading");
-    }
+    // The "What happened" body must NOT be in DOM at all.
+    expect(
+      screen.queryByText(/Factual source-headline body/),
+    ).not.toBeInTheDocument();
   });
 
   // #274 renamed "What led to this" → "Before This" in the foldback and
@@ -199,18 +219,26 @@ describe("Bootup News visual system components", () => {
     expect(screen.getByText("The Signal")).toBeInTheDocument();
     expect(screen.getByText("Before This")).toBeInTheDocument();
     expect(screen.getByText("The Ripple")).toBeInTheDocument();
-    // The Signal body appears twice — once as the card-face preview
-    // (testid signal-why-this-matters) and once in the expanded foldback.
-    // Both pull from publishedWhyItMatters; presence at least once is the
-    // assertion that matters.
-    expect(screen.getAllByText("The Signal body — what this means right now.").length).toBeGreaterThan(0);
+    // #274 follow-up: when expanded, the teaser is hidden so each layer's
+    // body text appears EXACTLY ONCE in DOM. Duplicate WITM render was
+    // the explicit bug this PR fixed.
     expect(
-      screen.getByText("The Before This body — what conditions produced it."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("The Ripple body — what this implies next.")).toBeInTheDocument();
+      screen.getAllByText("The Signal body — what this means right now."),
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByText("The Before This body — what conditions produced it."),
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByText("The Ripple body — what this implies next."),
+    ).toHaveLength(1);
 
-    // Render order: walk all section labels and assert the editorial-layer
-    // sequence is Signal → Before This → Ripple.
+    // Foldback contains EXACTLY the three editorial layers in order.
+    // No "What happened" label; no v1 labels.
+    expect(screen.queryByText("What happened")).not.toBeInTheDocument();
+    expect(screen.queryByText("Why this matters")).not.toBeInTheDocument();
+    expect(screen.queryByText("What led to this")).not.toBeInTheDocument();
+    expect(screen.queryByText("What it connects to")).not.toBeInTheDocument();
+
     const labels = screen
       .getAllByText(/^(The Signal|Before This|The Ripple)$/u)
       .map((node) => node.textContent);

@@ -137,11 +137,10 @@ describe("LandingHomepage", () => {
     expect(cards).toHaveLength(5);
     expect(within(cards[0]).getByText("Core signal · 01")).toBeInTheDocument();
     expect(within(cards[4]).getByText("Core signal · 05")).toBeInTheDocument();
-    // "Why this matters" appears twice when the card is expanded — once
-    // above the toggle as the collapsed-preview label, once below as
-    // the editorial depth-section label. Both are expected on the
-    // homepage now that cards land expanded by default.
-    expect(within(cards[0]).getAllByText("Why this matters").length).toBeGreaterThan(0);
+    // Post-#274-follow-up: the foldback owns the labeled rendering
+    // ("The Signal"); the v1 "Why this matters" label was removed.
+    expect(within(cards[0]).queryByText("Why this matters")).not.toBeInTheDocument();
+    expect(within(cards[0]).getByText("The Signal")).toBeInTheDocument();
     // Per-card inline depth expansion: top events expand in place rather
     // than linking out, and they now land already expanded on the
     // homepage so the depth is visible at first glance. The footer
@@ -169,9 +168,12 @@ describe("LandingHomepage", () => {
 
     const card = screen.getAllByTestId("signal-card")[0];
     expect(card).toHaveAttribute("data-signal-expanded", "true");
-    expect(within(card).getByText("What happened")).toBeInTheDocument();
-    // #274 foldback v2 labels: "Before This" replaces "What led to this".
+    // #274 follow-up: foldback shows the three editorial layers in v2
+    // labels. "What happened" was removed; never appears in DOM.
+    expect(within(card).queryByText("What happened")).not.toBeInTheDocument();
+    expect(within(card).getByText("The Signal")).toBeInTheDocument();
     expect(within(card).getByText("Before This")).toBeInTheDocument();
+    expect(within(card).getByText("The Ripple")).toBeInTheDocument();
 
     const toggle = within(card).getByTestId("signal-card-toggle");
     expect(toggle).toHaveAccessibleName(/collapse/i);
@@ -179,7 +181,9 @@ describe("LandingHomepage", () => {
     fireEvent.click(toggle);
 
     expect(card).toHaveAttribute("data-signal-expanded", "false");
-    expect(within(card).queryByText("What happened")).not.toBeInTheDocument();
+    // Collapsed: foldback labels absent; teaser is the only WITM rendering.
+    expect(within(card).queryByText("The Signal")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Before This")).not.toBeInTheDocument();
     expect(toggle).toHaveAccessibleName(/expand/i);
 
     fireEvent.click(toggle);
