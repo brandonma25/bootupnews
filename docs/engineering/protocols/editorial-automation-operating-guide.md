@@ -78,3 +78,13 @@
   - Does **not** call `captureRssFailure` — Sentry stays quiet for known-flaky sources.
 - Sentry noise filter: `sentry.server.config.ts` runs `isFilteredRssNoiseEvent` in `beforeSend` and drops events whose exception message matches `^Feed request retry exhausted for `. Those failures are now tracked exclusively in the Source Health Log. All other `RssError` variants continue to report normally.
 - Permissive failure contract: if `NOTION_SOURCE_HEALTH_LOG_DB_ID` is unset or the Notion query fails, the circuit breaker returns `skip: false` and the fetch proceeds. Observability degradation must never silently disable ingestion.
+
+## Three-Layer Publish Pipeline (PRD-66)
+- The publish gate (`publishApprovedSignals` in `src/lib/signals-editorial.ts`) now promotes all three editorial layers from `edited_*` to `published_*`:
+  - The Signal — `edited_why_it_matters` → `published_why_it_matters` (existing).
+  - Before This — `edited_what_led_to_it` → `published_what_led_to_it` (new in PRD-66).
+  - The Ripple — `edited_what_it_connects_to` → `published_what_it_connects_to` (new in PRD-66).
+- Each layer also promotes its structured payload (`edited_*_payload` → `published_*_payload`). The helper `buildLayerPublishText` mirrors the WITM payload-derived-text-with-edited-text-fallback rule for the two new layers.
+- **No `ai_*` fallback at publish.** If `edited_*` is null for a layer, the corresponding `published_*` stays null and the public foldback shows the layer's intentional empty state. Raw bridge-staged content never reaches the public surface.
+- **Bridge contract unchanged.** The Notion → Supabase bridge continues to populate `ai_*` and `human_*` for all three layers. The new `edited_*` / `published_*` columns are owned by the prod admin cockpit and the publish gate respectively. Runtime flow: bridge → `ai_*` / `human_*` → editor cockpit → `edited_*` → publish gate → `published_*`.
+- **Validator gate scope.** The WITM quality-gate validation columns (`why_it_matters_validation_*`) and the four corresponding rules apply ONLY to The Signal. Before This and The Ripple are not subject to the same automated quality gate; they pass the publish gate as long as the editor's `edited_*` text is non-empty.

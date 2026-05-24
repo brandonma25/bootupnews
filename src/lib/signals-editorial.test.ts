@@ -16,6 +16,19 @@ type SignalPostRow = {
   published_why_it_matters: string | null;
   edited_why_it_matters_payload: unknown | null;
   published_why_it_matters_payload: unknown | null;
+  // #274 Before This + The Ripple layer columns.
+  ai_what_led_to_it?: string | null;
+  human_what_led_to_it?: string | null;
+  edited_what_led_to_it?: string | null;
+  edited_what_led_to_it_payload?: unknown | null;
+  published_what_led_to_it?: string | null;
+  published_what_led_to_it_payload?: unknown | null;
+  ai_what_it_connects_to?: string | null;
+  human_what_it_connects_to?: string | null;
+  edited_what_it_connects_to?: string | null;
+  edited_what_it_connects_to_payload?: unknown | null;
+  published_what_it_connects_to?: string | null;
+  published_what_it_connects_to_payload?: unknown | null;
   why_it_matters_validation_status: "passed" | "requires_human_rewrite";
   why_it_matters_validation_failures: string[];
   why_it_matters_validation_details: string[];
@@ -126,6 +139,18 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     published_why_it_matters: overrides.published_why_it_matters ?? null,
     edited_why_it_matters_payload: overrides.edited_why_it_matters_payload ?? null,
     published_why_it_matters_payload: overrides.published_why_it_matters_payload ?? null,
+    ai_what_led_to_it: overrides.ai_what_led_to_it ?? null,
+    human_what_led_to_it: overrides.human_what_led_to_it ?? null,
+    edited_what_led_to_it: overrides.edited_what_led_to_it ?? null,
+    edited_what_led_to_it_payload: overrides.edited_what_led_to_it_payload ?? null,
+    published_what_led_to_it: overrides.published_what_led_to_it ?? null,
+    published_what_led_to_it_payload: overrides.published_what_led_to_it_payload ?? null,
+    ai_what_it_connects_to: overrides.ai_what_it_connects_to ?? null,
+    human_what_it_connects_to: overrides.human_what_it_connects_to ?? null,
+    edited_what_it_connects_to: overrides.edited_what_it_connects_to ?? null,
+    edited_what_it_connects_to_payload: overrides.edited_what_it_connects_to_payload ?? null,
+    published_what_it_connects_to: overrides.published_what_it_connects_to ?? null,
+    published_what_it_connects_to_payload: overrides.published_what_it_connects_to_payload ?? null,
     why_it_matters_validation_status: overrides.why_it_matters_validation_status ?? "passed",
     why_it_matters_validation_failures: overrides.why_it_matters_validation_failures ?? [],
     why_it_matters_validation_details: overrides.why_it_matters_validation_details ?? [],
@@ -1369,6 +1394,80 @@ describe("signals editorial workflow", () => {
       published_row_ids: rows.map((row) => row.id),
     });
     expect(supabase.publishedSlateItems).toHaveLength(count);
+  });
+
+  it("promotes all three editorial layers (#274): edited_what_led_to_it + edited_what_it_connects_to into published_* alongside why_it_matters, and leaves layers null when edited_* is null", async () => {
+    const wltiPayload = {
+      preview: "",
+      thesis: "Earlier supply shocks in 2020 and 2022 hit different inputs.",
+      sections: [],
+    };
+    const witcPayload = {
+      preview: "",
+      thesis: "Memory-chip and helium prices ride on this corridor.",
+      sections: [],
+    };
+    const rows = [
+      // Row 1: BOTH Before This + The Ripple have a structured payload
+      // (the payload's thesis becomes the published text; payload itself
+      // is written through verbatim).
+      createFinalSlateRow(1, {
+        edited_what_led_to_it: wltiPayload.thesis,
+        edited_what_led_to_it_payload: wltiPayload,
+        edited_what_it_connects_to: witcPayload.thesis,
+        edited_what_it_connects_to_payload: witcPayload,
+      }),
+      // Row 2: only Before This has edited content (text-only, no payload).
+      // The Ripple is unedited → published_what_it_connects_to stays null.
+      createFinalSlateRow(2, {
+        edited_what_led_to_it: "Q3 capex outran operating cash for the first time.",
+      }),
+      // Row 3: NEITHER new layer edited → both published_* must stay null.
+      // No ai_* fallback (the brief's "no raw ai_* leak" guarantee).
+      createFinalSlateRow(3, {
+        ai_what_led_to_it: "AI draft for Before This — should NOT be published.",
+        ai_what_it_connects_to: "AI draft for The Ripple — should NOT be published.",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { publishApprovedSignals } = await loadEditorialModule();
+    const result = await publishApprovedSignals();
+
+    expect(result.ok).toBe(true);
+    expect(rows.every((row) => row.editorial_status === "published")).toBe(true);
+    expect(rows.every((row) => row.is_live === true)).toBe(true);
+
+    // Row 1: full three-layer promotion (text built from each layer's
+    // structured payload + payload mirrored through).
+    expect(rows[0].published_why_it_matters).toBe(createValidWhyItMatters("Slate 1"));
+    expect(rows[0].published_what_led_to_it).toBe(wltiPayload.thesis);
+    expect(rows[0].published_what_led_to_it_payload).toEqual(wltiPayload);
+    expect(rows[0].published_what_it_connects_to).toBe(witcPayload.thesis);
+    expect(rows[0].published_what_it_connects_to_payload).toEqual(witcPayload);
+
+    // Row 2: Before This promoted from text; The Ripple stays null.
+    expect(rows[1].published_what_led_to_it).toBe(
+      "Q3 capex outran operating cash for the first time.",
+    );
+    expect(rows[1].published_what_it_connects_to).toBeNull();
+    expect(rows[1].published_what_it_connects_to_payload).toBeNull();
+
+    // Row 3: neither layer edited → BOTH published_* stay null. ai_* must
+    // NOT leak into the public surface.
+    expect(rows[2].published_what_led_to_it).toBeNull();
+    expect(rows[2].published_what_led_to_it_payload).toBeNull();
+    expect(rows[2].published_what_it_connects_to).toBeNull();
+    expect(rows[2].published_what_it_connects_to_payload).toBeNull();
+    // Sanity: the ai_* content stayed untouched (publish gate didn't
+    // copy from it).
+    expect(rows[2].ai_what_led_to_it).toBe("AI draft for Before This — should NOT be published.");
+    expect(rows[2].ai_what_it_connects_to).toBe("AI draft for The Ripple — should NOT be published.");
   });
 
   it("publishes only the selected partial Core/Context slate without promoting non-selected candidates", async () => {

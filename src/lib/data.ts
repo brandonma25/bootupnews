@@ -450,6 +450,25 @@ function mapHomepageSignalPostToBriefingItem(
       source === "published_live" || source === "recent_published" ? structuredWhyItMatters : null,
     publishedWhyItMattersStructured:
       source === "published_live" || source === "recent_published" ? structuredWhyItMatters : null,
+    // #274 Before This + The Ripple. Only flow published_* through to the
+    // public model. When the source isn't a live/recent-published snapshot,
+    // leave these null so unreviewed admin-staging content cannot leak.
+    publishedWhatLedToIt:
+      source === "published_live" || source === "recent_published"
+        ? post.publishedWhatLedToIt
+        : null,
+    publishedWhatLedToItStructured:
+      source === "published_live" || source === "recent_published"
+        ? post.publishedWhatLedToItStructured
+        : null,
+    publishedWhatItConnectsTo:
+      source === "published_live" || source === "recent_published"
+        ? post.publishedWhatItConnectsTo
+        : null,
+    publishedWhatItConnectsToStructured:
+      source === "published_live" || source === "recent_published"
+        ? post.publishedWhatItConnectsToStructured
+        : null,
     editorialStatus: source === "published_live" || source === "recent_published" ? "published" : post.editorialStatus,
     sources: post.sourceUrl ? [{ title: post.sourceName || "Source", url: post.sourceUrl }] : [],
     sourceCount: post.sourceUrl ? 1 : 0,

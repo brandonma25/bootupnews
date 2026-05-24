@@ -26,6 +26,13 @@ export type SignalCardSignal = {
   editedWhyItMatters?: string | null;
   aiWhyItMatters?: string | null;
   editorialWhyItMatters?: EditorialWhyItMattersContent | null;
+  // #274 Before This + The Ripple public values. The foldback reads ONLY
+  // published_* — the empty state is shown when they're null. NEVER fall
+  // back to ai_*/edited_*/human_* — that bypasses the publish gate.
+  publishedWhatLedToIt?: string | null;
+  publishedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+  publishedWhatItConnectsTo?: string | null;
+  publishedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   sourceName?: string | null;
   sourceUrl?: string | null;
   relatedArticles?: SourceLink[];
@@ -78,15 +85,19 @@ export function SignalCard({
   const sourceAttribution = getSourceAttribution(signal);
   const relatedCoverage = getRelatedCoverage(signal);
   const whatHappenedBody = (signal.whatHappened || signal.summary || "").trim();
-  const whatLedToThisBody = getStructuredSection(
-    signal.editorialWhyItMatters,
-    /led|caus|before|context/i,
+  // #274 Before This + The Ripple. Read ONLY published_* — never fall back
+  // to ai_*/edited_*/human_* and never re-mine the WITM payload's sections
+  // array (that was the v1-era hack that surfaced empty state for cards
+  // with real layer content). Empty/whitespace published_* shows the
+  // layer's intentional empty state.
+  const beforeThisBody = readLayerBody(
+    signal.publishedWhatLedToIt,
+    signal.publishedWhatLedToItStructured,
   );
-  const whatItConnectsToBody = (
-    getStructuredSection(signal.editorialWhyItMatters, /connect|next|watch|implication/i) ||
-    signal.selectionReason ||
-    ""
-  ).trim();
+  const theRippleBody = readLayerBody(
+    signal.publishedWhatItConnectsTo,
+    signal.publishedWhatItConnectsToStructured,
+  );
 
   const readMoreClassName = cn(
     "shrink-0 text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-secondary)] transition-colors",
@@ -197,13 +208,24 @@ export function SignalCard({
 
       {isExpanded ? (
         <div className="mt-4 border-t border-[var(--bu-border-subtle)] pt-4">
+          {/* #274 Editorial framework §2 cause-then-trajectory order in the
+              foldback: factual "What happened" first (sans, factual reporting),
+              then the three editorial layers in serif:
+                The Signal → Before This → The Ripple.
+              v2 labels here only; codebase-wide v1→v2 rename of
+              validator/server-action/type identifiers is parked in #271. */}
           <div className="space-y-4">
             <WhatHappenedSection body={whatHappenedBody} />
-            <ExpandedSerifSection label="Why this matters" body={whyItMatters} />
-            <WhatLedToThisSection body={whatLedToThisBody} />
-            <ExpandedSerifSection
-              label="What it connects to"
-              body={whatItConnectsToBody}
+            <ExpandedSerifSection label="The Signal" body={whyItMatters} />
+            <LayerWithEmptyState
+              label="Before This"
+              body={beforeThisBody}
+              emptyText="No prior context yet for this signal."
+            />
+            <LayerWithEmptyState
+              label="The Ripple"
+              body={theRippleBody}
+              emptyText="No downstream trajectory yet for this signal."
             />
           </div>
 
@@ -287,28 +309,56 @@ function ExpandedSerifSection({ label, body }: { label: string; body: string }) 
 }
 
 /**
- * "What led to this" is the structural-causation layer and must render
- * even when the underlying data is empty, per work prompt Change 1
- * acceptance criteria. Empty state uses an italic placeholder so the
- * absence is visible rather than silently hidden.
+ * Renders a Before This / The Ripple layer (#274). The brief is explicit:
+ *   - Layer reads its `published_*` field (handled by the caller).
+ *   - Null/empty `published_*` shows the empty state.
+ *   - Do NOT fall back to `ai_*` / `edited_*` / `human_*` — that bypasses
+ *     the publish gate's review step.
  */
-function WhatLedToThisSection({ body }: { body: string }) {
+function LayerWithEmptyState({
+  label,
+  body,
+  emptyText,
+}: {
+  label: string;
+  body: string;
+  emptyText: string;
+}) {
   const trimmed = body.trim();
 
   return (
     <section>
-      <SectionLabel>What led to this</SectionLabel>
+      <SectionLabel>{label}</SectionLabel>
       {trimmed ? (
         <p className="mt-1 font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]">
           {trimmed}
         </p>
       ) : (
         <p className="mt-1 font-heading italic text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-tertiary)]">
-          No structural context yet for this signal.
+          {emptyText}
         </p>
       )}
     </section>
   );
+}
+
+/**
+ * Read a #274 layer's foldback body. Prefers the structured payload's
+ * built text (matches WITM's render path); falls back to the raw published
+ * text. Returns "" when both are absent — the caller renders the empty
+ * state. NEVER reads `ai_*` / `edited_*` / `human_*` (publish-gate bypass).
+ */
+function readLayerBody(
+  publishedText: string | null | undefined,
+  publishedStructured: EditorialWhyItMattersContent | null | undefined,
+): string {
+  if (publishedStructured) {
+    const built = buildEditorialWhyItMattersText(publishedStructured, publishedText ?? "").trim();
+    if (built) {
+      return built;
+    }
+  }
+  return (publishedText ?? "").trim();
 }
 
 function resolveSignalTier(signal: SignalCardSignal, rank: number): SignalTier {
@@ -337,13 +387,6 @@ function getWhyItMattersText(signal: SignalCardSignal) {
   }
 
   return buildEditorialWhyItMattersText(structured, fallback).trim();
-}
-
-function getStructuredSection(
-  content: EditorialWhyItMattersContent | null | undefined,
-  pattern: RegExp,
-) {
-  return content?.sections.find((section) => pattern.test(section.title))?.body.trim() ?? "";
 }
 
 function getSourceAttribution(signal: SignalCardSignal) {

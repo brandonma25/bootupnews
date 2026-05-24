@@ -170,7 +170,8 @@ describe("LandingHomepage", () => {
     const card = screen.getAllByTestId("signal-card")[0];
     expect(card).toHaveAttribute("data-signal-expanded", "true");
     expect(within(card).getByText("What happened")).toBeInTheDocument();
-    expect(within(card).getByText("What led to this")).toBeInTheDocument();
+    // #274 foldback v2 labels: "Before This" replaces "What led to this".
+    expect(within(card).getByText("Before This")).toBeInTheDocument();
 
     const toggle = within(card).getByTestId("signal-card-toggle");
     expect(toggle).toHaveAccessibleName(/collapse/i);

@@ -47,6 +47,10 @@ const PUBLIC_SIGNAL_POST_REQUIRED_COLUMNS = [
   "selection_reason",
   "published_why_it_matters",
   "published_why_it_matters_payload",
+  "published_what_led_to_it",
+  "published_what_led_to_it_payload",
+  "published_what_it_connects_to",
+  "published_what_it_connects_to_payload",
   "why_it_matters_validation_status",
   "why_it_matters_validation_failures",
   "why_it_matters_validation_details",
@@ -80,6 +84,18 @@ const ADMIN_SIGNAL_POST_REQUIRED_COLUMNS = [
   "published_why_it_matters",
   "edited_why_it_matters_payload",
   "published_why_it_matters_payload",
+  "ai_what_led_to_it",
+  "human_what_led_to_it",
+  "edited_what_led_to_it",
+  "edited_what_led_to_it_payload",
+  "published_what_led_to_it",
+  "published_what_led_to_it_payload",
+  "ai_what_it_connects_to",
+  "human_what_it_connects_to",
+  "edited_what_it_connects_to",
+  "edited_what_it_connects_to_payload",
+  "published_what_it_connects_to",
+  "published_what_it_connects_to_payload",
   "why_it_matters_validation_status",
   "why_it_matters_validation_failures",
   "why_it_matters_validation_details",
@@ -177,6 +193,18 @@ type StoredSignalPost = {
   published_why_it_matters: string | null;
   edited_why_it_matters_payload: unknown | null;
   published_why_it_matters_payload: unknown | null;
+  ai_what_led_to_it: string | null;
+  human_what_led_to_it: string | null;
+  edited_what_led_to_it: string | null;
+  edited_what_led_to_it_payload: unknown | null;
+  published_what_led_to_it: string | null;
+  published_what_led_to_it_payload: unknown | null;
+  ai_what_it_connects_to: string | null;
+  human_what_it_connects_to: string | null;
+  edited_what_it_connects_to: string | null;
+  edited_what_it_connects_to_payload: unknown | null;
+  published_what_it_connects_to: string | null;
+  published_what_it_connects_to_payload: unknown | null;
   why_it_matters_validation_status: WhyItMattersReviewStatus | null;
   why_it_matters_validation_failures: string[] | null;
   why_it_matters_validation_details: string[] | null;
@@ -259,6 +287,22 @@ export type EditorialSignalPost = {
   publishedWhyItMatters: string | null;
   editedWhyItMattersStructured: EditorialWhyItMattersContent | null;
   publishedWhyItMattersStructured: EditorialWhyItMattersContent | null;
+  // Before This (#274). human_* is the bridge's raw Notion override input; the
+  // editor refines into edited_*; the publish gate promotes edited_* to
+  // published_*. Same shape on both new layers.
+  aiWhatLedToIt: string | null;
+  humanWhatLedToIt: string | null;
+  editedWhatLedToIt: string | null;
+  publishedWhatLedToIt: string | null;
+  editedWhatLedToItStructured: EditorialWhyItMattersContent | null;
+  publishedWhatLedToItStructured: EditorialWhyItMattersContent | null;
+  // The Ripple (#274).
+  aiWhatItConnectsTo: string | null;
+  humanWhatItConnectsTo: string | null;
+  editedWhatItConnectsTo: string | null;
+  publishedWhatItConnectsTo: string | null;
+  editedWhatItConnectsToStructured: EditorialWhyItMattersContent | null;
+  publishedWhatItConnectsToStructured: EditorialWhyItMattersContent | null;
   whyItMattersValidationStatus: WhyItMattersReviewStatus;
   whyItMattersValidationFailures: string[];
   whyItMattersValidationDetails: string[];
@@ -673,6 +717,30 @@ function normalizeEditorialText(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
+/**
+ * Build the public published_* text for a non-WITM layer (Before This,
+ * The Ripple — #274). Returns null when neither the structured payload nor
+ * the edited text carries content, so the publish gate writes NULL and the
+ * foldback shows the layer's empty state. Mirrors the WITM publish logic in
+ * publishApprovedSignals — payload-derived text preferred, edited text
+ * fallback, no ai_* fallback.
+ */
+function buildLayerPublishText(
+  editedText: string | null,
+  structuredContent: EditorialWhyItMattersContent | null,
+): string | null {
+  const fromStructured = structuredContent
+    ? normalizeEditorialText(
+        buildEditorialWhyItMattersText(structuredContent, editedText ?? ""),
+      )
+    : "";
+  if (fromStructured) {
+    return fromStructured;
+  }
+  const fallback = normalizeEditorialText(editedText);
+  return fallback || null;
+}
+
 function normalizePublicSourceUrl(value: string | null | undefined) {
   const normalized = normalizeEditorialText(value);
   return isValidPublicSourceUrl(normalized) ? normalized : "";
@@ -754,6 +822,18 @@ function mapStoredSignalPost(row: StoredSignalPost): EditorialSignalPost {
     publishedWhyItMatters: row.published_why_it_matters,
     editedWhyItMattersStructured: parseEditorialWhyItMattersContent(row.edited_why_it_matters_payload),
     publishedWhyItMattersStructured: parseEditorialWhyItMattersContent(row.published_why_it_matters_payload),
+    aiWhatLedToIt: row.ai_what_led_to_it,
+    humanWhatLedToIt: row.human_what_led_to_it,
+    editedWhatLedToIt: row.edited_what_led_to_it,
+    publishedWhatLedToIt: row.published_what_led_to_it,
+    editedWhatLedToItStructured: parseEditorialWhyItMattersContent(row.edited_what_led_to_it_payload),
+    publishedWhatLedToItStructured: parseEditorialWhyItMattersContent(row.published_what_led_to_it_payload),
+    aiWhatItConnectsTo: row.ai_what_it_connects_to,
+    humanWhatItConnectsTo: row.human_what_it_connects_to,
+    editedWhatItConnectsTo: row.edited_what_it_connects_to,
+    publishedWhatItConnectsTo: row.published_what_it_connects_to,
+    editedWhatItConnectsToStructured: parseEditorialWhyItMattersContent(row.edited_what_it_connects_to_payload),
+    publishedWhatItConnectsToStructured: parseEditorialWhyItMattersContent(row.published_what_it_connects_to_payload),
     whyItMattersValidationStatus: row.why_it_matters_validation_status ?? "passed",
     whyItMattersValidationFailures: row.why_it_matters_validation_failures ?? [],
     whyItMattersValidationDetails: row.why_it_matters_validation_details ?? [],
@@ -794,6 +874,10 @@ function mapStoredPublicSignalPost(row: Partial<StoredSignalPost> & Pick<
   | "selection_reason"
   | "published_why_it_matters"
   | "published_why_it_matters_payload"
+  | "published_what_led_to_it"
+  | "published_what_led_to_it_payload"
+  | "published_what_it_connects_to"
+  | "published_what_it_connects_to_payload"
   | "why_it_matters_validation_status"
   | "why_it_matters_validation_failures"
   | "why_it_matters_validation_details"
@@ -808,6 +892,14 @@ function mapStoredPublicSignalPost(row: Partial<StoredSignalPost> & Pick<
     ai_why_it_matters: "",
     edited_why_it_matters: null,
     edited_why_it_matters_payload: null,
+    ai_what_led_to_it: null,
+    human_what_led_to_it: null,
+    edited_what_led_to_it: null,
+    edited_what_led_to_it_payload: null,
+    ai_what_it_connects_to: null,
+    human_what_it_connects_to: null,
+    edited_what_it_connects_to: null,
+    edited_what_it_connects_to_payload: null,
     final_slate_rank: null,
     final_slate_tier: null,
     editorial_decision: null,
@@ -943,6 +1035,18 @@ function mapBriefingItemToSignalPost(
     publishedWhyItMatters: null,
     editedWhyItMattersStructured: null,
     publishedWhyItMattersStructured: null,
+    aiWhatLedToIt: null,
+    humanWhatLedToIt: null,
+    editedWhatLedToIt: null,
+    publishedWhatLedToIt: null,
+    editedWhatLedToItStructured: null,
+    publishedWhatLedToItStructured: null,
+    aiWhatItConnectsTo: null,
+    humanWhatItConnectsTo: null,
+    editedWhatItConnectsTo: null,
+    publishedWhatItConnectsTo: null,
+    editedWhatItConnectsToStructured: null,
+    publishedWhatItConnectsToStructured: null,
     whyItMattersValidationStatus: getValidationStatus(validation),
     whyItMattersValidationFailures: validation.failures,
     whyItMattersValidationDetails: validation.failureDetails,
@@ -2093,6 +2197,14 @@ export async function saveSignalDraft(input: {
   postId: string;
   editedWhyItMatters: string;
   editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
+  // Optional Before This / The Ripple layer payloads (#274). When provided
+  // (even as empty string), they are written through to edited_*; passing
+  // undefined leaves the columns untouched (preserves backward compat for
+  // callers that don't yet know about these layers).
+  editedWhatLedToIt?: string;
+  editedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+  editedWhatItConnectsTo?: string;
+  editedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   route?: string;
 }): Promise<EditorialMutationResult> {
   const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
@@ -2146,11 +2258,26 @@ export async function saveSignalDraft(input: {
     successMessage = shouldPreserveStatus ? "Editorial changes saved." : "Draft saved.";
   }
 
+  const wltiLayerWrite = buildLayerEditorialWrite(
+    input.editedWhatLedToIt,
+    input.editedWhatLedToItStructured,
+    "edited_what_led_to_it",
+    "edited_what_led_to_it_payload",
+  );
+  const witcLayerWrite = buildLayerEditorialWrite(
+    input.editedWhatItConnectsTo,
+    input.editedWhatItConnectsToStructured,
+    "edited_what_it_connects_to",
+    "edited_what_it_connects_to_payload",
+  );
+
   const updateResult = await context.client
     .from("signal_posts")
     .update({
       edited_why_it_matters: editorialText,
       edited_why_it_matters_payload: structuredContent,
+      ...wltiLayerWrite,
+      ...witcLayerWrite,
       ...(currentStatus === "published"
         ? {
             published_why_it_matters: editorialText,
@@ -2181,6 +2308,38 @@ export async function saveSignalDraft(input: {
   };
 }
 
+/**
+ * Build the partial update payload for a non-WITM editorial layer
+ * (Before This, The Ripple — #274). Returns `{}` when the caller did not
+ * provide a layer value (text undefined AND structured undefined), so the
+ * existing edited_* columns are NOT cleared by accident. Otherwise writes
+ * both the text and structured fields together, mirroring WITM's write
+ * shape. Empty text + null structured intentionally clears the layer.
+ */
+function buildLayerEditorialWrite(
+  editedText: string | undefined,
+  structuredContent: EditorialWhyItMattersContent | null | undefined,
+  textColumn: string,
+  payloadColumn: string,
+): Record<string, unknown> {
+  if (editedText === undefined && structuredContent === undefined) {
+    return {};
+  }
+  const effectiveStructured =
+    structuredContent !== undefined
+      ? structuredContent
+      : createEditorialContentFromLegacyText(editedText ?? "");
+  const fromStructured = effectiveStructured
+    ? normalizeEditorialText(
+        buildEditorialWhyItMattersText(effectiveStructured, editedText ?? ""),
+      )
+    : normalizeEditorialText(editedText ?? "");
+  return {
+    [textColumn]: fromStructured || null,
+    [payloadColumn]: effectiveStructured,
+  };
+}
+
 async function approveSignalPostWithContext(
   context: {
     client: EditorialClient;
@@ -2190,6 +2349,11 @@ async function approveSignalPostWithContext(
     postId: string;
     editedWhyItMatters: string;
     editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
+    // Optional Before This / The Ripple (#274) — see saveSignalDraft notes.
+    editedWhatLedToIt?: string;
+    editedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+    editedWhatItConnectsTo?: string;
+    editedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   },
 ): Promise<EditorialMutationResult> {
   const structuredContent =
@@ -2197,6 +2361,18 @@ async function approveSignalPostWithContext(
     createEditorialContentFromLegacyText(input.editedWhyItMatters);
   const editorialText = normalizeEditorialText(
     buildEditorialWhyItMattersText(structuredContent, input.editedWhyItMatters),
+  );
+  const wltiLayerWrite = buildLayerEditorialWrite(
+    input.editedWhatLedToIt,
+    input.editedWhatLedToItStructured,
+    "edited_what_led_to_it",
+    "edited_what_led_to_it_payload",
+  );
+  const witcLayerWrite = buildLayerEditorialWrite(
+    input.editedWhatItConnectsTo,
+    input.editedWhatItConnectsToStructured,
+    "edited_what_it_connects_to",
+    "edited_what_it_connects_to_payload",
   );
 
   if (!editorialText) {
@@ -2248,6 +2424,8 @@ async function approveSignalPostWithContext(
       .update({
         edited_why_it_matters: editorialText,
         edited_why_it_matters_payload: structuredContent,
+        ...wltiLayerWrite,
+        ...witcLayerWrite,
         editorial_status: "needs_review",
         editorial_decision: "rewrite_requested",
         ...buildWhyItMattersValidationFields(validation, now),
@@ -2277,6 +2455,8 @@ async function approveSignalPostWithContext(
     .update({
       edited_why_it_matters: editorialText,
       edited_why_it_matters_payload: structuredContent,
+      ...wltiLayerWrite,
+      ...witcLayerWrite,
       editorial_status: "approved",
       editorial_decision: "approved",
       decision_note: null,
@@ -2312,6 +2492,11 @@ export async function approveSignalPost(input: {
   postId: string;
   editedWhyItMatters: string;
   editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
+  // Optional Before This / The Ripple (#274).
+  editedWhatLedToIt?: string;
+  editedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+  editedWhatItConnectsTo?: string;
+  editedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   route?: string;
 }): Promise<EditorialMutationResult> {
   const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
@@ -2332,6 +2517,11 @@ export async function approveSignalPosts(input: {
     postId: string;
     editedWhyItMatters: string;
     editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
+    // Optional Before This / The Ripple (#274) per-row layer content.
+    editedWhatLedToIt?: string;
+    editedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+    editedWhatItConnectsTo?: string;
+    editedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   }>;
   route?: string;
 }): Promise<EditorialMutationResult> {
@@ -2352,6 +2542,10 @@ export async function approveSignalPosts(input: {
           postId: normalizeEditorialText(post.postId),
           editedWhyItMatters: post.editedWhyItMatters,
           editedWhyItMattersStructured: post.editedWhyItMattersStructured,
+          editedWhatLedToIt: post.editedWhatLedToIt,
+          editedWhatLedToItStructured: post.editedWhatLedToItStructured,
+          editedWhatItConnectsTo: post.editedWhatItConnectsTo,
+          editedWhatItConnectsToStructured: post.editedWhatItConnectsToStructured,
         }))
         .filter((post) => post.postId)
         .map((post) => [post.postId, post]),
@@ -3187,12 +3381,30 @@ export async function publishApprovedSignals(input: {
         post.editedWhyItMatters || post.publishedWhyItMatters || "",
       ),
     );
+    // Before This + The Ripple (#274). Promote whatever the editor placed in
+    // edited_* (text + structured payload). If a layer was never edited, the
+    // promoted value is null and the foldback shows the empty state — we do
+    // NOT fall back to ai_* here, that would publish unreviewed content.
+    const wltiStructured = post.editedWhatLedToItStructured;
+    const wltiText = buildLayerPublishText(
+      post.editedWhatLedToIt,
+      wltiStructured,
+    );
+    const witcStructured = post.editedWhatItConnectsToStructured;
+    const witcText = buildLayerPublishText(
+      post.editedWhatItConnectsTo,
+      witcStructured,
+    );
 
     return {
       post,
       structuredContent,
       text,
       validation: validateWhyItMatters(text),
+      wltiText,
+      wltiStructured,
+      witcText,
+      witcStructured,
     };
   });
 
@@ -3298,20 +3510,37 @@ export async function publishApprovedSignals(input: {
   }
 
   const updateResults = await Promise.all(
-    publicationCandidates.map(({ post, structuredContent, text, validation }) =>
-      context.client
-        .from("signal_posts")
-        .update({
-          published_why_it_matters: text,
-          published_why_it_matters_payload: structuredContent,
-          editorial_status: "published",
-          editorial_decision: "approved",
-          ...buildWhyItMattersValidationFields(validation, now),
-          is_live: true,
-          published_at: now,
-          updated_at: now,
-        })
-        .eq("id", post.id),
+    publicationCandidates.map(
+      ({
+        post,
+        structuredContent,
+        text,
+        validation,
+        wltiText,
+        wltiStructured,
+        witcText,
+        witcStructured,
+      }) =>
+        context.client
+          .from("signal_posts")
+          .update({
+            published_why_it_matters: text,
+            published_why_it_matters_payload: structuredContent,
+            // Promote Before This + The Ripple from edited_* to published_*.
+            // null when the layer was never edited — the foldback handles
+            // null as the layer's empty state. See #274 Part B Step 4.
+            published_what_led_to_it: wltiText,
+            published_what_led_to_it_payload: wltiStructured,
+            published_what_it_connects_to: witcText,
+            published_what_it_connects_to_payload: witcStructured,
+            editorial_status: "published",
+            editorial_decision: "approved",
+            ...buildWhyItMattersValidationFields(validation, now),
+            is_live: true,
+            published_at: now,
+            updated_at: now,
+          })
+          .eq("id", post.id),
     ),
   );
 

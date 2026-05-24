@@ -155,10 +155,13 @@ describe("Bootup News visual system components", () => {
     }
   });
 
-  it("renders the italic empty-state for What led to this when data is missing", () => {
+  // #274 renamed "What led to this" → "Before This" in the foldback and
+  // wired it to read published_what_led_to_it. When published_* is null
+  // the layer shows the empty state in italic tertiary text.
+  it("renders the italic empty-state for Before This when published_what_led_to_it is missing", () => {
     const signal = {
       id: "signal-empty-led",
-      title: "Card without structural context yet",
+      title: "Card without prior context yet",
       whyItMatters: "Editorial body only.",
       sourceName: "Reuters",
       sourceUrl: "https://www.reuters.com/story",
@@ -166,10 +169,85 @@ describe("Bootup News visual system components", () => {
 
     render(<SignalCard signal={signal} rank={1} defaultExpanded />);
 
-    expect(screen.getByText("What led to this")).toBeInTheDocument();
-    const placeholder = screen.getByText("No structural context yet for this signal.");
+    expect(screen.getByText("Before This")).toBeInTheDocument();
+    const placeholder = screen.getByText("No prior context yet for this signal.");
     expect(placeholder).toHaveClass("italic");
     expect(placeholder).toHaveClass("text-[var(--bu-text-tertiary)]");
+  });
+
+  // #274 — when all three layers carry published content, the foldback
+  // renders them with v2 labels in the order The Signal → Before This →
+  // The Ripple. Each layer's body comes from its published_* column;
+  // ai_*/edited_* must NOT be surfaced.
+  it("renders all three editorial layers with v2 labels and cause-then-trajectory order when published_* is set (#274)", () => {
+    render(
+      <SignalCard
+        rank={1}
+        defaultExpanded
+        signal={{
+          id: "signal-three-layer",
+          title: "Card with all three editorial layers published",
+          publishedWhyItMatters: "The Signal body — what this means right now.",
+          publishedWhatLedToIt: "The Before This body — what conditions produced it.",
+          publishedWhatItConnectsTo: "The Ripple body — what this implies next.",
+          sourceName: "Reuters",
+          sourceUrl: "https://www.reuters.com/story",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("The Signal")).toBeInTheDocument();
+    expect(screen.getByText("Before This")).toBeInTheDocument();
+    expect(screen.getByText("The Ripple")).toBeInTheDocument();
+    // The Signal body appears twice — once as the card-face preview
+    // (testid signal-why-this-matters) and once in the expanded foldback.
+    // Both pull from publishedWhyItMatters; presence at least once is the
+    // assertion that matters.
+    expect(screen.getAllByText("The Signal body — what this means right now.").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("The Before This body — what conditions produced it."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("The Ripple body — what this implies next.")).toBeInTheDocument();
+
+    // Render order: walk all section labels and assert the editorial-layer
+    // sequence is Signal → Before This → Ripple.
+    const labels = screen
+      .getAllByText(/^(The Signal|Before This|The Ripple)$/u)
+      .map((node) => node.textContent);
+    expect(labels).toEqual(["The Signal", "Before This", "The Ripple"]);
+  });
+
+  // #274 — when published_what_led_to_it and published_what_it_connects_to
+  // are null, the foldback MUST show the empty state for each layer and
+  // MUST NOT fall back to ai_*/edited_*/human_* (publish-gate bypass).
+  it("shows empty state for Before This / The Ripple when published_* is null and never leaks ai_* content (#274)", () => {
+    render(
+      <SignalCard
+        rank={1}
+        defaultExpanded
+        signal={{
+          id: "signal-empty-layers",
+          title: "Card with unreviewed layer content",
+          publishedWhyItMatters: "The Signal published body.",
+          // published_* is null/undefined for the new layers. We deliberately
+          // also do NOT pass ai_*/edited_*/human_* — those are not part of
+          // SignalCardSignal. If they were ever added, the card must still
+          // refuse to surface them.
+          sourceName: "Reuters",
+          sourceUrl: "https://www.reuters.com/story",
+        }}
+      />,
+    );
+
+    // Labels show.
+    expect(screen.getByText("Before This")).toBeInTheDocument();
+    expect(screen.getByText("The Ripple")).toBeInTheDocument();
+
+    // Empty-state strings render in italic tertiary text.
+    const beforeEmpty = screen.getByText("No prior context yet for this signal.");
+    const rippleEmpty = screen.getByText("No downstream trajectory yet for this signal.");
+    expect(beforeEmpty).toHaveClass("italic");
+    expect(rippleEmpty).toHaveClass("italic");
   });
 
   it("keeps compact signals neutral for the secondary list surface", () => {
