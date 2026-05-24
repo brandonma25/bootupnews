@@ -200,6 +200,23 @@ Final live state confirmed via `GET https://api.cron-job.org/jobs`:
 
 Operational lesson captured in [`docs/engineering/CRON_SETUP.md` §6 → Burst-rate gotcha](../../engineering/CRON_SETUP.md#burst-rate-gotcha-observed-2026-05-22): high-churn syncs (multiple creates + multiple deletes) can interleave reads and writes tightly enough to trip an apparent per-window throttle even when the daily 100-request cap is nowhere near exhausted. The script's `failed=N` summary line accurately reflects this; the workaround is either re-running the sync (idempotent) or a single direct `PUT` for the missed job.
 
+### Phase 7.3 — Partial-index ON CONFLICT mismatch (issue #268, 3-day production outage 2026-05-21 → 2026-05-23)
+
+**Severity:** load-bearing. Production ingestion silently failed every cron fire for 3 consecutive days. Zero `signal_posts` rows were written between 2026-05-21 10:15Z (the last fire under pre-PR-260 code) and the fix landing. `cron_runs.status='fail'` every day; Sentry surfaced BOOT-UP-WEB-6 (RSS signal post persistence failed during daily refresh) and BOOT-UP-WEB-7 (Current RSS Top 5 snapshot could not be persisted for editing) but those wrappers carried no Postgres-side error message.
+
+**Root cause:** PR #260's migration `20260521120000_cron_runs_and_source_url_idempotency.sql` created `signal_posts_briefing_date_source_url_key` as a **partial** unique index (`WHERE source_url IS NOT NULL`). The same PR switched `persistSignalPostCandidates` to `.upsert(rows, { onConflict: "briefing_date,source_url", ignoreDuplicates: true })`. supabase-js translates this to a bare `ON CONFLICT (briefing_date, source_url) DO NOTHING` with no `WHERE` predicate. Postgres requires the partial-index's predicate to be repeated in the conflict-inference clause; without it the planner cannot match any unique index and aborts the entire INSERT batch with `SQLSTATE 42P10: there is no unique or exclusion constraint matching the ON CONFLICT specification`. The vitest mock at `signals-editorial.test.ts:~478` implements `.upsert()` as a JS stand-in that does NOT enforce ON CONFLICT inference semantics, so 795 green tests never caught the bug.
+
+**Why detection lagged 3 days:** the new consolidated 12:00 UTC schedule didn't start firing until 2026-05-22 (after `cron:sync:prune` ran), so the first failing run under post-PR-260 code was 05-22 12:00. Sentry events landed but were classified as transient feed/persistence issues. `cron_runs` rows showed `status='fail'` with duration ~25–30s — within budget, ruling out the timeout hypothesis only on the third day's diagnostic deep-dive.
+
+**Fix (PR #268-fix):** four parts, one PR.
+
+1. **App** — `persistSignalPostCandidates` rewritten to a select-then-decide flow (mirrors PR #266's `pushApprovedRow`): SELECT existing `source_url`s for the briefing_date → filter candidate rows to non-present → plain `.insert()` for the rest. No `.upsert()`, no `ON CONFLICT`. The SELECT → INSERT race window is closed at the orchestration layer by the `cron_runs` run-lock from PRs #260 + #266.
+2. **Audit** — every signal_posts writer enumerated. `pushApprovedRow` already uses `.insert()`/`.update()` via PR #266. `promoteNewsletterStoryToCandidate` uses plain `.insert()` (no upsert). No other writers exist.
+3. **Index decision** — the partial unique index `signal_posts_briefing_date_source_url_key` is **kept as a passive data-integrity guard**. After Part 1, no writer uses it for `ON CONFLICT` inference, so the partial predicate no longer creates a footgun. It still prevents duplicate non-NULL `(briefing_date, source_url)` pairs from any future writer, with zero behavior cost.
+4. **Test gap** — new lint-style guard at `src/lib/signal-posts-writers.guard.test.ts` scans all production `.ts` files and fails if any production code calls `.upsert(...)` against `signal_posts`. The relax-the-rule conditions ((a) all relevant indexes non-partial, and (b) integration test against real Postgres) are documented in the test file's header so deleting the rule forces the review conversation. Additionally, the mock's known gap is now explicitly documented at `signals-editorial.test.ts:~478` so future editors know what the mock does NOT enforce.
+
+**Operational lesson:** supabase-js's `.upsert({onConflict})` cannot match partial unique indexes. Any future migration adding a partial unique index that a JS-client upsert needs to target MUST be paired with either (a) a non-partial sibling index, or (b) a switch to select-then-decide / RPC. The guard test enforces this at PR review time.
+
 ## Closeout Checklist
 
 - Scope completed: all phases (0–5) plus the cron-job.org sync tooling landing.

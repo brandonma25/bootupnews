@@ -1313,45 +1313,94 @@ async function persistSignalPostCandidates(
 
   const now = new Date().toISOString();
 
-  // Upsert on (briefing_date, source_url) so a second ingestion run (e.g. the
-  // rollback escape hatch dual-trigger, or any future re-fire) is a no-op
-  // rather than a duplicate insert. The partial unique index backing this
-  // conflict target is signal_posts_briefing_date_source_url_key (migration
-  // 20260521120000). All rows in missingCandidates are pre-filtered by
-  // isValidPublicSourceUrl(), so source_url is non-null and matches the
-  // partial index predicate.
+  // Select-then-decide persistence (issue #268 — production was down for 3 days
+  // because the previous `.upsert(..., { onConflict: "briefing_date,source_url",
+  // ignoreDuplicates: true })` could not match the PARTIAL unique index
+  // `signal_posts_briefing_date_source_url_key WHERE source_url IS NOT NULL`).
   //
+  // supabase-js emits a bare `ON CONFLICT (briefing_date, source_url) DO NOTHING`
+  // with no WHERE predicate; Postgres requires the partial index's predicate
+  // to be repeated in the conflict-inference clause, so it returned SQLSTATE
+  // 42P10 "there is no unique or exclusion constraint matching the ON CONFLICT
+  // specification" — aborting the entire INSERT batch on every run since PR
+  // #260 + the consolidated schedule went live. Test mocks didn't enforce
+  // index-inference semantics so 795 green vitest cases never caught it.
+  //
+  // The fix mirrors PR #266's `pushApprovedRow` rewrite: SELECT the existing
+  // source_url values for the briefing_date, filter the candidate batch to
+  // those whose source_url isn't already present, and INSERT only the missing
+  // rows via plain `.insert()`. No `ON CONFLICT`. The select-then-insert
+  // window is not atomic, but the run-lock from PR #260 + #266 (`cron_runs`
+  // PK with status-aware reclaim) prevents concurrent cron fires from
+  // racing into the same briefing_date — so the race window is already
+  // closed at the orchestration layer.
+  //
+  // Task 3 provenance stamps (PR #262) are preserved verbatim below.
+  const candidateUrls = missingCandidates
+    .map((c) => c.sourceUrl)
+    .filter((u): u is string => typeof u === "string" && u.length > 0);
+  const existingUrlsResult = await client
+    .from("signal_posts")
+    .select("source_url")
+    .eq("briefing_date", briefingDate)
+    .in("source_url", candidateUrls);
+
+  if (existingUrlsResult.error) {
+    captureRssEditorialStorageFailure({
+      failureType: "rss_cache_read_failed",
+      phase: "store",
+      operation: "preflight_existing_source_urls",
+      briefingDate,
+      message: "RSS signal snapshot pre-flight existing-URL check failed.",
+    });
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      skippedCandidates,
+      message: `Pre-flight failed; could not check existing source_urls: ${existingUrlsResult.error.message}`,
+    };
+  }
+
+  const existingUrlSet = new Set(
+    ((existingUrlsResult.data ?? []) as Array<{ source_url: string | null }>)
+      .map((r) => r.source_url)
+      .filter((u): u is string => typeof u === "string"),
+  );
+
+  const candidatesToInsert = missingCandidates.filter(
+    (c) => !existingUrlSet.has(c.sourceUrl),
+  );
+
+  if (candidatesToInsert.length === 0) {
+    return {
+      ok: true,
+      briefingDate,
+      insertedCount: 0,
+      insertedPostIds: [],
+      skippedCandidates,
+      mode,
+      message: "The daily signal snapshot already exists for this briefing date (all candidate URLs already present).",
+    };
+  }
+
   // Task 3 — Legacy template generator provenance stamps. The witm_draft_*
   // columns were left NULL on every legacy-path row in production, making the
-  // boilerplate output indistinguishable from the (future) v2 LLM bridge
-  // rows. Stamping them at write time means any post-deploy query can tell
-  // legacy heuristic copy from v2 LLM copy by provenance alone, and the v2
-  // bridge (Task 4) gets a deterministic predicate to overwrite legacy rows
-  // when the editor approves a real draft.
-  //
-  // Per-column rationale:
-  //   - witm_draft_generated_by='deterministic_template' — CHECK constraint
-  //     allows {llm, deterministic_template, human}; this is the legacy bucket.
-  //   - witm_draft_model='heuristic_template_v1' — free-text identifier for
-  //     the summarizer + why-it-matters template builder
-  //     (src/lib/why-it-matters.ts → buildEventTypeSpecificWhyThisMatters,
-  //     summarizer.ts → generateWhyThisMattersHeuristically).
+  // boilerplate output indistinguishable from v2 LLM bridge rows. Stamping
+  // them at write time means any post-deploy query can tell legacy heuristic
+  // copy from v2 LLM copy by `witm_draft_generated_by` alone:
+  //   - 'deterministic_template' — CHECK allows {llm, deterministic_template, human}.
+  //   - 'heuristic_template_v1' — free-text identifier for the summarizer +
+  //     why-it-matters template builder (src/lib/why-it-matters.ts →
+  //     buildEventTypeSpecificWhyThisMatters; summarizer.ts →
+  //     generateWhyThisMattersHeuristically).
   //   - editorial_content_source='ai' — closest fit under the
-  //     {ai, human, ai+human} CHECK. The heuristic is structurally an
-  //     AI-shaped synthetic generator (not human-edited); 'ai' will be the
-  //     same value the v2 LLM bridge uses, so callers must combine it with
-  //     witm_draft_generated_by to distinguish the two paths.
-  //   - why_it_matters_validation_status: see Task 6 — still defaults to
-  //     'passed' from the CHECK default because the legacy validator's
-  //     enum doesn't yet model "not_run". Task 6 lands the enum change.
-  //
-  // The legacy path NEVER overwrites a v2 bridge row: the upsert uses
-  // ignoreDuplicates, so any existing (briefing_date, source_url) row —
-  // whether legacy or v2 — wins. Task 4 will need to invert this for the
-  // bridge so v2 rows can overwrite stale deterministic_template rows when
-  // BM approves a real draft for the same article URL.
-  const insertResult = await client.from("signal_posts").upsert(
-    missingCandidates.map((post) => ({
+  //     {ai, human, ai+human} CHECK. v2 LLM bridge writes the same value, so
+  //     callers must combine it with witm_draft_generated_by to distinguish.
+  //   - why_it_matters_validation_status: still defaults to 'passed' from the
+  //     CHECK default. Task 6 lands the 'not_run' enum addition.
+  const insertResult = await client.from("signal_posts").insert(
+    candidatesToInsert.map((post) => ({
       briefing_date: briefingDate,
       rank: post.rank,
       title: post.title,
@@ -1386,7 +1435,6 @@ async function persistSignalPostCandidates(
       created_at: now,
       updated_at: now,
     })),
-    { onConflict: "briefing_date,source_url", ignoreDuplicates: true },
   ).select("id");
 
   if (insertResult.error) {

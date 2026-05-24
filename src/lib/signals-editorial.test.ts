@@ -479,9 +479,20 @@ function createSupabaseMock(
         },
         // The upsert mock mirrors insert because the test fixtures never seed
         // pre-existing rows that would actually conflict on
-        // (briefing_date, source_url). Real conflict behavior is covered by the
-        // route-level cron run-lock test (the partial unique index is enforced
-        // by Postgres, not this mock).
+        // (briefing_date, source_url).
+        //
+        // KNOWN GAP (issue #268): this mock does NOT enforce Postgres's
+        // ON CONFLICT inference rules against partial unique indexes. PR
+        // #260 passed all tests using `{onConflict:'briefing_date,source_url',
+        // ignoreDuplicates:true}` even though Postgres would have rejected
+        // the bare ON CONFLICT clause with SQLSTATE 42P10 against the
+        // PARTIAL `signal_posts_briefing_date_source_url_key` index — and
+        // production was down for 3 days as a result. The lint-style guard
+        // at src/lib/signal-posts-writers.guard.test.ts forbids any new
+        // `.upsert()` against signal_posts to prevent recurrence. Do not
+        // delete this comment without addressing the gap (either by
+        // extending the mock to model index inference, or by adding a
+        // real-Postgres integration harness).
         upsert(values: Partial<TestRow> | Array<Partial<TestRow>>, _options?: unknown) {
           operation = "insert";
           const insertError = options.insertErrors?.[tableName];
