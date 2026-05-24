@@ -78,6 +78,21 @@ function CandidateHiddenInputs({ candidate }: { candidate: EditorialSignalPost }
   const structuredContent =
     candidate.editedWhyItMattersStructured ?? candidate.publishedWhyItMattersStructured ?? null;
   const structuredJson = structuredContent ? JSON.stringify(structuredContent) : "";
+  // #274 Before This / The Ripple per-row pass-through. We post the current
+  // persisted content for each layer so bulk approve preserves any prior
+  // edits (vs. clearing them by submitting empty strings).
+  const persistedWhatLedToIt =
+    candidate.editedWhatLedToIt ??
+    candidate.publishedWhatLedToIt ??
+    candidate.humanWhatLedToIt ??
+    candidate.aiWhatLedToIt ??
+    "";
+  const persistedWhatItConnectsTo =
+    candidate.editedWhatItConnectsTo ??
+    candidate.publishedWhatItConnectsTo ??
+    candidate.humanWhatItConnectsTo ??
+    candidate.aiWhatItConnectsTo ??
+    "";
 
   return (
     <>
@@ -89,6 +104,8 @@ function CandidateHiddenInputs({ candidate }: { candidate: EditorialSignalPost }
       />
       <input type="hidden" name="editedWhyItMatters" value={persistedEditorialText} />
       <input type="hidden" name="structuredWhyItMatters" value={structuredJson} />
+      <input type="hidden" name="editedWhatLedToIt" value={persistedWhatLedToIt} />
+      <input type="hidden" name="editedWhatItConnectsTo" value={persistedWhatItConnectsTo} />
     </>
   );
 }

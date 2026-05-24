@@ -41,6 +41,18 @@ type StructuredEditorialFieldsProps = {
   legacyText: string;
   structuredContent: EditorialWhyItMattersContent | null;
   /**
+   * Initial Before This (`what_led_to_it`) text the editor sees in the
+   * textarea (#274). Pre-filled from edited_*, then published_*, then
+   * human_*, then ai_* — first non-empty wins. Editor saves write to
+   * edited_what_led_to_it via the form action.
+   */
+  initialEditedWhatLedToIt: string;
+  /**
+   * Initial The Ripple (`what_it_connects_to`) text the editor sees in
+   * the textarea (#274). Same precedence as initialEditedWhatLedToIt.
+   */
+  initialEditedWhatItConnectsTo: string;
+  /**
    * Vestigial prop. The previous bulk-approve flow scraped this row's
    * hidden inputs from the DOM when this flag was true. That coupling
    * was removed when the bulk-approve form moved up to
@@ -62,6 +74,19 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
   const editableText = post.editedWhyItMatters || post.publishedWhyItMatters || post.aiWhyItMatters;
   const structuredContent =
     post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
+  // Before This / The Ripple (#274). Pre-fill the editor with the most
+  // editorially-trustworthy source available: prior edited copy, then a
+  // previously-published version, then the bridge's human override, then
+  // the AI draft. The editor can wipe to a clean slate by clearing the
+  // textarea before saving — empty string clears the layer at save time.
+  const initialEditedWhatLedToIt =
+    post.editedWhatLedToIt ?? post.publishedWhatLedToIt ?? post.humanWhatLedToIt ?? post.aiWhatLedToIt ?? "";
+  const initialEditedWhatItConnectsTo =
+    post.editedWhatItConnectsTo ??
+    post.publishedWhatItConnectsTo ??
+    post.humanWhatItConnectsTo ??
+    post.aiWhatItConnectsTo ??
+    "";
   const controlsDisabled = !storageReady || !post.persisted;
   const decisionControlsDisabled =
     controlsDisabled || post.isLive || post.editorialStatus === "published" || Boolean(post.publishedAt);
@@ -162,6 +187,8 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
             aiWhyItMatters={post.aiWhyItMatters}
             legacyText={editableText}
             structuredContent={structuredContent}
+            initialEditedWhatLedToIt={initialEditedWhatLedToIt}
+            initialEditedWhatItConnectsTo={initialEditedWhatItConnectsTo}
             eligibleForApproveAll={eligibleForApproveAll}
           />
 
@@ -260,6 +287,8 @@ export function StructuredEditorialFields({
   aiWhyItMatters,
   legacyText,
   structuredContent,
+  initialEditedWhatLedToIt,
+  initialEditedWhatItConnectsTo,
   // Vestigial after the bulk-approve refactor; see prop docs above.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   eligibleForApproveAll: _eligibleForApproveAll,
@@ -272,6 +301,15 @@ export function StructuredEditorialFields({
   const [sectionTitles, setSectionTitles] = useState(initialSections.map((section) => section.title));
   const [sectionBodies, setSectionBodies] = useState(initialSections.map((section) => section.body));
   const [previewMode, setPreviewMode] = useState<"collapsed" | "expanded">("collapsed");
+  // #274 Before This / The Ripple. These are simple textareas wired to
+  // hidden form fields the server actions read into edited_what_led_to_it
+  // and edited_what_it_connects_to. We do not yet expose a structured
+  // editor for these layers; the lib derives a legacy-text payload
+  // server-side when the structured content is undefined.
+  const [editedWhatLedToIt, setEditedWhatLedToIt] = useState(initialEditedWhatLedToIt);
+  const [editedWhatItConnectsTo, setEditedWhatItConnectsTo] = useState(
+    initialEditedWhatItConnectsTo,
+  );
   const content = useMemo(
     () =>
       normalizeEditorialWhyItMattersContent({
@@ -303,6 +341,21 @@ export function StructuredEditorialFields({
         type="hidden"
         name="structuredWhyItMatters"
         value={structuredJson}
+      />
+      {/* #274 Before This + The Ripple — hidden form fields wired to the
+          textareas below. We post empty string when cleared so the server
+          knows the editor intentionally wiped the layer (vs. unchanged). */}
+      <input
+        type="hidden"
+        name="editedWhatLedToIt"
+        value={editedWhatLedToIt}
+        readOnly
+      />
+      <input
+        type="hidden"
+        name="editedWhatItConnectsTo"
+        value={editedWhatItConnectsTo}
+        readOnly
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
@@ -437,6 +490,39 @@ export function StructuredEditorialFields({
             </div>
           )}
         </div>
+      </div>
+
+      {/* #274 Before This + The Ripple. Simple textareas, no structured
+          editor — the publish gate writes both the text and a
+          legacy-text-derived payload to published_what_*. The editor can
+          clear either layer by emptying the textarea before saving. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <FieldBlock
+          id={`editedWhatLedToIt-${postId}`}
+          label="Before This (what led to this)"
+          help="Causal / preceding context. Promoted to published_what_led_to_it on publish. Leave empty to suppress the layer from the public foldback."
+        >
+          <textarea
+            id={`editedWhatLedToIt-${postId}`}
+            value={editedWhatLedToIt}
+            onChange={(event) => setEditedWhatLedToIt(event.target.value)}
+            rows={5}
+            className="w-full resize-y rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm leading-6 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
+          />
+        </FieldBlock>
+        <FieldBlock
+          id={`editedWhatItConnectsTo-${postId}`}
+          label="The Ripple (what it connects to)"
+          help="Trajectory / downstream implications. Promoted to published_what_it_connects_to on publish. Leave empty to suppress the layer from the public foldback."
+        >
+          <textarea
+            id={`editedWhatItConnectsTo-${postId}`}
+            value={editedWhatItConnectsTo}
+            onChange={(event) => setEditedWhatItConnectsTo(event.target.value)}
+            rows={5}
+            className="w-full resize-y rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm leading-6 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
+          />
+        </FieldBlock>
       </div>
     </div>
   );

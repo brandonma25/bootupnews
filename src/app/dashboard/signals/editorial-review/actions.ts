@@ -61,6 +61,20 @@ function readStructuredEditorialInput(formData: FormData) {
   });
 }
 
+/**
+ * Read a non-WITM layer's text field from the composer form (#274). The form
+ * posts the edited text as `<fieldName>`. We do not yet expose a structured
+ * editor for these layers — the lib's `buildLayerEditorialWrite` derives a
+ * legacy-text payload server-side from this string when none is provided.
+ * Returns `undefined` (not "") when the field is absent so the lib's
+ * "do not touch unless provided" semantics hold. Empty strings ARE passed
+ * through (meaning the editor intentionally cleared the layer).
+ */
+function readLayerEditorialText(formData: FormData, fieldName: string): string | undefined {
+  const raw = formData.get(fieldName);
+  return raw === null ? undefined : String(raw);
+}
+
 function parseStructuredJson(value: string) {
   if (!value.trim()) {
     return null;
@@ -78,6 +92,8 @@ export async function saveSignalDraftAction(formData: FormData) {
     postId: String(formData.get("postId") ?? ""),
     editedWhyItMatters: String(formData.get("editedWhyItMatters") ?? ""),
     editedWhyItMattersStructured: readStructuredEditorialInput(formData),
+    editedWhatLedToIt: readLayerEditorialText(formData, "editedWhatLedToIt"),
+    editedWhatItConnectsTo: readLayerEditorialText(formData, "editedWhatItConnectsTo"),
   });
 
   if (result.ok) {
@@ -92,6 +108,8 @@ export async function approveSignalPostAction(formData: FormData) {
     postId: String(formData.get("postId") ?? ""),
     editedWhyItMatters: String(formData.get("editedWhyItMatters") ?? ""),
     editedWhyItMattersStructured: readStructuredEditorialInput(formData),
+    editedWhatLedToIt: readLayerEditorialText(formData, "editedWhatLedToIt"),
+    editedWhatItConnectsTo: readLayerEditorialText(formData, "editedWhatItConnectsTo"),
   });
 
   if (result.ok) {
@@ -109,11 +127,20 @@ export async function approveAllSignalPostsAction(formData: FormData) {
   const structuredValues = formData
     .getAll("structuredWhyItMatters")
     .map((value) => parseEditorialWhyItMattersContent(parseStructuredJson(String(value))));
+  // Per-row Before This / The Ripple text. Form posts these as parallel
+  // arrays keyed on row index (one entry per postId). Empty string
+  // intentionally clears that layer; absent entry leaves it untouched.
+  const wltiValues = formData.getAll("editedWhatLedToIt").map((value) => String(value));
+  const witcValues = formData
+    .getAll("editedWhatItConnectsTo")
+    .map((value) => String(value));
   const result = await approveSignalPosts({
     posts: postIds.map((postId, index) => ({
       postId,
       editedWhyItMatters: editedWhyItMattersValues[index] ?? "",
       editedWhyItMattersStructured: structuredValues[index] ?? null,
+      editedWhatLedToIt: wltiValues[index],
+      editedWhatItConnectsTo: witcValues[index],
     })),
   });
 
