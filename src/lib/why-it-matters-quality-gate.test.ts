@@ -330,4 +330,97 @@ describe("why-it-matters quality gate", () => {
     expect(card.whyItMattersValidation.passed).toBe(false);
     expect(card.reviewFailureReasons.length).toBeGreaterThan(1);
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // v2-content characterization (issue #270).
+  //
+  // These tests pin down two false-positives the validator emitted against
+  // the v2 LLM drafts on 2026-05-24. The v2 editorial framework permits:
+  //   - inline citation markers like [A], [A1], [P2], [F1], [V1] (§5.2)
+  //   - decimals (1.8) and abbreviations (U.S., e.g., i.e., etc., No., vs.)
+  //
+  // Tests A/B/C: SHOULD pass after the fix (currently fail).
+  // Tests D/E/F: SHOULD still fail after the fix (guardrails — real
+  //              placeholders, forbidden vocab, genuine short fragments).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  describe("v2 content (issue #270)", () => {
+    it("A: passes a Signal containing U.S., a 1.8 decimal, and a [A] citation marker", () => {
+      const result = validateWhyItMatters(
+        "The U.S. Federal Reserve raised the policy rate by 1.8 percentage points this cycle, lifting borrowing costs to a 22-year high [A].",
+      );
+
+      expect(result.passed).toBe(true);
+      expect(result.failures).toEqual([]);
+    });
+
+    it("B: real 2026-05-24 supply-chain card text triggers neither incomplete_sentence nor template_placeholder_language", () => {
+      const result = validateWhyItMatters(
+        "The Federal Reserve flagged a third global supply shock in six years [A]. The Global Supply Chain Pressure Index jumped 1.3 points in two months, to 1.8 standard deviations above its average [A].",
+      );
+
+      expect(result.failures).not.toContain("incomplete_sentence");
+      expect(result.failures).not.toContain("template_placeholder_language");
+    });
+
+    it("C: bracketed citation markers [A], [A1], [P2], [F1], [V1] do not trigger template_placeholder_language", () => {
+      const markers = ["[A]", "[A1]", "[P2]", "[F1]", "[V1]"];
+      for (const marker of markers) {
+        const result = validateWhyItMatters(
+          `The Federal Reserve raised the policy rate by 25 basis points last week ${marker}.`,
+        );
+        expect(
+          result.failures,
+          `marker ${marker} should not trigger template_placeholder_language`,
+        ).not.toContain("template_placeholder_language");
+      }
+    });
+
+    it("D (guardrail): genuine lowercase placeholders {company} and [topic] are still flagged", () => {
+      const curly = validateWhyItMatters(
+        "The Federal Reserve decision matters because {company} now controls how borrowing costs feed into demand.",
+      );
+      const square = validateWhyItMatters(
+        "The Federal Reserve decision matters because investors are repricing [topic] across the curve.",
+      );
+
+      expect(curly.failures).toContain("template_placeholder_language");
+      expect(curly.failureDetails).toEqual(
+        expect.arrayContaining([
+          'template_placeholder_language: Contains unresolved template variable: "{company}"',
+        ]),
+      );
+      expect(square.failures).toContain("template_placeholder_language");
+      expect(square.failureDetails).toEqual(
+        expect.arrayContaining([
+          'template_placeholder_language: Contains unresolved template variable: "[topic]"',
+        ]),
+      );
+    });
+
+    it("E (guardrail): forbidden-vocab phrases from TEMPLATE_PLACEHOLDER_PHRASES are still flagged", () => {
+      const expectationsResult = validateWhyItMatters(
+        "The Federal Reserve hold could move expectations across the curve next quarter.",
+      );
+      const individualResult = validateWhyItMatters(
+        "The Federal Reserve decision is mainly useful for individual decision-making across U.S. households.",
+      );
+
+      expect(expectationsResult.failures).toContain("template_placeholder_language");
+      expect(individualResult.failures).toContain("template_placeholder_language");
+    });
+
+    it("F (guardrail): genuine sub-8-word sentence (no decimal, no abbreviation) is still flagged incomplete_sentence", () => {
+      const result = validateWhyItMatters(
+        "The Federal Reserve raised the policy rate by 25 basis points last week. Markets fell sharply.",
+      );
+
+      expect(result.failures).toContain("incomplete_sentence");
+      expect(result.failureDetails).toEqual(
+        expect.arrayContaining([
+          'incomplete_sentence: Sentence has fewer than 8 words: "Markets fell sharply."',
+        ]),
+      );
+    });
+  });
 });

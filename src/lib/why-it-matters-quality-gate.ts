@@ -44,6 +44,43 @@ const TERMINAL_PUNCTUATION_PATTERN = /[.!?]$/;
 const SIGNAL_SUFFIX_PATTERN = /\s*\(Signal:\s*[^)]+\)\s*$/i;
 const UNRESOLVED_VARIABLE_PATTERN =
   /(?:\{\{\s*[^{}]+\s*\}\}|\{[a-z][a-z0-9_\s-]*\}|\[[a-z][a-z0-9_\s-]*\]|\$[a-z][a-z0-9_]*)/gi;
+// v2 editorial framework §5.2 citation markers: [A], [A1]+, [P#], [F#], [V#].
+// Shape = single uppercase letter optionally followed by digits, bracketed.
+// These markers are REQUIRED content, not unfilled template tokens, so we
+// post-filter them out of UNRESOLVED_VARIABLE_PATTERN matches (issue #270).
+const CITATION_MARKER_PATTERN = /^\[[A-Z]\d*\]$/;
+// Sentinel char (SOH, U+0001) — guaranteed not to appear in editorial text.
+// We swap "."→sentinel in decimals and known abbreviations BEFORE splitting on
+// sentence-terminal punctuation, then swap back after each sentence is sliced
+// (issue #270 — the splitter was breaking on every period including 1.8 and
+// U.S.).
+const SENTENCE_GUARD_SENTINEL = "";
+// Whitelist of period-bearing abbreviations the sentence splitter must not
+// fragment. Sorted with longest first so multi-period abbreviations match
+// before their shorter prefixes (e.g. "U.S.A." before "U.S.").
+const SENTENCE_SPLITTER_ABBREVIATIONS = [
+  "U.S.A.",
+  "Ph.D.",
+  "U.S.",
+  "U.K.",
+  "E.U.",
+  "e.g.",
+  "i.e.",
+  "etc.",
+  "vs.",
+  "No.",
+  "Inc.",
+  "Ltd.",
+  "Corp.",
+  "Mrs.",
+  "Mr.",
+  "Ms.",
+  "Dr.",
+  "Jr.",
+  "Sr.",
+  "Mt.",
+  "St.",
+];
 const DANGLING_ENDING_PATTERNS = [
   {
     label: "rather than",
@@ -350,9 +387,30 @@ function getWordCount(value: string) {
     .filter((word) => /[A-Za-z0-9]/.test(word)).length;
 }
 
+// Replace periods that are part of decimals or known abbreviations with a
+// sentinel char so the sentence splitter does not fragment them. The sentinel
+// is restored back to "." after sentences are sliced.
+function protectSentenceSplitterEdgeCases(value: string) {
+  let protectedValue = value.replace(/(\d)\.(\d)/g, `$1${SENTENCE_GUARD_SENTINEL}$2`);
+  for (const abbreviation of SENTENCE_SPLITTER_ABBREVIATIONS) {
+    const pattern = new RegExp(escapeRegExp(abbreviation), "gi");
+    protectedValue = protectedValue.replace(pattern, (match) =>
+      match.replace(/\./g, SENTENCE_GUARD_SENTINEL),
+    );
+  }
+  return protectedValue;
+}
+
+function restoreSentenceSplitterEdgeCases(value: string) {
+  return value.split(SENTENCE_GUARD_SENTINEL).join(".");
+}
+
 function getSentences(value: string) {
-  const matches = value.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [];
-  return matches.map((sentence) => sentence.trim()).filter(Boolean);
+  const protectedValue = protectSentenceSplitterEdgeCases(value);
+  const matches = protectedValue.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [];
+  return matches
+    .map((sentence) => restoreSentenceSplitterEdgeCases(sentence).trim())
+    .filter(Boolean);
 }
 
 function hasSpecificNoun(value: string) {
@@ -432,7 +490,13 @@ function detectTemplatePlaceholderLanguage(
     }
   }
 
-  const unresolvedVariables = value.match(UNRESOLVED_VARIABLE_PATTERN) ?? [];
+  // Filter out v2 framework citation markers ([A], [A1]+, [P#], [F#], [V#]).
+  // The third branch of UNRESOLVED_VARIABLE_PATTERN (`\[[a-z]...\]` with /i
+  // flag) was catching them as unfilled placeholders — false positive
+  // tracked in issue #270.
+  const unresolvedVariables = (value.match(UNRESOLVED_VARIABLE_PATTERN) ?? []).filter(
+    (variable) => !CITATION_MARKER_PATTERN.test(variable),
+  );
   for (const variable of unresolvedVariables) {
     addFailure(
       failures,
