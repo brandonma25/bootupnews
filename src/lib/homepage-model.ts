@@ -55,6 +55,12 @@ export type HomepageEvent = {
   trustLayer: TrustLayerPresentation;
   whyItMatters: string;
   editorialWhyItMatters?: EditorialWhyItMattersContent | null;
+  // #274 Before This + The Ripple — public published_* values only. Null
+  // unless the editor approved + the publish gate promoted that layer.
+  publishedWhatLedToIt?: string | null;
+  publishedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+  publishedWhatItConnectsTo?: string | null;
+  publishedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   whyThisIsHere: string;
   relatedArticles: EventArticle[];
   timeline: EventTimelineMilestone[];
@@ -440,6 +446,22 @@ export function buildHomepageEvents(
         }),
         whyItMatters,
         editorialWhyItMatters,
+        // #274 Pass-through; the SignalCard foldback reads these and falls
+        // back to its layer-empty state when they are null. We deliberately
+        // do NOT inject ai_*/edited_*/human_* fallbacks here — that would
+        // publish unreviewed content.
+        publishedWhatLedToIt:
+          item.editorialStatus === "published" ? item.publishedWhatLedToIt ?? null : null,
+        publishedWhatLedToItStructured:
+          item.editorialStatus === "published"
+            ? item.publishedWhatLedToItStructured ?? null
+            : null,
+        publishedWhatItConnectsTo:
+          item.editorialStatus === "published" ? item.publishedWhatItConnectsTo ?? null : null,
+        publishedWhatItConnectsToStructured:
+          item.editorialStatus === "published"
+            ? item.publishedWhatItConnectsToStructured ?? null
+            : null,
         whyThisIsHere: buildWhyThisIsHere(item, classification, intelligence),
         relatedArticles: buildHomepageRelatedArticles(item),
         timeline: buildEventTimeline(item, siblingItems),

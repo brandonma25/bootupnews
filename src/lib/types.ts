@@ -173,6 +173,13 @@ export type BriefingItem = {
   editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
   publishedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
   editorialWhyItMatters?: EditorialWhyItMattersContent | null;
+  // #274 Before This + The Ripple. Public published_* values only — the
+  // upstream selector decides whether to surface them. ai_*/edited_*/human_*
+  // intentionally stay inside the admin path and do NOT flow through here.
+  publishedWhatLedToIt?: string | null;
+  publishedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+  publishedWhatItConnectsTo?: string | null;
+  publishedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   editorialStatus?: EditorialStatus;
   editedBy?: string | null;
   editedAt?: string | null;
