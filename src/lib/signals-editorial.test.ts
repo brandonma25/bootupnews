@@ -3000,6 +3000,14 @@ describe("signals editorial workflow", () => {
     });
   });
 
+  // STANDING RULE (issue #282 — re-publish partial-state bug):
+  // State-transition tests must assert the COMPLETE resulting row state
+  // (all promoted columns + status + is_live + id), never just the
+  // function return — this bug (and the #275 duplicate-render bug) both
+  // shipped because tests asserted the happy-path output, not the end
+  // state. Every test in this block reads the final mock row and pins
+  // every column the brief's acceptance criteria mention.
+
   // #280 — re-publish a card that is already live + published. Snapshots
   // the prior published_* into previous_published_snapshot, overwrites in
   // place from edited_*, keeps is_live=true and same id. Does NOT replace
@@ -3168,6 +3176,104 @@ describe("signals editorial workflow", () => {
       expect(rows.every((row) => row.is_live === true)).toBe(true);
       // First-time publish does not snapshot — the column stays null.
       expect(rows.every((row) => row.previous_published_snapshot === null)).toBe(true);
+    });
+
+    // STANDING RULE applies to this test — assert the COMPLETE row state.
+    // This is the regression test for issue #282 (the prod bug where
+    // depth layers stayed NULL and status flipped to "approved" after
+    // re-publish, causing the card to vanish from the public homepage).
+    //
+    // Repro: a live+published card whose depth-layer `edited_*` AND
+    // `published_*` columns are BOTH null (the common state for any
+    // card that was first-published before depth-layer promotion was
+    // supported, or whose depth layers were never edited+saved). The
+    // editor types depth-layer content into the textareas and clicks
+    // Re-publish. The action passes the typed text to the lib via the
+    // new optional `editedWhat*` parameters. Expected: all three
+    // `published_*` columns reflect the typed content, status stays
+    // 'published', is_live=true, snapshot captures the null prior.
+    it("issue #282: re-publishes ALL three layers from form-supplied content even when DB edited_*/published_* are both null", async () => {
+      const priorPublishedAt = "2026-05-23T12:00:00.000Z";
+      const rows = [
+        createRow({
+          id: "live-card-282",
+          briefing_date: "2026-05-24",
+          editorial_status: "published",
+          editorial_decision: "approved",
+          is_live: true,
+          published_at: priorPublishedAt,
+          why_it_matters_validation_status: "passed",
+          // The Signal IS published (slate gate writes it on first publish).
+          published_why_it_matters: createValidWhyItMatters("Prior Signal"),
+          edited_why_it_matters: createValidWhyItMatters("Prior Signal"),
+          // BUT depth layers are NULL in DB — never edited, never promoted.
+          // This is the exact prod-bug precondition.
+          edited_what_led_to_it: null,
+          published_what_led_to_it: null,
+          edited_what_it_connects_to: null,
+          published_what_it_connects_to: null,
+          source_url: "https://example.com/source",
+        }),
+      ];
+      createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+      safeGetUser.mockResolvedValue({
+        user: { id: "admin-1", email: "admin@example.com" },
+        supabase: {},
+        sessionCookiePresent: true,
+      });
+
+      const { republishLiveSignalPost } = await loadEditorialModule();
+      const result = await republishLiveSignalPost({
+        postId: "live-card-282",
+        // Editor's typed textarea content — must reach published_* even
+        // though DB-edited_* and DB-published_* are null for these layers.
+        editedWhyItMatters: createValidWhyItMatters("Updated Signal"),
+        editedWhatLedToIt: "New Before This text typed in the cockpit.",
+        editedWhatItConnectsTo: "New Ripple text typed in the cockpit.",
+      });
+
+      // Read the COMPLETE resulting row state, not just the function return.
+      const row = rows[0];
+
+      // The function must succeed.
+      expect(result.ok).toBe(true);
+      expect(result.code).toBe("republished");
+
+      // Status MUST stay 'published' — NOT 'approved' (the prod regression).
+      expect(row.editorial_status).toBe("published");
+      expect(row.is_live).toBe(true);
+      expect(row.id).toBe("live-card-282");
+
+      // ALL THREE published_* layers must reflect the typed content.
+      expect(row.published_why_it_matters).toBe(createValidWhyItMatters("Updated Signal"));
+      // These two are the layers that went NULL in prod — the regression
+      // test pins them tight.
+      expect(row.published_what_led_to_it).toBe(
+        "New Before This text typed in the cockpit.",
+      );
+      expect(row.published_what_it_connects_to).toBe(
+        "New Ripple text typed in the cockpit.",
+      );
+
+      // edited_* should ALSO carry the new content so any later Save
+      // Edits / refresh / Approve sees consistent state.
+      expect(row.edited_what_led_to_it).toBe(
+        "New Before This text typed in the cockpit.",
+      );
+      expect(row.edited_what_it_connects_to).toBe(
+        "New Ripple text typed in the cockpit.",
+      );
+
+      // Snapshot captured the prior published values (null for the depth
+      // layers in this scenario).
+      expect(row.previous_published_snapshot).toMatchObject({
+        why_it_matters: createValidWhyItMatters("Prior Signal"),
+        what_led_to_it: null,
+        what_it_connects_to: null,
+      });
+
+      // published_at bumped.
+      expect(row.published_at).not.toBe(priorPublishedAt);
     });
   });
 });

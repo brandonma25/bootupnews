@@ -98,6 +98,14 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
     post.whyItMattersValidationStatus !== "requires_human_rewrite" &&
     !isBlockingDecision(post.editorialDecision);
   const requiresHumanRewrite = post.whyItMattersValidationStatus === "requires_human_rewrite";
+  // #282 — A card that is currently published+live MUST flow through
+  // Re-publish for any update. Approve flips editorial_status to
+  // 'approved' without touching published_*, which removes the card
+  // from the public homepage query (which requires status='published').
+  // Hide Approve on live cards so that footgun is gone; Re-publish is
+  // the correct control.
+  const isCurrentlyLivePublished =
+    post.isLive && post.editorialStatus === "published" && Boolean(post.publishedAt);
   const toggleLabel = isExpanded ? "Collapse" : "Expand";
   const panelId = `editorial-panel-${post.id}`;
 
@@ -205,15 +213,20 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
               <Save className="h-4 w-4" />
               Save Edits
             </Button>
-            <Button
-              type="submit"
-              formAction={approveSignalPostAction}
-              disabled={controlsDisabled}
-              className="gap-2"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Approve
-            </Button>
+            {/* #282 Approve hidden on currently-live-published cards
+                — see isCurrentlyLivePublished comment. Re-publish is
+                the safe path. */}
+            {isCurrentlyLivePublished ? null : (
+              <Button
+                type="submit"
+                formAction={approveSignalPostAction}
+                disabled={controlsDisabled}
+                className="gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Approve
+              </Button>
+            )}
             <Button
               type="submit"
               formAction={resetSignalPostToAiDraftAction}
@@ -230,7 +243,7 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
                 from edited_*. Validation gate (WITM passed) still applies.
                 Distinct from the slate-publish button (which only handles
                 never-published cards). */}
-            {post.isLive && post.editorialStatus === "published" && post.publishedAt ? (
+            {isCurrentlyLivePublished ? (
               <Button
                 type="submit"
                 formAction={republishLiveSignalPostAction}
