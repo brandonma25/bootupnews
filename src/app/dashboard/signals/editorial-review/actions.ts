@@ -19,6 +19,7 @@ import {
   rejectSignalPost,
   removeSignalPostFromFinalSlate,
   replaceSignalPostInFinalSlate,
+  republishLiveSignalPost,
   requestSignalPostRewrite,
   resetSignalPostToAiDraft,
   saveSignalDraft,
@@ -222,6 +223,24 @@ export async function publishTopSignalsAction() {
 
 export async function publishSignalPostAction(formData: FormData) {
   const result = await publishSignalPost({
+    postId: String(formData.get("postId") ?? ""),
+  });
+
+  if (result.ok) {
+    revalidateEditorialRoutes();
+  }
+
+  redirectWithResult(result);
+}
+
+/**
+ * Re-publish an already-live signal post in place (#280). Snapshots the
+ * prior `published_*` into `previous_published_snapshot` and overwrites
+ * from `edited_*`. Refuses for never-published cards (use the slate
+ * publish gate instead) and refuses on WITM validator failure.
+ */
+export async function republishLiveSignalPostAction(formData: FormData) {
+  const result = await republishLiveSignalPost({
     postId: String(formData.get("postId") ?? ""),
   });
 
