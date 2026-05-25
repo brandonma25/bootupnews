@@ -236,12 +236,29 @@ export async function publishSignalPostAction(formData: FormData) {
 /**
  * Re-publish an already-live signal post in place (#280). Snapshots the
  * prior `published_*` into `previous_published_snapshot` and overwrites
- * from `edited_*`. Refuses for never-published cards (use the slate
- * publish gate instead) and refuses on WITM validator failure.
+ * `published_*` from the editor's currently-typed form content (falling
+ * back to DB `edited_*` then DB `published_*` for layers the editor
+ * didn't touch). The form-captured content is also persisted into
+ * `edited_*` in the same atomic update so subsequent reads see
+ * consistent state.
+ *
+ * Refuses for never-published cards (use the slate publish gate instead)
+ * and refuses on WITM validator failure.
+ *
+ * #282 (regression fix): previously this action only passed `postId` to
+ * the lib, so the lib read DB `edited_*` (often null for depth layers)
+ * and wrote null into `published_what_led_to_it` /
+ * `published_what_it_connects_to`. The editor's typed textarea content
+ * was silently dropped. The lib's new optional `editedWhat*` parameters
+ * close that gap.
  */
 export async function republishLiveSignalPostAction(formData: FormData) {
   const result = await republishLiveSignalPost({
     postId: String(formData.get("postId") ?? ""),
+    editedWhyItMatters: String(formData.get("editedWhyItMatters") ?? ""),
+    editedWhyItMattersStructured: readStructuredEditorialInput(formData),
+    editedWhatLedToIt: readLayerEditorialText(formData, "editedWhatLedToIt"),
+    editedWhatItConnectsTo: readLayerEditorialText(formData, "editedWhatItConnectsTo"),
   });
 
   if (result.ok) {

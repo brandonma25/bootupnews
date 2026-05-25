@@ -3812,6 +3812,24 @@ export async function publishSignalPost(input: {
  */
 export async function republishLiveSignalPost(input: {
   postId: string;
+  // #282 — Optional editor-typed content from the cockpit form. When
+  // provided, these values are used in preference to the DB's `edited_*`
+  // for the corresponding layer, AND are persisted into `edited_*` in
+  // the same atomic update so the row's edit-state stays consistent.
+  // When undefined, the function falls back to DB `edited_*` then DB
+  // `published_*` (the prior behavior).
+  //
+  // Why this matters: without form-capture, an editor who typed depth-
+  // layer content into the textareas and clicked Re-publish would write
+  // null into `published_what_led_to_it` / `published_what_it_connects_to`
+  // because DB `edited_*` was null for those layers (the prod incident
+  // root cause).
+  editedWhyItMatters?: string;
+  editedWhyItMattersStructured?: EditorialWhyItMattersContent | null;
+  editedWhatLedToIt?: string;
+  editedWhatLedToItStructured?: EditorialWhyItMattersContent | null;
+  editedWhatItConnectsTo?: string;
+  editedWhatItConnectsToStructured?: EditorialWhyItMattersContent | null;
   route?: string;
 }): Promise<EditorialMutationResult> {
   const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
@@ -3868,16 +3886,25 @@ export async function republishLiveSignalPost(input: {
     };
   }
 
-  // Build the new published text from edited_* first (the editor's
-  // latest review), falling back to the existing published value when
-  // edited_* is null. Mirrors the slate publish path.
+  // #282 — Resolve each layer's "to-be-published" text using a strict
+  // precedence: explicit form input wins, then DB `edited_*`, then DB
+  // `published_*` (so an unedited layer keeps whatever was already
+  // published). Form-captured content also flows into `edited_*` in the
+  // same atomic update so the row's edit-state stays in sync.
+  //
+  // The Signal: structured payload + text are resolved together so the
+  // payload-derived text (matching the slate publish + WITM editor) wins
+  // when a structured payload exists.
+  const witmTextSource =
+    input.editedWhyItMatters !== undefined
+      ? input.editedWhyItMatters
+      : (post.editedWhyItMatters || post.publishedWhyItMatters || "");
   const structuredContent =
-    post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
+    input.editedWhyItMattersStructured !== undefined
+      ? input.editedWhyItMattersStructured
+      : (post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured);
   const witmText = normalizeEditorialText(
-    buildEditorialWhyItMattersText(
-      structuredContent,
-      post.editedWhyItMatters || post.publishedWhyItMatters || "",
-    ),
+    buildEditorialWhyItMattersText(structuredContent, witmTextSource),
   );
   if (!witmText) {
     return {
@@ -3895,21 +3922,28 @@ export async function republishLiveSignalPost(input: {
     };
   }
 
-  // Before This + The Ripple use the editor's edited_* if set, else fall
-  // back to the existing published_* so a re-publish that only touches
-  // The Signal doesn't accidentally null out the other two layers.
-  const wltiStructured =
-    post.editedWhatLedToItStructured ?? post.publishedWhatLedToItStructured;
-  const wltiText = buildLayerPublishText(
-    post.editedWhatLedToIt ?? post.publishedWhatLedToIt,
-    wltiStructured,
-  );
-  const witcStructured =
-    post.editedWhatItConnectsToStructured ?? post.publishedWhatItConnectsToStructured;
-  const witcText = buildLayerPublishText(
-    post.editedWhatItConnectsTo ?? post.publishedWhatItConnectsTo,
-    witcStructured,
-  );
+  // Before This + The Ripple — same precedence. Falling back to existing
+  // `published_*` keeps a Signal-only re-publish from accidentally
+  // nulling the other two layers.
+  const wltiResolvedText =
+    input.editedWhatLedToIt !== undefined
+      ? input.editedWhatLedToIt
+      : (post.editedWhatLedToIt ?? post.publishedWhatLedToIt);
+  const wltiResolvedStructured =
+    input.editedWhatLedToItStructured !== undefined
+      ? input.editedWhatLedToItStructured
+      : (post.editedWhatLedToItStructured ?? post.publishedWhatLedToItStructured);
+  const wltiText = buildLayerPublishText(wltiResolvedText, wltiResolvedStructured);
+
+  const witcResolvedText =
+    input.editedWhatItConnectsTo !== undefined
+      ? input.editedWhatItConnectsTo
+      : (post.editedWhatItConnectsTo ?? post.publishedWhatItConnectsTo);
+  const witcResolvedStructured =
+    input.editedWhatItConnectsToStructured !== undefined
+      ? input.editedWhatItConnectsToStructured
+      : (post.editedWhatItConnectsToStructured ?? post.publishedWhatItConnectsToStructured);
+  const witcText = buildLayerPublishText(witcResolvedText, witcResolvedStructured);
 
   const snapshottedAt = new Date().toISOString();
   // Snapshot the CURRENT published_* + WITM payload BEFORE overwriting.
@@ -3925,16 +3959,43 @@ export async function republishLiveSignalPost(input: {
     snapshotted_at: snapshottedAt,
   };
 
+  // #282 — Persist form-captured content into `edited_*` alongside the
+  // `published_*` promotion so any subsequent Save Edits / refresh / etc.
+  // reads consistent state. Only writes the column when input was
+  // explicitly provided (undefined ⇒ leave `edited_*` untouched).
+  const editedWritebacks: Record<string, unknown> = {};
+  if (input.editedWhyItMatters !== undefined) {
+    editedWritebacks.edited_why_it_matters = witmText || null;
+  }
+  if (input.editedWhyItMattersStructured !== undefined) {
+    editedWritebacks.edited_why_it_matters_payload = structuredContent;
+  }
+  if (input.editedWhatLedToIt !== undefined) {
+    editedWritebacks.edited_what_led_to_it = wltiText;
+  }
+  if (input.editedWhatLedToItStructured !== undefined) {
+    editedWritebacks.edited_what_led_to_it_payload = wltiResolvedStructured;
+  }
+  if (input.editedWhatItConnectsTo !== undefined) {
+    editedWritebacks.edited_what_it_connects_to = witcText;
+  }
+  if (input.editedWhatItConnectsToStructured !== undefined) {
+    editedWritebacks.edited_what_it_connects_to_payload = witcResolvedStructured;
+  }
+
   const updateResult = await context.client
     .from("signal_posts")
     .update({
       previous_published_snapshot: previousPublishedSnapshot,
+      // Edited writebacks (form-captured content → edited_*).
+      ...editedWritebacks,
+      // Published promotion (all three layers).
       published_why_it_matters: witmText,
       published_why_it_matters_payload: structuredContent,
       published_what_led_to_it: wltiText,
-      published_what_led_to_it_payload: wltiStructured,
+      published_what_led_to_it_payload: wltiResolvedStructured,
       published_what_it_connects_to: witcText,
-      published_what_it_connects_to_payload: witcStructured,
+      published_what_it_connects_to_payload: witcResolvedStructured,
       // Stay live, stay published. Bump published_at so observability
       // can tell the re-publish moment apart from the original publish.
       is_live: true,
