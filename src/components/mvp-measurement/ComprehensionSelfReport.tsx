@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { trackMvpMeasurementEvent } from "@/lib/mvp-measurement-client";
+import {
+  resolveAndPersistMvpCohort,
+  trackMvpMeasurementEvent,
+} from "@/lib/mvp-measurement-client";
 import {
   hasSignalReadFiredThisSession,
   subscribeToSignalRead,
@@ -169,6 +172,13 @@ export function ComprehensionSelfReport({
     setHidden(true);
     if (typeof window !== "undefined") {
       writeStorage(window.localStorage, COMPREHENSION_LAST_SHOWN_KEY, String(now()));
+    }
+    if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+      console.info("[mvp-measurement] comprehension_self_report", {
+        response,
+        briefingDate: briefingDate ?? null,
+        cohort: resolveAndPersistMvpCohort(),
+      });
     }
     void trackMvpMeasurementEvent({
       eventName: "comprehension_self_report",

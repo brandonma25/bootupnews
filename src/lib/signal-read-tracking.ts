@@ -1,6 +1,9 @@
 "use client";
 
-import { trackMvpMeasurementEvent } from "@/lib/mvp-measurement-client";
+import {
+  resolveAndPersistMvpCohort,
+  trackMvpMeasurementEvent,
+} from "@/lib/mvp-measurement-client";
 
 export type SignalReadTracking = {
   route?: string | null;
@@ -142,6 +145,19 @@ function emitSignalRead(state: CardState) {
   markCardFiredInSession(state.tracking.signalPostId);
   const wasFirst = !hasSignalReadFiredThisSession();
   markSessionSignalReadFired();
+
+  if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+    // Dev-only mirror of the Supabase emission so manual QA on localhost
+    // can observe signal_read without a database round-trip.
+    console.info("[mvp-measurement] signal_read", {
+      signalId: state.tracking.signalPostId,
+      signalSlug: state.tracking.signalSlug ?? null,
+      signalRank: state.tracking.signalRank ?? null,
+      dwellMs,
+      scrolled: state.scrolledWhileVisible,
+      cohort: resolveAndPersistMvpCohort(),
+    });
+  }
 
   void trackMvpMeasurementEvent({
     eventName: "signal_read",
