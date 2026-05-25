@@ -187,7 +187,10 @@ export function MvpHarnessClient() {
             Reset visitor (session + 7-day cap + session counter)
           </button>
           <span className="text-xs text-amber-800">
-            Persisted cohort: <code>{cohortLabel}</code>
+            Persisted cohort:{" "}
+            {/* localStorage read is client-only; SSR-rendered value
+                deliberately differs from the hydrated value. */}
+            <code suppressHydrationWarning>{cohortLabel}</code>
           </span>
         </div>
         <p className="mt-3 text-xs">
