@@ -200,30 +200,42 @@ export function MvpHarnessClient() {
         </p>
       </header>
 
-      <div className="space-y-4">
+      <div>
         {MOCK_SIGNALS.map(({ signal, defaultExpanded, note }, index) => (
-          <div key={`${resetTick}-${signal.id}`} className="space-y-1">
-            <p className="text-xs text-gray-500">{note}</p>
-            <SignalCard
-              signal={signal}
-              rank={index + 1}
-              tier="core"
-              defaultExpanded={defaultExpanded}
-              mvpDwellTracking={{
-                route: "/dev/mvp-harness",
-                surface: "dev_mvp_harness",
-                signalPostId: signal.id,
-                signalSlug: signal.title,
-                signalRank: index + 1,
-                briefingDate: HARNESS_BRIEFING_DATE,
-              }}
-            />
-          </div>
+          <section
+            key={`${resetTick}-${signal.id}`}
+            data-harness-slot={`signal-${index + 1}`}
+            // Each card lives in its own viewport-sized slot so dwelling on
+            // one card cannot accidentally satisfy the 50%-visibility
+            // threshold for an adjacent card. The slot is taller than the
+            // viewport so only one card can be ≥50% visible at a time.
+            className="flex min-h-screen items-center justify-center py-12"
+          >
+            <div className="w-full space-y-2">
+              <p className="text-xs uppercase tracking-wide text-gray-500">
+                Slot {index + 1} — {note}
+              </p>
+              <SignalCard
+                signal={signal}
+                rank={index + 1}
+                tier="core"
+                defaultExpanded={defaultExpanded}
+                mvpDwellTracking={{
+                  route: "/dev/mvp-harness",
+                  surface: "dev_mvp_harness",
+                  signalPostId: signal.id,
+                  signalSlug: signal.title,
+                  signalRank: index + 1,
+                  briefingDate: HARNESS_BRIEFING_DATE,
+                }}
+              />
+            </div>
+          </section>
         ))}
       </div>
 
-      {/* Bottom spacer so signal 3 can be fully on screen while signal 1/2 are
-          scrolled out — needed for behaviors 1 and 3. */}
+      {/* Final spacer so the last card can be scrolled into a fully-on-screen
+          position without the survey crowding it from below. */}
       <div className="h-[60vh]" />
 
       <ComprehensionSelfReport
