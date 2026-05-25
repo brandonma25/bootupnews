@@ -119,10 +119,11 @@ export default function LandingHomepage({
                   "data-mvp-signal-rank": index + 1,
                   "data-mvp-briefing-date": briefingDateKey,
                 }}
-                mvpLayerTracking={{
+                mvpDwellTracking={{
                   route: "/",
                   surface: "home_top_event",
                   signalPostId: event.id,
+                  signalSlug: event.title,
                   signalRank: index + 1,
                   briefingDate: briefingDateKey,
                 }}

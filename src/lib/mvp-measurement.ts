@@ -6,7 +6,7 @@ export const MVP_MEASUREMENT_EVENT_NAMES = [
   "signal_full_expansion",
   "signal_full_expansion_proxy",
   "signal_details_click",
-  "signal_layer_open",
+  "signal_read",
   "source_click",
   "category_tab_open",
   "comprehension_prompt_shown",
@@ -16,53 +16,43 @@ export const MVP_MEASUREMENT_EVENT_NAMES = [
 
 export type MvpMeasurementEventName = (typeof MVP_MEASUREMENT_EVENT_NAMES)[number];
 
-export const MVP_SIGNAL_LAYERS = [
-  "what_happened",
-  "why_it_matters",
-  "what_led_to_this",
-  "what_it_connects_to",
-] as const;
-
-export type MvpSignalLayer = (typeof MVP_SIGNAL_LAYERS)[number];
-
-export const MVP_COHORTS = ["tester", "internal", "qa"] as const;
+export const MVP_COHORTS = ["qa", "tester", "internal"] as const;
 
 export type MvpCohort = (typeof MVP_COHORTS)[number];
 
-export function isMvpSignalLayer(value: unknown): value is MvpSignalLayer {
-  return typeof value === "string" && MVP_SIGNAL_LAYERS.includes(value as MvpSignalLayer);
+export function isMvpCohort(value: unknown): value is MvpCohort {
+  return typeof value === "string" && MVP_COHORTS.includes(value as MvpCohort);
 }
 
-export function parseTesterIds(value: string | null | undefined): string[] {
-  if (!value || typeof value !== "string") {
-    return [];
-  }
-
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
-export function resolveMvpCohort({
-  visitorId,
-  qaFlag,
-  testerIds,
+/**
+ * Deterministic cohort resolution from URL entry markers + a previously
+ * persisted value. First match wins. The browser-side wrapper in
+ * mvp-measurement-client.ts handles reading the query params and
+ * persisting the resolved value.
+ */
+export function resolveMvpCohortFromMarkers({
+  queryQa,
+  queryCohort,
+  persisted,
 }: {
-  visitorId: string;
-  qaFlag: boolean;
-  testerIds: readonly string[];
+  queryQa: boolean;
+  queryCohort: string | null;
+  persisted: string | null;
 }): MvpCohort {
-  if (qaFlag) {
+  if (queryQa) {
     return "qa";
   }
 
-  if (visitorId && testerIds.includes(visitorId)) {
+  const queryNormalized = queryCohort?.trim().toLowerCase() ?? "";
+  if (queryNormalized === "tester") {
     return "tester";
+  }
+  if (queryNormalized === "internal") {
+    return "internal";
+  }
+
+  if (isMvpCohort(persisted)) {
+    return persisted;
   }
 
   return "internal";

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  parseTesterIds,
-  resolveMvpCohort,
+  resolveMvpCohortFromMarkers,
   sanitizeMetadata,
   validateMvpMeasurementEvent,
 } from "@/lib/mvp-measurement";
@@ -103,17 +102,17 @@ describe("MVP measurement event validation", () => {
     });
   });
 
-  it("accepts the signal_layer_open and comprehension_self_report event names", () => {
-    const layerResult = validateMvpMeasurementEvent({
+  it("accepts the signal_read and comprehension_self_report event names", () => {
+    const signalReadResult = validateMvpMeasurementEvent({
       ...validPayload,
-      eventName: "signal_layer_open",
+      eventName: "signal_read",
       metadata: {
-        layer: "why_it_matters",
-        allFourOpened: false,
+        signalRank: 1,
+        dwellMs: 21000,
       },
     });
 
-    expect(layerResult.ok).toBe(true);
+    expect(signalReadResult.ok).toBe(true);
 
     const selfReportResult = validateMvpMeasurementEvent({
       eventName: "comprehension_self_report",
@@ -160,67 +159,72 @@ describe("MVP measurement event validation", () => {
   });
 });
 
-describe("resolveMvpCohort", () => {
-  const testerIds = ["mvp_alice", "mvp_bob"] as const;
-
-  it("returns 'qa' when the QA flag is set, even when on the tester allowlist", () => {
+describe("resolveMvpCohortFromMarkers", () => {
+  it("returns 'qa' when ?mvp_qa is set, even if ?c=tester is also present", () => {
     expect(
-      resolveMvpCohort({
-        visitorId: "mvp_alice",
-        qaFlag: true,
-        testerIds,
+      resolveMvpCohortFromMarkers({
+        queryQa: true,
+        queryCohort: "tester",
+        persisted: null,
       }),
     ).toBe("qa");
   });
 
-  it("returns 'tester' for an allowlisted visitor without the QA flag", () => {
+  it("returns 'tester' when ?c=tester is set without a QA flag", () => {
     expect(
-      resolveMvpCohort({
-        visitorId: "mvp_alice",
-        qaFlag: false,
-        testerIds,
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: "tester",
+        persisted: null,
       }),
     ).toBe("tester");
   });
 
-  it("returns 'internal' for non-allowlisted visitors", () => {
+  it("returns 'internal' when ?c=internal is set explicitly", () => {
     expect(
-      resolveMvpCohort({
-        visitorId: "mvp_random_visitor",
-        qaFlag: false,
-        testerIds,
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: "internal",
+        persisted: "tester",
       }),
     ).toBe("internal");
   });
 
-  it("falls back to 'internal' when the visitor id is empty", () => {
+  it("falls back to the previously persisted cohort when no marker is in the URL", () => {
     expect(
-      resolveMvpCohort({
-        visitorId: "",
-        qaFlag: false,
-        testerIds,
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: null,
+        persisted: "tester",
+      }),
+    ).toBe("tester");
+
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: null,
+        persisted: "qa",
+      }),
+    ).toBe("qa");
+  });
+
+  it("defaults to 'internal' when neither URL nor storage provide a cohort", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: null,
+        persisted: null,
       }),
     ).toBe("internal");
   });
-});
 
-describe("parseTesterIds", () => {
-  it("returns an empty list for an empty or missing env value", () => {
-    expect(parseTesterIds(undefined)).toEqual([]);
-    expect(parseTesterIds(null)).toEqual([]);
-    expect(parseTesterIds("")).toEqual([]);
-    expect(parseTesterIds("   ")).toEqual([]);
-  });
-
-  it("splits a comma-separated env value and trims whitespace", () => {
-    expect(parseTesterIds("mvp_alice, mvp_bob ,mvp_carol")).toEqual([
-      "mvp_alice",
-      "mvp_bob",
-      "mvp_carol",
-    ]);
-  });
-
-  it("deduplicates repeated tester ids", () => {
-    expect(parseTesterIds("mvp_alice,mvp_alice,mvp_bob")).toEqual(["mvp_alice", "mvp_bob"]);
+  it("ignores unknown query cohort values and falls back to persisted/default", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: "admin",
+        persisted: null,
+      }),
+    ).toBe("internal");
   });
 });

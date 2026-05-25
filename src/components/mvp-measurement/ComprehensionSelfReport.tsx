@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { trackMvpMeasurementEvent } from "@/lib/mvp-measurement-client";
+import {
+  hasSignalReadFiredThisSession,
+  subscribeToSignalRead,
+} from "@/lib/signal-read-tracking";
 import { cn } from "@/lib/utils";
 
 export const COMPREHENSION_PROMPT_STATEMENT =
@@ -15,24 +19,56 @@ export const COMPREHENSION_SESSION_COUNT_KEY =
 export const COMPREHENSION_SESSION_COUNTED_KEY =
   "bootup:mvp-measurement:session-counted";
 
+export const COMPREHENSION_DEBUG_QUERY_PARAM = "mvp_survey_debug";
+
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const DEFAULT_DELAY_MS = 30_000;
+const INACTIVITY_TRIGGER_MS = 45_000;
+
+export type ComprehensionSuppressionReason =
+  | "first_session"
+  | "no_signal_read"
+  | "cap_active"
+  | "gate_off";
+
+type Logger = Pick<Console, "info">;
 
 type ComprehensionSelfReportProps = {
   briefingDate?: string | null;
-  /** Override the visibility delay; primarily for tests. */
-  delayMs?: number;
+  /** Override the inactivity delay; primarily for tests. */
+  inactivityMs?: number;
   /** Override the "now" clock; primarily for tests. */
   now?: () => number;
+  /** Inject a logger for tests; defaults to `console`. */
+  logger?: Logger;
 };
 
 export function ComprehensionSelfReport({
   briefingDate,
-  delayMs = DEFAULT_DELAY_MS,
+  inactivityMs = INACTIVITY_TRIGGER_MS,
   now = Date.now,
+  logger,
 }: ComprehensionSelfReportProps) {
-  const [shouldRender, setShouldRender] = useState(false);
+  const [armed, setArmed] = useState<boolean>(() =>
+    typeof window === "undefined" ? false : hasSignalReadFiredThisSession(),
+  );
+  const [shown, setShown] = useState(false);
   const [hidden, setHidden] = useState(false);
+
+  const inactivityTimerRef = useRef<number | null>(null);
+  const triggerInstalledRef = useRef(false);
+
+  const debugMode = readDebugFlag();
+  const logSuppression = useCallback(
+    (reason: ComprehensionSuppressionReason) => {
+      if (!debugMode) {
+        return;
+      }
+      (logger ?? console).info(
+        `[comprehension-self-report] suppressed: ${reason}`,
+      );
+    },
+    [debugMode, logger],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -40,32 +76,100 @@ export function ComprehensionSelfReport({
     }
 
     const sessionCount = incrementSessionCountIfNew();
-    if (sessionCount <= 1) {
+    const suppressions = collectStaticSuppressions({
+      sessionCount,
+      nowMs: now(),
+      debugMode,
+    });
+
+    if (suppressions.length > 0) {
+      logSuppression(suppressions[0]!);
       return;
     }
 
-    if (!isOutsideFrequencyCap(now())) {
+    if (!hasSignalReadFiredThisSession()) {
+      logSuppression("no_signal_read");
+    }
+
+    return subscribeToSignalRead(() => {
+      setArmed(true);
+    });
+  }, [debugMode, logSuppression, now]);
+
+  const tryShow = useCallback(() => {
+    if (shown || hidden) {
+      return;
+    }
+    setShown(true);
+  }, [shown, hidden]);
+
+  useEffect(() => {
+    if (!armed || shown || hidden || triggerInstalledRef.current) {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      if (!isOutsideFrequencyCap(now())) {
-        return;
+    const sessionCount = readPersistedSessionCount();
+    const suppressions = collectStaticSuppressions({
+      sessionCount,
+      nowMs: now(),
+      debugMode,
+    });
+    if (suppressions.length > 0) {
+      return;
+    }
+
+    triggerInstalledRef.current = true;
+
+    const clearInactivityTimer = () => {
+      if (inactivityTimerRef.current !== null) {
+        window.clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
       }
+    };
 
-      writeStorage(window.localStorage, COMPREHENSION_LAST_SHOWN_KEY, String(now()));
-      setShouldRender(true);
-    }, delayMs);
+    const resetInactivity = () => {
+      clearInactivityTimer();
+      inactivityTimerRef.current = window.setTimeout(tryShow, inactivityMs);
+    };
 
-    return () => window.clearTimeout(timeoutId);
-  }, [delayMs, now]);
+    const handleMouseOut = (event: MouseEvent) => {
+      if (event.clientY <= 0) {
+        tryShow();
+      }
+    };
 
-  if (!shouldRender || hidden) {
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        tryShow();
+      }
+    };
+
+    resetInactivity();
+    window.addEventListener("scroll", resetInactivity, { passive: true });
+    window.addEventListener("click", resetInactivity);
+    window.addEventListener("keydown", resetInactivity);
+    document.addEventListener("mouseout", handleMouseOut);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInactivityTimer();
+      window.removeEventListener("scroll", resetInactivity);
+      window.removeEventListener("click", resetInactivity);
+      window.removeEventListener("keydown", resetInactivity);
+      document.removeEventListener("mouseout", handleMouseOut);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [armed, shown, hidden, inactivityMs, tryShow, debugMode, now]);
+
+  if (!shown || hidden) {
     return null;
   }
 
   function handleAnswer(response: "agree" | "disagree") {
     setHidden(true);
+    if (typeof window !== "undefined") {
+      writeStorage(window.localStorage, COMPREHENSION_LAST_SHOWN_KEY, String(now()));
+    }
     void trackMvpMeasurementEvent({
       eventName: "comprehension_self_report",
       route: typeof window !== "undefined" ? window.location.pathname : null,
@@ -79,7 +183,7 @@ export function ComprehensionSelfReport({
   }
 
   function handleDismiss() {
-    // Dismissal is not an event by design (see PR description).
+    // Dismissal is not an event and does not trip the 7-day cap.
     setHidden(true);
   }
 
@@ -131,6 +235,45 @@ export function ComprehensionSelfReport({
   );
 }
 
+/**
+ * Suppression checks that are independent of `signal_read` — useful both
+ * at mount-time gating and for the debug logger.
+ */
+export function collectStaticSuppressions({
+  sessionCount,
+  nowMs,
+  debugMode,
+}: {
+  sessionCount: number;
+  nowMs: number;
+  debugMode: boolean;
+}): ComprehensionSuppressionReason[] {
+  const reasons: ComprehensionSuppressionReason[] = [];
+
+  if (sessionCount <= 1 && !debugMode) {
+    reasons.push("first_session");
+  }
+
+  if (!isOutsideFrequencyCap(nowMs) && !debugMode) {
+    reasons.push("cap_active");
+  }
+
+  return reasons;
+}
+
+function readDebugFlag(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get(COMPREHENSION_DEBUG_QUERY_PARAM);
+    return value !== null && /^(1|true|yes|on)$/i.test(value.trim());
+  } catch {
+    return false;
+  }
+}
+
 function isOutsideFrequencyCap(nowMs: number): boolean {
   if (typeof window === "undefined") {
     return false;
@@ -147,6 +290,19 @@ function isOutsideFrequencyCap(nowMs: number): boolean {
   }
 
   return nowMs - lastShownMs >= SEVEN_DAYS_MS;
+}
+
+function readPersistedSessionCount(): number {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+  try {
+    const stored = window.localStorage.getItem(COMPREHENSION_SESSION_COUNT_KEY);
+    const parsed = Number.parseInt(stored ?? "", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  } catch {
+    return 0;
+  }
 }
 
 function incrementSessionCountIfNew(): number {

@@ -34,7 +34,13 @@ function clearPostHogEnv() {
   delete process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS;
   delete process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS;
   delete process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE;
-  delete process.env.NEXT_PUBLIC_TESTER_IDS;
+}
+
+function resetWindowLocation() {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: { ...window.location, search: "" },
+  });
 }
 
 function enablePostHog() {
@@ -48,6 +54,7 @@ describe("trackMvpMeasurementEvent", () => {
     vi.resetModules();
     vi.clearAllMocks();
     clearPostHogEnv();
+    resetWindowLocation();
     installStorage("localStorage");
     installStorage("sessionStorage");
     vi.stubGlobal(
@@ -128,7 +135,7 @@ describe("trackMvpMeasurementEvent", () => {
     expect(posthogMock.capture).not.toHaveBeenCalled();
   });
 
-  it("tags every event with cohort=internal by default", async () => {
+  it("tags every event with cohort=internal by default when no marker exists", async () => {
     const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
 
     await trackMvpMeasurementEvent({
@@ -143,14 +150,13 @@ describe("trackMvpMeasurementEvent", () => {
     expect(payload.metadata.cohort).toBe("internal");
   });
 
-  it("tags events with cohort=tester when the visitor id is in the allowlist", async () => {
-    window.localStorage.setItem(
-      "bootup:mvp-measurement:visitor-id",
-      "mvp_known_tester",
-    );
-    process.env.NEXT_PUBLIC_TESTER_IDS = "mvp_known_tester, mvp_other";
-    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
+  it("tags events with cohort=tester when ?c=tester is in the entry URL and persists it", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, search: "?c=tester" },
+    });
 
+    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
     await trackMvpMeasurementEvent({
       eventName: "homepage_view",
       route: "/",
@@ -161,18 +167,16 @@ describe("trackMvpMeasurementEvent", () => {
     const [, init] = vi.mocked(fetch).mock.calls[0]!;
     const payload = JSON.parse(String(init?.body));
     expect(payload.metadata.cohort).toBe("tester");
-    expect(payload.visitorId).toBe("mvp_known_tester");
+    expect(window.localStorage.getItem("bootup:mvp-measurement:cohort")).toBe("tester");
   });
 
-  it("tags events with cohort=qa when the QA flag is set on the visitor", async () => {
-    window.localStorage.setItem("bootup:mvp-measurement:qa-flag", "1");
-    window.localStorage.setItem(
-      "bootup:mvp-measurement:visitor-id",
-      "mvp_known_tester",
-    );
-    process.env.NEXT_PUBLIC_TESTER_IDS = "mvp_known_tester";
-    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
+  it("tags events with cohort=qa when ?mvp_qa=1 is in the entry URL", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, search: "?mvp_qa=1" },
+    });
 
+    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
     await trackMvpMeasurementEvent({
       eventName: "homepage_view",
       route: "/",
@@ -183,6 +187,43 @@ describe("trackMvpMeasurementEvent", () => {
     const [, init] = vi.mocked(fetch).mock.calls[0]!;
     const payload = JSON.parse(String(init?.body));
     expect(payload.metadata.cohort).toBe("qa");
+  });
+
+  it("reuses the previously persisted cohort when no URL marker is present", async () => {
+    window.localStorage.setItem("bootup:mvp-measurement:cohort", "tester");
+
+    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
+    await trackMvpMeasurementEvent({
+      eventName: "homepage_view",
+      route: "/",
+      surface: "home",
+      briefingDate: "2026-05-01",
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.metadata.cohort).toBe("tester");
+  });
+
+  it("overrides the persisted cohort when ?c=internal is in the entry URL", async () => {
+    window.localStorage.setItem("bootup:mvp-measurement:cohort", "tester");
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, search: "?c=internal" },
+    });
+
+    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
+    await trackMvpMeasurementEvent({
+      eventName: "homepage_view",
+      route: "/",
+      surface: "home",
+      briefingDate: "2026-05-01",
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.metadata.cohort).toBe("internal");
+    expect(window.localStorage.getItem("bootup:mvp-measurement:cohort")).toBe("internal");
   });
 
   it("does not throw or block the Supabase post when analytics capture fails", async () => {

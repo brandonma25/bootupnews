@@ -3,8 +3,7 @@
 import {
   isMvpMeasurementEventName,
   isUuid,
-  parseTesterIds,
-  resolveMvpCohort,
+  resolveMvpCohortFromMarkers,
   validateMvpMeasurementEvent,
   type MvpCohort,
   type MvpMeasurementEventInput,
@@ -14,8 +13,9 @@ import { capturePostHogMvpMeasurementEvent } from "@/lib/posthog-client";
 
 const VISITOR_STORAGE_KEY = "bootup:mvp-measurement:visitor-id";
 const SESSION_STORAGE_KEY = "bootup:mvp-measurement:session-id";
-const QA_FLAG_STORAGE_KEY = "bootup:mvp-measurement:qa-flag";
+const COHORT_STORAGE_KEY = "bootup:mvp-measurement:cohort";
 const QA_FLAG_QUERY_PARAM = "mvp_qa";
+const COHORT_QUERY_PARAM = "c";
 
 function createId(prefix: string) {
   const randomId =
@@ -85,37 +85,53 @@ export function getSignalPostIdFromLegacyId(value: string | null | undefined) {
   return isUuid(value) ? value : null;
 }
 
-export function readMvpQaFlag(): boolean {
+function readQueryParam(name: string): string | null {
   if (typeof window === "undefined") {
-    return false;
+    return null;
   }
 
   try {
-    const params = new URLSearchParams(window.location.search);
-    const queryValue = params.get(QA_FLAG_QUERY_PARAM);
-    if (queryValue !== null) {
-      const enabled = /^(1|true|yes|on)$/i.test(queryValue.trim());
-      writeStorage(window.localStorage, QA_FLAG_STORAGE_KEY, enabled ? "1" : "0");
-      return enabled;
-    }
+    return new URLSearchParams(window.location.search).get(name);
   } catch {
-    // URL parsing or storage failures must not block reading.
+    return null;
+  }
+}
+
+function isTruthyQueryValue(value: string | null): boolean {
+  if (value === null) {
+    return false;
+  }
+  return /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+/**
+ * Resolve cohort from URL entry markers (`?mvp_qa=1`, `?c=tester`,
+ * `?c=internal`), falling back to a previously persisted value, then to
+ * `"internal"`. Whenever the URL provides a marker, the resolved cohort
+ * is persisted client-side so subsequent visits without a marker keep the
+ * same tag (matches how visitor_id is persisted).
+ */
+export function resolveAndPersistMvpCohort(): MvpCohort {
+  if (typeof window === "undefined") {
+    return "internal";
   }
 
-  const stored = readStorage(window.localStorage, QA_FLAG_STORAGE_KEY);
-  return stored === "1";
-}
+  const queryQa = isTruthyQueryValue(readQueryParam(QA_FLAG_QUERY_PARAM));
+  const queryCohort = readQueryParam(COHORT_QUERY_PARAM);
+  const persisted = readStorage(window.localStorage, COHORT_STORAGE_KEY);
 
-export function readMvpTesterIds(): string[] {
-  return parseTesterIds(process.env.NEXT_PUBLIC_TESTER_IDS);
-}
-
-export function resolveMvpCohortForVisitor(visitorId: string): MvpCohort {
-  return resolveMvpCohort({
-    visitorId,
-    qaFlag: readMvpQaFlag(),
-    testerIds: readMvpTesterIds(),
+  const resolved = resolveMvpCohortFromMarkers({
+    queryQa,
+    queryCohort,
+    persisted,
   });
+
+  const hadQueryMarker = queryQa || Boolean(queryCohort);
+  if (hadQueryMarker || persisted !== resolved) {
+    writeStorage(window.localStorage, COHORT_STORAGE_KEY, resolved);
+  }
+
+  return resolved;
 }
 
 export async function trackMvpMeasurementEvent(
@@ -128,7 +144,7 @@ export async function trackMvpMeasurementEvent(
   }
 
   const visitorId = getOrCreateMvpVisitorId();
-  const cohort = resolveMvpCohortForVisitor(visitorId);
+  const cohort = resolveAndPersistMvpCohort();
   const payload: MvpMeasurementEventInput = {
     ...input,
     visitorId,

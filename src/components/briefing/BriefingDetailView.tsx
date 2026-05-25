@@ -72,10 +72,11 @@ export function BriefingDetailView({
               rank={index + 1}
               tier="core"
               defaultExpanded
-              mvpLayerTracking={{
+              mvpDwellTracking={{
                 route: `/briefing/${briefingDateKey}`,
                 surface: "briefing_detail",
                 signalPostId: event.id,
+                signalSlug: event.title,
                 signalRank: index + 1,
                 briefingDate: briefingDateKey,
               }}
