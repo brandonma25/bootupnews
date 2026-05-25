@@ -125,6 +125,11 @@ function installScrollHandler() {
 }
 
 function handleScroll() {
+  if (process.env.NODE_ENV !== "production") {
+    const visible = [...cardStates.values()].filter((s) => s.visible).length;
+    const total = cardStates.size;
+    console.info("[mvp-measurement] scroll", { visibleCards: visible, totalCards: total });
+  }
   for (const state of cardStates.values()) {
     if (!state.fired && state.visible) {
       state.scrolledWhileVisible = true;
@@ -238,6 +243,16 @@ export function registerSignalReadObserver(
         const meetsThreshold =
           entry.isIntersecting && entry.intersectionRatio >= SIGNAL_READ_VISIBILITY_THRESHOLD;
 
+        if (process.env.NODE_ENV !== "production") {
+          console.info("[mvp-measurement] observer", {
+            signalId: tracking.signalPostId,
+            ratio: Number(entry.intersectionRatio.toFixed(3)),
+            isIntersecting: entry.isIntersecting,
+            meetsThreshold,
+            wasVisible: state.visible,
+          });
+        }
+
         if (meetsThreshold && !state.visible) {
           state.visible = true;
           state.visibleSinceMs = nowFn();
@@ -250,6 +265,13 @@ export function registerSignalReadObserver(
               return;
             }
             state.dwellMet = true;
+            if (process.env.NODE_ENV !== "production") {
+              console.info("[mvp-measurement] dwell timer fired", {
+                signalId: tracking.signalPostId,
+                scrolledWhileVisible: state.scrolledWhileVisible,
+                willEmit: state.scrolledWhileVisible,
+              });
+            }
             if (state.scrolledWhileVisible) {
               emitSignalRead(state);
             }
