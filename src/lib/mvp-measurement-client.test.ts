@@ -34,6 +34,7 @@ function clearPostHogEnv() {
   delete process.env.NEXT_PUBLIC_POSTHOG_HEATMAPS;
   delete process.env.NEXT_PUBLIC_POSTHOG_DEAD_CLICKS;
   delete process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE;
+  delete process.env.NEXT_PUBLIC_TESTER_IDS;
 }
 
 function enablePostHog() {
@@ -125,6 +126,63 @@ describe("trackMvpMeasurementEvent", () => {
     expect(posthogBody.properties).not.toHaveProperty("email");
     expect(posthogBody.properties).not.toHaveProperty("whyItMatters");
     expect(posthogMock.capture).not.toHaveBeenCalled();
+  });
+
+  it("tags every event with cohort=internal by default", async () => {
+    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
+
+    await trackMvpMeasurementEvent({
+      eventName: "homepage_view",
+      route: "/",
+      surface: "home",
+      briefingDate: "2026-05-01",
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.metadata.cohort).toBe("internal");
+  });
+
+  it("tags events with cohort=tester when the visitor id is in the allowlist", async () => {
+    window.localStorage.setItem(
+      "bootup:mvp-measurement:visitor-id",
+      "mvp_known_tester",
+    );
+    process.env.NEXT_PUBLIC_TESTER_IDS = "mvp_known_tester, mvp_other";
+    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
+
+    await trackMvpMeasurementEvent({
+      eventName: "homepage_view",
+      route: "/",
+      surface: "home",
+      briefingDate: "2026-05-01",
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.metadata.cohort).toBe("tester");
+    expect(payload.visitorId).toBe("mvp_known_tester");
+  });
+
+  it("tags events with cohort=qa when the QA flag is set on the visitor", async () => {
+    window.localStorage.setItem("bootup:mvp-measurement:qa-flag", "1");
+    window.localStorage.setItem(
+      "bootup:mvp-measurement:visitor-id",
+      "mvp_known_tester",
+    );
+    process.env.NEXT_PUBLIC_TESTER_IDS = "mvp_known_tester";
+    const { trackMvpMeasurementEvent } = await import("@/lib/mvp-measurement-client");
+
+    await trackMvpMeasurementEvent({
+      eventName: "homepage_view",
+      route: "/",
+      surface: "home",
+      briefingDate: "2026-05-01",
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.metadata.cohort).toBe("qa");
   });
 
   it("does not throw or block the Supabase post when analytics capture fails", async () => {

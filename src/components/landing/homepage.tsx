@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
 import { CategoryNavigation } from "@/components/home/CategoryNavigation";
+import { ComprehensionSelfReport } from "@/components/mvp-measurement/ComprehensionSelfReport";
 import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
 import { DateBadge } from "@/components/signals/DateBadge";
 import { SignalCard } from "@/components/signals/SignalCard";
@@ -118,12 +119,21 @@ export default function LandingHomepage({
                   "data-mvp-signal-rank": index + 1,
                   "data-mvp-briefing-date": briefingDateKey,
                 }}
+                mvpLayerTracking={{
+                  route: "/",
+                  surface: "home_top_event",
+                  signalPostId: event.id,
+                  signalRank: index + 1,
+                  briefingDate: briefingDateKey,
+                }}
               />
             ))}
           </div>
         ) : (
           <StatusPanel title={topEventsEmptyMessage.title} body={topEventsEmptyMessage.body} />
         )}
+
+        <ComprehensionSelfReport briefingDate={briefingDateKey} />
 
         {debugEnabled ? (
           <Panel className="mt-[var(--bu-space-5)] p-5">

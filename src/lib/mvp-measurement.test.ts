@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseTesterIds,
+  resolveMvpCohort,
   sanitizeMetadata,
   validateMvpMeasurementEvent,
 } from "@/lib/mvp-measurement";
@@ -101,6 +103,32 @@ describe("MVP measurement event validation", () => {
     });
   });
 
+  it("accepts the signal_layer_open and comprehension_self_report event names", () => {
+    const layerResult = validateMvpMeasurementEvent({
+      ...validPayload,
+      eventName: "signal_layer_open",
+      metadata: {
+        layer: "why_it_matters",
+        allFourOpened: false,
+      },
+    });
+
+    expect(layerResult.ok).toBe(true);
+
+    const selfReportResult = validateMvpMeasurementEvent({
+      eventName: "comprehension_self_report",
+      visitorId: "mvp_1234567890abcdef",
+      sessionId: "mvp_session_1234567890abcdef",
+      route: "/",
+      metadata: {
+        response: "agree",
+        briefingDate: "2026-05-01",
+      },
+    });
+
+    expect(selfReportResult.ok).toBe(true);
+  });
+
   it("accepts sanitized category tab opens without signal identifiers", () => {
     const result = validateMvpMeasurementEvent({
       eventName: "category_tab_open",
@@ -129,5 +157,70 @@ describe("MVP measurement event validation", () => {
         },
       }),
     });
+  });
+});
+
+describe("resolveMvpCohort", () => {
+  const testerIds = ["mvp_alice", "mvp_bob"] as const;
+
+  it("returns 'qa' when the QA flag is set, even when on the tester allowlist", () => {
+    expect(
+      resolveMvpCohort({
+        visitorId: "mvp_alice",
+        qaFlag: true,
+        testerIds,
+      }),
+    ).toBe("qa");
+  });
+
+  it("returns 'tester' for an allowlisted visitor without the QA flag", () => {
+    expect(
+      resolveMvpCohort({
+        visitorId: "mvp_alice",
+        qaFlag: false,
+        testerIds,
+      }),
+    ).toBe("tester");
+  });
+
+  it("returns 'internal' for non-allowlisted visitors", () => {
+    expect(
+      resolveMvpCohort({
+        visitorId: "mvp_random_visitor",
+        qaFlag: false,
+        testerIds,
+      }),
+    ).toBe("internal");
+  });
+
+  it("falls back to 'internal' when the visitor id is empty", () => {
+    expect(
+      resolveMvpCohort({
+        visitorId: "",
+        qaFlag: false,
+        testerIds,
+      }),
+    ).toBe("internal");
+  });
+});
+
+describe("parseTesterIds", () => {
+  it("returns an empty list for an empty or missing env value", () => {
+    expect(parseTesterIds(undefined)).toEqual([]);
+    expect(parseTesterIds(null)).toEqual([]);
+    expect(parseTesterIds("")).toEqual([]);
+    expect(parseTesterIds("   ")).toEqual([]);
+  });
+
+  it("splits a comma-separated env value and trims whitespace", () => {
+    expect(parseTesterIds("mvp_alice, mvp_bob ,mvp_carol")).toEqual([
+      "mvp_alice",
+      "mvp_bob",
+      "mvp_carol",
+    ]);
+  });
+
+  it("deduplicates repeated tester ids", () => {
+    expect(parseTesterIds("mvp_alice,mvp_alice,mvp_bob")).toEqual(["mvp_alice", "mvp_bob"]);
   });
 });

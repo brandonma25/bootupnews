@@ -6,13 +6,67 @@ export const MVP_MEASUREMENT_EVENT_NAMES = [
   "signal_full_expansion",
   "signal_full_expansion_proxy",
   "signal_details_click",
+  "signal_layer_open",
   "source_click",
   "category_tab_open",
   "comprehension_prompt_shown",
   "comprehension_prompt_answered",
+  "comprehension_self_report",
 ] as const;
 
 export type MvpMeasurementEventName = (typeof MVP_MEASUREMENT_EVENT_NAMES)[number];
+
+export const MVP_SIGNAL_LAYERS = [
+  "what_happened",
+  "why_it_matters",
+  "what_led_to_this",
+  "what_it_connects_to",
+] as const;
+
+export type MvpSignalLayer = (typeof MVP_SIGNAL_LAYERS)[number];
+
+export const MVP_COHORTS = ["tester", "internal", "qa"] as const;
+
+export type MvpCohort = (typeof MVP_COHORTS)[number];
+
+export function isMvpSignalLayer(value: unknown): value is MvpSignalLayer {
+  return typeof value === "string" && MVP_SIGNAL_LAYERS.includes(value as MvpSignalLayer);
+}
+
+export function parseTesterIds(value: string | null | undefined): string[] {
+  if (!value || typeof value !== "string") {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export function resolveMvpCohort({
+  visitorId,
+  qaFlag,
+  testerIds,
+}: {
+  visitorId: string;
+  qaFlag: boolean;
+  testerIds: readonly string[];
+}): MvpCohort {
+  if (qaFlag) {
+    return "qa";
+  }
+
+  if (visitorId && testerIds.includes(visitorId)) {
+    return "tester";
+  }
+
+  return "internal";
+}
 
 export type MvpMeasurementEventInput = {
   eventName: MvpMeasurementEventName;

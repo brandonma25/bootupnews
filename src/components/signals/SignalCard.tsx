@@ -1,13 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ExternalLink } from "lucide-react";
 
 import { buildEditorialWhyItMattersText } from "@/lib/editorial-content";
 import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
+import {
+  MVP_SIGNAL_LAYERS,
+  type MvpSignalLayer,
+} from "@/lib/mvp-measurement";
+import { trackMvpMeasurementEvent } from "@/lib/mvp-measurement-client";
 import { cn } from "@/lib/utils";
 import { TierBadge, type SignalTier } from "./TierBadge";
+
+export type SignalCardMvpLayerTracking = {
+  route?: string | null;
+  surface?: string | null;
+  signalPostId: string;
+  signalRank?: number | null;
+  briefingDate?: string | null;
+  publishedSlateId?: string | null;
+};
 
 type SourceLink = {
   title: string;
@@ -61,6 +75,13 @@ export type SignalCardProps = {
   tier?: SignalTier;
   readMoreHref?: string;
   trackingAttributes?: Record<string, string | number | undefined>;
+  /**
+   * When provided, emits `signal_layer_open` events as each of the four
+   * editorial layers scrolls into view for this signal. Per-signal
+   * deduped within a measurement session via sessionStorage; the event
+   * that completes the four-layer set carries `allFourOpened: true`.
+   */
+  mvpLayerTracking?: SignalCardMvpLayerTracking;
   className?: string;
 };
 
@@ -73,11 +94,42 @@ export function SignalCard({
   tier,
   readMoreHref,
   trackingAttributes,
+  mvpLayerTracking,
   className,
 }: SignalCardProps) {
   const interactive = defaultExpanded !== undefined;
   const [localExpanded, setLocalExpanded] = useState(defaultExpanded ?? false);
   const isExpanded = interactive ? localExpanded : expanded;
+
+  const cardRef = useRef<HTMLElement | null>(null);
+  const whyItMattersRef = useRef<HTMLElement | null>(null);
+  const beforeThisRef = useRef<HTMLElement | null>(null);
+  const theRippleRef = useRef<HTMLElement | null>(null);
+
+  useMvpLayerObserver({
+    tracking: mvpLayerTracking,
+    layer: "what_happened",
+    target: cardRef,
+    active: true,
+  });
+  useMvpLayerObserver({
+    tracking: mvpLayerTracking,
+    layer: "why_it_matters",
+    target: whyItMattersRef,
+    active: isExpanded,
+  });
+  useMvpLayerObserver({
+    tracking: mvpLayerTracking,
+    layer: "what_led_to_this",
+    target: beforeThisRef,
+    active: isExpanded,
+  });
+  useMvpLayerObserver({
+    tracking: mvpLayerTracking,
+    layer: "what_it_connects_to",
+    target: theRippleRef,
+    active: isExpanded,
+  });
 
   const displayRank = rank ?? signal.finalSlateRank ?? signal.rank ?? 1;
   const displayTier = tier ?? resolveSignalTier(signal, displayRank);
@@ -123,6 +175,7 @@ export function SignalCard({
 
   return (
     <article
+      ref={cardRef}
       className={cn(
         "rounded-[var(--bu-radius-lg)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)]",
         compact ? "p-4" : "p-4 md:p-6",
@@ -227,16 +280,22 @@ export function SignalCard({
               labels here only; codebase-wide v1→v2 rename of
               validator/server-action/type identifiers is parked in #271. */}
           <div className="space-y-4">
-            <ExpandedSerifSection label="The Signal" body={whyItMatters} />
+            <ExpandedSerifSection
+              label="The Signal"
+              body={whyItMatters}
+              sectionRef={whyItMattersRef}
+            />
             <LayerWithEmptyState
               label="Before This"
               body={beforeThisBody}
               emptyText="No prior context yet for this signal."
+              sectionRef={beforeThisRef}
             />
             <LayerWithEmptyState
               label="The Ripple"
               body={theRippleBody}
               emptyText="No downstream trajectory yet for this signal."
+              sectionRef={theRippleRef}
             />
           </div>
 
@@ -284,13 +343,21 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
  * "Why this matters" / "What it connects to" — editorial-voice sections
  * in serif. Empty sections are suppressed to avoid empty boxes.
  */
-function ExpandedSerifSection({ label, body }: { label: string; body: string }) {
+function ExpandedSerifSection({
+  label,
+  body,
+  sectionRef,
+}: {
+  label: string;
+  body: string;
+  sectionRef?: React.MutableRefObject<HTMLElement | null>;
+}) {
   if (!body.trim()) {
     return null;
   }
 
   return (
-    <section>
+    <section ref={sectionRef as React.RefObject<HTMLElement>}>
       <SectionLabel>{label}</SectionLabel>
       <p className="mt-1 font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]">
         {body}
@@ -310,15 +377,17 @@ function LayerWithEmptyState({
   label,
   body,
   emptyText,
+  sectionRef,
 }: {
   label: string;
   body: string;
   emptyText: string;
+  sectionRef?: React.MutableRefObject<HTMLElement | null>;
 }) {
   const trimmed = body.trim();
 
   return (
-    <section>
+    <section ref={sectionRef as React.RefObject<HTMLElement>}>
       <SectionLabel>{label}</SectionLabel>
       {trimmed ? (
         <p className="mt-1 font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]">
@@ -454,4 +523,114 @@ function isValidSourceUrl(url: string | null | undefined) {
   } catch {
     return false;
   }
+}
+
+const MVP_LAYER_STORAGE_PREFIX = "bootup:mvp-measurement:layers:";
+
+function readMvpLayerSet(signalPostId: string): Set<MvpSignalLayer> {
+  if (typeof window === "undefined") {
+    return new Set();
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(`${MVP_LAYER_STORAGE_PREFIX}${signalPostId}`);
+    if (!raw) {
+      return new Set();
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return new Set();
+    }
+
+    return new Set(parsed.filter((entry): entry is MvpSignalLayer =>
+      MVP_SIGNAL_LAYERS.includes(entry as MvpSignalLayer),
+    ));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeMvpLayerSet(signalPostId: string, layers: Set<MvpSignalLayer>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      `${MVP_LAYER_STORAGE_PREFIX}${signalPostId}`,
+      JSON.stringify([...layers]),
+    );
+  } catch {
+    // SessionStorage failures must never block reading.
+  }
+}
+
+function useMvpLayerObserver({
+  tracking,
+  layer,
+  target,
+  active,
+}: {
+  tracking: SignalCardMvpLayerTracking | undefined;
+  layer: MvpSignalLayer;
+  target: React.MutableRefObject<HTMLElement | null>;
+  active: boolean;
+}) {
+  useEffect(() => {
+    if (!tracking || !active || typeof window === "undefined") {
+      return;
+    }
+
+    const element = target.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const opened = readMvpLayerSet(tracking.signalPostId);
+    if (opened.has(layer)) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries, instance) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) {
+            continue;
+          }
+
+          const currentOpened = readMvpLayerSet(tracking.signalPostId);
+          if (currentOpened.has(layer)) {
+            instance.disconnect();
+            return;
+          }
+
+          currentOpened.add(layer);
+          writeMvpLayerSet(tracking.signalPostId, currentOpened);
+          const allFourOpened = currentOpened.size === MVP_SIGNAL_LAYERS.length;
+
+          void trackMvpMeasurementEvent({
+            eventName: "signal_layer_open",
+            route: tracking.route ?? null,
+            surface: tracking.surface ?? null,
+            signalPostId: tracking.signalPostId,
+            signalRank: tracking.signalRank ?? null,
+            briefingDate: tracking.briefingDate ?? null,
+            publishedSlateId: tracking.publishedSlateId ?? null,
+            metadata: {
+              layer,
+              allFourOpened,
+            },
+          });
+
+          instance.disconnect();
+          return;
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [tracking, layer, target, active]);
 }

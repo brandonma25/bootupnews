@@ -3,7 +3,10 @@
 import {
   isMvpMeasurementEventName,
   isUuid,
+  parseTesterIds,
+  resolveMvpCohort,
   validateMvpMeasurementEvent,
+  type MvpCohort,
   type MvpMeasurementEventInput,
   type MvpMeasurementEventName,
 } from "@/lib/mvp-measurement";
@@ -11,6 +14,8 @@ import { capturePostHogMvpMeasurementEvent } from "@/lib/posthog-client";
 
 const VISITOR_STORAGE_KEY = "bootup:mvp-measurement:visitor-id";
 const SESSION_STORAGE_KEY = "bootup:mvp-measurement:session-id";
+const QA_FLAG_STORAGE_KEY = "bootup:mvp-measurement:qa-flag";
+const QA_FLAG_QUERY_PARAM = "mvp_qa";
 
 function createId(prefix: string) {
   const randomId =
@@ -80,6 +85,39 @@ export function getSignalPostIdFromLegacyId(value: string | null | undefined) {
   return isUuid(value) ? value : null;
 }
 
+export function readMvpQaFlag(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const queryValue = params.get(QA_FLAG_QUERY_PARAM);
+    if (queryValue !== null) {
+      const enabled = /^(1|true|yes|on)$/i.test(queryValue.trim());
+      writeStorage(window.localStorage, QA_FLAG_STORAGE_KEY, enabled ? "1" : "0");
+      return enabled;
+    }
+  } catch {
+    // URL parsing or storage failures must not block reading.
+  }
+
+  const stored = readStorage(window.localStorage, QA_FLAG_STORAGE_KEY);
+  return stored === "1";
+}
+
+export function readMvpTesterIds(): string[] {
+  return parseTesterIds(process.env.NEXT_PUBLIC_TESTER_IDS);
+}
+
+export function resolveMvpCohortForVisitor(visitorId: string): MvpCohort {
+  return resolveMvpCohort({
+    visitorId,
+    qaFlag: readMvpQaFlag(),
+    testerIds: readMvpTesterIds(),
+  });
+}
+
 export async function trackMvpMeasurementEvent(
   input: Omit<MvpMeasurementEventInput, "visitorId" | "sessionId"> & {
     eventName: MvpMeasurementEventName;
@@ -89,10 +127,16 @@ export async function trackMvpMeasurementEvent(
     return;
   }
 
+  const visitorId = getOrCreateMvpVisitorId();
+  const cohort = resolveMvpCohortForVisitor(visitorId);
   const payload: MvpMeasurementEventInput = {
     ...input,
-    visitorId: getOrCreateMvpVisitorId(),
+    visitorId,
     sessionId: getOrCreateMvpSessionId(),
+    metadata: {
+      ...(input.metadata ?? {}),
+      cohort,
+    },
   };
   const validation = validateMvpMeasurementEvent(payload);
   const requestPayload = validation.ok ? validation.value : payload;
