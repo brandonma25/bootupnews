@@ -96,6 +96,7 @@ const ADMIN_SIGNAL_POST_REQUIRED_COLUMNS = [
   "edited_what_it_connects_to_payload",
   "published_what_it_connects_to",
   "published_what_it_connects_to_payload",
+  "previous_published_snapshot",
   "why_it_matters_validation_status",
   "why_it_matters_validation_failures",
   "why_it_matters_validation_details",
@@ -205,6 +206,8 @@ type StoredSignalPost = {
   edited_what_it_connects_to_payload: unknown | null;
   published_what_it_connects_to: string | null;
   published_what_it_connects_to_payload: unknown | null;
+  // #280 — single-prior-version snapshot written by the re-publish path.
+  previous_published_snapshot: unknown | null;
   why_it_matters_validation_status: WhyItMattersReviewStatus | null;
   why_it_matters_validation_failures: string[] | null;
   why_it_matters_validation_details: string[] | null;
@@ -426,6 +429,7 @@ export type EditorialMutationResult = {
     | "not_found"
     | "published"
     | "publish_blocked"
+    | "republished"
     | "reset"
     | "replacement_updated"
     | "slate_updated"
@@ -900,6 +904,7 @@ function mapStoredPublicSignalPost(row: Partial<StoredSignalPost> & Pick<
     human_what_it_connects_to: null,
     edited_what_it_connects_to: null,
     edited_what_it_connects_to_payload: null,
+    previous_published_snapshot: null,
     final_slate_rank: null,
     final_slate_tier: null,
     editorial_decision: null,
@@ -3772,6 +3777,187 @@ export async function publishSignalPost(input: {
     ok: false,
     code: "publish_blocked",
     message: `Individual signal publishing is disabled. Use Publish Final Slate after a validated ${FINAL_SLATE_MIN_PUBLIC_ROWS}-${FINAL_SLATE_MAX_PUBLIC_ROWS} row slate passes validation.`,
+  };
+}
+
+/**
+ * Re-publish an ALREADY-LIVE signal post in place (issue #280). Distinct
+ * from `publishApprovedSignals` (the slate-wide gate) and from
+ * `publishSignalPost` (intentionally disabled).
+ *
+ * Pre-conditions (refuses if any fails):
+ *   - Row exists.
+ *   - `is_live === true` AND `editorial_status === 'published'` AND
+ *     `published_at IS NOT NULL`. The function is for re-publishing a
+ *     live card; it is NOT a back door for first-publish bypass of the
+ *     slate gate.
+ *   - The Signal's new text (built from `edited_*` first, then
+ *     `published_*` fallback, then runs through `validateWhyItMatters`)
+ *     must pass the validator. We do NOT weaken WITM validation here.
+ *   - `source_url` still passes the public-URL guard.
+ *
+ * Write path:
+ *   1. SNAPSHOT the current `published_*` text + WITM payload into
+ *      `previous_published_snapshot` (single-prior-version; overwritten
+ *      on each re-publish).
+ *   2. OVERWRITE all three `published_*` text + payload columns in the
+ *      same row, sourced from the row's current `edited_*` values (same
+ *      `buildLayerPublishText` logic as the slate publish).
+ *   3. Keep `is_live=true`, `editorial_status='published'`, bump
+ *      `published_at=now`.
+ *
+ * Does NOT touch the `published_slates` audit table — that audits SLATE
+ * publishes (a new row of slate is going live). Re-publish-in-place is a
+ * single-row correction; the snapshot column is its audit surface.
+ */
+export async function republishLiveSignalPost(input: {
+  postId: string;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return {
+      ok: false,
+      code: context.code,
+      message: context.message,
+    };
+  }
+
+  const lookup = await context.client
+    .from("signal_posts")
+    .select(SIGNAL_POST_SELECT)
+    .eq("id", input.postId)
+    .maybeSingle();
+
+  if (lookup.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: `The signal post could not be loaded for re-publish: ${lookup.error.message}`,
+    };
+  }
+  if (!lookup.data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "The signal post could not be found.",
+    };
+  }
+
+  const stored = lookup.data as unknown as StoredSignalPost;
+  const post = mapStoredSignalPost(stored);
+
+  // Pre-condition: must currently be live + published. This function is
+  // NOT a back door around the slate publish gate for never-published
+  // cards — those still go through `publishApprovedSignals`.
+  if (!post.isLive || post.editorialStatus !== "published" || !post.publishedAt) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message:
+        "Re-publish only applies to a card that is already live and published. Use the slate publish gate for first-publish.",
+    };
+  }
+
+  if (!isValidPublicSourceUrl(post.sourceUrl)) {
+    return {
+      ok: false,
+      code: "missing_public_source_url",
+      message: buildMissingPublicSourceUrlMessage("re-publish"),
+    };
+  }
+
+  // Build the new published text from edited_* first (the editor's
+  // latest review), falling back to the existing published value when
+  // edited_* is null. Mirrors the slate publish path.
+  const structuredContent =
+    post.editedWhyItMattersStructured ?? post.publishedWhyItMattersStructured;
+  const witmText = normalizeEditorialText(
+    buildEditorialWhyItMattersText(
+      structuredContent,
+      post.editedWhyItMatters || post.publishedWhyItMatters || "",
+    ),
+  );
+  if (!witmText) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Re-publish requires Why it matters text. No row was changed.",
+    };
+  }
+  const validation = validateWhyItMatters(witmText);
+  if (!validation.passed) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: `${getValidationFailureMessage(validation)} No row was changed.`,
+    };
+  }
+
+  // Before This + The Ripple use the editor's edited_* if set, else fall
+  // back to the existing published_* so a re-publish that only touches
+  // The Signal doesn't accidentally null out the other two layers.
+  const wltiStructured =
+    post.editedWhatLedToItStructured ?? post.publishedWhatLedToItStructured;
+  const wltiText = buildLayerPublishText(
+    post.editedWhatLedToIt ?? post.publishedWhatLedToIt,
+    wltiStructured,
+  );
+  const witcStructured =
+    post.editedWhatItConnectsToStructured ?? post.publishedWhatItConnectsToStructured;
+  const witcText = buildLayerPublishText(
+    post.editedWhatItConnectsTo ?? post.publishedWhatItConnectsTo,
+    witcStructured,
+  );
+
+  const snapshottedAt = new Date().toISOString();
+  // Snapshot the CURRENT published_* + WITM payload BEFORE overwriting.
+  // Shape documented in the migration file. One prior version only — each
+  // re-publish overwrites the snapshot.
+  const previousPublishedSnapshot = {
+    why_it_matters: post.publishedWhyItMatters,
+    what_led_to_it: post.publishedWhatLedToIt,
+    what_it_connects_to: post.publishedWhatItConnectsTo,
+    why_it_matters_payload: post.publishedWhyItMattersStructured,
+    what_led_to_it_payload: post.publishedWhatLedToItStructured,
+    what_it_connects_to_payload: post.publishedWhatItConnectsToStructured,
+    snapshotted_at: snapshottedAt,
+  };
+
+  const updateResult = await context.client
+    .from("signal_posts")
+    .update({
+      previous_published_snapshot: previousPublishedSnapshot,
+      published_why_it_matters: witmText,
+      published_why_it_matters_payload: structuredContent,
+      published_what_led_to_it: wltiText,
+      published_what_led_to_it_payload: wltiStructured,
+      published_what_it_connects_to: witcText,
+      published_what_it_connects_to_payload: witcStructured,
+      // Stay live, stay published. Bump published_at so observability
+      // can tell the re-publish moment apart from the original publish.
+      is_live: true,
+      editorial_status: "published",
+      editorial_decision: "approved",
+      published_at: snapshottedAt,
+      ...buildWhyItMattersValidationFields(validation, snapshottedAt),
+      updated_at: snapshottedAt,
+    })
+    .eq("id", input.postId);
+
+  if (updateResult.error) {
+    return {
+      ok: false,
+      code: "storage_error",
+      message: `The signal post could not be re-published: ${updateResult.error.message}`,
+    };
+  }
+
+  return {
+    ok: true,
+    code: "republished",
+    message: `Re-published live card. Prior published copy preserved in the snapshot column at ${snapshottedAt}.`,
   };
 }
 

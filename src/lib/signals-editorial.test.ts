@@ -29,6 +29,8 @@ type SignalPostRow = {
   edited_what_it_connects_to_payload?: unknown | null;
   published_what_it_connects_to?: string | null;
   published_what_it_connects_to_payload?: unknown | null;
+  // #280 single-prior-version snapshot for re-publish.
+  previous_published_snapshot?: unknown | null;
   why_it_matters_validation_status: "passed" | "requires_human_rewrite";
   why_it_matters_validation_failures: string[];
   why_it_matters_validation_details: string[];
@@ -151,6 +153,7 @@ function createRow(overrides: Partial<SignalPostRow> = {}): SignalPostRow {
     edited_what_it_connects_to_payload: overrides.edited_what_it_connects_to_payload ?? null,
     published_what_it_connects_to: overrides.published_what_it_connects_to ?? null,
     published_what_it_connects_to_payload: overrides.published_what_it_connects_to_payload ?? null,
+    previous_published_snapshot: overrides.previous_published_snapshot ?? null,
     why_it_matters_validation_status: overrides.why_it_matters_validation_status ?? "passed",
     why_it_matters_validation_failures: overrides.why_it_matters_validation_failures ?? [],
     why_it_matters_validation_details: overrides.why_it_matters_validation_details ?? [],
@@ -2994,6 +2997,177 @@ describe("signals editorial workflow", () => {
       briefingDate: null,
       errorMessage:
         "public signal_posts read failed: column signal_posts.why_it_matters_validation_failures does not exist",
+    });
+  });
+
+  // #280 — re-publish a card that is already live + published. Snapshots
+  // the prior published_* into previous_published_snapshot, overwrites in
+  // place from edited_*, keeps is_live=true and same id. Does NOT replace
+  // the slate-publish gate for never-published cards.
+  describe("republishLiveSignalPost (#280)", () => {
+    it("snapshots prior published_* and overwrites in place when editor re-publishes a live card", async () => {
+      const priorPublishedAt = "2026-05-23T12:00:00.000Z";
+      const rows = [
+        createRow({
+          id: "live-card-1",
+          briefing_date: "2026-05-24",
+          editorial_status: "published",
+          editorial_decision: "approved",
+          is_live: true,
+          published_at: priorPublishedAt,
+          why_it_matters_validation_status: "passed",
+          // Prior published copy.
+          published_why_it_matters: createValidWhyItMatters("Prior Signal"),
+          published_what_led_to_it: "Prior Before This body.",
+          published_what_it_connects_to: "Prior Ripple body.",
+          // Editor's pending edits in the cockpit — what should be promoted.
+          edited_why_it_matters: createValidWhyItMatters("Updated Signal"),
+          edited_what_led_to_it: "Updated Before This body — corrected.",
+          edited_what_it_connects_to: "Updated Ripple body — enriched.",
+          source_url: "https://example.com/source",
+        }),
+      ];
+      createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+      safeGetUser.mockResolvedValue({
+        user: { id: "admin-1", email: "admin@example.com" },
+        supabase: {},
+        sessionCookiePresent: true,
+      });
+
+      const { republishLiveSignalPost } = await loadEditorialModule();
+      const result = await republishLiveSignalPost({ postId: "live-card-1" });
+
+      expect(result.ok).toBe(true);
+      expect(result.code).toBe("republished");
+
+      const row = rows[0];
+      // Stays live, same id, status still published.
+      expect(row.id).toBe("live-card-1");
+      expect(row.is_live).toBe(true);
+      expect(row.editorial_status).toBe("published");
+
+      // Prior published_* copied into the snapshot column BEFORE the overwrite.
+      expect(row.previous_published_snapshot).toMatchObject({
+        why_it_matters: createValidWhyItMatters("Prior Signal"),
+        what_led_to_it: "Prior Before This body.",
+        what_it_connects_to: "Prior Ripple body.",
+      });
+      expect((row.previous_published_snapshot as { snapshotted_at: string }).snapshotted_at).toMatch(
+        /^\d{4}-\d{2}-\d{2}T/,
+      );
+
+      // published_* overwritten from edited_*.
+      expect(row.published_why_it_matters).toBe(createValidWhyItMatters("Updated Signal"));
+      expect(row.published_what_led_to_it).toBe("Updated Before This body — corrected.");
+      expect(row.published_what_it_connects_to).toBe("Updated Ripple body — enriched.");
+
+      // published_at bumped past the prior value.
+      expect(row.published_at).not.toBe(priorPublishedAt);
+      expect(row.published_at).not.toBeNull();
+    });
+
+    it("refuses to re-publish when WITM validation fails (does not write snapshot or overwrite)", async () => {
+      const rows = [
+        createRow({
+          id: "live-card-2",
+          editorial_status: "published",
+          editorial_decision: "approved",
+          is_live: true,
+          published_at: "2026-05-23T12:00:00.000Z",
+          why_it_matters_validation_status: "passed",
+          published_why_it_matters: createValidWhyItMatters("Prior Signal"),
+          // Editor's edits FAIL validation (forbidden vocab from the
+          // TEMPLATE_PLACEHOLDER_PHRASES list — `mainly useful for individual readers`).
+          edited_why_it_matters:
+            "The story is mainly useful for individual readers, not market-moving for institutions.",
+          source_url: "https://example.com/source",
+        }),
+      ];
+      createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+      safeGetUser.mockResolvedValue({
+        user: { id: "admin-1", email: "admin@example.com" },
+        supabase: {},
+        sessionCookiePresent: true,
+      });
+
+      const { republishLiveSignalPost } = await loadEditorialModule();
+      const result = await republishLiveSignalPost({ postId: "live-card-2" });
+
+      expect(result.ok).toBe(false);
+      expect(result.code).toBe("publish_blocked");
+
+      const row = rows[0];
+      expect(row.previous_published_snapshot).toBeNull();
+      expect(row.published_why_it_matters).toBe(createValidWhyItMatters("Prior Signal"));
+    });
+
+    it("refuses to re-publish a card that has never been published (use the slate gate instead)", async () => {
+      const rows = [
+        createRow({
+          id: "draft-card",
+          editorial_status: "approved",
+          editorial_decision: "approved",
+          is_live: false,
+          published_at: null,
+          why_it_matters_validation_status: "passed",
+          edited_why_it_matters: createValidWhyItMatters("Approved Draft"),
+          source_url: "https://example.com/source",
+        }),
+      ];
+      createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+      safeGetUser.mockResolvedValue({
+        user: { id: "admin-1", email: "admin@example.com" },
+        supabase: {},
+        sessionCookiePresent: true,
+      });
+
+      const { republishLiveSignalPost } = await loadEditorialModule();
+      const result = await republishLiveSignalPost({ postId: "draft-card" });
+
+      expect(result.ok).toBe(false);
+      expect(result.code).toBe("publish_blocked");
+      expect(result.message).toMatch(/already live and published/i);
+
+      const row = rows[0];
+      expect(row.previous_published_snapshot).toBeNull();
+      expect(row.is_live).toBe(false);
+      expect(row.editorial_status).toBe("approved");
+    });
+
+    it("returns not_found when the post id does not resolve to a row", async () => {
+      createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock([]));
+      safeGetUser.mockResolvedValue({
+        user: { id: "admin-1", email: "admin@example.com" },
+        supabase: {},
+        sessionCookiePresent: true,
+      });
+
+      const { republishLiveSignalPost } = await loadEditorialModule();
+      const result = await republishLiveSignalPost({ postId: "missing-id" });
+
+      expect(result.ok).toBe(false);
+      expect(result.code).toBe("not_found");
+    });
+
+    it("never-published cards still publish via the normal slate-gate path with previous_published_snapshot left null", async () => {
+      // Sanity test: the slate publish path is unchanged and does NOT
+      // touch previous_published_snapshot.
+      const rows = createPartialFinalSlate(3);
+      createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+      safeGetUser.mockResolvedValue({
+        user: { id: "admin-1", email: "admin@example.com" },
+        supabase: {},
+        sessionCookiePresent: true,
+      });
+
+      const { publishApprovedSignals } = await loadEditorialModule();
+      const result = await publishApprovedSignals();
+
+      expect(result.ok).toBe(true);
+      expect(rows.every((row) => row.editorial_status === "published")).toBe(true);
+      expect(rows.every((row) => row.is_live === true)).toBe(true);
+      // First-time publish does not snapshot — the column stays null.
+      expect(rows.every((row) => row.previous_published_snapshot === null)).toBe(true);
     });
   });
 });

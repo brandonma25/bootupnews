@@ -10,6 +10,7 @@ import {
   SlotPanel,
   type ComposerSlot,
 } from "@/components/admin/editorial-composer/SlotPanel";
+import { SignalPostEditor } from "@/app/dashboard/signals/editorial-review/StructuredEditorialFields";
 import type { EditorialSignalPost } from "@/lib/signals-editorial";
 
 vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
@@ -21,6 +22,7 @@ vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
   rejectSignalPostAction: vi.fn(),
   requestRewriteAction: vi.fn(),
   resetSignalPostToAiDraftAction: vi.fn(),
+  republishLiveSignalPostAction: vi.fn(),
 }));
 
 function createCandidate(overrides: Partial<EditorialSignalPost> = {}): EditorialSignalPost {
@@ -445,5 +447,75 @@ describe("isEligibleForBulkApprove", () => {
         true,
       ),
     ).toBe(true);
+  });
+});
+
+// #280 — "Re-publish live card" button in the SignalPostEditor panel.
+// Shown only for cards that are currently published + live; submits to
+// republishLiveSignalPostAction which snapshots the prior published_*
+// and overwrites in place.
+describe("SignalPostEditor — re-publish live card button (#280)", () => {
+  function renderEditor(overrides: Partial<EditorialSignalPost> = {}) {
+    const post = createCandidate(overrides);
+    return render(
+      <SignalPostEditor post={post} storageReady defaultExpanded />,
+    );
+  }
+
+  it("shows the Re-publish button when the card is currently published + live + has publishedAt", () => {
+    renderEditor({
+      editorialStatus: "published",
+      editorialDecision: "approved",
+      finalSlateRank: 1,
+      whyItMattersValidationStatus: "passed",
+      isLive: true,
+      publishedAt: "2026-05-23T12:00:00.000Z",
+    });
+
+    expect(screen.getByTestId("republish-live-card")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /re-publish live card/i })).toBeInTheDocument();
+  });
+
+  it("hides the Re-publish button on a never-published candidate (use the slate gate instead)", () => {
+    renderEditor({
+      editorialStatus: "approved",
+      editorialDecision: "approved",
+      finalSlateRank: 1,
+      whyItMattersValidationStatus: "passed",
+      isLive: false,
+      publishedAt: null,
+    });
+
+    expect(screen.queryByTestId("republish-live-card")).not.toBeInTheDocument();
+  });
+
+  it("hides the Re-publish button on a draft / needs-review candidate", () => {
+    renderEditor({
+      editorialStatus: "needs_review",
+      editorialDecision: null,
+      finalSlateRank: null,
+      whyItMattersValidationStatus: "passed",
+      isLive: false,
+      publishedAt: null,
+    });
+
+    expect(screen.queryByTestId("republish-live-card")).not.toBeInTheDocument();
+  });
+
+  it("disables the Re-publish button when WITM validator is failing on the live card", () => {
+    renderEditor({
+      editorialStatus: "published",
+      editorialDecision: "approved",
+      finalSlateRank: 1,
+      whyItMattersValidationStatus: "requires_human_rewrite",
+      whyItMattersValidationFailures: ["template_placeholder_language"],
+      whyItMattersValidationDetails: ["placeholder language"],
+      isLive: true,
+      publishedAt: "2026-05-23T12:00:00.000Z",
+    });
+
+    const button = screen.getByTestId("republish-live-card");
+    expect(button).toBeInTheDocument();
+    expect(button).toBeDisabled();
   });
 });

@@ -79,6 +79,14 @@
 - Sentry noise filter: `sentry.server.config.ts` runs `isFilteredRssNoiseEvent` in `beforeSend` and drops events whose exception message matches `^Feed request retry exhausted for `. Those failures are now tracked exclusively in the Source Health Log. All other `RssError` variants continue to report normally.
 - Permissive failure contract: if `NOTION_SOURCE_HEALTH_LOG_DB_ID` is unset or the Notion query fails, the circuit breaker returns `skip: false` and the fetch proceeds. Observability degradation must never silently disable ingestion.
 
+## Re-Publish Live Card (PRD-67)
+- The cockpit can re-publish an already-live card in place via the "Re-publish live card" button on the per-card editor panel (`SignalPostEditor` in `StructuredEditorialFields.tsx`). The button is shown ONLY when the row is currently `is_live=true` AND `editorial_status='published'` AND `published_at IS NOT NULL`. Disabled when `why_it_matters_validation_status='requires_human_rewrite'`.
+- Server function `republishLiveSignalPost` (`src/lib/signals-editorial.ts`) is the single supported path: snapshots the current `published_*` text + WITM payload into `previous_published_snapshot` BEFORE overwriting from `edited_*`. Bumps `published_at=now`. Keeps `is_live=true`, `editorial_status='published'`, same row id.
+- Distinct from `publishApprovedSignals` (the slate-wide first-publish gate, unchanged here) and from the intentionally-disabled `publishSignalPost` (single-row first-publish, kept disabled).
+- WITM validation gate still applies — re-publish refuses if `validateWhyItMatters` fails on the new text. Source-URL guard still applies. We do NOT weaken those.
+- The snapshot is a single prior version (overwritten on each re-publish). The future corrections-log feature can migrate the jsonb to an array or a dedicated history table without losing data.
+- The `published_slates` audit table is NOT written on re-publish — that table audits slate publishes (a NEW row of slate going live); single-row corrections use the snapshot column as their audit surface.
+
 ## Three-Layer Publish Pipeline (PRD-66)
 - The publish gate (`publishApprovedSignals` in `src/lib/signals-editorial.ts`) now promotes all three editorial layers from `edited_*` to `published_*`:
   - The Signal — `edited_why_it_matters` → `published_why_it_matters` (existing).

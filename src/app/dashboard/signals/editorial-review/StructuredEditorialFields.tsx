@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  RefreshCw,
   RotateCcw,
   Save,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import {
   approveSignalPostAction,
   holdSignalPostAction,
   rejectSignalPostAction,
+  republishLiveSignalPostAction,
   requestRewriteAction,
   resetSignalPostToAiDraftAction,
   saveSignalDraftAction,
@@ -222,6 +224,25 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
               <RotateCcw className="h-4 w-4" />
               Reset to AI Draft
             </Button>
+            {/* #280 Re-publish-in-place control. Only enabled for cards
+                that are CURRENTLY published + live. Snapshots the prior
+                published_* into previous_published_snapshot, overwrites
+                from edited_*. Validation gate (WITM passed) still applies.
+                Distinct from the slate-publish button (which only handles
+                never-published cards). */}
+            {post.isLive && post.editorialStatus === "published" && post.publishedAt ? (
+              <Button
+                type="submit"
+                formAction={republishLiveSignalPostAction}
+                variant="secondary"
+                disabled={controlsDisabled || requiresHumanRewrite}
+                className="gap-2"
+                data-testid="republish-live-card"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Re-publish live card
+              </Button>
+            ) : null}
           </div>
           <div className="space-y-3 rounded-card border border-[var(--border)] bg-[var(--bg)] p-3">
             <label htmlFor={`decisionNote-${post.id}`} className="text-sm font-medium text-[var(--text-primary)]">
