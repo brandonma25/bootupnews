@@ -3,6 +3,10 @@ import { errorContext, logServerEvent } from "@/lib/observability";
 import { deduplicateCandidates, type NewsletterCandidate, type RssCandidate } from "@/lib/editorial-staging/dedup";
 import { writeEditorialQueueRow } from "@/lib/editorial-staging/notion-writer";
 import { sendEditorialCompletionEmail } from "@/lib/editorial-staging/email";
+import {
+  applyEvergreenFilter,
+  resolveEvergreenFilterConfig,
+} from "@/lib/editorial-staging/evergreen-filter";
 
 type Category = "Tech" | "Finance" | "Politics";
 
@@ -33,6 +37,17 @@ export type EditorialStagingRunSummary = {
   /** Track 2 P4 — staged headline already exists at non-`raw` status on a different briefing date within the lookback window. */
   notionRowsSkippedDuplicateAcrossDates: number;
   notionErrors: string[];
+  /**
+   * Track 2 P7 — count of candidates hard-rejected by the evergreen/
+   * explainer filter (title-regex or source-denylist match). Mirrors P4's
+   * cross-date dedup counter pattern.
+   */
+  candidatesFilteredEvergreen: number;
+  /**
+   * Track 2 P7 — count of candidates whose baseScore was reduced by the
+   * URL date-path drift penalty (a soft signal, not a hard reject).
+   */
+  candidatesPenalizedEvergreen: number;
 };
 
 export type EditorialStagingRunResult = {
@@ -209,6 +224,8 @@ function buildFailureResult(
       notionRowsSkippedHumanEdited: 0,
       notionRowsSkippedDuplicateAcrossDates: 0,
       notionErrors: [],
+      candidatesFilteredEvergreen: 0,
+      candidatesPenalizedEvergreen: 0,
     },
   };
 }
@@ -272,8 +289,32 @@ export async function runEditorialStaging(options: {
     poolHeadlines: dedupedPool.slice(0, 10).map((c) => c.headline.slice(0, 60)),
   });
 
-  // Step E: Score and select top 7
-  const selected = scoreAndSelect(dedupedPool);
+  // Step D.5 (Track 2 P7): evergreen/explainer filter.
+  //
+  // Catches the DEBUT side of the evergreen problem (P4 handled REPEAT).
+  // Config-driven via EVERGREEN_FILTER_CONFIG_JSON env var; falls back to
+  // built-in defaults. Returns hard-rejected (title regex / source
+  // denylist) and soft-penalized (URL date-path drift) candidates;
+  // counters mirror P4's pattern.
+  const evergreenConfig = resolveEvergreenFilterConfig();
+  const filtered = applyEvergreenFilter(dedupedPool, {
+    config: evergreenConfig,
+    briefingDate,
+  });
+  logServerEvent("info", "Editorial staging: evergreen filter applied", {
+    briefingDate,
+    poolSizeBefore: dedupedPool.length,
+    poolSizeAfter: filtered.passed.length,
+    candidatesFilteredEvergreen: filtered.candidatesFilteredEvergreen,
+    candidatesPenalizedEvergreen: filtered.candidatesPenalizedEvergreen,
+    rejectedSamples: filtered.rejected.slice(0, 5).map((r) => ({
+      headline: r.candidate.headline.slice(0, 60),
+      reason: r.reason,
+    })),
+  });
+
+  // Step E: Score and select top 7 (from the filtered pool)
+  const selected = scoreAndSelect(filtered.passed);
 
   // Step F: Write to Notion Editorial Queue (idempotent — insert | update | skip)
   let notionRowsInserted = 0;
@@ -354,6 +395,8 @@ export async function runEditorialStaging(options: {
     notionRowsUpdated,
     notionRowsSkippedHumanEdited,
     notionRowsSkippedDuplicateAcrossDates,
+    candidatesFilteredEvergreen: filtered.candidatesFilteredEvergreen,
+    candidatesPenalizedEvergreen: filtered.candidatesPenalizedEvergreen,
   });
 
   return {
@@ -372,6 +415,8 @@ export async function runEditorialStaging(options: {
       notionRowsSkippedHumanEdited,
       notionRowsSkippedDuplicateAcrossDates,
       notionErrors,
+      candidatesFilteredEvergreen: filtered.candidatesFilteredEvergreen,
+      candidatesPenalizedEvergreen: filtered.candidatesPenalizedEvergreen,
     },
   };
 }
