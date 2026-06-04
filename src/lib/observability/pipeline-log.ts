@@ -19,7 +19,7 @@ import { errorContext, logServerEvent } from "@/lib/observability";
 const NOTION_API_VERSION = "2022-06-28";
 const NOTION_PAGES_URL = "https://api.notion.com/v1/pages";
 
-export type PipelineLogRunType = "ingestion" | "health_check";
+export type PipelineLogRunType = "ingestion" | "health_check" | "needs_review_sweep";
 export type PipelineLogStatus = "ok" | "warn" | "fail";
 
 export type PipelineLogEntry = {
