@@ -8,6 +8,13 @@ import {
   verifyGmailNewsletterLabelVisible,
 } from "@/lib/newsletter-ingestion/gmail";
 
+const { sentryCaptureMessage } = vi.hoisted(() => ({
+  sentryCaptureMessage: vi.fn(),
+}));
+vi.mock("@sentry/nextjs", () => ({
+  captureMessage: sentryCaptureMessage,
+}));
+
 describe("Gmail newsletter API client", () => {
   it("builds the benchmark label search query with a since date", () => {
     expect(
@@ -158,5 +165,73 @@ describe("Gmail newsletter API client", () => {
       expect(result.message).not.toContain("refresh-token");
       expect(result.message).not.toContain("client-secret");
     }
+  });
+
+  // Track 2 P3 — per-call timeout. A hung Gmail call must NOT block the
+  // cron toward the 60s Vercel function ceiling. The timeout fires at
+  // 10s (per-call), aborts the request, captures Sentry, and raises a
+  // retryable GmailApiError so the caller's retry policy handles it
+  // uniformly.
+  it("times out a hung Gmail call after the per-call ceiling and captures Sentry (#272 P3)", async () => {
+    sentryCaptureMessage.mockReset();
+    // Mock fetch that never resolves until aborted via the AbortSignal.
+    // We listen to init.signal for the abort and reject with an AbortError
+    // — exactly what runtimes do when AbortController.abort() fires.
+    const fetchImpl = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal?.aborted) {
+          const err = new Error("aborted");
+          err.name = "AbortError";
+          reject(err);
+          return;
+        }
+        signal?.addEventListener("abort", () => {
+          const err = new Error("aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      });
+    });
+
+    // Speed up the test — use fake timers to advance past the 10s ceiling.
+    vi.useFakeTimers();
+
+    const tokenPromise = (async () => {
+      try {
+        // getAccessToken() is the first call — wrap a refresh-token fetch.
+        const { getGmailAccessToken } = await import("@/lib/newsletter-ingestion/gmail");
+        return await getGmailAccessToken(
+          {
+            clientId: "client-id",
+            clientSecret: "client-secret",
+            refreshToken: "refresh-token",
+          },
+          fetchImpl as typeof fetch,
+        );
+      } catch (error) {
+        return error;
+      }
+    })();
+
+    // Advance past the 10s per-call ceiling.
+    await vi.advanceTimersByTimeAsync(10_100);
+    const outcome = await tokenPromise;
+    vi.useRealTimers();
+
+    expect(outcome).toBeInstanceOf(GmailApiError);
+    expect((outcome as GmailApiError).message).toMatch(/timed out after 10000ms/i);
+    // Timed-out OAuth refresh is retryable so any caller's retry policy
+    // can re-attempt with backoff (the OAuth helper itself doesn't
+    // retry; the gmailFetchJson wrapper does for API calls).
+    expect((outcome as GmailApiError).retryable).toBe(true);
+
+    expect(sentryCaptureMessage).toHaveBeenCalledWith(
+      "Gmail call timed out",
+      expect.objectContaining({
+        level: "warning",
+        fingerprint: ["gmail-call-timeout", "Gmail OAuth refresh"],
+      }),
+    );
   });
 });
