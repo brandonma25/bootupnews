@@ -8,15 +8,10 @@ import {
   parseArgs,
   printSummary,
 } from "./common.mjs";
-
-const DEFAULT_LCP_THRESHOLD_MS = 3000;
-const DEFAULT_LCP_TARGET_MS = 2000;
-const DEFAULT_NETWORK_IDLE_THRESHOLD_MS = 3000;
-
-function parseNumber(value, fallback) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
+import {
+  evaluatePerformance,
+  resolvePerformanceConfig,
+} from "./performance-evaluator.mjs";
 
 function byteLength(value) {
   return Buffer.byteLength(value, "utf8");
@@ -53,11 +48,22 @@ async function getHomepageHtmlSize(url) {
   };
 }
 
-async function measureHomepagePerformance(url) {
+async function measureHomepagePerformance(url, perfConfig) {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   const requestUrls = new Set();
   let scriptBytes = 0;
+
+  // Emulate a mid-tier phone via the Chrome DevTools Protocol so the gate
+  // reflects the RES-60 field population rather than a fast desktop runner.
+  const client = await page.context().newCDPSession(page);
+  if (perfConfig.cpuThrottleRate > 1) {
+    await client.send("Emulation.setCPUThrottlingRate", { rate: perfConfig.cpuThrottleRate });
+  }
+  if (perfConfig.networkProfile) {
+    await client.send("Network.enable");
+    await client.send("Network.emulateNetworkConditions", perfConfig.networkProfile);
+  }
 
   page.on("request", (request) => {
     requestUrls.add(request.url());
@@ -82,6 +88,7 @@ async function measureHomepagePerformance(url) {
   await page.addInitScript(() => {
     window.__bootupPerformance = {
       lcp: 0,
+      tbt: 0,
     };
 
     try {
@@ -97,6 +104,24 @@ async function measureHomepagePerformance(url) {
       observer.observe({ type: "largest-contentful-paint", buffered: true });
     } catch {
       window.__bootupPerformance.lcp = 0;
+    }
+
+    try {
+      // Total Blocking Time proxy: sum of (longtask duration - 50ms) over all
+      // long tasks. This is the metric a hydration regression inflates under a
+      // CPU throttle — reconciling many heavy nodes produces long tasks.
+      const tbtObserver = new PerformanceObserver((entryList) => {
+        for (const entry of entryList.getEntries()) {
+          const blocking = entry.duration - 50;
+          if (blocking > 0) {
+            window.__bootupPerformance.tbt += blocking;
+          }
+        }
+      });
+
+      tbtObserver.observe({ type: "longtask", buffered: true });
+    } catch {
+      window.__bootupPerformance.tbt = 0;
     }
   });
 
@@ -122,6 +147,7 @@ async function measureHomepagePerformance(url) {
     return {
       fcp: fcp?.startTime ?? Number.NaN,
       lcp: window.__bootupPerformance?.lcp ?? Number.NaN,
+      tbt: window.__bootupPerformance?.tbt ?? Number.NaN,
       loadEventEnd,
     };
   });
@@ -140,18 +166,6 @@ async function measureHomepagePerformance(url) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const baseUrl = args["base-url"] || args.url || process.env.RELEASE_BASE_URL;
-  const lcpThresholdMs = parseNumber(
-    args["lcp-threshold-ms"] || process.env.RELEASE_LCP_THRESHOLD_MS,
-    DEFAULT_LCP_THRESHOLD_MS,
-  );
-  const lcpTargetMs = parseNumber(
-    args["lcp-target-ms"] || process.env.RELEASE_LCP_TARGET_MS,
-    DEFAULT_LCP_TARGET_MS,
-  );
-  const networkIdleThresholdMs = parseNumber(
-    args["network-idle-threshold-ms"] || process.env.RELEASE_NETWORK_IDLE_THRESHOLD_MS,
-    DEFAULT_NETWORK_IDLE_THRESHOLD_MS,
-  );
   const step = createStep("homepage performance gate");
   const startedAt = Date.now();
 
@@ -165,41 +179,45 @@ async function main() {
     exitForSteps([step]);
   }
 
+  let perfConfig;
+  try {
+    perfConfig = resolvePerformanceConfig(args, process.env);
+  } catch (error) {
+    step.status = "failed";
+    step.details = error instanceof Error ? error.message : String(error);
+    printSummary({ label: "production performance", steps: [step] });
+    exitForSteps([step]);
+  }
+
+  const { thresholds } = perfConfig;
   const homepageUrl = new URL("/", baseUrl).toString();
+  const emulation = `${perfConfig.cpuThrottleRate}x CPU / ${perfConfig.networkProfileName} network`;
 
   try {
     const [htmlSize, metrics] = await Promise.all([
       getHomepageHtmlSize(homepageUrl),
-      measureHomepagePerformance(homepageUrl),
+      measureHomepagePerformance(homepageUrl, perfConfig),
     ]);
 
     step.durationMs = Date.now() - startedAt;
     step.details = [
       `URL: ${homepageUrl}`,
-      `LCP: ${formatMs(metrics.lcp)} (target ${lcpTargetMs}ms, hard fail ${lcpThresholdMs}ms)`,
+      `emulation: ${emulation}`,
+      `LCP: ${formatMs(metrics.lcp)} (target ${thresholds.lcpTargetMs}ms, hard fail ${thresholds.lcpHardFailMs}ms)`,
       `FCP: ${formatMs(metrics.fcp)}`,
+      `TBT: ${formatMs(metrics.tbt)} (hard fail ${thresholds.tbtHardFailMs}ms)`,
       `load event: ${formatMs(metrics.loadEventEnd)}`,
-      `network idle: ${formatMs(metrics.networkIdleMs)} (hard fail ${networkIdleThresholdMs}ms)`,
+      `network idle: ${formatMs(metrics.networkIdleMs)} (hard fail ${thresholds.networkIdleHardFailMs}ms)`,
       `HTML size: ${formatBytes(htmlSize.bytes)} decompressed (HTTP ${htmlSize.status})`,
       `script bytes: ${formatBytes(metrics.scriptBytes)}`,
       `route requests: ${metrics.routeRequestCount}`,
       `browser elapsed: ${formatMs(metrics.elapsedMs)}`,
     ].join("; ");
 
-    if (!Number.isFinite(metrics.lcp) || metrics.lcp <= 0) {
-      step.status = "failed";
-      step.details += "; LCP was not reported by Chromium.";
-    } else if (metrics.lcp > lcpThresholdMs) {
-      step.status = "failed";
-      step.details += `; homepage LCP exceeded ${lcpThresholdMs}ms.`;
-    } else if (!Number.isFinite(metrics.networkIdleMs) || metrics.networkIdleMs <= 0) {
-      step.status = "failed";
-      step.details += "; network idle was not reached within the measurement window.";
-    } else if (metrics.networkIdleMs > networkIdleThresholdMs) {
-      step.status = "failed";
-      step.details += `; homepage network idle exceeded ${networkIdleThresholdMs}ms.`;
-    } else {
-      step.status = "passed";
+    const result = evaluatePerformance(metrics, thresholds);
+    step.status = result.status;
+    if (result.reasons.length) {
+      step.details += `; ${result.reasons.join(" ")}`;
     }
   } catch (error) {
     step.status = "failed";
@@ -210,7 +228,7 @@ async function main() {
   printSummary({
     label: "production performance",
     steps: [step],
-    extraLines: [`Base URL: ${baseUrl}`],
+    extraLines: [`Base URL: ${baseUrl}`, `Emulation: ${emulation}`],
   });
 
   exitForSteps([step]);
