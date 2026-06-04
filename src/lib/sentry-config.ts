@@ -83,6 +83,68 @@ export function readSentryReplaysOnErrorSampleRate() {
   return readSampleRate("SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE", DEFAULT_REPLAYS_ON_ERROR_SAMPLE_RATE);
 }
 
+export const SENTRY_REPLAY_DEFER_MS = 3000;
+
+type ScheduleFn = (callback: () => void) => () => void;
+
+/**
+ * Defer Sentry Session Replay attachment out of the render-blocking window.
+ *
+ * Replay is the heaviest Sentry integration: instantiating `replayIntegration()`
+ * and starting its recording machinery is real synchronous main-thread work.
+ * Previously it was passed to `Sentry.init({ integrations: [replayIntegration()] })`
+ * in `instrumentation-client.ts`, which runs at client-instrumentation load —
+ * inside the render-blocking window before First Contentful Paint. On mid-tier
+ * devices that synchronous setup measurably delayed FCP/LCP.
+ *
+ * This runs `attach` AFTER first paint (first idle callback, or a 3000ms
+ * fallback mirroring the existing PostHog defer), so replay setup never runs
+ * before the page is interactive. Sentry core still initializes synchronously,
+ * so error/exception/trace capture is unaffected — only the replay recording
+ * attachment is delayed by a few seconds.
+ *
+ * `schedule` is injectable for unit testing; `onError` keeps replay best-effort.
+ * Returns a cancel function (used by tests; harmless in production).
+ */
+export function scheduleDeferredSentryReplay(
+  attach: () => void,
+  options: { schedule?: ScheduleFn; onError?: (error: unknown) => void } = {},
+): () => void {
+  const schedule = options.schedule ?? defaultReplaySchedule;
+  const onError = options.onError ?? (() => {});
+
+  return schedule(() => {
+    try {
+      attach();
+    } catch (error) {
+      onError(error);
+    }
+  });
+}
+
+const defaultReplaySchedule: ScheduleFn = (callback) => {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const idle = (
+    window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    }
+  ).requestIdleCallback;
+
+  if (typeof idle === "function") {
+    const handle = idle(callback, { timeout: SENTRY_REPLAY_DEFER_MS + 2000 });
+    return () => {
+      (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback?.(handle);
+    };
+  }
+
+  const timer = window.setTimeout(callback, SENTRY_REPLAY_DEFER_MS);
+  return () => window.clearTimeout(timer);
+};
+
 export function sanitizeUrl(value: string) {
   const trimmed = value.trim();
 
