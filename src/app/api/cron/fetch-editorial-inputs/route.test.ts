@@ -73,7 +73,7 @@ type LockRow = {
   cron_name: string;
   started_at: string;
   finished_at: string | null;
-  status: "running" | "ok" | "fail" | "timeout";
+  status: "running" | "ok" | "warn" | "fail" | "timeout";
 };
 
 function buildLockClient(initialRow: LockRow | null = null, options: { insertError?: { code: string; message: string } } = {}) {
@@ -391,6 +391,70 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       runType: "ingestion",
       status: "fail",
     });
+  });
+
+  // #272 — Newsletter is supplementary. An RSS-healthy run with a dead
+  // newsletter source must be `warn` (degraded), NOT `fail`. The legacy
+  // boolean `rss.success && newsletter.success` was marking every RSS-
+  // healthy run since 2026-05-18 as fail because the Gmail credential
+  // expired around then. This regression test pins the new contract.
+  it("writes Pipeline Log status=warn (NOT fail) and cron_runs status=warn when newsletter fails but RSS is healthy (#272)", async () => {
+    // Track 2 P1 rev: cron_runs.status must mirror the Pipeline Log's
+    // three-state ladder. A degraded leg = warn (not 'ok'). 'ok' would
+    // collapse the signal — cron_runs becomes useless as a gauge if
+    // every RSS-healthy run reads as 'ok' regardless of newsletter death.
+    const client = buildLockClient(null);
+    createSupabaseServiceRoleClient.mockReturnValue(client);
+
+    runNewsletterIngestion.mockResolvedValue({
+      success: false,
+      timestamp: "2026-05-12T10:15:01.000Z",
+      summary: {
+        message: "Newsletter ingestion failed closed before completion.",
+      },
+    });
+    // RSS + editorial staging stay healthy via the beforeEach defaults.
+
+    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+    await GET(buildRequest("local-cron-secret"));
+    await runCapturedAfter();
+
+    expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
+    expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
+      runType: "ingestion",
+      status: "warn",
+    });
+    expect(writePipelineLogEntry.mock.calls[0][0].message).toMatch(/RSS=ok/);
+    expect(writePipelineLogEntry.mock.calls[0][0].message).toMatch(/newsletter=degraded/);
+
+    // cron_runs finalize wrote 'warn' (not 'ok') so the guard table
+    // surfaces the degraded leg without paging cron-job.org.
+    expect(client._state.row?.status).toBe("warn");
+    expect(client._state.row?.finished_at).not.toBeNull();
+  });
+
+  it("writes Pipeline Log status=ok and cron_runs status=ok when newsletter returns success on an empty Gmail label (#272)", async () => {
+    const client = buildLockClient(null);
+    createSupabaseServiceRoleClient.mockReturnValue(client);
+
+    runNewsletterIngestion.mockResolvedValue({
+      success: true,
+      timestamp: "2026-05-12T10:15:01.000Z",
+      summary: {
+        message: "No newsletters received from the configured Gmail label since the last fetch.",
+      },
+    });
+
+    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+    await GET(buildRequest("local-cron-secret"));
+    await runCapturedAfter();
+
+    expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
+    expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
+      runType: "ingestion",
+      status: "ok",
+    });
+    expect(client._state.row?.status).toBe("ok");
   });
 
   it("still attempts newsletter ingestion when the RSS path fails closed", async () => {
