@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 function clearSentryEnv() {
   delete process.env.SENTRY_DSN;
@@ -100,5 +100,55 @@ describe("isFilteredRssNoiseEvent (PRD-65 Phase 4.5)", () => {
     expect(isFilteredRssNoiseEvent(undefined)).toBe(false);
     expect(isFilteredRssNoiseEvent({})).toBe(false);
     expect(isFilteredRssNoiseEvent({ exception: { values: [{}] } })).toBe(false);
+  });
+});
+
+describe("scheduleDeferredSentryReplay", () => {
+  it("does NOT run the attach callback synchronously — only after the schedule fires", async () => {
+    const { scheduleDeferredSentryReplay } = await import("@/lib/sentry-config");
+    const attach = vi.fn();
+    let scheduled: (() => void) | null = null;
+    const schedule = (cb: () => void) => {
+      scheduled = cb;
+      return () => {};
+    };
+
+    scheduleDeferredSentryReplay(attach, { schedule });
+
+    // The whole point: replay setup must not touch the main thread before paint.
+    expect(attach).not.toHaveBeenCalled();
+    expect(scheduled).toBeTypeOf("function");
+  });
+
+  it("runs the attach callback once the scheduled callback fires", async () => {
+    const { scheduleDeferredSentryReplay } = await import("@/lib/sentry-config");
+    const attach = vi.fn();
+    let scheduled: (() => void) | null = null;
+    const schedule = (cb: () => void) => {
+      scheduled = cb;
+      return () => {};
+    };
+
+    scheduleDeferredSentryReplay(attach, { schedule });
+    scheduled!();
+
+    expect(attach).toHaveBeenCalledTimes(1);
+  });
+
+  it("swallows attach failures so replay never breaks error capture or the app", async () => {
+    const { scheduleDeferredSentryReplay } = await import("@/lib/sentry-config");
+    const attach = vi.fn(() => {
+      throw new Error("replay attach failed");
+    });
+    const onError = vi.fn();
+    let scheduled: (() => void) | null = null;
+    const schedule = (cb: () => void) => {
+      scheduled = cb;
+      return () => {};
+    };
+
+    scheduleDeferredSentryReplay(attach, { schedule, onError });
+    expect(() => scheduled!()).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
   });
 });
