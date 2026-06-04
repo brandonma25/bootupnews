@@ -168,8 +168,12 @@ describe("/api/cron/health", () => {
   });
 
   it("returns status=warn HTTP 200 when row count >= 7 but an expected source is missing", async () => {
-    // 7 rows but no row from "TechCrunch" (the third expected source).
-    const sources = ["Reuters", "Bloomberg", "Reuters", "Bloomberg", "Reuters", "Bloomberg", "Reuters"];
+    // 7 rows with 5+ distinct sources (passing the diversity floor) but
+    // no row from "TechCrunch" (the third expected source).
+    const sources = [
+      "Reuters", "Bloomberg", "WSJ", "FT", "Axios",
+      "Bloomberg", "Reuters",
+    ];
     fetchMock.mockReset();
     fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
@@ -191,9 +195,47 @@ describe("/api/cron/health", () => {
     );
   });
 
-  it("forgiving source match — manifest 'Reuters' matches Notion 'reuters.com'", async () => {
-    // 7 rows; Reuters appears only as a domain, but should still satisfy the manifest entry.
-    const sources = ["reuters.com", "Bloomberg", "TechCrunch", "Bloomberg", "Bloomberg", "Bloomberg", "Bloomberg"];
+  // Track 2 P6 — source-diversity floor. 7+ rows but < 5 distinct sources
+  // is a monoculture day; ingestion has degraded even if Notion looks
+  // populated. Fails (pageable), not just warns.
+  it("returns status=fail HTTP 500 when row count >= 7 but distinct sources < 5 (monoculture day) (#272 P6)", async () => {
+    // 7 rows from only 2 sources.
+    const sources = ["Reuters", "Bloomberg", "Reuters", "Bloomberg", "Reuters", "Bloomberg", "Reuters"];
+    fetchMock.mockReset();
+    fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return jsonResponse(200, { results: sources.map(makeQueueRow) });
+    });
+
+    const { GET } = await import("@/app/api/cron/health/route");
+    const response = await GET(buildRequest("test-cron-secret"));
+    const body = (await response.json()) as {
+      status: string;
+      row_count: number;
+      distinct_source_count: number;
+      expected_min_distinct_sources: number;
+      message: string;
+    };
+
+    expect(response.status).toBe(500);
+    expect(body.status).toBe("fail");
+    expect(body.row_count).toBe(7);
+    expect(body.distinct_source_count).toBe(2);
+    expect(body.expected_min_distinct_sources).toBe(5);
+    expect(body.message).toMatch(/monoculture day/i);
+    expect(writePipelineLogEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "fail", runType: "health_check" }),
+    );
+  });
+
+  it("forgiving source match — manifest 'Reuters' matches Notion 'reuters.com' (uses 5+ distinct sources to pass diversity)", async () => {
+    // 7 rows; Reuters appears only as a domain, but should still satisfy
+    // the manifest entry. Add other distinct sources so the diversity
+    // floor is satisfied — the test's intent is the forgiving match.
+    const sources = [
+      "reuters.com", "Bloomberg", "TechCrunch", "WSJ", "FT",
+      "Wired", "Verge",
+    ];
     fetchMock.mockReset();
     fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
       calls.push({ url, init });

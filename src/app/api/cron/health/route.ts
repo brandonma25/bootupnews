@@ -9,6 +9,15 @@ export const runtime = "nodejs";
 
 const NOTION_API_VERSION = "2022-06-28";
 const EXPECTED_MIN_ROW_COUNT = 7;
+/**
+ * Track 2 P6 — source-diversity floor. A row-count canary alone passes a
+ * day where 7 rows all came from one source (a monoculture). The
+ * diversity floor catches that: < 5 distinct sources surfaced today
+ * indicates ingestion has degraded even if Notion looks populated.
+ * Calibrated against the 38-source manifest — 5/38 is the floor where
+ * the editor would notice missing categories of coverage.
+ */
+const EXPECTED_MIN_DISTINCT_SOURCES = 5;
 const BRIEFING_DAY_BOUNDARY_HOUR_TAIPEI = 6;
 
 function isAuthorized(request: Request) {
@@ -226,6 +235,13 @@ export async function GET(request: Request) {
   } else if (rowCount < EXPECTED_MIN_ROW_COUNT) {
     status = "fail";
     message = `Editorial queue has ${rowCount} rows for ${briefingDate}; expected at least ${EXPECTED_MIN_ROW_COUNT}.`;
+  } else if (sourceHealth.distinctSourceCount < EXPECTED_MIN_DISTINCT_SOURCES) {
+    // Track 2 P6 — diversity floor. 7+ rows but < 5 distinct sources means
+    // a monoculture day; ingestion has degraded even if Notion looks
+    // populated. Fail (pageable), not warn — the brief explicitly calls
+    // out source diversity as the canary signal that matters.
+    status = "fail";
+    message = `Editorial queue has ${rowCount} rows for ${briefingDate} from only ${sourceHealth.distinctSourceCount} distinct sources; expected at least ${EXPECTED_MIN_DISTINCT_SOURCES} (monoculture day).`;
   } else if (sourceHealth.missing.length > 0) {
     status = "warn";
     message = `${rowCount} rows for ${briefingDate}, but expected sources missing: ${sourceHealth.missing.join(", ")}.`;
@@ -259,6 +275,8 @@ export async function GET(request: Request) {
       status,
       row_count: rowCount,
       expected_min: EXPECTED_MIN_ROW_COUNT,
+      expected_min_distinct_sources: EXPECTED_MIN_DISTINCT_SOURCES,
+      distinct_source_count: sourceHealth.distinctSourceCount,
       briefing_date: briefingDate,
       message,
       source_health: sourceHealth,
