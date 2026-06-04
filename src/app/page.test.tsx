@@ -39,8 +39,11 @@ vi.mock("@/lib/data", () => ({
   getHomepagePageState,
 }));
 
+const selectHomepageTopEvents = vi.fn(() => [] as unknown[]);
+
 vi.mock("@/lib/homepage-model", () => ({
   buildHomepageViewModel,
+  selectHomepageTopEvents,
 }));
 
 vi.mock("@/lib/homepage-editorial-overrides", () => ({

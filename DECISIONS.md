@@ -183,3 +183,17 @@ Bootup News was built as a solo, AI-agent-assisted product system. This file sum
 **Evidence:** PRs [#255](https://github.com/brandonma25/bootupnews/pull/255), [#257](https://github.com/brandonma25/bootupnews/pull/257); `docs/adr/002-prd-index-ci-enforcement.md`; `scripts/governance_common.py` (`validate_prd_index_consistency`, `extract_prd_references`, `resolve_prd_file_path`); `scripts/release-governance-gate.py`; `scripts/release-governance-gate.test.py` (16 new tests); `AGENTS.md` §5 and §10.
 
 **Interview read:** This shows the governance gate is a backstop for spec-author oversight, not just for agent oversight. The CI failure on PR #257 caught a real gap in the v4 spec — the fix is this ADR itself, which the gate then accepted as a valid documentation lane. That sequence is the system working as designed.
+
+## D15 — Server-render Signal Cards; hydrate only the interactive shell
+
+**Decision:** The homepage's Signal Cards render their editorial content as Server Components and pass it into a small `"use client"` island (`SignalCardInteractive`) that owns only the `<article>` element, the expand/collapse state, and the toggle button. Cards stay visually expanded by default and server-rendered; only the tiny interactive shell hydrates.
+
+**Context:** Field LCP on `/` regressed (FCP 3.92s / LCP 5.91s, TTFB 0.16s) after the May-24 three-layer foldback render (PRD-66 / #275) tripled per-card DOM. Because `LandingHomepage` is a hookless `"use client"` shell, every card hydrated as part of the homepage client tree, reconciling that tripled DOM on the main thread on load. React has no partial hydration within a single client tree, so keeping the content server-rendered AND non-hydrated required moving it across an RSC boundary (content passed as children into a client island).
+
+**Rejected alternative:** `next/dynamic({ ssr: false })` on the card content — that would drop the content from SSR and break the locked expand-by-default decision (collapse-then-expand flash). Also rejected: collapsing cards by default (off the table per product), and a lazy-hydration dependency (heavier, less idiomatic than RSC children).
+
+**Trade-off accepted:** `SignalCard` is split into a Server Component plus a client island, and the homepage route (`page.tsx`) now renders the cards and passes them to the client shell as a prop. The briefing-detail route keeps the client-render path (not the regression surface). Rendered HTML is byte-identical to the prior monolithic client component (verified: 109,699 B uncompressed / 30,056 B gzipped, identical content), so there is no visual change, flash, or layout shift (CLS 0, confirmed via Playwright with JS disabled and enabled).
+
+**Evidence:** `docs/product/prd/prd-69-signalcard-server-render-deferred-hydration.md`; `src/components/signals/SignalCard.tsx` (server) + `src/components/signals/SignalCardInteractive.tsx` (island); `src/app/page.tsx`; `src/components/landing/homepage.tsx`; `src/lib/homepage-model.ts` (`selectHomepageTopEvents`); `docs/product/feature-system.csv`.
+
+**Interview read:** This shows the fix followed the rendering reality. Rather than collapse the cards (cheap but product-breaking) or accept the hydration cost, the work used the RSC boundary to keep the exact same expanded SSR output while removing the content from the client hydration tree — and proved no-visual-change with byte-identical HTML before shipping.
