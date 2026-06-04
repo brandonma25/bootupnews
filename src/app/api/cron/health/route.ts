@@ -8,7 +8,34 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const NOTION_API_VERSION = "2022-06-28";
+
+/**
+ * Track 2 P6 health gate ladder. TWO thresholds — separating "pipeline is
+ * BROKEN" (pages, HTTP 500) from "pipeline FUNCTIONING but day is thin"
+ * (does not page, HTTP 200 + cron_runs.status='warn').
+ *
+ * Rationale: PR #300 v1 conflated these. A monoculture day (7 rows but all
+ * from one source) tripped the same 500 as a zero-rows-ingested day. That
+ * pages the operator at 03:00 for "thin news" — the exact cry-wolf pattern
+ * Track 2 exists to fix. The fix is two thresholds.
+ *
+ *   diversity TARGET — the editorial bar. Below = thin/monoculture = WARN.
+ *   hard FLOOR       — the breakage line. Below = broken pipeline = FAIL.
+ *
+ * cron-job.org's failure trigger keys on HTTP status — so warn (200)
+ * registers in cron_runs without paging. Requires migration
+ * 20260604070000_cron_runs_add_warn_status.sql.
+ */
 const EXPECTED_MIN_ROW_COUNT = 7;
+const EXPECTED_MIN_DISTINCT_SOURCES = 5;
+/**
+ * Hard floor for distinct sources contributing to a day. At or below this
+ * the pipeline is broken, not just thin — e.g. only 1–2 feeds returned
+ * anything end-to-end. Calibrated against the 38-source manifest: 3 is the
+ * lowest count consistent with "feeds-returning-content path is healthy",
+ * matching the user's "feeds-returning-content below a hard floor" spec.
+ */
+const HARD_FLOOR_DISTINCT_SOURCES = 3;
 const BRIEFING_DAY_BOUNDARY_HOUR_TAIPEI = 6;
 
 function isAuthorized(request: Request) {
@@ -217,15 +244,38 @@ export async function GET(request: Request) {
   const rowCount = rows.length;
   const sourceHealth = computeSourceHealth(rows);
 
+  // Track 2 P6 rev — gate ladder with separate hard_floor vs diversity_target.
+  //
+  //   queryError                    -> fail HTTP 500 (broken: Notion query threw)
+  //   rowCount === 0                -> fail HTTP 500 (broken: zero ingested)
+  //   distinct < HARD_FLOOR (3)     -> fail HTTP 500 (broken: feed pipeline collapsed)
+  //   rowCount < EXPECTED_MIN (7)   -> warn HTTP 200 (thin news, not broken)
+  //   distinct < MIN_DISTINCT (5)   -> warn HTTP 200 (monoculture, functioning)
+  //   missing expected sources      -> warn HTTP 200 (degraded coverage)
+  //   otherwise                     -> ok   HTTP 200
+  //
+  // The brief explicitly forbids paging on "thin/monoculture but functioning"
+  // (PR #300 v1's bug). 500 is reserved for hard breakage only. cron-job.org's
+  // failure trigger keys on HTTP status — warn (200) records in cron_runs as
+  // 'warn' without paging.
   let status: PipelineLogStatus;
   let message: string;
 
   if (queryError) {
     status = "fail";
     message = `Notion query failed: ${queryError}`;
-  } else if (rowCount < EXPECTED_MIN_ROW_COUNT) {
+  } else if (rowCount === 0) {
     status = "fail";
-    message = `Editorial queue has ${rowCount} rows for ${briefingDate}; expected at least ${EXPECTED_MIN_ROW_COUNT}.`;
+    message = `Editorial queue has zero rows for ${briefingDate}; ingestion did not deliver.`;
+  } else if (sourceHealth.distinctSourceCount < HARD_FLOOR_DISTINCT_SOURCES) {
+    status = "fail";
+    message = `Editorial queue has ${rowCount} rows for ${briefingDate} from only ${sourceHealth.distinctSourceCount} distinct source(s); hard floor is ${HARD_FLOOR_DISTINCT_SOURCES} (feed pipeline collapse).`;
+  } else if (rowCount < EXPECTED_MIN_ROW_COUNT) {
+    status = "warn";
+    message = `Editorial queue has ${rowCount} rows for ${briefingDate}; expected at least ${EXPECTED_MIN_ROW_COUNT} (thin day).`;
+  } else if (sourceHealth.distinctSourceCount < EXPECTED_MIN_DISTINCT_SOURCES) {
+    status = "warn";
+    message = `${rowCount} rows for ${briefingDate} from only ${sourceHealth.distinctSourceCount} distinct sources; diversity target is ${EXPECTED_MIN_DISTINCT_SOURCES} (monoculture but functioning).`;
   } else if (sourceHealth.missing.length > 0) {
     status = "warn";
     message = `${rowCount} rows for ${briefingDate}, but expected sources missing: ${sourceHealth.missing.join(", ")}.`;
@@ -259,11 +309,17 @@ export async function GET(request: Request) {
       status,
       row_count: rowCount,
       expected_min: EXPECTED_MIN_ROW_COUNT,
+      expected_min_distinct_sources: EXPECTED_MIN_DISTINCT_SOURCES,
+      hard_floor_distinct_sources: HARD_FLOOR_DISTINCT_SOURCES,
+      distinct_source_count: sourceHealth.distinctSourceCount,
       briefing_date: briefingDate,
       message,
       source_health: sourceHealth,
       pipeline_log_written: pipelineLogResult.written,
     },
+    // Track 2 P6 rev: only 'fail' pages (HTTP 500). 'warn' returns 200 so
+    // cron-job.org's HTTP-status failure trigger does NOT fire on thin or
+    // monoculture days — those land in cron_runs.status='warn' instead.
     { status: status === "fail" ? 500 : 200 },
   );
 }
