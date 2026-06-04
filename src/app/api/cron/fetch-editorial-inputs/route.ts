@@ -396,7 +396,13 @@ async function executePipelineWork(briefingDate: string) {
   }
 
   const { newsletter, rss, editorialStaging } = pipelineResult;
-  const success = rss.success && newsletter.success;
+  // #272 — Run-success is owned by the CRITICAL leg (RSS). Newsletter is
+  // a supplementary input source; an empty Gmail label or an OAuth
+  // expiry there must DEGRADE the run, not fail it. The legacy boolean
+  // (`rss.success && newsletter.success`) marked every RSS-healthy run
+  // as `fail` from 2026-05-18 onward when newsletter ingestion broke,
+  // hiding actual ingestion-pipeline health behind a false-fail signal.
+  const success = rss.success;
 
   logServerEvent(success ? "info" : "error", "Combined editorial input cron completed", {
     route: "/api/cron/fetch-editorial-inputs",
@@ -416,15 +422,22 @@ async function executePipelineWork(briefingDate: string) {
   const skipped = stagingSummary?.notionRowsSkippedHumanEdited ?? 0;
   const stagingErrors = stagingSummary?.notionErrors ?? [];
 
-  const pipelineLogStatus = success
-    ? stagingErrors.length > 0
+  // #272 — Three-state Pipeline Log status:
+  //   - fail: the critical leg (RSS) broke.
+  //   - warn: RSS healthy BUT newsletter degraded OR editorial-staging
+  //           surfaced row-level errors. Visible to operators without
+  //           paging.
+  //   - ok:   RSS healthy AND newsletter healthy AND no staging errors.
+  const pipelineLogStatus = !rss.success
+    ? "fail"
+    : (!newsletter.success || stagingErrors.length > 0)
       ? "warn"
-      : "ok"
-    : "fail";
+      : "ok";
 
-  const pipelineLogMessage = success
-    ? `Ingestion completed: RSS=${rss.success ? "ok" : "fail"}, newsletter=${newsletter.success ? "ok" : "fail"}, editorial staging inserted=${inserted} updated=${updated} skipped=${skipped}${stagingErrors.length > 0 ? `; staging errors=${stagingErrors.length}` : ""}.`
-    : `Ingestion failed: RSS=${rss.success ? "ok" : "fail"}, newsletter=${newsletter.success ? "ok" : "fail"}.`;
+  const pipelineLogMessage =
+    pipelineLogStatus === "fail"
+      ? `Ingestion failed: RSS=fail, newsletter=${newsletter.success ? "ok" : "fail"}.`
+      : `Ingestion completed: RSS=ok, newsletter=${newsletter.success ? "ok" : "degraded"}, editorial staging inserted=${inserted} updated=${updated} skipped=${skipped}${stagingErrors.length > 0 ? `; staging errors=${stagingErrors.length}` : ""}.`;
 
   if (briefingDateForLog) {
     await writePipelineLogEntry({
