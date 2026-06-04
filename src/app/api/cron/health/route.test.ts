@@ -109,12 +109,25 @@ describe("/api/cron/health", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns status=fail HTTP 500 when row count is below the expected minimum", async () => {
+  // Track 2 P6 rev — thin-but-functioning day. Row count below the
+  // editorial minimum (7) but ABOVE the hard floor (distinct sources >= 3)
+  // means a slow news day, not a broken pipeline. Must warn HTTP 200,
+  // NOT page (HTTP 500). PR #300 v1 paged here and the user explicitly
+  // flagged it as the cry-wolf pattern Track 2 exists to fix.
+  it("returns status=warn HTTP 200 (NOT 500) when row count is below 7 but distinct sources >= 3 (thin day)", async () => {
+    // 5 rows from 3 distinct sources: under the editorial floor (7), above
+    // the hard floor (3 distinct). Pipeline is functioning; day is thin.
     fetchMock.mockReset();
     fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
       return jsonResponse(200, {
-        results: [makeQueueRow("Reuters"), makeQueueRow("Bloomberg")],
+        results: [
+          makeQueueRow("Reuters"),
+          makeQueueRow("Bloomberg"),
+          makeQueueRow("TechCrunch"),
+          makeQueueRow("Reuters"),
+          makeQueueRow("Bloomberg"),
+        ],
       });
     });
 
@@ -124,21 +137,84 @@ describe("/api/cron/health", () => {
       status: string;
       row_count: number;
       expected_min: number;
-      briefing_date: string;
+      message: string;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("warn");
+    expect(body.row_count).toBe(5);
+    expect(body.expected_min).toBe(7);
+    expect(body.message).toMatch(/thin day/i);
+    expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
+    expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
+      runType: "health_check",
+      status: "warn",
+      rowCount: 5,
+    });
+  });
+
+  // Track 2 P6 rev — hard fault: zero rows. Ingestion did not deliver
+  // anything for the briefing date. This pages (HTTP 500) because nothing
+  // happened end-to-end.
+  it("returns status=fail HTTP 500 when row count is zero (hard fault: nothing ingested)", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return jsonResponse(200, { results: [] });
+    });
+
+    const { GET } = await import("@/app/api/cron/health/route");
+    const response = await GET(buildRequest("test-cron-secret"));
+    const body = (await response.json()) as {
+      status: string;
+      row_count: number;
+      message: string;
     };
 
     expect(response.status).toBe(500);
     expect(body.status).toBe("fail");
-    expect(body.row_count).toBe(2);
-    expect(body.expected_min).toBe(7);
-    expect(typeof body.briefing_date).toBe("string");
-    // Pipeline Log was written with status=fail
-    expect(writePipelineLogEntry).toHaveBeenCalledTimes(1);
-    expect(writePipelineLogEntry.mock.calls[0][0]).toMatchObject({
-      runType: "health_check",
-      status: "fail",
-      rowCount: 2,
+    expect(body.row_count).toBe(0);
+    expect(body.message).toMatch(/zero rows/i);
+    expect(writePipelineLogEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ runType: "health_check", status: "fail", rowCount: 0 }),
+    );
+  });
+
+  // Track 2 P6 rev — hard fault: feed pipeline collapse. Some rows landed
+  // but they came from only 1–2 distinct sources, below the hard floor
+  // (3). This pages because the feed-fetching path itself is broken,
+  // not just light.
+  it("returns status=fail HTTP 500 when distinct sources are below the hard floor (feed pipeline collapse)", async () => {
+    // 4 rows but all from 2 sources (< HARD_FLOOR_DISTINCT_SOURCES = 3).
+    fetchMock.mockReset();
+    fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return jsonResponse(200, {
+        results: [
+          makeQueueRow("Reuters"),
+          makeQueueRow("Bloomberg"),
+          makeQueueRow("Reuters"),
+          makeQueueRow("Bloomberg"),
+        ],
+      });
     });
+
+    const { GET } = await import("@/app/api/cron/health/route");
+    const response = await GET(buildRequest("test-cron-secret"));
+    const body = (await response.json()) as {
+      status: string;
+      row_count: number;
+      distinct_source_count: number;
+      hard_floor_distinct_sources: number;
+      message: string;
+    };
+
+    expect(response.status).toBe(500);
+    expect(body.status).toBe("fail");
+    expect(body.row_count).toBe(4);
+    expect(body.distinct_source_count).toBe(2);
+    expect(body.hard_floor_distinct_sources).toBe(3);
+    expect(body.message).toMatch(/feed pipeline collapse/i);
   });
 
   it("returns status=ok HTTP 200 when row count >= 7 and all expected sources contributed", async () => {
@@ -195,12 +271,16 @@ describe("/api/cron/health", () => {
     );
   });
 
-  // Track 2 P6 — source-diversity floor. 7+ rows but < 5 distinct sources
-  // is a monoculture day; ingestion has degraded even if Notion looks
-  // populated. Fails (pageable), not just warns.
-  it("returns status=fail HTTP 500 when row count >= 7 but distinct sources < 5 (monoculture day) (#272 P6)", async () => {
-    // 7 rows from only 2 sources.
-    const sources = ["Reuters", "Bloomberg", "Reuters", "Bloomberg", "Reuters", "Bloomberg", "Reuters"];
+  // Track 2 P6 rev — monoculture but functioning. 7+ rows with distinct
+  // sources between the hard floor (3) and the diversity target (5) means
+  // the pipeline IS delivering and diversity is below target — thin in
+  // coverage, not broken. Must warn HTTP 200, NOT page (HTTP 500).
+  //
+  // PR #300 v1 paged here; user flagged the rewrite. The hard fault for
+  // < hard floor (< 3 distinct) is exercised in its own test above.
+  it("returns status=warn HTTP 200 (NOT 500) when row count >= 7 but distinct sources between hard floor and target (monoculture but functioning) (#272 P6 rev)", async () => {
+    // 7 rows from 3 distinct sources — >= hard floor (3), < target (5).
+    const sources = ["Reuters", "Bloomberg", "TechCrunch", "Reuters", "Bloomberg", "TechCrunch", "Reuters"];
     fetchMock.mockReset();
     fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
@@ -214,17 +294,19 @@ describe("/api/cron/health", () => {
       row_count: number;
       distinct_source_count: number;
       expected_min_distinct_sources: number;
+      hard_floor_distinct_sources: number;
       message: string;
     };
 
-    expect(response.status).toBe(500);
-    expect(body.status).toBe("fail");
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("warn");
     expect(body.row_count).toBe(7);
-    expect(body.distinct_source_count).toBe(2);
+    expect(body.distinct_source_count).toBe(3);
     expect(body.expected_min_distinct_sources).toBe(5);
-    expect(body.message).toMatch(/monoculture day/i);
+    expect(body.hard_floor_distinct_sources).toBe(3);
+    expect(body.message).toMatch(/monoculture but functioning/i);
     expect(writePipelineLogEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "fail", runType: "health_check" }),
+      expect.objectContaining({ status: "warn", runType: "health_check" }),
     );
   });
 
