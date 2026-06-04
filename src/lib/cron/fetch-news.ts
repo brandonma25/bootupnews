@@ -71,7 +71,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
   const checkInId = captureRssCronCheckIn("in_progress");
 
   logServerEvent("info", "Daily news cron started", {
-    route: "/api/cron/fetch-news",
+    // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
     timestamp,
   });
 
@@ -82,7 +85,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       "rss.refresh",
       "refresh",
       {
-        route: "/api/cron/fetch-news",
+        // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
       },
       () => generateDailyBriefing(demoTopics, sources, { suppliedByManifest: sourcePlan.suppliedByManifest }),
     );
@@ -113,7 +119,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       };
 
       logServerEvent("warn", "Daily news cron skipped seed fallback output", {
-        route: "/api/cron/fetch-news",
+        // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
         ...result.summary,
       });
       captureRssFailure(new Error(result.summary.message), {
@@ -123,7 +132,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
         retryCount: pipelineRun.feed_failures.length,
         message: result.summary.message,
         extra: {
-          route: "/api/cron/fetch-news",
+          // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
           pipelineRunId: pipelineRun.run_id,
           usedSeedFallback: true,
           feedFailureCount: pipelineRun.feed_failures.length,
@@ -150,7 +162,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       };
 
       logServerEvent("error", "Daily news cron produced zero items", {
-        route: "/api/cron/fetch-news",
+        // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
         ...result.summary,
         briefingItemCount: 0,
       });
@@ -160,7 +175,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
         level: "error",
         message: result.summary.message,
         extra: {
-          route: "/api/cron/fetch-news",
+          // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
           pipelineRunId: pipelineRun.run_id,
           briefingItemCount: 0,
           feedFailureCount: pipelineRun.feed_failures.length,
@@ -175,7 +193,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       // Not a Sentry-worthy event — the editor needs to know we shipped fewer
       // than target, but the run completed and downstream email will say so.
       logServerEvent("warn", "Daily news cron completed in degraded mode", {
-        route: "/api/cron/fetch-news",
+        // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
         briefingItemCount: stagedItemCount,
         targetItemCount: EDITORIAL_TARGET_ITEM_COUNT,
         ...baseSummary,
@@ -197,7 +218,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
     };
 
     logServerEvent(snapshot.ok ? "info" : "error", snapshot.ok ? "Daily news cron succeeded" : "Daily news cron failed", {
-      route: "/api/cron/fetch-news",
+      // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
       ...result.summary,
     });
 
@@ -208,7 +232,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
         level: "error",
         message: "RSS signal post persistence failed during daily refresh.",
         extra: {
-          route: "/api/cron/fetch-news",
+          // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
           pipelineRunId: pipelineRun.run_id,
           briefingDate,
           operation: "persist_signal_posts",
@@ -223,7 +250,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
     const result = buildFailureResult(timestamp, "Daily news cron failed before completion.");
 
     logServerEvent("error", "Daily news cron failed", {
-      route: "/api/cron/fetch-news",
+      // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
       timestamp,
       ...errorContext(error),
     });
@@ -233,7 +263,10 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       level: "error",
       message: result.summary.message,
       extra: {
-        route: "/api/cron/fetch-news",
+        // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
+    // reached cron_runs). runDailyNewsCron now runs only via
+    // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
+    route: "/api/cron/fetch-editorial-inputs",
       },
     });
     captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
