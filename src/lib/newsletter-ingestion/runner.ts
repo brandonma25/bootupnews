@@ -320,7 +320,11 @@ export async function runNewsletterIngestion(
   const testRunId = options.testRunId ?? null;
 
   logServerEvent("info", "Newsletter ingestion run started", {
-    route: "/api/cron/newsletter-ingestion",
+    // Track 2 P5 — the standalone /api/cron/newsletter-ingestion route was
+// removed (orphan; never reached `cron_runs`). The newsletter runner now
+// only runs as part of /api/cron/fetch-editorial-inputs. Log tag points
+// at the live caller for log-search accuracy.
+route: "/api/cron/fetch-editorial-inputs",
     testRunId,
     dryRun: config.dryRun,
     enabled: config.enabled,
@@ -395,6 +399,23 @@ export async function runNewsletterIngestion(
       maxResults: config.maxEmailsPerRun,
     });
 
+    // #272 — Empty Gmail label is NOT a failure. The brief's "newsletter
+    // is supplementary" contract requires the runner to return success
+    // when there is simply nothing new since the last fetch, so the
+    // upstream cron logs a `warn` ("degraded") rather than a `fail`.
+    if (refs.length === 0) {
+      return buildResult({
+        success: true,
+        timestamp,
+        config,
+        sinceDate,
+        briefingDate,
+        testRunId,
+        message: "No newsletters received from the configured Gmail label since the last fetch.",
+        fetchedMessageCount: 0,
+      });
+    }
+
     if (config.dryRun) {
       const dryRunSummary = await dryRunExtract({
         gmailClient,
@@ -453,7 +474,11 @@ export async function runNewsletterIngestion(
     });
   } catch (error) {
     logServerEvent("error", "Newsletter ingestion failed closed before completion", {
-      route: "/api/cron/newsletter-ingestion",
+      // Track 2 P5 — the standalone /api/cron/newsletter-ingestion route was
+// removed (orphan; never reached `cron_runs`). The newsletter runner now
+// only runs as part of /api/cron/fetch-editorial-inputs. Log tag points
+// at the live caller for log-search accuracy.
+route: "/api/cron/fetch-editorial-inputs",
       testRunId,
       ...errorContext(error),
     });

@@ -14,22 +14,48 @@ export type EditorialCandidateForNotion = {
 export type EditorialQueueWriteAction =
   | "inserted"
   | "updated"
-  | "skipped_human_edited";
+  | "skipped_human_edited"
+  /**
+   * Track 2 P4 — the same headline was already staged at a non-`raw`
+   * status within the last `CROSS_DATE_DEDUP_LOOKBACK_DAYS` (typically
+   * 14). The editor / archive system already has it. We do NOT create a
+   * new row on a different briefing date; preserves each day's archive
+   * but stops evergreen recurrence (e.g. the two recurring Fed-research
+   * pieces that drifted across multiple briefing dates without ever
+   * being re-edited by BM).
+   */
+  | "skipped_duplicate_across_dates";
 
 export type EditorialQueueWriteResult = {
   action: EditorialQueueWriteAction;
   /** The Notion page ID for the row (set for inserted/updated; also set for skipped). */
   pageId: string;
   /**
-   * Existing Status value seen when the action is `skipped_human_edited`. Omitted
-   * for inserts; for updates, this is always "raw" (otherwise we would skip).
+   * Existing Status value seen when the action is `skipped_human_edited`
+   * or `skipped_duplicate_across_dates`. Omitted for inserts; for
+   * updates, this is always "raw" (otherwise we would skip).
    */
   existingStatus?: string;
+  /**
+   * Set for `skipped_duplicate_across_dates`: the briefing date of the
+   * pre-existing row that triggered the skip. Useful in logs to confirm
+   * the cross-date match was real.
+   */
+  existingBriefingDate?: string;
 };
 
 const NOTION_API_VERSION = "2022-06-28";
 const NOTION_PAGES_URL = "https://api.notion.com/v1/pages";
 const NOTION_TITLE_MAX = 2000;
+/**
+ * Cross-date dedup lookback window. Long enough to catch evergreens
+ * a single source typically re-serves (1-2 weeks); short enough that a
+ * later re-staging on a genuinely new briefing date is not blocked
+ * indefinitely. Adjust with care — narrower lets evergreens recur;
+ * wider risks suppressing a legitimate re-publish of a story whose
+ * substance changed.
+ */
+const CROSS_DATE_DEDUP_LOOKBACK_DAYS = 14;
 
 function richText(content: string) {
   return [{ text: { content: content.slice(0, NOTION_TITLE_MAX) } }];
@@ -200,12 +226,98 @@ async function updateRow(
 }
 
 /**
- * Idempotent write to the Notion Editorial Queue, keyed on Headline +
- * Briefing Date:
- *  - inserts when no matching row exists,
- *  - updates in place when a matching row exists with Status="raw",
- *  - skips entirely when a matching row exists with any other Status
- *    (the row has been touched by the human editor).
+ * Track 2 P4 — find an EXISTING row with the same Headline staged on a
+ * DIFFERENT briefing date within the last `lookbackDays`. Returns the
+ * first match (in case there are several recurrences). Used by the
+ * cross-date dedup guard to refuse re-staging evergreens that BM has
+ * already advanced past `raw`.
+ *
+ * Implementation note: Notion's database query doesn't support a "NOT
+ * EQUAL" filter on date directly — we filter to the date range
+ * `[today - lookbackDays, today - 1]` (which excludes today by
+ * construction). The same-day `findExistingRow` continues to handle the
+ * same-briefing-date case.
+ */
+type CrossDateMatch = {
+  pageId: string;
+  status: string | null;
+  briefingDate: string | null;
+};
+
+async function findCrossDateMatch(
+  notionDbId: string,
+  headline: string,
+  briefingDate: string,
+  token: string,
+  lookbackDays: number,
+): Promise<CrossDateMatch | null> {
+  const todayMs = Date.parse(`${briefingDate}T00:00:00Z`);
+  if (Number.isNaN(todayMs)) return null;
+  const startMs = todayMs - lookbackDays * 24 * 60 * 60 * 1000;
+  const startISO = new Date(startMs).toISOString().slice(0, 10);
+  // End is the day BEFORE the current briefingDate so we don't
+  // double-match the same-day row (which findExistingRow handles).
+  const endMs = todayMs - 24 * 60 * 60 * 1000;
+  const endISO = new Date(endMs).toISOString().slice(0, 10);
+
+  const headlineForQuery = headline.slice(0, NOTION_TITLE_MAX);
+  const response = await fetch(
+    `https://api.notion.com/v1/databases/${notionDbId}/query`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Notion-Version": NOTION_API_VERSION,
+      },
+      body: JSON.stringify({
+        filter: {
+          and: [
+            { property: "Headline", title: { equals: headlineForQuery } },
+            { property: "Briefing Date", date: { on_or_after: startISO } },
+            { property: "Briefing Date", date: { on_or_before: endISO } },
+          ],
+        },
+        page_size: 5,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "(no body)");
+    throw new Error(`Notion cross-date query failed (${response.status}): ${text}`);
+  }
+
+  const data = (await response.json()) as {
+    results?: Array<{
+      id?: string;
+      properties?: {
+        Status?: { select?: { name?: string } | null };
+        "Briefing Date"?: { date?: { start?: string } | null };
+      };
+    }>;
+  };
+
+  const first = data.results?.[0];
+  if (!first?.id) return null;
+  const statusName = first.properties?.Status?.select?.name ?? null;
+  const existingBriefingDate = first.properties?.["Briefing Date"]?.date?.start ?? null;
+  return { pageId: first.id, status: statusName, briefingDate: existingBriefingDate };
+}
+
+/**
+ * Idempotent write to the Notion Editorial Queue:
+ *  - Same briefing date: inserts when no matching row exists, updates
+ *    in place when a matching row exists with Status="raw", skips
+ *    entirely when a matching row exists with any other Status (human
+ *    editor touched it).
+ *  - Cross-date (#P4): if the same Headline already exists within the
+ *    last `CROSS_DATE_DEDUP_LOOKBACK_DAYS` on a DIFFERENT briefing
+ *    date at any non-`raw` status (i.e. the editor has already moved
+ *    it through the queue), skip with `skipped_duplicate_across_dates`
+ *    rather than create a fresh row. A row still at `raw` on a prior
+ *    date is treated as not-yet-processed and re-staging is allowed
+ *    (matches existing "raw can be updated" semantics).
  */
 export async function writeEditorialQueueRow(input: {
   candidate: EditorialCandidateForNotion;
@@ -236,6 +348,23 @@ export async function writeEditorialQueueRow(input: {
     }
     await updateRow(existing.pageId, candidate, briefingDate, token);
     return { action: "updated", pageId: existing.pageId };
+  }
+
+  // No same-day match. Check the cross-date window before inserting.
+  const crossDate = await findCrossDateMatch(
+    notionDbId,
+    candidate.headline,
+    briefingDate,
+    token,
+    CROSS_DATE_DEDUP_LOOKBACK_DAYS,
+  );
+  if (crossDate && crossDate.status && crossDate.status !== "raw") {
+    return {
+      action: "skipped_duplicate_across_dates",
+      pageId: crossDate.pageId,
+      existingStatus: crossDate.status,
+      existingBriefingDate: crossDate.briefingDate ?? undefined,
+    };
   }
 
   const pageId = await createRow(notionDbId, candidate, briefingDate, token);
