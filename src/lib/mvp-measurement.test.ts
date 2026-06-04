@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveMvpCohortFromMarkers,
   sanitizeMetadata,
   validateMvpMeasurementEvent,
 } from "@/lib/mvp-measurement";
@@ -101,6 +102,32 @@ describe("MVP measurement event validation", () => {
     });
   });
 
+  it("accepts the signal_read and comprehension_self_report event names", () => {
+    const signalReadResult = validateMvpMeasurementEvent({
+      ...validPayload,
+      eventName: "signal_read",
+      metadata: {
+        signalRank: 1,
+        dwellMs: 21000,
+      },
+    });
+
+    expect(signalReadResult.ok).toBe(true);
+
+    const selfReportResult = validateMvpMeasurementEvent({
+      eventName: "comprehension_self_report",
+      visitorId: "mvp_1234567890abcdef",
+      sessionId: "mvp_session_1234567890abcdef",
+      route: "/",
+      metadata: {
+        response: "agree",
+        briefingDate: "2026-05-01",
+      },
+    });
+
+    expect(selfReportResult.ok).toBe(true);
+  });
+
   it("accepts sanitized category tab opens without signal identifiers", () => {
     const result = validateMvpMeasurementEvent({
       eventName: "category_tab_open",
@@ -129,5 +156,75 @@ describe("MVP measurement event validation", () => {
         },
       }),
     });
+  });
+});
+
+describe("resolveMvpCohortFromMarkers", () => {
+  it("returns 'qa' when ?mvp_qa is set, even if ?c=tester is also present", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: true,
+        queryCohort: "tester",
+        persisted: null,
+      }),
+    ).toBe("qa");
+  });
+
+  it("returns 'tester' when ?c=tester is set without a QA flag", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: "tester",
+        persisted: null,
+      }),
+    ).toBe("tester");
+  });
+
+  it("returns 'internal' when ?c=internal is set explicitly", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: "internal",
+        persisted: "tester",
+      }),
+    ).toBe("internal");
+  });
+
+  it("falls back to the previously persisted cohort when no marker is in the URL", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: null,
+        persisted: "tester",
+      }),
+    ).toBe("tester");
+
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: null,
+        persisted: "qa",
+      }),
+    ).toBe("qa");
+  });
+
+  it("defaults to 'internal' when neither URL nor storage provide a cohort", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: null,
+        persisted: null,
+      }),
+    ).toBe("internal");
+  });
+
+  it("ignores unknown query cohort values and falls back to persisted/default", () => {
+    expect(
+      resolveMvpCohortFromMarkers({
+        queryQa: false,
+        queryCohort: "admin",
+        persisted: null,
+      }),
+    ).toBe("internal");
   });
 });

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ExternalLink } from "lucide-react";
 
 import { buildEditorialWhyItMattersText } from "@/lib/editorial-content";
 import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
+import { registerSignalReadObserver, type SignalReadTracking } from "@/lib/signal-read-tracking";
 import { cn } from "@/lib/utils";
 import { TierBadge, type SignalTier } from "./TierBadge";
 
@@ -61,6 +62,13 @@ export type SignalCardProps = {
   tier?: SignalTier;
   readMoreHref?: string;
   trackingAttributes?: Record<string, string | number | undefined>;
+  /**
+   * When provided, emits a single `signal_read` event for this card once
+   * the dwell threshold (≥50% in viewport for ≥20s continuous) is met
+   * AND at least one scroll has happened while the card was visible.
+   * Session-deduped per signal.
+   */
+  mvpDwellTracking?: SignalReadTracking;
   className?: string;
 };
 
@@ -73,11 +81,25 @@ export function SignalCard({
   tier,
   readMoreHref,
   trackingAttributes,
+  mvpDwellTracking,
   className,
 }: SignalCardProps) {
   const interactive = defaultExpanded !== undefined;
   const [localExpanded, setLocalExpanded] = useState(defaultExpanded ?? false);
   const isExpanded = interactive ? localExpanded : expanded;
+
+  const cardRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!mvpDwellTracking) {
+      return;
+    }
+    const element = cardRef.current;
+    if (!element) {
+      return;
+    }
+    return registerSignalReadObserver(element, mvpDwellTracking);
+  }, [mvpDwellTracking]);
 
   const displayRank = rank ?? signal.finalSlateRank ?? signal.rank ?? 1;
   const displayTier = tier ?? resolveSignalTier(signal, displayRank);
@@ -123,6 +145,7 @@ export function SignalCard({
 
   return (
     <article
+      ref={cardRef}
       className={cn(
         "rounded-[var(--bu-radius-lg)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)]",
         compact ? "p-4" : "p-4 md:p-6",

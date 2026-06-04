@@ -183,3 +183,17 @@ Bootup News was built as a solo, AI-agent-assisted product system. This file sum
 **Evidence:** PRs [#255](https://github.com/brandonma25/bootupnews/pull/255), [#257](https://github.com/brandonma25/bootupnews/pull/257); `docs/adr/002-prd-index-ci-enforcement.md`; `scripts/governance_common.py` (`validate_prd_index_consistency`, `extract_prd_references`, `resolve_prd_file_path`); `scripts/release-governance-gate.py`; `scripts/release-governance-gate.test.py` (16 new tests); `AGENTS.md` §5 and §10.
 
 **Interview read:** This shows the governance gate is a backstop for spec-author oversight, not just for agent oversight. The CI failure on PR #257 caught a real gap in the v4 spec — the fix is this ADR itself, which the gate then accepted as a valid documentation lane. That sequence is the system working as designed.
+
+## D14 — Measure MVP depth by dwell, not by layer expansion
+
+**Decision:** Phase-1 depth engagement is measured by a session-scoped `signal_read` event (≥50% in viewport for ≥20s continuous AND at least one scroll while visible), and the canonical Criterion 2 is restated as "≥60% of sessions include at least one `signal_read`". Per-layer expansion events (the original `signal_layer_open` / `allFourOpened` design) are rejected.
+
+**Context:** All three editorial layers ("The Signal", "Before This", "The Ripple") render expanded by default on the homepage and briefing detail surfaces; the only user affordance is "Collapse". Layer-open instrumentation would have measured a click that never happens, so reporting on it would have generated noise instead of signal. Cohort isolation (`?mvp_qa=1` / `?c=tester` / `?c=internal`, persisted client-side) lands in the same PR so the dwell rate can be computed on the real-tester slice.
+
+**Rejected alternative:** Keeping the `signal_layer_open` + `allFourOpened` framing and treating "any expanded section visible on load" as an opened layer. This was scoped first, then withdrawn once the expanded-by-default render path was confirmed.
+
+**Trade-off accepted:** Dwell is a softer behavioral proxy than an explicit click — a card that is on screen during a long pause can still emit `signal_read`. The scroll-while-visible requirement is the smallest filter that excludes the most obvious false positive (idle tab). Stronger filtering (e.g., requiring text selection, hover, or active focus) is deferred until the redefined Criterion 2 has actual telemetry to argue against.
+
+**Evidence:** `docs/product/prd/prd-68-mvp-measurement-dwell-and-self-report.md`; `src/lib/signal-read-tracking.ts`; `src/components/mvp-measurement/ComprehensionSelfReport.tsx`; `src/lib/mvp-measurement.ts` (event-name registration, cohort resolution); `docs/product/feature-system.csv`.
+
+**Interview read:** This shows the measurement design followed the actual UI rather than the original spec. When the rendering reality made a click-based metric meaningless, the metric was redefined explicitly in DECISIONS.md instead of being silently dropped or fudged.

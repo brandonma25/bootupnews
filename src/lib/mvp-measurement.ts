@@ -6,13 +6,57 @@ export const MVP_MEASUREMENT_EVENT_NAMES = [
   "signal_full_expansion",
   "signal_full_expansion_proxy",
   "signal_details_click",
+  "signal_read",
   "source_click",
   "category_tab_open",
   "comprehension_prompt_shown",
   "comprehension_prompt_answered",
+  "comprehension_self_report",
 ] as const;
 
 export type MvpMeasurementEventName = (typeof MVP_MEASUREMENT_EVENT_NAMES)[number];
+
+export const MVP_COHORTS = ["qa", "tester", "internal"] as const;
+
+export type MvpCohort = (typeof MVP_COHORTS)[number];
+
+export function isMvpCohort(value: unknown): value is MvpCohort {
+  return typeof value === "string" && MVP_COHORTS.includes(value as MvpCohort);
+}
+
+/**
+ * Deterministic cohort resolution from URL entry markers + a previously
+ * persisted value. First match wins. The browser-side wrapper in
+ * mvp-measurement-client.ts handles reading the query params and
+ * persisting the resolved value.
+ */
+export function resolveMvpCohortFromMarkers({
+  queryQa,
+  queryCohort,
+  persisted,
+}: {
+  queryQa: boolean;
+  queryCohort: string | null;
+  persisted: string | null;
+}): MvpCohort {
+  if (queryQa) {
+    return "qa";
+  }
+
+  const queryNormalized = queryCohort?.trim().toLowerCase() ?? "";
+  if (queryNormalized === "tester") {
+    return "tester";
+  }
+  if (queryNormalized === "internal") {
+    return "internal";
+  }
+
+  if (isMvpCohort(persisted)) {
+    return persisted;
+  }
+
+  return "internal";
+}
 
 export type MvpMeasurementEventInput = {
   eventName: MvpMeasurementEventName;

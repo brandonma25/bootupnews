@@ -3,7 +3,9 @@
 import {
   isMvpMeasurementEventName,
   isUuid,
+  resolveMvpCohortFromMarkers,
   validateMvpMeasurementEvent,
+  type MvpCohort,
   type MvpMeasurementEventInput,
   type MvpMeasurementEventName,
 } from "@/lib/mvp-measurement";
@@ -11,6 +13,9 @@ import { capturePostHogMvpMeasurementEvent } from "@/lib/posthog-client";
 
 const VISITOR_STORAGE_KEY = "bootup:mvp-measurement:visitor-id";
 const SESSION_STORAGE_KEY = "bootup:mvp-measurement:session-id";
+const COHORT_STORAGE_KEY = "bootup:mvp-measurement:cohort";
+const QA_FLAG_QUERY_PARAM = "mvp_qa";
+const COHORT_QUERY_PARAM = "c";
 
 function createId(prefix: string) {
   const randomId =
@@ -80,6 +85,55 @@ export function getSignalPostIdFromLegacyId(value: string | null | undefined) {
   return isUuid(value) ? value : null;
 }
 
+function readQueryParam(name: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return new URLSearchParams(window.location.search).get(name);
+  } catch {
+    return null;
+  }
+}
+
+function isTruthyQueryValue(value: string | null): boolean {
+  if (value === null) {
+    return false;
+  }
+  return /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+/**
+ * Resolve cohort from URL entry markers (`?mvp_qa=1`, `?c=tester`,
+ * `?c=internal`), falling back to a previously persisted value, then to
+ * `"internal"`. Whenever the URL provides a marker, the resolved cohort
+ * is persisted client-side so subsequent visits without a marker keep the
+ * same tag (matches how visitor_id is persisted).
+ */
+export function resolveAndPersistMvpCohort(): MvpCohort {
+  if (typeof window === "undefined") {
+    return "internal";
+  }
+
+  const queryQa = isTruthyQueryValue(readQueryParam(QA_FLAG_QUERY_PARAM));
+  const queryCohort = readQueryParam(COHORT_QUERY_PARAM);
+  const persisted = readStorage(window.localStorage, COHORT_STORAGE_KEY);
+
+  const resolved = resolveMvpCohortFromMarkers({
+    queryQa,
+    queryCohort,
+    persisted,
+  });
+
+  const hadQueryMarker = queryQa || Boolean(queryCohort);
+  if (hadQueryMarker || persisted !== resolved) {
+    writeStorage(window.localStorage, COHORT_STORAGE_KEY, resolved);
+  }
+
+  return resolved;
+}
+
 export async function trackMvpMeasurementEvent(
   input: Omit<MvpMeasurementEventInput, "visitorId" | "sessionId"> & {
     eventName: MvpMeasurementEventName;
@@ -89,10 +143,16 @@ export async function trackMvpMeasurementEvent(
     return;
   }
 
+  const visitorId = getOrCreateMvpVisitorId();
+  const cohort = resolveAndPersistMvpCohort();
   const payload: MvpMeasurementEventInput = {
     ...input,
-    visitorId: getOrCreateMvpVisitorId(),
+    visitorId,
     sessionId: getOrCreateMvpSessionId(),
+    metadata: {
+      ...(input.metadata ?? {}),
+      cohort,
+    },
   };
   const validation = validateMvpMeasurementEvent(payload);
   const requestPayload = validation.ok ? validation.value : payload;

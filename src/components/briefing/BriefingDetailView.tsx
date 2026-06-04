@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+import { ComprehensionSelfReport } from "@/components/mvp-measurement/ComprehensionSelfReport";
 import { DateBadge } from "@/components/signals/DateBadge";
 import { SignalCard } from "@/components/signals/SignalCard";
 import { Button } from "@/components/ui/button";
@@ -71,12 +72,22 @@ export function BriefingDetailView({
               rank={index + 1}
               tier="core"
               defaultExpanded
+              mvpDwellTracking={{
+                route: `/briefing/${briefingDateKey}`,
+                surface: "briefing_detail",
+                signalPostId: event.id,
+                signalSlug: event.title,
+                signalRank: index + 1,
+                briefingDate: briefingDateKey,
+              }}
             />
           ))}
         </div>
       ) : (
         <StatusPanel title={noDataMessage.title} body={noDataMessage.body} />
       )}
+
+      <ComprehensionSelfReport briefingDate={briefingDateKey} />
     </div>
   );
 }
