@@ -5,6 +5,11 @@ const posthogMock = vi.hoisted(() => ({
   init: vi.fn(),
   startSessionRecording: vi.fn(),
   stopSessionRecording: vi.fn(),
+  get_distinct_id: vi.fn(() => "sdk_distinct_id"),
+  get_session_id: vi.fn(() => "sdk_session_id"),
+  opt_out_capturing: vi.fn(),
+  opt_in_capturing: vi.fn(),
+  has_opted_out_capturing: vi.fn(() => false),
 }));
 
 vi.mock("posthog-js", () => ({
@@ -203,5 +208,71 @@ describe("PostHog client analytics bridge", () => {
     expect(isPostHogSessionReplayEligible("/dashboard/signals/editorial-review")).toBe(false);
     expect(isPostHogSessionReplayEligible("/login?redirectTo=%2F")).toBe(false);
     expect(isPostHogSessionReplayEligible("/auth/callback")).toBe(false);
+  });
+
+  it("attributes direct captures to the PostHog SDK identity so a visitor is not split across two persons", async () => {
+    process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+    process.env.NEXT_PUBLIC_POSTHOG_PAGEVIEWS = "1";
+
+    const { initializePostHogClient } = await import("@/lib/posthog-client");
+    initializePostHogClient();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [, requestInit] = vi.mocked(fetch).mock.calls[0]!;
+    const body = JSON.parse(String(requestInit?.body));
+    expect(body.properties.distinct_id).toBe("sdk_distinct_id");
+    expect(body.properties.$session_id).toBe("sdk_session_id");
+  });
+
+  it("excludes opted-out (admin) visitors from initialization and all capture", async () => {
+    process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+    process.env.NEXT_PUBLIC_POSTHOG_PAGEVIEWS = "1";
+
+    const { initializePostHogClient, setPostHogAnalyticsOptOut } = await import("@/lib/posthog-client");
+    setPostHogAnalyticsOptOut(true);
+
+    expect(initializePostHogClient()).toBeNull();
+    expect(posthogMock.init).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("blocks the direct MVP measurement capture when opted out", async () => {
+    process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+
+    const { capturePostHogMvpMeasurementEvent, setPostHogAnalyticsOptOut } = await import(
+      "@/lib/posthog-client"
+    );
+    setPostHogAnalyticsOptOut(true);
+
+    capturePostHogMvpMeasurementEvent({
+      eventName: "homepage_view",
+      route: "/",
+      surface: "home",
+      visitorId: "mvp_visitor",
+      sessionId: "mvp_session",
+    } as unknown as Parameters<typeof capturePostHogMvpMeasurementEvent>[0]);
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("stops capture and session replay when an admin is detected after initialization", async () => {
+    process.env.NEXT_PUBLIC_ENABLE_POSTHOG = "1";
+    process.env.NEXT_PUBLIC_POSTHOG_TOKEN = "phc_project_token";
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+
+    const { initializePostHogClient, setPostHogAnalyticsOptOut } = await import("@/lib/posthog-client");
+    initializePostHogClient();
+    posthogMock.stopSessionRecording.mockClear();
+
+    setPostHogAnalyticsOptOut(true);
+
+    expect(posthogMock.opt_out_capturing).toHaveBeenCalledTimes(1);
+    expect(posthogMock.stopSessionRecording).toHaveBeenCalledTimes(1);
   });
 });
