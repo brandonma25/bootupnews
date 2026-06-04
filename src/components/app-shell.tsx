@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
+
 import Link from "next/link";
 
 import { signOutAction } from "@/app/actions";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Button } from "@/components/ui/button";
+import { setPostHogAnalyticsOptOut } from "@/lib/posthog-client";
 import type { ViewerAccount } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +29,16 @@ export function AppShell({
   account?: ViewerAccount | null;
   isAdmin?: boolean;
 }) {
+  // Keep admin / internal traffic out of PostHog (session replay, heatmaps, web
+  // analytics). Admins are matched server-side by email allowlist and that
+  // identity is never sent to PostHog, so there is no PostHog person property to
+  // filter on — we opt the SDK out on the client instead. AppShell wraps every
+  // public reading surface, so this follows the admin across the app.
+  // [analytics: admin-opt-out]
+  useEffect(() => {
+    setPostHogAnalyticsOptOut(isAdmin);
+  }, [isAdmin]);
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1440px] gap-6 px-4 py-4 pb-24 lg:px-6 lg:pb-4">
       <aside className="hidden w-[240px] shrink-0 lg:block">

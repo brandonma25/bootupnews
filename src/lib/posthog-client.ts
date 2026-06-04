@@ -29,6 +29,13 @@ const ADMIN_OR_AUTH_URL_IGNORELIST = [
 let initialized = false;
 let routeSyncInstalled = false;
 let lastCapturedPageviewRoute = "";
+// When true, this visitor is excluded from ALL PostHog egress — SDK init,
+// autocapture, heatmaps, session replay, and the direct-capture pageview/MVP
+// bridge below. Driven by the server-computed `isAdmin` flag from AppShell.
+// Internal users are filtered this way (rather than by a PostHog person
+// property) because the app never calls posthog.identify() and deliberately
+// never sends email/identity to PostHog. [analytics: admin-opt-out]
+let analyticsOptedOut = false;
 
 type PostHogClientConfig = {
   enabled: boolean;
@@ -62,7 +69,7 @@ export function readPostHogClientConfig(): PostHogClientConfig {
 }
 
 export function initializePostHogClient() {
-  if (typeof window === "undefined" || initialized) {
+  if (typeof window === "undefined" || initialized || analyticsOptedOut) {
     return initialized ? posthog : null;
   }
 
@@ -122,8 +129,41 @@ export function initializePostHogClient() {
   }
 }
 
+/**
+ * Opt the current visitor out of (or back into) all PostHog analytics. Admin /
+ * internal users are matched server-side by email allowlist (see isAdminUser);
+ * AppShell calls this on the client so their own browsing never lands in
+ * session replay, heatmaps, or web analytics. The in-memory flag is the source
+ * of truth: when it is set before init runs (the normal case, since init is
+ * deferred ~3s) the SDK never starts at all. The opt_out/opt_in calls below
+ * only matter in the rare case the SDK is already running when this is called.
+ * [analytics: admin-opt-out]
+ */
+export function setPostHogAnalyticsOptOut(optedOut: boolean) {
+  analyticsOptedOut = optedOut;
+
+  if (typeof window === "undefined" || !initialized) {
+    return;
+  }
+
+  try {
+    if (optedOut) {
+      posthog.opt_out_capturing();
+      posthog.stopSessionRecording();
+    } else if (posthog.has_opted_out_capturing()) {
+      posthog.opt_in_capturing();
+    }
+  } catch {
+    // Opt-out is best effort; on error analytics still fails closed via the flag.
+  }
+}
+
 export function capturePostHogMvpMeasurementEvent(event: ValidatedMvpMeasurementEvent) {
   try {
+    if (analyticsOptedOut) {
+      return;
+    }
+
     const config = readPostHogClientConfig();
     if (!config.enabled || typeof window === "undefined") {
       return;
@@ -200,14 +240,42 @@ async function sendPostHogBrowserCapture(
         event: eventName,
         properties: {
           ...properties,
-          distinct_id: properties.mvpVisitorId,
-          $session_id: properties.mvpSessionId,
+          // Reuse the PostHog SDK's own anonymous identity so these direct
+          // captures and the SDK-captured events (autocapture, heatmaps,
+          // session replay) resolve to ONE person instead of two. The local
+          // MVP storage id is only a fallback for when the SDK is unavailable.
+          // [analytics: unified-distinct-id]
+          distinct_id: resolvePostHogDistinctId(properties.mvpVisitorId),
+          $session_id: resolvePostHogSessionId(properties.mvpSessionId),
         },
       }),
     });
   } catch {
     // Direct PostHog capture is best effort and must never block reading.
   }
+}
+
+function resolvePostHogDistinctId(fallback: unknown) {
+  return readInitializedPostHogId(() => posthog.get_distinct_id(), fallback);
+}
+
+function resolvePostHogSessionId(fallback: unknown) {
+  return readInitializedPostHogId(() => posthog.get_session_id(), fallback);
+}
+
+function readInitializedPostHogId(read: () => string | undefined, fallback: unknown) {
+  if (initialized) {
+    try {
+      const id = read();
+      if (typeof id === "string" && id.trim()) {
+        return id;
+      }
+    } catch {
+      // Fall through to the local measurement id below.
+    }
+  }
+
+  return fallback;
 }
 
 function sanitizePostHogCapture(capture: CaptureResult | null) {
@@ -447,7 +515,7 @@ function installRouteSessionReplaySync(config: PostHogClientConfig) {
 }
 
 function capturePostHogPageview(config: Pick<PostHogClientConfig, "host" | "pageviewsEnabled" | "token">) {
-  if (!config.pageviewsEnabled || typeof window === "undefined") {
+  if (!config.pageviewsEnabled || typeof window === "undefined" || analyticsOptedOut) {
     return;
   }
 
@@ -507,7 +575,7 @@ function syncSessionRecordingForRoute(
   }
 
   try {
-    if (config.sessionReplayEnabled && isPostHogSessionReplayEligible(window.location.pathname)) {
+    if (!analyticsOptedOut && config.sessionReplayEnabled && isPostHogSessionReplayEligible(window.location.pathname)) {
       client.startSessionRecording(config.replaySampleRate >= 1 ? true : undefined);
     } else {
       client.stopSessionRecording();
