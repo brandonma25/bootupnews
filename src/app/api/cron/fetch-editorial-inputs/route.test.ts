@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const runDailyNewsCron = vi.fn();
 const runNewsletterIngestion = vi.fn();
 const runEditorialStaging = vi.fn();
+const runNeedsReviewSweep = vi.fn();
 const logServerEvent = vi.fn();
 const writePipelineLogEntry = vi.fn();
 const sentryCaptureException = vi.fn();
@@ -38,6 +39,10 @@ vi.mock("@/lib/newsletter-ingestion/runner", () => ({
 
 vi.mock("@/lib/editorial-staging/runner", () => ({
   runEditorialStaging,
+}));
+
+vi.mock("@/lib/editorial-sweep/needs-review-sweep", () => ({
+  runNeedsReviewSweep,
 }));
 
 vi.mock("@/lib/observability", () => ({
@@ -209,6 +214,19 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       },
     });
     writePipelineLogEntry.mockResolvedValue({ written: true, pageId: "log-1" });
+    // P8-precondition sweep is best-effort and tested in its own suite; here it
+    // is a no-op so the route tests stay focused on the fetch pipeline.
+    runNeedsReviewSweep.mockResolvedValue({
+      cutoffDate: "2026-05-05",
+      ttlDays: 7,
+      dryRun: true,
+      disposedCount: 0,
+      flaggedCount: 0,
+      disposition: "removed_from_slate",
+      capped: false,
+      mutated: false,
+      flaggedSamples: [],
+    });
     // Default: lock acquires cleanly. Individual tests override.
     createSupabaseServiceRoleClient.mockReturnValue(buildSupabaseLockClient(true));
   });
@@ -307,6 +325,40 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     expect(runDailyNewsCron.mock.invocationCallOrder[0]).toBeLessThan(
       runEditorialStaging.mock.invocationCallOrder[0],
     );
+  });
+
+  // P8-precondition — the needs_review sweep must run FIRST, before any fetch
+  // leg, so a fetch failure can never skip it.
+  it("runs the needs_review sweep before the fetch legs", async () => {
+    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+    await GET(buildRequest("local-cron-secret"));
+    await runCapturedAfter();
+
+    expect(runNeedsReviewSweep).toHaveBeenCalledTimes(1);
+    expect(runNeedsReviewSweep.mock.invocationCallOrder[0]).toBeLessThan(
+      runNewsletterIngestion.mock.invocationCallOrder[0],
+    );
+  });
+
+  // P8-precondition — a sweep failure must NOT stop the fetch or flip the run
+  // status. The route swallows a sweep throw and proceeds.
+  it("continues the fetch pipeline when the needs_review sweep throws", async () => {
+    runNeedsReviewSweep.mockRejectedValue(new Error("sweep boom"));
+
+    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
+    const response = await GET(buildRequest("local-cron-secret"));
+    expect(response.status).toBe(202);
+
+    await runCapturedAfter();
+
+    // Fetch legs still ran; the run still wrote its Pipeline Log as ok.
+    expect(runNewsletterIngestion).toHaveBeenCalledTimes(1);
+    expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
+    expect(runEditorialStaging).toHaveBeenCalledTimes(1);
+    const ingestionLog = writePipelineLogEntry.mock.calls.find(
+      ([entry]) => entry.runType === "ingestion",
+    );
+    expect(ingestionLog?.[0].status).toBe("ok");
   });
 
   it("writes a Pipeline Log entry on completion with status=ok when all branches succeed", async () => {

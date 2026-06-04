@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { runDailyNewsCron, type DailyNewsCronRunResult } from "@/lib/cron/fetch-news";
 import { runNewsletterIngestion, type NewsletterIngestionRunResult } from "@/lib/newsletter-ingestion/runner";
 import { runEditorialStaging, type EditorialStagingRunResult } from "@/lib/editorial-staging/runner";
+import { runNeedsReviewSweep } from "@/lib/editorial-sweep/needs-review-sweep";
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { writePipelineLogEntry } from "@/lib/observability/pipeline-log";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -346,6 +347,24 @@ async function executePipelineWork(briefingDate: string) {
     briefingDate,
     internalTimeoutMs: INTERNAL_PIPELINE_TIMEOUT_MS,
   });
+
+  // P8-precondition — needs_review TTL sweep. Runs FIRST, before any fetch leg,
+  // and is fully decoupled from the fetch run's outcome:
+  //   - A fetch failure later can never skip the sweep, because the sweep
+  //     already ran.
+  //   - A sweep fault never flips the fetch run's success or pipelineLogStatus.
+  //     runNeedsReviewSweep() is best-effort and never throws; we additionally
+  //     guard here so even an unexpected throw is swallowed.
+  //   - It is OUTSIDE runWithInternalTimeout so a slow fetch can't starve it;
+  //     the sweep is a single bounded UPDATE.
+  try {
+    await runNeedsReviewSweep();
+  } catch (error) {
+    logServerEvent("error", "needs_review sweep threw out of module (swallowed; fetch continues)", {
+      route: "/api/cron/fetch-editorial-inputs",
+      ...errorContext(error),
+    });
+  }
 
   let pipelineResult:
     | { newsletter: EditorialInputTaskResult; rss: EditorialInputTaskResult; editorialStaging: EditorialInputTaskResult }
