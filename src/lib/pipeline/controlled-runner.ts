@@ -306,7 +306,7 @@ export async function runControlledPipeline(
 
   if (config.mode === "normal") {
     throw new Error(
-      "Controlled pipeline execution is limited to dry_run and draft_only. Normal scheduled execution remains owned by /api/cron/fetch-news after re-enable approval.",
+      "Controlled pipeline execution is limited to dry_run and draft_only. Normal scheduled execution is owned by /api/cron/fetch-editorial-inputs (Track 2 P5 removed the orphan /api/cron/fetch-news endpoint).",
     );
   }
 

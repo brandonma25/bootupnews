@@ -320,7 +320,11 @@ export async function runNewsletterIngestion(
   const testRunId = options.testRunId ?? null;
 
   logServerEvent("info", "Newsletter ingestion run started", {
-    route: "/api/cron/newsletter-ingestion",
+    // Track 2 P5 — the standalone /api/cron/newsletter-ingestion route was
+// removed (orphan; never reached `cron_runs`). The newsletter runner now
+// only runs as part of /api/cron/fetch-editorial-inputs. Log tag points
+// at the live caller for log-search accuracy.
+route: "/api/cron/fetch-editorial-inputs",
     testRunId,
     dryRun: config.dryRun,
     enabled: config.enabled,
@@ -470,7 +474,11 @@ export async function runNewsletterIngestion(
     });
   } catch (error) {
     logServerEvent("error", "Newsletter ingestion failed closed before completion", {
-      route: "/api/cron/newsletter-ingestion",
+      // Track 2 P5 — the standalone /api/cron/newsletter-ingestion route was
+// removed (orphan; never reached `cron_runs`). The newsletter runner now
+// only runs as part of /api/cron/fetch-editorial-inputs. Log tag points
+// at the live caller for log-search accuracy.
+route: "/api/cron/fetch-editorial-inputs",
       testRunId,
       ...errorContext(error),
     });
