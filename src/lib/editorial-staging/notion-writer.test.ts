@@ -72,13 +72,20 @@ describe("writeEditorialQueueRow — idempotent insert | update | skip", () => {
     delete process.env.NOTION_TOKEN;
   });
 
-  it("inserts when no matching row exists", async () => {
+  it("inserts when no matching row exists (no same-day, no cross-date)", async () => {
     fetchMock.mockReset();
     fetchMock
+      // 1. Same-day Headline+Briefing Date query — empty.
       .mockImplementationOnce(async (url: string, init?: RequestInit) => {
         calls.push({ url, init });
         return emptyQueryResponse();
       })
+      // 2. Cross-date lookback query (#P4) — empty.
+      .mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        return emptyQueryResponse();
+      })
+      // 3. Create.
       .mockImplementationOnce(async (url: string, init?: RequestInit) => {
         calls.push({ url, init });
         return createSuccessResponse("new-page-1");
@@ -91,10 +98,11 @@ describe("writeEditorialQueueRow — idempotent insert | update | skip", () => {
     });
 
     expect(result).toEqual({ action: "inserted", pageId: "new-page-1" });
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     expect(calls[0].url).toBe(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`);
-    expect(calls[1].url).toBe("https://api.notion.com/v1/pages");
-    expect(calls[1].init?.method).toBe("POST");
+    expect(calls[1].url).toBe(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`);
+    expect(calls[2].url).toBe("https://api.notion.com/v1/pages");
+    expect(calls[2].init?.method).toBe("POST");
   });
 
   it("updates in place when a matching row exists at Status=raw", async () => {
@@ -165,10 +173,16 @@ describe("writeEditorialQueueRow — idempotent insert | update | skip", () => {
     expect(result.existingStatus).toBe("(unset)");
   });
 
-  it("filters the Notion query by both Headline AND Briefing Date", async () => {
+  it("filters the same-day Notion query by both Headline AND Briefing Date", async () => {
     fetchMock.mockReset();
     fetchMock
       .mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        return emptyQueryResponse();
+      })
+      .mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        // Cross-date query (#P4) — empty so we still exercise the
+        // same-day filter assertions below.
         calls.push({ url, init });
         return emptyQueryResponse();
       })
@@ -195,13 +209,102 @@ describe("writeEditorialQueueRow — idempotent insert | update | skip", () => {
     });
   });
 
+  // Track 2 P4 — cross-date dedup. Same headline staged at non-`raw`
+  // status on a prior briefing date within the 14-day window → skip,
+  // do not create a fresh row.
+  it("skips when the same headline already exists at non-raw status on a recent briefing date (#P4)", async () => {
+    fetchMock.mockReset();
+    fetchMock
+      // 1. Same-day query — no match.
+      .mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        return emptyQueryResponse();
+      })
+      // 2. Cross-date query — match at Approved, briefing date 4 days ago.
+      .mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        return jsonResponse(200, {
+          results: [
+            {
+              id: "evergreen-page-1",
+              properties: {
+                Status: { select: { name: "Approved" } },
+                "Briefing Date": { date: { start: "2026-05-13" } },
+              },
+            },
+          ],
+        });
+      });
+
+    const result = await writeEditorialQueueRow({
+      candidate: baseCandidate,
+      briefingDate: BRIEFING_DATE,
+      notionDbId: NOTION_DB_ID,
+    });
+
+    expect(result).toEqual({
+      action: "skipped_duplicate_across_dates",
+      pageId: "evergreen-page-1",
+      existingStatus: "Approved",
+      existingBriefingDate: "2026-05-13",
+    });
+    // No third call (no create) — only the two queries.
+    expect(calls).toHaveLength(2);
+    expect(calls[0].url).toBe(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`);
+    expect(calls[1].url).toBe(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`);
+    // Cross-date filter excludes the current briefing date by upper-bounding
+    // on `on_or_before` < BRIEFING_DATE.
+    const crossDateBody = JSON.parse((calls[1].init?.body as string) ?? "{}");
+    expect(crossDateBody.filter.and).toHaveLength(3);
+    expect(crossDateBody.filter.and[0]).toEqual({
+      property: "Headline",
+      title: { equals: baseCandidate.headline },
+    });
+    expect(crossDateBody.filter.and[2].property).toBe("Briefing Date");
+    expect(crossDateBody.filter.and[2].date.on_or_before).toBe("2026-05-16");
+  });
+
+  it("does NOT skip when the cross-date match is still at status=raw (re-staging allowed)", async () => {
+    fetchMock.mockReset();
+    fetchMock
+      // 1. Same-day — no match.
+      .mockImplementationOnce(async () => emptyQueryResponse())
+      // 2. Cross-date — match at raw (not yet processed). Should NOT skip.
+      .mockImplementationOnce(async () =>
+        jsonResponse(200, {
+          results: [
+            {
+              id: "stale-raw-1",
+              properties: {
+                Status: { select: { name: "raw" } },
+                "Briefing Date": { date: { start: "2026-05-15" } },
+              },
+            },
+          ],
+        }),
+      )
+      // 3. Create — proceed with insert because cross-date match is raw.
+      .mockImplementationOnce(async () => createSuccessResponse("new-page-3"));
+
+    const result = await writeEditorialQueueRow({
+      candidate: baseCandidate,
+      briefingDate: BRIEFING_DATE,
+      notionDbId: NOTION_DB_ID,
+    });
+
+    expect(result.action).toBe("inserted");
+    expect(result.pageId).toBe("new-page-3");
+  });
+
   it("is idempotent: running twice with the same input produces one insert then one update", async () => {
     fetchMock.mockReset();
     fetchMock
-      // run 1: query (empty) -> create
+      // run 1: same-day (empty) -> cross-date (empty) -> create
+      .mockImplementationOnce(async () => emptyQueryResponse())
       .mockImplementationOnce(async () => emptyQueryResponse())
       .mockImplementationOnce(async () => createSuccessResponse("page-XYZ"))
-      // run 2: query (returns the row we just created at raw) -> update
+      // run 2: same-day query returns the row we just created at raw -> update
+      // (no cross-date query because same-day match short-circuits)
       .mockImplementationOnce(async () =>
         queryResponseWithMatch("page-XYZ", "raw"),
       )
@@ -221,9 +324,10 @@ describe("writeEditorialQueueRow — idempotent insert | update | skip", () => {
     expect(first.action).toBe("inserted");
     expect(second.action).toBe("updated");
     expect(second.pageId).toBe("page-XYZ");
-    // Two runs total = 4 API calls (2 queries + 1 create + 1 update). Zero
-    // duplicate-row writes.
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // Run 1 = 3 calls (same-day query + cross-date query + create).
+    // Run 2 = 2 calls (same-day query + update; cross-date skipped
+    // because same-day match short-circuits). Total = 5.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it("throws a descriptive error when NOTION_TOKEN is unset", async () => {
