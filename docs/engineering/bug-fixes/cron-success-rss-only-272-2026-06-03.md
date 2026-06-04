@@ -25,7 +25,21 @@ const pipelineLogStatus = !rss.success
     : "ok";
 ```
 
-`cron_runs.status` was already keyed off `pipelineLogStatus === "fail"`, so `warn` correctly resolves to `ok` at the lock layer. No `finalizeRunLock` change needed.
+### Revision (2026-06-04) — `cron_runs.status='warn'` mirrors Pipeline Log
+
+The original fix wrote `cron_runs.status='ok'` on degraded runs, collapsing the three-state Pipeline Log ladder into two states at the guard-table layer. Track 2 P1 revision adds a Supabase migration `supabase/migrations/20260604070000_cron_runs_add_warn_status.sql` that adds `'warn'` to the `cron_runs.status` CHECK constraint, and updates `finalizeRunLock`'s signature + the call site so `pipelineLogStatus` passes through directly:
+
+```ts
+// Was:
+await finalizeRunLock(briefingDate, pipelineLogStatus === "fail" ? "fail" : "ok");
+
+// Now (after migration applies 'warn' to the CHECK constraint):
+await finalizeRunLock(briefingDate, pipelineLogStatus);
+```
+
+Migration ordering is load-bearing: the CHECK constraint addition MUST land before any code writes `'warn'`. cron-job.org's failure trigger keys on HTTP status, so `'warn'` runs are visible without paging.
+
+Refer to PRD-65 Phase 7.4 for the operational write-up.
 
 One change in `src/lib/newsletter-ingestion/runner.ts` — explicit early-return after `fetchBootUpBenchmarkEmails` when the Gmail label yields zero refs:
 
