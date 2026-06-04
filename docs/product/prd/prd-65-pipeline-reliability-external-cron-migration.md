@@ -217,6 +217,18 @@ Operational lesson captured in [`docs/engineering/CRON_SETUP.md` §6 → Burst-r
 
 **Operational lesson:** supabase-js's `.upsert({onConflict})` cannot match partial unique indexes. Any future migration adding a partial unique index that a JS-client upsert needs to target MUST be paired with either (a) a non-partial sibling index, or (b) a switch to select-then-decide / RPC. The guard test enforces this at PR review time.
 
+### Phase 7.4 — `cron_runs.status='warn'` for degraded runs (Track 2 P1, 2026-06-04)
+
+**Severity:** observability fidelity. Production ingestion runs since 2026-05-22 wrote `cron_runs.status='ok'` on degraded paths (RSS healthy + newsletter dead), collapsing the three-state Pipeline Log ladder (`ok`/`warn`/`fail`) into two states at the guard-table layer. `cron_runs` was therefore useless as a gauge — every RSS-healthy run read clean regardless of newsletter state.
+
+**Root cause:** The CHECK constraint on `cron_runs.status` from PR #260's migration (`20260521120000_cron_runs_and_source_url_idempotency.sql`) allowed only `('running','ok','fail','timeout')`. The `'warn'` value used elsewhere in the Pipeline Log schema would have thrown a constraint violation if written to `cron_runs`, so `finalizeRunLock` defensively collapsed `warn → ok`. Track 2 P1 (PR #289) introduced the three-state Pipeline Log but kept the same `cron_runs` write contract.
+
+**Fix:** migration `supabase/migrations/20260604070000_cron_runs_add_warn_status.sql` drops the existing CHECK constraint and re-adds it with `'warn'` included (`'running'`, `'ok'`, `'warn'`, `'fail'`, `'timeout'`). `finalizeRunLock`'s parameter type widens to accept `'warn'`, and the call site in `route.ts` now passes `pipelineLogStatus` through directly rather than collapsing the degraded case.
+
+**Migration ordering is load-bearing:** the migration must land **before** any code path that writes `'warn'` to `cron_runs` (this PR's writes, plus the in-flight Track 2 P6 health-check rewrite). If P6 ships first, its `'warn'` write throws the constraint violation and the health-check row finalize silently drops — recreating the same depth-layer dark-write class as the cron_runs failure PR #275 fixed.
+
+**Operator behavior preserved:** cron-job.org's failure trigger keys on HTTP status, NOT on `cron_runs.status`. The ingestion endpoint still returns 202 on degraded runs, so `'warn'` is observable in `cron_runs` and Pipeline Log without paging.
+
 ## Closeout Checklist
 
 - Scope completed: all phases (0–5) plus the cron-job.org sync tooling landing.
