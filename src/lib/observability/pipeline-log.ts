@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 import { errorContext, logServerEvent } from "@/lib/observability";
 
 /**
@@ -49,27 +51,62 @@ function richText(content: string) {
   return [{ text: { content } }];
 }
 
+/**
+ * Capture a Sentry message for a writer no-op. Track 2 P2: the legacy
+ * `warn`-only path went dark on prod when log env vars drifted off the
+ * Production scope on Vercel — there was no pageable signal that
+ * observability had stopped working. A Sentry message at `warning`
+ * level surfaces silent observability loss without paging.
+ *
+ * Deduped by fingerprint per reason so a missing env var produces one
+ * Sentry issue, not one per cron run. The `extra` payload carries the
+ * specific reason + run metadata for the issue body.
+ */
+function captureWriterNoop(reason: string, extra: Record<string, unknown>) {
+  Sentry.captureMessage("Pipeline log writer no-op", {
+    level: "warning",
+    fingerprint: ["pipeline-log-writer-noop", reason],
+    tags: {
+      observability_surface: "pipeline_log",
+      writer_noop_reason: reason,
+    },
+    extra,
+  });
+}
+
 export async function writePipelineLogEntry(
   entry: PipelineLogEntry,
 ): Promise<PipelineLogWriteResult> {
   const dbId = process.env.NOTION_PIPELINE_LOG_DB_ID?.trim();
   if (!dbId) {
+    const reason = "NOTION_PIPELINE_LOG_DB_ID not configured";
     logServerEvent("warn", "Pipeline log skipped: NOTION_PIPELINE_LOG_DB_ID not configured", {
       runType: entry.runType,
       status: entry.status,
       briefingDate: entry.briefingDate,
     });
-    return { written: false, reason: "NOTION_PIPELINE_LOG_DB_ID not configured" };
+    captureWriterNoop(reason, {
+      runType: entry.runType,
+      status: entry.status,
+      briefingDate: entry.briefingDate,
+    });
+    return { written: false, reason };
   }
 
   const token = process.env.NOTION_TOKEN?.trim();
   if (!token) {
+    const reason = "NOTION_TOKEN not configured";
     logServerEvent("warn", "Pipeline log skipped: NOTION_TOKEN not configured", {
       runType: entry.runType,
       status: entry.status,
       briefingDate: entry.briefingDate,
     });
-    return { written: false, reason: "NOTION_TOKEN not configured" };
+    captureWriterNoop(reason, {
+      runType: entry.runType,
+      status: entry.status,
+      briefingDate: entry.briefingDate,
+    });
+    return { written: false, reason };
   }
 
   const sourceHealth =
@@ -104,6 +141,7 @@ export async function writePipelineLogEntry(
 
     if (!response.ok) {
       const text = await response.text().catch(() => "(no body)");
+      const reason = `HTTP ${response.status}`;
       logServerEvent("warn", "Pipeline log write failed", {
         runType: entry.runType,
         status: entry.status,
@@ -111,23 +149,46 @@ export async function writePipelineLogEntry(
         httpStatus: response.status,
         body: truncate(text, 400),
       });
-      return { written: false, reason: `HTTP ${response.status}` };
+      captureWriterNoop(reason, {
+        runType: entry.runType,
+        status: entry.status,
+        briefingDate: entry.briefingDate,
+        httpStatus: response.status,
+        body: truncate(text, 400),
+      });
+      return { written: false, reason };
     }
 
     const data = (await response.json().catch(() => ({}))) as { id?: string };
-    return data.id
-      ? { written: true, pageId: data.id }
-      : { written: false, reason: "Notion response missing id" };
+    if (data.id) {
+      return { written: true, pageId: data.id };
+    }
+    const reason = "Notion response missing id";
+    captureWriterNoop(reason, {
+      runType: entry.runType,
+      status: entry.status,
+      briefingDate: entry.briefingDate,
+    });
+    return { written: false, reason };
   } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     logServerEvent("warn", "Pipeline log write threw", {
       runType: entry.runType,
       status: entry.status,
       briefingDate: entry.briefingDate,
       ...errorContext(error),
     });
-    return {
-      written: false,
-      reason: error instanceof Error ? error.message : String(error),
-    };
+    Sentry.captureException(error, {
+      tags: {
+        observability_surface: "pipeline_log",
+        writer_noop_reason: "threw",
+      },
+      extra: {
+        runType: entry.runType,
+        status: entry.status,
+        briefingDate: entry.briefingDate,
+      },
+    });
+    return { written: false, reason };
   }
 }
