@@ -201,7 +201,14 @@ async function attemptClaim(
  * Mark the run-lock terminal. Best-effort — never throws or blocks the cron.
  * No-op when the lock was never acquired (lock_check_failed fallthrough).
  */
-async function finalizeRunLock(briefingDate: string, status: "ok" | "fail" | "timeout"): Promise<void> {
+async function finalizeRunLock(
+  briefingDate: string,
+  status: "ok" | "warn" | "fail" | "timeout",
+): Promise<void> {
+  // 'warn' was added to the cron_runs.status CHECK constraint by
+  // migration 20260604070000_cron_runs_add_warn_status.sql. That
+  // migration MUST land before this code deploys, otherwise this write
+  // throws a constraint violation and the lock never finalizes.
   try {
     const client = createSupabaseServiceRoleClient();
     if (!client) return;
@@ -466,7 +473,14 @@ async function executePipelineWork(briefingDate: string) {
   // briefingDateForLog so the finalize keys to the same row that tryAcquireRunLock
   // claimed. They will agree under normal operation; this guards against drift
   // if editorial staging ever resolves a different Taipei calendar day.
-  await finalizeRunLock(briefingDate, pipelineLogStatus === "fail" ? "fail" : "ok");
+  //
+  // Track 2 P1 rev: write 'warn' (not 'ok') on the degraded path so cron_runs
+  // surfaces the same three-state ladder as the Pipeline Log. Reserves 'ok' for
+  // fully clean runs; reserves 'fail' for genuine breakage. cron-job.org's
+  // failure trigger keys on HTTP status, NOT on the cron_runs row — so a 'warn'
+  // run is visible to operators without paging. Requires migration
+  // 20260604070000_cron_runs_add_warn_status.sql to be applied first.
+  await finalizeRunLock(briefingDate, pipelineLogStatus);
 }
 
 export async function GET(request: Request) {
