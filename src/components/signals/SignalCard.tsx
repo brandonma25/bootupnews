@@ -1,12 +1,10 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import { buildEditorialWhyItMattersText } from "@/lib/editorial-content";
 import type { EditorialWhyItMattersContent } from "@/lib/editorial-content";
 import { cn } from "@/lib/utils";
+import { SignalCardInteractive } from "./SignalCardInteractive";
 import { TierBadge, type SignalTier } from "./TierBadge";
 
 type SourceLink = {
@@ -75,9 +73,13 @@ export function SignalCard({
   trackingAttributes,
   className,
 }: SignalCardProps) {
+  // SignalCard is a Server Component. When `defaultExpanded` is provided the
+  // expand/collapse interactivity is delegated to the <SignalCardInteractive>
+  // client island; the heavy editorial slots below (teaser, foldback) are
+  // server-rendered React nodes passed into that island, so on the homepage
+  // route they are RSC payload and never hydrate. This keeps cards painting
+  // expanded from SSR with no hydration of the three editorial layers. [perf]
   const interactive = defaultExpanded !== undefined;
-  const [localExpanded, setLocalExpanded] = useState(defaultExpanded ?? false);
-  const isExpanded = interactive ? localExpanded : expanded;
 
   const displayRank = rank ?? signal.finalSlateRank ?? signal.rank ?? 1;
   const displayTier = tier ?? resolveSignalTier(signal, displayRank);
@@ -113,161 +115,158 @@ export function SignalCard({
     compact ? "hover:text-[var(--bu-text-primary)]" : "hover:text-[var(--bu-accent)]",
   );
 
-  const toggleClassName = cn(
-    "inline-flex shrink-0 items-center gap-1 text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-secondary)] transition-colors hover:text-[var(--bu-text-primary)]",
+  const articleClassName = cn(
+    "rounded-[var(--bu-radius-lg)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)]",
+    compact ? "p-4" : "p-4 md:p-6",
+    className,
   );
 
-  function handleToggle() {
-    setLocalExpanded((value) => !value);
-  }
+  const badgeNode = <TierBadge tier={displayTier} rank={displayRank} accented={!compact} />;
 
-  return (
-    <article
+  const titleNode = (
+    <h2
       className={cn(
-        "rounded-[var(--bu-radius-lg)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)]",
-        compact ? "p-4" : "p-4 md:p-6",
-        className,
+        "mt-3 font-sans font-medium tracking-[-0.015em] text-[var(--bu-text-primary)]",
+        compact
+          ? "text-[18px] leading-[1.28]"
+          : "text-[var(--bu-size-card-title-mobile)] leading-[1.25] md:text-[var(--bu-size-card-title)]",
       )}
-      data-testid="signal-card"
-      data-signal-tier={displayTier}
-      data-signal-expanded={isExpanded ? "true" : "false"}
     >
-      <TierBadge tier={displayTier} rank={displayRank} accented={!compact} />
+      {signal.title}
+    </h2>
+  );
 
-      <h2
+  // Collapsed/compact card-face teaser. Rendered only when collapsed so the
+  // full Signal body appears once — inside the foldback. No v1 "Why this
+  // matters" label here; the foldback owns the labeled rendering.
+  const teaserNode = whyItMatters ? (
+    <section className="mt-3">
+      <p
         className={cn(
-          "mt-3 font-sans font-medium tracking-[-0.015em] text-[var(--bu-text-primary)]",
-          compact
-            ? "text-[18px] leading-[1.28]"
-            : "text-[var(--bu-size-card-title-mobile)] leading-[1.25] md:text-[var(--bu-size-card-title)]",
+          "font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]",
+          !compact && "line-clamp-2",
+          compact && "line-clamp-2 text-[var(--bu-size-meta)] leading-[1.5]",
         )}
+        data-testid="signal-card-teaser"
       >
-        {signal.title}
-      </h2>
+        {whyItMatters}
+      </p>
+    </section>
+  ) : null;
 
-      {/* Collapsed/compact card-face teaser. Hidden when expanded so the
-          full Signal body only appears once — inside the foldback below.
-          No v1 "Why this matters" label here; the foldback owns the
-          labeled rendering. */}
-      {!isExpanded && whyItMatters ? (
-        <section className="mt-3">
-          <p
-            className={cn(
-              "font-heading text-[var(--bu-size-witm)] font-normal leading-[var(--bu-line-witm)] text-[var(--bu-text-primary)]",
-              !compact && "line-clamp-2",
-              compact && "line-clamp-2 text-[var(--bu-size-meta)] leading-[1.5]",
-            )}
-            data-testid="signal-card-teaser"
-          >
-            {whyItMatters}
+  // Foldback shows EXACTLY the three editorial layers in cause-then-trajectory
+  // order (editorial framework §2): The Signal → Before This → The Ripple.
+  const foldbackNode = (
+    <div className="mt-4 border-t border-[var(--bu-border-subtle)] pt-4">
+      <div className="space-y-4">
+        <ExpandedSerifSection label="The Signal" body={whyItMatters} />
+        <LayerWithEmptyState
+          label="Before This"
+          body={beforeThisBody}
+          emptyText="No prior context yet for this signal."
+        />
+        <LayerWithEmptyState
+          label="The Ripple"
+          body={theRippleBody}
+          emptyText="No downstream trajectory yet for this signal."
+        />
+      </div>
+
+      {relatedCoverage.length ? (
+        <section className="mt-4 border-t border-[var(--bu-border-subtle)] pt-4">
+          <p className="text-[var(--bu-size-micro)] font-medium uppercase leading-none tracking-[0.08em] text-[var(--bu-text-tertiary)]">
+            Supporting coverage
           </p>
+          <div className="mt-3 grid gap-2">
+            {relatedCoverage.map((source) => (
+              <a
+                key={`${source.sourceName}-${source.url}-${source.title}`}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-start justify-between gap-3 rounded-[var(--bu-radius-md)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)] px-3 py-3 text-[var(--bu-size-meta)] leading-5 text-[var(--bu-text-primary)] transition-colors hover:border-[var(--bu-border-default)] hover:text-[var(--bu-accent)]"
+              >
+                <span className="min-w-0">
+                  <span className="font-medium">{source.sourceName}</span>
+                  {source.title && source.title.trim() !== source.sourceName.trim() ? (
+                    <span className="text-[var(--bu-text-secondary)]">: {source.title}</span>
+                  ) : null}
+                </span>
+                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--bu-text-tertiary)]" />
+              </a>
+            ))}
+          </div>
         </section>
       ) : null}
+    </div>
+  );
+
+  const sourceLinkNode = signal.sourceUrl ? (
+    // Standalone external-link icon — matches the source-link affordance used
+    // by category tab article rows so the card face exposes the original
+    // article URL at first glance, not behind the Expand toggle.
+    <a
+      href={signal.sourceUrl}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Read source: ${signal.sourceName ?? "open original article"}`}
+      title="Read at source"
+      className="inline-flex items-center text-[var(--bu-text-secondary)] transition-colors hover:text-[var(--bu-accent)]"
+      data-testid="signal-card-source-link"
+    >
+      <ExternalLink aria-hidden="true" className="h-4 w-4" />
+    </a>
+  ) : null;
+
+  // Interactive cards delegate the article shell + expand/collapse state to the
+  // client island; the slots above remain server-rendered (not hydrated).
+  if (interactive) {
+    return (
+      <SignalCardInteractive
+        defaultExpanded={defaultExpanded as boolean}
+        articleClassName={articleClassName}
+        displayTier={displayTier}
+        badge={badgeNode}
+        title={titleNode}
+        teaser={teaserNode}
+        sourceAttribution={sourceAttribution}
+        sourceUrl={signal.sourceUrl}
+        sourceName={signal.sourceName}
+        foldback={foldbackNode}
+        trackingAttributes={trackingAttributes}
+      />
+    );
+  }
+
+  // Non-interactive (compact / read-more) cards are fully static — no client
+  // island, no hydration. `expanded` is the legacy externally-controlled flag.
+  return (
+    <article
+      className={articleClassName}
+      data-testid="signal-card"
+      data-signal-tier={displayTier}
+      data-signal-expanded={expanded ? "true" : "false"}
+    >
+      {badgeNode}
+      {titleNode}
+
+      {!expanded ? teaserNode : null}
 
       <footer className="mt-4 flex items-center justify-between gap-4 border-t border-[var(--bu-border-subtle)] pt-3">
         <p className="min-w-0 truncate text-[var(--bu-size-meta)] font-normal leading-5 text-[var(--bu-text-tertiary)]">
           {sourceAttribution}
         </p>
         <div className="flex shrink-0 items-center gap-3">
-          {signal.sourceUrl ? (
-            // Standalone external-link icon — matches the source-link
-            // affordance used by category tab article rows so the card
-            // face exposes the original article URL at first glance,
-            // not behind the Expand toggle.
-            <a
-              href={signal.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Read source: ${signal.sourceName ?? "open original article"}`}
-              title="Read at source"
-              className="inline-flex items-center text-[var(--bu-text-secondary)] transition-colors hover:text-[var(--bu-accent)]"
-              data-testid="signal-card-source-link"
-            >
-              <ExternalLink aria-hidden="true" className="h-4 w-4" />
-            </a>
-          ) : null}
-          {interactive ? (
-            <button
-              type="button"
-              onClick={handleToggle}
-              aria-expanded={isExpanded}
-              className={toggleClassName}
-              data-testid="signal-card-toggle"
-              {...trackingAttributes}
-            >
-              {isExpanded ? "Collapse" : "Expand"}
-              <ChevronDown
-                aria-hidden="true"
-                className={cn(
-                  "h-3.5 w-3.5 transition-transform",
-                  isExpanded ? "rotate-180" : "rotate-0",
-                )}
-              />
-            </button>
-          ) : readMoreHref ? (
-            <Link
-              href={readMoreHref}
-              className={readMoreClassName}
-              {...trackingAttributes}
-            >
+          {sourceLinkNode}
+          {readMoreHref ? (
+            <Link href={readMoreHref} className={readMoreClassName} {...trackingAttributes}>
               Read more →
             </Link>
           ) : null}
         </div>
       </footer>
 
-      {isExpanded ? (
-        <div className="mt-4 border-t border-[var(--bu-border-subtle)] pt-4">
-          {/* Foldback shows EXACTLY the three editorial layers in
-              cause-then-trajectory order (editorial framework §2):
-                The Signal → Before This → The Ripple.
-              "What happened" was removed in this follow-up — it duplicated
-              source-headline material already implied by the title and
-              footer attribution, and crowded the editorial voice. v2
-              labels here only; codebase-wide v1→v2 rename of
-              validator/server-action/type identifiers is parked in #271. */}
-          <div className="space-y-4">
-            <ExpandedSerifSection label="The Signal" body={whyItMatters} />
-            <LayerWithEmptyState
-              label="Before This"
-              body={beforeThisBody}
-              emptyText="No prior context yet for this signal."
-            />
-            <LayerWithEmptyState
-              label="The Ripple"
-              body={theRippleBody}
-              emptyText="No downstream trajectory yet for this signal."
-            />
-          </div>
-
-          {relatedCoverage.length ? (
-            <section className="mt-4 border-t border-[var(--bu-border-subtle)] pt-4">
-              <p className="text-[var(--bu-size-micro)] font-medium uppercase leading-none tracking-[0.08em] text-[var(--bu-text-tertiary)]">
-                Supporting coverage
-              </p>
-              <div className="mt-3 grid gap-2">
-                {relatedCoverage.map((source) => (
-                  <a
-                    key={`${source.sourceName}-${source.url}-${source.title}`}
-                    href={source.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-start justify-between gap-3 rounded-[var(--bu-radius-md)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)] px-3 py-3 text-[var(--bu-size-meta)] leading-5 text-[var(--bu-text-primary)] transition-colors hover:border-[var(--bu-border-default)] hover:text-[var(--bu-accent)]"
-                  >
-                    <span className="min-w-0">
-                      <span className="font-medium">{source.sourceName}</span>
-                      {source.title && source.title.trim() !== source.sourceName.trim() ? (
-                        <span className="text-[var(--bu-text-secondary)]">: {source.title}</span>
-                      ) : null}
-                    </span>
-                    <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--bu-text-tertiary)]" />
-                  </a>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
-      ) : null}
+      {expanded ? foldbackNode : null}
     </article>
   );
 }
