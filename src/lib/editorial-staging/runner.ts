@@ -30,6 +30,8 @@ export type EditorialStagingRunSummary = {
   notionRowsInserted: number;
   notionRowsUpdated: number;
   notionRowsSkippedHumanEdited: number;
+  /** Track 2 P4 — staged headline already exists at non-`raw` status on a different briefing date within the lookback window. */
+  notionRowsSkippedDuplicateAcrossDates: number;
   notionErrors: string[];
 };
 
@@ -205,6 +207,7 @@ function buildFailureResult(
       notionRowsInserted: 0,
       notionRowsUpdated: 0,
       notionRowsSkippedHumanEdited: 0,
+      notionRowsSkippedDuplicateAcrossDates: 0,
       notionErrors: [],
     },
   };
@@ -276,6 +279,7 @@ export async function runEditorialStaging(options: {
   let notionRowsInserted = 0;
   let notionRowsUpdated = 0;
   let notionRowsSkippedHumanEdited = 0;
+  let notionRowsSkippedDuplicateAcrossDates = 0;
   const notionErrors: string[] = [];
 
   for (const candidate of selected) {
@@ -283,6 +287,8 @@ export async function runEditorialStaging(options: {
       const result = await writeEditorialQueueRow({ candidate, briefingDate, notionDbId });
       if (result.action === "inserted") notionRowsInserted += 1;
       else if (result.action === "updated") notionRowsUpdated += 1;
+      else if (result.action === "skipped_duplicate_across_dates")
+        notionRowsSkippedDuplicateAcrossDates += 1;
       else notionRowsSkippedHumanEdited += 1;
 
       logServerEvent("info", "editorial_queue_row write", {
@@ -347,6 +353,7 @@ export async function runEditorialStaging(options: {
     notionRowsInserted,
     notionRowsUpdated,
     notionRowsSkippedHumanEdited,
+    notionRowsSkippedDuplicateAcrossDates,
   });
 
   return {
@@ -363,6 +370,7 @@ export async function runEditorialStaging(options: {
       notionRowsInserted,
       notionRowsUpdated,
       notionRowsSkippedHumanEdited,
+      notionRowsSkippedDuplicateAcrossDates,
       notionErrors,
     },
   };

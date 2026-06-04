@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 import { errorContext, logServerEvent } from "@/lib/observability";
 
 /**
@@ -171,6 +173,23 @@ function buildProperties(
   return properties;
 }
 
+/**
+ * Track 2 P2 — Sentry signal when the source-health writer no-ops.
+ * Deduped per reason so a missing env var produces one Sentry issue
+ * across the entire run, not one per source fetched (38 sources/day).
+ */
+function captureSourceHealthNoop(reason: string, extra: Record<string, unknown>) {
+  Sentry.captureMessage("Source health log writer no-op", {
+    level: "warning",
+    fingerprint: ["source-health-log-writer-noop", reason],
+    tags: {
+      observability_surface: "source_health_log",
+      writer_noop_reason: reason,
+    },
+    extra,
+  });
+}
+
 export async function writeSourceHealthEntry(
   entry: SourceHealthEntry,
 ): Promise<SourceHealthWriteResult> {
@@ -178,6 +197,11 @@ export async function writeSourceHealthEntry(
   if (!env.ok) {
     logServerEvent("warn", "Source health log skipped: env not configured", {
       reason: env.reason,
+      source: entry.source,
+      date: entry.date,
+      outcome: entry.outcome,
+    });
+    captureSourceHealthNoop(env.reason, {
       source: entry.source,
       date: entry.date,
       outcome: entry.outcome,
@@ -202,6 +226,7 @@ export async function writeSourceHealthEntry(
       });
       if (!response.ok) {
         const text = await response.text().catch(() => "(no body)");
+        const reason = `HTTP ${response.status}`;
         logServerEvent("warn", "Source health log update failed", {
           source: entry.source,
           date: entry.date,
@@ -209,7 +234,14 @@ export async function writeSourceHealthEntry(
           httpStatus: response.status,
           body: truncate(text, 400),
         });
-        return { written: false, reason: `HTTP ${response.status}` };
+        captureSourceHealthNoop(reason, {
+          source: entry.source,
+          date: entry.date,
+          pageId: existing.pageId,
+          httpStatus: response.status,
+          body: truncate(text, 400),
+        });
+        return { written: false, reason };
       }
       return { written: true, pageId: existing.pageId, action: "updated" };
     }
@@ -228,24 +260,48 @@ export async function writeSourceHealthEntry(
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "(no body)");
+      const reason = `HTTP ${response.status}`;
       logServerEvent("warn", "Source health log create failed", {
         source: entry.source,
         date: entry.date,
         httpStatus: response.status,
         body: truncate(text, 400),
       });
-      return { written: false, reason: `HTTP ${response.status}` };
+      captureSourceHealthNoop(reason, {
+        source: entry.source,
+        date: entry.date,
+        httpStatus: response.status,
+        body: truncate(text, 400),
+      });
+      return { written: false, reason };
     }
     const data = (await response.json().catch(() => ({}))) as { id?: string };
-    return data.id
-      ? { written: true, pageId: data.id, action: "inserted" }
-      : { written: false, reason: "Notion response missing id" };
+    if (data.id) {
+      return { written: true, pageId: data.id, action: "inserted" };
+    }
+    const reason = "Notion response missing id";
+    captureSourceHealthNoop(reason, {
+      source: entry.source,
+      date: entry.date,
+    });
+    return { written: false, reason };
   } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     logServerEvent("warn", "Source health log write threw", {
       source: entry.source,
       date: entry.date,
       ...errorContext(error),
     });
-    return { written: false, reason: error instanceof Error ? error.message : String(error) };
+    Sentry.captureException(error, {
+      tags: {
+        observability_surface: "source_health_log",
+        writer_noop_reason: "threw",
+      },
+      extra: {
+        source: entry.source,
+        date: entry.date,
+      },
+    });
+    return { written: false, reason };
   }
 }
