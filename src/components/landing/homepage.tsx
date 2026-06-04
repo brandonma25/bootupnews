@@ -1,17 +1,17 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
 import { CategoryNavigation } from "@/components/home/CategoryNavigation";
 import { MvpMeasurementTracker } from "@/components/mvp-measurement/MvpMeasurementTracker";
 import { DateBadge } from "@/components/signals/DateBadge";
-import { SignalCard } from "@/components/signals/SignalCard";
 import { Panel } from "@/components/ui/panel";
 import {
   buildOverallNoDataMessage,
+  selectHomepageTopEvents,
   type HomepageViewModel,
-  type HomepageEvent,
 } from "@/lib/homepage-model";
 import type { DashboardData, ViewerAccount } from "@/lib/types";
 import { getBriefingDateKey } from "@/lib/utils";
@@ -32,6 +32,13 @@ type LandingHomepageProps = {
   authState?: string;
   debugEnabled?: boolean;
   homepageViewModel: HomepageViewModel;
+  /**
+   * Top Signal Cards, pre-rendered by the server route as RSC payload. Passing
+   * them in (rather than mapping <SignalCard> here) keeps the heavy editorial
+   * card content from hydrating inside this client shell. See PR perf/defer-
+   * signalcard-hydration.
+   */
+  signalCards: ReactNode;
 };
 
 export default function LandingHomepage({
@@ -41,12 +48,13 @@ export default function LandingHomepage({
   authState,
   debugEnabled = false,
   homepageViewModel,
+  signalCards,
 }: LandingHomepageProps) {
-  const { featured, topRanked, debug } = homepageViewModel;
-  const topEvents = dedupeEvents([featured, ...topRanked]).slice(0, 5);
+  const { debug } = homepageViewModel;
+  const topEventCount = selectHomepageTopEvents(homepageViewModel).length;
   const briefingDateKey = getBriefingDateKey(data.briefing.briefingDate);
   const publicRankedSignalCount = data.publicRankedSignalCount ?? homepageViewModel.debug.rankedEventsCount;
-  const noDataMessage = buildOverallNoDataMessage(topEvents.length);
+  const noDataMessage = buildOverallNoDataMessage(topEventCount);
   const topEventsEmptyMessage =
     data.homepageFreshnessNotice?.kind === "empty"
       ? { title: data.homepageFreshnessNotice.text, body: "" }
@@ -62,7 +70,7 @@ export default function LandingHomepage({
           surface: "home",
           briefingDate: briefingDateKey,
           metadata: {
-            visibleSignalCount: topEvents.length,
+            visibleSignalCount: topEventCount,
             publicRankedSignalCount,
             coreSignalCount: homepageViewModel.debug.coreSignalCount,
             contextSignalCount: homepageViewModel.debug.contextSignalCount,
@@ -100,27 +108,8 @@ export default function LandingHomepage({
           </Panel>
         ) : null}
 
-        {topEvents.length ? (
-          <div className="grid gap-[var(--bu-space-3)]">
-            {topEvents.map((event, index) => (
-              <SignalCard
-                key={event.id}
-                signal={event}
-                rank={index + 1}
-                tier="core"
-                defaultExpanded
-                trackingAttributes={{
-                  "data-mvp-measurement-event": "signal_details_click",
-                  "data-mvp-route": "/",
-                  "data-mvp-surface": "home_top_event",
-                  "data-mvp-signal-post-id": event.id,
-                  "data-mvp-signal-slug": event.title,
-                  "data-mvp-signal-rank": index + 1,
-                  "data-mvp-briefing-date": briefingDateKey,
-                }}
-              />
-            ))}
-          </div>
+        {topEventCount ? (
+          <div className="grid gap-[var(--bu-space-3)]">{signalCards}</div>
         ) : (
           <StatusPanel title={topEventsEmptyMessage.title} body={topEventsEmptyMessage.body} />
         )}
@@ -139,18 +128,6 @@ export default function LandingHomepage({
       </div>
     </AppShell>
   );
-}
-
-function dedupeEvents(events: Array<HomepageEvent | null>) {
-  const seen = new Set<string>();
-  return events.filter((event): event is HomepageEvent => {
-    if (!event || seen.has(event.id)) {
-      return false;
-    }
-
-    seen.add(event.id);
-    return true;
-  });
 }
 
 function parseBriefingDate(value: string) {

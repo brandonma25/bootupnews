@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildHomepageEvents, buildHomepageViewModel, selectCategoryTabEvents } from "@/lib/homepage-model";
+import {
+  buildHomepageEvents,
+  buildHomepageViewModel,
+  HOMEPAGE_TOP_EVENTS_LIMIT,
+  selectCategoryTabEvents,
+  selectHomepageTopEvents,
+} from "@/lib/homepage-model";
 import { createDefaultPersonalizationProfile } from "@/lib/personalization";
 import type { DashboardData, BriefingItem } from "@/lib/types";
 
@@ -1471,4 +1477,33 @@ describe("buildHomepageViewModel", () => {
     expect(model.earlySignals.map((event) => event.id)).toContain("weak-early-personalization");
   });
 
+});
+
+describe("selectHomepageTopEvents", () => {
+  it("returns featured first, then top-ranked, capped at the limit", () => {
+    const data = createData(
+      Array.from({ length: 9 }, (_, index) =>
+        createItem({
+          id: `evt-${index + 1}`,
+          title: `Signal ${index + 1}`,
+          sourceCount: 4,
+        }),
+      ),
+    );
+    const viewModel = buildHomepageViewModel(data);
+
+    const topEvents = selectHomepageTopEvents(viewModel);
+
+    expect(topEvents.length).toBeLessThanOrEqual(HOMEPAGE_TOP_EVENTS_LIMIT);
+    if (viewModel.featured) {
+      expect(topEvents[0]?.id).toBe(viewModel.featured.id);
+    }
+    const ids = topEvents.map((event) => event.id);
+    expect(new Set(ids).size).toBe(ids.length); // no duplicates
+  });
+
+  it("returns an empty array when there are no events", () => {
+    const viewModel = buildHomepageViewModel(createData([]));
+    expect(selectHomepageTopEvents(viewModel)).toEqual([]);
+  });
 });

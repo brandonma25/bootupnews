@@ -129,6 +129,27 @@ export type HomepageViewModel = {
   debug: HomepageDebugModel;
 };
 
+export const HOMEPAGE_TOP_EVENTS_LIMIT = 5;
+
+/**
+ * Canonical selection of the homepage's top Signal Cards: featured first, then
+ * top-ranked, de-duplicated by id and capped at HOMEPAGE_TOP_EVENTS_LIMIT.
+ * Shared by the server route (which renders the cards) and the client homepage
+ * shell (which needs the count) so the two can never diverge.
+ */
+export function selectHomepageTopEvents(viewModel: HomepageViewModel): HomepageEvent[] {
+  const seen = new Set<string>();
+  return [viewModel.featured, ...viewModel.topRanked]
+    .filter((event): event is HomepageEvent => {
+      if (!event || seen.has(event.id)) {
+        return false;
+      }
+      seen.add(event.id);
+      return true;
+    })
+    .slice(0, HOMEPAGE_TOP_EVENTS_LIMIT);
+}
+
 const TOP_EVENTS_LIMIT = 4;
 // Bumped from 6 to 10 so each Browse-by-category tab exposes a fuller
 // list of category-specific stories on the homepage.

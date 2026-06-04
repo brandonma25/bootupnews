@@ -5,8 +5,39 @@ import { describe, expect, it, vi } from "vitest";
 import ErrorBoundaryPage from "@/app/error";
 import Loading from "@/app/loading";
 import LandingHomepage from "@/components/landing/homepage";
-import { buildHomepageViewModel } from "@/lib/homepage-model";
+import { SignalCard } from "@/components/signals/SignalCard";
+import {
+  buildHomepageViewModel,
+  selectHomepageTopEvents,
+  type HomepageViewModel,
+} from "@/lib/homepage-model";
 import type { BriefingItem, DashboardData } from "@/lib/types";
+import { getBriefingDateKey } from "@/lib/utils";
+
+// Mirror src/app/page.tsx: the server route renders the top Signal Cards and
+// passes them into LandingHomepage as the `signalCards` prop. Tests build them
+// the same way so the rendered output matches production.
+function buildSignalCardsForTest(viewModel: HomepageViewModel, briefingDate: string) {
+  const briefingDateKey = getBriefingDateKey(briefingDate);
+  return selectHomepageTopEvents(viewModel).map((event, index) => (
+    <SignalCard
+      key={event.id}
+      signal={event}
+      rank={index + 1}
+      tier="core"
+      defaultExpanded
+      trackingAttributes={{
+        "data-mvp-measurement-event": "signal_details_click",
+        "data-mvp-route": "/",
+        "data-mvp-surface": "home_top_event",
+        "data-mvp-signal-post-id": event.id,
+        "data-mvp-signal-slug": event.title,
+        "data-mvp-signal-rank": index + 1,
+        "data-mvp-briefing-date": briefingDateKey,
+      }}
+    />
+  ));
+}
 
 function createItem(overrides: Partial<BriefingItem> = {}): BriefingItem {
   return {
@@ -83,12 +114,16 @@ function createData(
 }
 
 function renderHomepage(data: DashboardData, options: Partial<ComponentProps<typeof LandingHomepage>> = {}) {
+  const homepageViewModel = options.homepageViewModel ?? buildHomepageViewModel(data);
+  const signalCards =
+    options.signalCards ?? buildSignalCardsForTest(homepageViewModel, data.briefing.briefingDate);
   return render(
     <LandingHomepage
       data={data}
       viewer={null}
-      homepageViewModel={buildHomepageViewModel(data)}
       {...options}
+      homepageViewModel={homepageViewModel}
+      signalCards={signalCards}
     />,
   );
 }
@@ -204,11 +239,13 @@ describe("LandingHomepage", () => {
       }),
     ]);
 
+    const modelViewModel = buildHomepageViewModel(modelData);
     render(
       <LandingHomepage
         data={rawData}
         viewer={null}
-        homepageViewModel={buildHomepageViewModel(modelData)}
+        homepageViewModel={modelViewModel}
+        signalCards={buildSignalCardsForTest(modelViewModel, rawData.briefing.briefingDate)}
       />,
     );
 

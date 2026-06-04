@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 
 import LandingHomepage from "@/components/landing/homepage";
+import { SignalCard } from "@/components/signals/SignalCard";
 import { getHomepagePageState } from "@/lib/data";
 import { isAdminUser } from "@/lib/admin-auth";
 import { buildPublicAppUrl, getPublicAppOrigin, isHomepageDebugConfigured } from "@/lib/env";
 import { applyHomepageEditorialOverridesToDashboardData } from "@/lib/homepage-editorial-overrides";
-import { buildHomepageViewModel } from "@/lib/homepage-model";
+import { buildHomepageViewModel, selectHomepageTopEvents } from "@/lib/homepage-model";
+import { getBriefingDateKey } from "@/lib/utils";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -68,6 +70,31 @@ export default async function Page({ searchParams }: PageProps) {
     publicRankedSignalCount: data.publicRankedItems?.length ?? homepageViewModel.debug.rankedEventsCount,
   };
 
+  // Render the top Signal Cards HERE, in the Server Component, so their heavy
+  // editorial content is RSC payload that never hydrates inside the client
+  // LandingHomepage shell. Only each card's small interactive island hydrates.
+  // Selection + props are identical to the previous in-shell map. [perf]
+  const briefingDateKey = getBriefingDateKey(data.briefing.briefingDate);
+  const topEvents = selectHomepageTopEvents(homepageClientViewModel);
+  const signalCards = topEvents.map((event, index) => (
+    <SignalCard
+      key={event.id}
+      signal={event}
+      rank={index + 1}
+      tier="core"
+      defaultExpanded
+      trackingAttributes={{
+        "data-mvp-measurement-event": "signal_details_click",
+        "data-mvp-route": "/",
+        "data-mvp-surface": "home_top_event",
+        "data-mvp-signal-post-id": event.id,
+        "data-mvp-signal-slug": event.title,
+        "data-mvp-signal-rank": index + 1,
+        "data-mvp-briefing-date": briefingDateKey,
+      }}
+    />
+  ));
+
   return (
     <LandingHomepage
       data={homepageClientData}
@@ -76,6 +103,7 @@ export default async function Page({ searchParams }: PageProps) {
       authState={authState}
       debugEnabled={debugEnabled}
       homepageViewModel={homepageClientViewModel}
+      signalCards={signalCards}
     />
   );
 }
