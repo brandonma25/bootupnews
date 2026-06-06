@@ -358,3 +358,71 @@ describe("writeEditorialQueueRow — idempotent insert | update | skip", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe("writeEditorialQueueRow — dryRun does READS but ZERO writes (Track 2 PART 1)", () => {
+  const calls: RecordedFetch[] = [];
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    calls.length = 0;
+    process.env.NOTION_TOKEN = "test-token";
+    fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    delete process.env.NOTION_TOKEN;
+  });
+
+  it("would-insert: runs both READ queries, NEVER POSTs to /v1/pages", async () => {
+    fetchMock.mockReset();
+    fetchMock
+      .mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init }); // same-day query
+        return emptyQueryResponse();
+      })
+      .mockImplementationOnce(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init }); // cross-date (P4) query
+        return emptyQueryResponse();
+      });
+
+    const result = await writeEditorialQueueRow({
+      candidate: baseCandidate,
+      briefingDate: BRIEFING_DATE,
+      notionDbId: NOTION_DB_ID,
+      dryRun: true,
+    });
+
+    expect(result).toEqual({ action: "inserted", pageId: "(dry-run)" });
+    // Both READ lookups ran (the computed action is real). Note: Notion DB
+    // queries are themselves POST /databases/{id}/query — those are reads. The
+    // WRITE is POST /v1/pages (createRow), which must never happen in dryRun.
+    expect(calls).toHaveLength(2);
+    expect(calls.every((c) => c.url.endsWith(`/databases/${NOTION_DB_ID}/query`))).toBe(true);
+    expect(calls.some((c) => c.url === "https://api.notion.com/v1/pages")).toBe(false);
+  });
+
+  it("would-update: runs the same-day READ, NEVER PATCHes the page", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockImplementationOnce(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init }); // same-day match at Status=raw
+      return queryResponseWithMatch("existing-page-7", "raw");
+    });
+
+    const result = await writeEditorialQueueRow({
+      candidate: baseCandidate,
+      briefingDate: BRIEFING_DATE,
+      notionDbId: NOTION_DB_ID,
+      dryRun: true,
+    });
+
+    expect(result).toEqual({ action: "updated", pageId: "existing-page-7" });
+    expect(calls).toHaveLength(1); // only the read query — no PATCH
+    expect(calls.some((c) => (c.init?.method ?? "GET") === "PATCH")).toBe(false);
+  });
+});

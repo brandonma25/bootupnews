@@ -48,6 +48,16 @@ export type EditorialStagingRunSummary = {
    * URL date-path drift penalty (a soft signal, not a hard reject).
    */
   candidatesPenalizedEvergreen: number;
+  /**
+   * Track 2 dry-run harness only — present when runEditorialStaging is called
+   * with { dryRun: true }. Samples for the validation report; undefined on
+   * normal (writing) runs.
+   */
+  dryRunDetail?: {
+    selected: Array<{ headline: string; slot: "Core" | "Context" }>;
+    evergreenRejected: Array<{ headline: string; reason: "title" | "source" }>;
+    crossDateSkipped: Array<{ headline: string; existingBriefingDate?: string }>;
+  };
 };
 
 export type EditorialStagingRunResult = {
@@ -232,8 +242,16 @@ function buildFailureResult(
 
 export async function runEditorialStaging(options: {
   now?: Date;
+  /**
+   * Track 2 dry-run harness: run dedup (P4 read-only) + evergreen filter (P7)
+   * + scoreAndSelect and report WHAT WOULD STAGE, but skip the Notion
+   * writeEditorialQueueRow POST/PATCH and the completion email. Supabase
+   * candidate reads + Notion dedup-lookup reads still happen. Zero writes.
+   */
+  dryRun?: boolean;
 } = {}): Promise<EditorialStagingRunResult> {
   const now = options.now ?? new Date();
+  const dryRun = options.dryRun ?? false;
   const timestamp = now.toISOString();
   const briefingDate = todayTaipei(now);
   const notionDbId = process.env.NOTION_EDITORIAL_QUEUE_DB_ID?.trim();
@@ -322,15 +340,20 @@ export async function runEditorialStaging(options: {
   let notionRowsSkippedHumanEdited = 0;
   let notionRowsSkippedDuplicateAcrossDates = 0;
   const notionErrors: string[] = [];
+  const crossDateSkippedSample: Array<{ headline: string; existingBriefingDate?: string }> = [];
 
   for (const candidate of selected) {
     try {
-      const result = await writeEditorialQueueRow({ candidate, briefingDate, notionDbId });
+      const result = await writeEditorialQueueRow({ candidate, briefingDate, notionDbId, dryRun });
       if (result.action === "inserted") notionRowsInserted += 1;
       else if (result.action === "updated") notionRowsUpdated += 1;
-      else if (result.action === "skipped_duplicate_across_dates")
+      else if (result.action === "skipped_duplicate_across_dates") {
         notionRowsSkippedDuplicateAcrossDates += 1;
-      else notionRowsSkippedHumanEdited += 1;
+        crossDateSkippedSample.push({
+          headline: candidate.headline.slice(0, 80),
+          existingBriefingDate: result.existingBriefingDate,
+        });
+      } else notionRowsSkippedHumanEdited += 1;
 
       logServerEvent("info", "editorial_queue_row write", {
         briefingDate,
@@ -363,21 +386,23 @@ export async function runEditorialStaging(options: {
     return acc;
   }, {});
 
-  // Step G: Send completion email
-  try {
-    await sendEditorialCompletionEmail({
-      briefingDate,
-      candidateCount: selected.length,
-      coreCount,
-      contextCount,
-      categoryBreakdown,
-      notionDbId,
-    });
-  } catch (error) {
-    logServerEvent("error", "Editorial staging: completion email failed", {
-      briefingDate,
-      ...errorContext(error),
-    });
+  // Step G: Send completion email (skipped in dry-run — no outbound side effects)
+  if (!dryRun) {
+    try {
+      await sendEditorialCompletionEmail({
+        briefingDate,
+        candidateCount: selected.length,
+        coreCount,
+        contextCount,
+        categoryBreakdown,
+        notionDbId,
+      });
+    } catch (error) {
+      logServerEvent("error", "Editorial staging: completion email failed", {
+        briefingDate,
+        ...errorContext(error),
+      });
+    }
   }
 
   const message =
@@ -417,6 +442,19 @@ export async function runEditorialStaging(options: {
       notionErrors,
       candidatesFilteredEvergreen: filtered.candidatesFilteredEvergreen,
       candidatesPenalizedEvergreen: filtered.candidatesPenalizedEvergreen,
+      dryRunDetail: dryRun
+        ? {
+            selected: selected.map((c) => ({
+              headline: c.headline.slice(0, 80),
+              slot: c.slot,
+            })),
+            evergreenRejected: filtered.rejected.map((r) => ({
+              headline: r.candidate.headline.slice(0, 80),
+              reason: r.reason,
+            })),
+            crossDateSkipped: crossDateSkippedSample,
+          }
+        : undefined,
     },
   };
 }

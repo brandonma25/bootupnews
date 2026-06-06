@@ -310,6 +310,17 @@ export async function runControlledPipeline(
     );
   }
 
+  // Track 2 PART 4 footgun guardrail — draft_only is the ONLY mode that WRITES
+  // signal_posts to Supabase. Refuse it unless writes are explicitly confirmed,
+  // so no run can persist to prod by accident. dry_run (npm run pipeline:dry)
+  // is unaffected and always safe.
+  if (config.mode === "draft_only" && process.env.PIPELINE_RUN_CONFIRM_WRITES !== "1") {
+    throw new Error(
+      "draft_only mode WRITES signal_posts to Supabase. Set PIPELINE_RUN_CONFIRM_WRITES=1 to confirm, " +
+        "or use PIPELINE_RUN_MODE=dry_run (npm run pipeline:dry) for a safe no-write run.",
+    );
+  }
+
   if (config.replayArtifactPath) {
     return runControlledPipelineReplay(config);
   }

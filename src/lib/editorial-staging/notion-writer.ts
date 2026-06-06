@@ -323,8 +323,15 @@ export async function writeEditorialQueueRow(input: {
   candidate: EditorialCandidateForNotion;
   briefingDate: string;
   notionDbId: string;
+  /**
+   * Track 2 dry-run harness: when true, still run the same-day + cross-date
+   * READ lookups (so the computed action — insert/update/skip — is the real
+   * one), but skip the actual createRow/updateRow Notion WRITE. The returned
+   * action reports what WOULD happen; zero writes occur.
+   */
+  dryRun?: boolean;
 }): Promise<EditorialQueueWriteResult> {
-  const { candidate, briefingDate, notionDbId } = input;
+  const { candidate, briefingDate, notionDbId, dryRun = false } = input;
   const token = process.env.NOTION_TOKEN?.trim();
 
   if (!token) {
@@ -346,7 +353,9 @@ export async function writeEditorialQueueRow(input: {
         existingStatus: existing.status ?? "(unset)",
       };
     }
-    await updateRow(existing.pageId, candidate, briefingDate, token);
+    if (!dryRun) {
+      await updateRow(existing.pageId, candidate, briefingDate, token);
+    }
     return { action: "updated", pageId: existing.pageId };
   }
 
@@ -367,6 +376,9 @@ export async function writeEditorialQueueRow(input: {
     };
   }
 
+  if (dryRun) {
+    return { action: "inserted", pageId: "(dry-run)" };
+  }
   const pageId = await createRow(notionDbId, candidate, briefingDate, token);
   return { action: "inserted", pageId };
 }
