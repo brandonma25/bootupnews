@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ControlledPipelineConfig } from "@/lib/pipeline/controlled-execution";
 import { PUBLIC_SURFACE_SOURCE_MANIFEST } from "@/lib/source-manifest";
@@ -226,6 +226,10 @@ async function writeReplayArtifact(artifact: unknown) {
 describe("runControlledPipeline", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // These cases deliberately exercise draft_only selection + (mocked) persist,
+    // so confirm the Track 2 PART 4 write guard. The dedicated guard test below
+    // covers the refusal path with the flag unset.
+    process.env.PIPELINE_RUN_CONFIRM_WRITES = "1";
     const items = [
       buildItem(1),
       buildItem(2),
@@ -839,5 +843,65 @@ describe("runControlledPipeline", () => {
     await expect(runControlledPipeline(buildConfig({ mode: "normal", testRunId: null }))).rejects.toThrow(
       /limited to dry_run and draft_only/i,
     );
+  });
+});
+
+describe("runControlledPipeline — PART 4 write-confirm guardrail", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    delete process.env.PIPELINE_RUN_CONFIRM_WRITES;
+    generateDailyBriefing.mockResolvedValue({
+      briefing: {
+        id: "briefing-guard",
+        briefingDate: "2026-04-28T12:00:00.000Z",
+        title: "Bootup News",
+        intro: "Guard test briefing.",
+        readingWindow: "20 minutes",
+        items: [],
+      },
+      publicRankedItems: [],
+      pipelineRun: { run_id: "pipeline-guard", num_clusters: 0 },
+    });
+    persistSignalPostsForBriefing.mockResolvedValue({
+      ok: true,
+      briefingDate: "2026-04-28",
+      insertedCount: 0,
+      insertedPostIds: [],
+      mode: "draft_only",
+      message: "ok",
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.PIPELINE_RUN_CONFIRM_WRITES;
+  });
+
+  it("refuses draft_only (the only persisting mode) unless writes are confirmed", async () => {
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await expect(
+      runControlledPipeline(
+        buildConfig({ mode: "draft_only", briefingDateOverride: "2026-04-28", testRunId: "guard-test" }),
+      ),
+    ).rejects.toThrow(/PIPELINE_RUN_CONFIRM_WRITES=1/);
+    // The refusal happens BEFORE any briefing generation or persist.
+    expect(persistSignalPostsForBriefing).not.toHaveBeenCalled();
+    expect(generateDailyBriefing).not.toHaveBeenCalled();
+  });
+
+  it("allows draft_only once PIPELINE_RUN_CONFIRM_WRITES=1 is set", async () => {
+    process.env.PIPELINE_RUN_CONFIRM_WRITES = "1";
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await expect(
+      runControlledPipeline(
+        buildConfig({ mode: "draft_only", briefingDateOverride: "2026-04-28", testRunId: "guard-test" }),
+      ),
+    ).resolves.toBeTruthy();
+    expect(persistSignalPostsForBriefing).toHaveBeenCalled();
+  });
+
+  it("dry_run never requires the confirm flag (the blessed safe mode)", async () => {
+    const { runControlledPipeline } = await import("@/lib/pipeline/controlled-runner");
+    await expect(runControlledPipeline(buildConfig({ mode: "dry_run" }))).resolves.toBeTruthy();
+    expect(persistSignalPostsForBriefing).not.toHaveBeenCalled();
   });
 });

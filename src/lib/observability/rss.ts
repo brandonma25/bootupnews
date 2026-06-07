@@ -334,7 +334,18 @@ export function captureRssFailure(error: unknown, context: RssFailureContext) {
     normalizedContext,
   );
 
-  if (isMarkedCaptured(error) || !isSentryConfigured("server")) {
+  // PART 5: in a plain node/tsx process (the dry-run harness, any CLI, CI) the
+  // Sentry SDK is never initialized, so `Sentry.withScope` / `captureException`
+  // / `captureMessage` are undefined even though SENTRY_DSN is present in env
+  // (isSentryConfigured only checks the env var). Calling them throws
+  // `Sentry.withScope is not a function` and crashes the whole ingestion on the
+  // FIRST feed failure. recordRssFailure + logRssEvent above already captured
+  // the failure; skip the Sentry leg when the SDK isn't actually live.
+  if (
+    isMarkedCaptured(error) ||
+    !isSentryConfigured("server") ||
+    typeof Sentry.withScope !== "function"
+  ) {
     return null;
   }
 
@@ -679,17 +690,15 @@ function logRssEvent(level: "info" | "warn" | "error", message: string, context:
     return;
   }
 
-  if (level === "error") {
-    Sentry.logger.error(message, context);
-    return;
-  }
-
-  if (level === "warn") {
-    Sentry.logger.warn(message, context);
-    return;
-  }
-
-  Sentry.logger.info(message, context);
+  // Sentry's structured `logger` API only exists when the logs experiment is
+  // enabled in Sentry.init (the Next.js server runtime). In a plain node/tsx
+  // process — the dry-run harness, any CLI script, CI — `Sentry.logger` is
+  // undefined, so `Sentry.logger.warn(...)` throws
+  // `Cannot read properties of undefined (reading 'warn')` and crashes the
+  // entire ingestion on the FIRST feed failure (Track 2 PART 5). The JSON log
+  // via logServerEvent above already fired, so guard the Sentry leg.
+  const sentryLogger = Sentry.logger as typeof Sentry.logger | undefined;
+  sentryLogger?.[level]?.(message, context);
 }
 
 function isMarkedCaptured(error: unknown) {

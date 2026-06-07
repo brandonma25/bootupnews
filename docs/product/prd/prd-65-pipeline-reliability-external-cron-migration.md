@@ -229,6 +229,38 @@ Operational lesson captured in [`docs/engineering/CRON_SETUP.md` §6 → Burst-r
 
 **Operator behavior preserved:** cron-job.org's failure trigger keys on HTTP status, NOT on `cron_runs.status`. The ingestion endpoint still returns 202 on degraded runs, so `'warn'` is observable in `cron_runs` and Pipeline Log without paging.
 
+### Phase 7.5 — Full-pipeline dry-run validation harness (Track 2, 2026-06-06)
+
+**Problem this closes:** every pipeline change had a ~24-hour feedback loop — the only end-to-end exercise of sweep → newsletter → RSS → staging was the 12:00 UTC cron tick. A regression (e.g. the newsletter leg silently dying) was invisible until the next day's run, and even then read as a *fast green* rather than a failure. This phase adds one command that runs the whole pipeline in dry-run in <1 min, writing nothing to prod.
+
+**Blessed safe command:** `npm run pipeline:dry` → `scripts/pipeline-dry-run.ts` → `runFullPipelineDryRun()` (`src/lib/pipeline/full-dry-run.ts`). Prints a capability matrix + per-stage timing + feature-validation counts, and writes a JSON artifact to `.pipeline-runs/` (gitignored).
+
+**PART 0 — capability matrix (the anti-false-success floor).** Before any stage runs, `runPreflight()` (`src/lib/pipeline/preflight.ts`) probes each stage's real dependency (network egress, Supabase `cron_runs` read, Notion `users/me`, Gmail creds presence) and emits a three-state-per-stage matrix that the report never collapses:
+
+- `ran` — executed against a real, reachable dependency.
+- `skipped` — creds/dependency absent; the **exact** missing var or `no egress` is named, and `stage_ms = N/A` (never `0`).
+- `degraded` — ran, but the dependency returned nothing (e.g. all feeds failed → `candidate_pool_insufficient`).
+
+The specific trap this closes: newsletter with a missing Gmail credential now reports `skipped (missing GMAIL_REFRESH_TOKEN)` with `newsletter_ms = N/A` — **never** `newsletter_ms ≈ 0 + items = 0`, which reads as "fast and fixed" and reincarnates the cron-green-while-newsletter-was-dead failure class from Phase 7.4.
+
+**PART 1 — coverage with no logic fork.** The harness calls the SAME production functions in dry mode — `runNeedsReviewSweep` (forced `NEEDS_REVIEW_SWEEP_DRY_RUN=true`), `runNewsletterIngestion({ dryRun: true })`, `runControlledPipeline(… PIPELINE_RUN_MODE=dry_run)`, and `runEditorialStaging({ dryRun: true })`. A new `dryRun` flag on `runEditorialStaging` + `writeEditorialQueueRow` keeps the same-day + cross-date (P4) Notion **READ** lookups (so the computed insert/update/skip action is the real one) while skipping every `createRow`/`updateRow` **WRITE** and the completion email. Asserted by `notion-writer.test.ts` (dryRun does reads, zero `/v1/pages` writes).
+
+**PART 2 — shared timing util.** `StageTimer` (`src/lib/pipeline/stage-timing.ts`) emits `stage_ms { sweep, newsletter, rss, staging, total }`; `markSkipped` records `"N/A"`, never `0`. Built once, intended for reuse by the live cron route's timing breadcrumb (timeout-bundle FIX 3).
+
+**PART 3 — feature-validation visibility.** The report surfaces `candidatesFilteredEvergreen` (P7), `notionRowsSkippedDuplicateAcrossDates` (P4 cross-date would-skip), newsletter items processed, and selected core/context counts — so a change to any of those levers is observable in one place.
+
+**PART 4 — footgun guardrail (default-safe).** `runControlledPipeline` now refuses the only persisting mode (`draft_only`) unless `PIPELINE_RUN_CONFIRM_WRITES=1` is explicitly set; `dry_run` is always allowed. `npm run pipeline:controlled-test` now defaults to `PIPELINE_RUN_MODE=dry_run`. No run can write to prod by accident. Asserted by `controlled-runner.test.ts` (PART 4 guardrail describe).
+
+**PART 5 — graceful all-sources-failed degrade (also a production fix).** `captureRssFailure` / `logRssEvent` (`src/lib/observability/rss.ts`) crashed with `Sentry.withScope is not a function` whenever the Sentry SDK was not initialized (any plain node/tsx/CI process, and any code path that reached the RSS failure handler before init). On an all-feeds-failed run this took the whole RSS leg down on the FIRST feed failure instead of degrading. Fix: guard every Sentry call (`typeof Sentry.withScope !== "function"` and `Sentry.logger?.[level]?.()`) so the JSON structured log still fires and ingestion degrades to `candidate_pool_insufficient` rather than throwing.
+
+**CI-vs-local split (load-bearing):** CI runners have no egress and no prod secrets, so on CI every stage resolves to `skipped`/`degraded` and the suite exercises the **logic + degrade** paths (PART 5, the fixture/guard tests) only. The **live-fetch + real-timing** path runs **LOCAL** (`npm run pipeline:dry` with `.env.local`). Both are valid; the matrix names which one ran.
+
+**SCOPE BOUNDARY (stated in the report and the PR):** a local node process has **no 60s ceiling**. This harness validates pipeline **logic + relative stage timing** only — it **CANNOT certify the Vercel 60s timeout is fixed**. `report.certifies60sFit` is hard-coded `false`; "does it fit in 60s on Vercel" requires a deployed (preview/prod) test. This is deliberately decoupled from the decouple-legs / timeout work.
+
+**Files:** new — `src/lib/pipeline/{preflight,full-dry-run,stage-timing}.ts` (+ tests), `scripts/pipeline-dry-run.ts`, `src/lib/observability/rss-sentry-guard.test.ts`. Changed — `src/lib/observability/rss.ts` (PART 5 prod fix), `src/lib/editorial-staging/{notion-writer,runner}.ts` (dryRun), `src/lib/pipeline/controlled-runner.ts` (PART 4 guard), `package.json` (`pipeline:dry` + safe controlled-test default).
+
+**No schema changes, no migrations, no P4/P7 logic changes, no stage moved off the critical path** (that is the decouple-legs PR). Read-only fetches against prod Supabase/Notion are intentional (real P4 dedup data); zero writes occur.
+
 ## Closeout Checklist
 
 - Scope completed: all phases (0–5) plus the cron-job.org sync tooling landing.

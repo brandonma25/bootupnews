@@ -93,6 +93,30 @@ describe("RSS Sentry observability", () => {
     expect(captureException).toHaveBeenCalledTimes(1);
   });
 
+  it("PART 5 guard does NOT silence prod: with Sentry initialized, logger + capture STILL fire", async () => {
+    // Inverse of rss-sentry-guard.test.ts (which mocks the SDK absent). Here the
+    // mocked SDK is PRESENT/initialized (withScope + logger are real fns), as in
+    // the Vercel server runtime. The PART 5 guards must NOT short-circuit.
+    process.env.SENTRY_DSN = "https://public@example.ingest.sentry.io/1";
+    const { captureRssFailure } = await import("@/lib/observability/rss");
+
+    captureRssFailure(new Error("Feed request failed with status 500"), {
+      failureType: "rss_fetch_http_error",
+      phase: "fetch",
+      feedUrl: "https://feeds.example.com/rss.xml",
+      feedName: "Example Feed",
+      statusCode: 500,
+    });
+
+    // logRssEvent → Sentry.logger[level] leg fires (the rewritten path).
+    const loggerCalls =
+      logger.error.mock.calls.length + logger.warn.mock.calls.length + logger.info.mock.calls.length;
+    expect(loggerCalls).toBeGreaterThan(0);
+    // captureRssFailure → withScope ran (scope tagged) + captureException fired.
+    expect(scope.setTag).toHaveBeenCalledWith("component", "rss");
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
   it("classifies common fetch and parse failure shapes", async () => {
     const { classifyRssFailure } = await import("@/lib/observability/rss");
 
