@@ -353,6 +353,8 @@ function createSupabaseMock(
       const filters: Array<{ column: string; value: unknown }> = [];
       const inclusionFilters: Array<{ column: string; values: unknown[] }> = [];
       const lessThanFilters: Array<{ column: string; value: unknown }> = [];
+      const greaterEqualFilters: Array<{ column: string; value: unknown }> = [];
+      const lessEqualFilters: Array<{ column: string; value: unknown }> = [];
       const notNullFilters: Array<{ column: string }> = [];
       let orSearch = "";
       const orderRules: Array<{ column: string; ascending: boolean }> = [];
@@ -368,6 +370,18 @@ function createSupabaseMock(
             return typeof rowValue === "number" && typeof filter.value === "number"
               ? rowValue < filter.value
               : String(rowValue) < String(filter.value);
+          }) &&
+          greaterEqualFilters.every((filter) => {
+            const rowValue = (row as Record<string, unknown>)[filter.column];
+            return typeof rowValue === "number" && typeof filter.value === "number"
+              ? rowValue >= filter.value
+              : String(rowValue) >= String(filter.value);
+          }) &&
+          lessEqualFilters.every((filter) => {
+            const rowValue = (row as Record<string, unknown>)[filter.column];
+            return typeof rowValue === "number" && typeof filter.value === "number"
+              ? rowValue <= filter.value
+              : String(rowValue) <= String(filter.value);
           }) &&
           notNullFilters.every((filter) => (row as Record<string, unknown>)[filter.column] !== null) &&
           (orSearch
@@ -560,6 +574,14 @@ function createSupabaseMock(
         },
         lt(column: string, value: unknown) {
           lessThanFilters.push({ column, value });
+          return builder;
+        },
+        gte(column: string, value: unknown) {
+          greaterEqualFilters.push({ column, value });
+          return builder;
+        },
+        lte(column: string, value: unknown) {
+          lessEqualFilters.push({ column, value });
           return builder;
         },
         not(column: string, operator: string, value: unknown) {
