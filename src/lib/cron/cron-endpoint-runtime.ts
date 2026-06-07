@@ -12,12 +12,16 @@
  * briefing_date) is retained only by the briefing endpoint — see route.ts.
  */
 
+import * as Sentry from "@sentry/nextjs";
+
 import { errorContext, logServerEvent } from "@/lib/observability";
-import type {
-  EditorialPipelineStageName,
-  EditorialPipelineStageRunner,
+import {
+  runEditorialIngestionPipeline,
+  type EditorialPipelineResults,
+  type EditorialPipelineStageName,
+  type EditorialPipelineStageRunner,
 } from "@/lib/pipeline/editorial-ingestion-pipeline";
-import { StageTimer } from "@/lib/pipeline/stage-timing";
+import { StageTimer, type StageMs } from "@/lib/pipeline/stage-timing";
 
 /**
  * Internal wall, ~5s below the 60s Vercel function ceiling, so a captured
@@ -115,4 +119,66 @@ export function createTimedStageRunner(input: {
       } as unknown as T;
     }
   };
+}
+
+export type EditorialStagesRun = {
+  results: EditorialPipelineResults;
+  /** Per-stage durations + wall-clock total (partial on timeout). */
+  stageMs: StageMs;
+  timedOut: boolean;
+  /** The stage in flight when the budget expired (only meaningful when timedOut). */
+  inFlightStage: EditorialPipelineStageName;
+};
+
+/**
+ * Run a stage SUBSET of the editorial pipeline with the shared internal-timeout
+ * + per-stage StageTimer instrumentation. Used by every editorial cron endpoint
+ * (newsletter and briefing) so the timing + timeout handling is identical.
+ *
+ * On internal timeout it captures + flushes a Sentry event naming the in-flight
+ * stage and returns `timedOut: true` with the partial stage_ms — the caller
+ * decides the endpoint-specific finalize (run-lock 'timeout' for the briefing
+ * endpoint; a logged degrade for the lock-free newsletter endpoint).
+ */
+export async function runEditorialStagesWithTiming(input: {
+  routeName: string;
+  stages: EditorialPipelineStageName[];
+  now?: Date;
+}): Promise<EditorialStagesRun> {
+  const timer = new StageTimer();
+  const stageRef: { current: EditorialPipelineStageName } = { current: input.stages[0] };
+  const runStage = createTimedStageRunner({ stageRef, timer, routeName: input.routeName });
+
+  try {
+    const results = await runWithStageTimeout(
+      stageRef,
+      runEditorialIngestionPipeline({ dryRun: false, now: input.now, runStage, stages: input.stages }),
+      INTERNAL_STAGE_TIMEOUT_MS,
+    );
+    return { results, stageMs: timer.snapshot(), timedOut: false, inFlightStage: stageRef.current };
+  } catch (error) {
+    if (error instanceof StageTimeoutError) {
+      const stageMs = timer.snapshot();
+      Sentry.captureException(error, {
+        level: "error",
+        tags: { route: input.routeName, stage: error.stage, failure_type: "ingestion_timeout_internal" },
+        extra: { internalTimeoutMs: error.timeoutMs, stageMs },
+      });
+      // Force the buffered event out before Vercel freezes the instance (~5s).
+      await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+      logServerEvent("error", "Cron endpoint hit internal timeout", {
+        route: input.routeName,
+        stage: error.stage,
+        internalTimeoutMs: error.timeoutMs,
+        stageMs,
+      });
+      return {
+        results: { newsletter: null, rss: null, editorialStaging: null },
+        stageMs,
+        timedOut: true,
+        inFlightStage: error.stage as EditorialPipelineStageName,
+      };
+    }
+    throw error;
+  }
 }
