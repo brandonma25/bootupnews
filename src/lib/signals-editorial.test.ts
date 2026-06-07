@@ -353,6 +353,8 @@ function createSupabaseMock(
       const filters: Array<{ column: string; value: unknown }> = [];
       const inclusionFilters: Array<{ column: string; values: unknown[] }> = [];
       const lessThanFilters: Array<{ column: string; value: unknown }> = [];
+      const greaterEqualFilters: Array<{ column: string; value: unknown }> = [];
+      const lessEqualFilters: Array<{ column: string; value: unknown }> = [];
       const notNullFilters: Array<{ column: string }> = [];
       let orSearch = "";
       const orderRules: Array<{ column: string; ascending: boolean }> = [];
@@ -368,6 +370,18 @@ function createSupabaseMock(
             return typeof rowValue === "number" && typeof filter.value === "number"
               ? rowValue < filter.value
               : String(rowValue) < String(filter.value);
+          }) &&
+          greaterEqualFilters.every((filter) => {
+            const rowValue = (row as Record<string, unknown>)[filter.column];
+            return typeof rowValue === "number" && typeof filter.value === "number"
+              ? rowValue >= filter.value
+              : String(rowValue) >= String(filter.value);
+          }) &&
+          lessEqualFilters.every((filter) => {
+            const rowValue = (row as Record<string, unknown>)[filter.column];
+            return typeof rowValue === "number" && typeof filter.value === "number"
+              ? rowValue <= filter.value
+              : String(rowValue) <= String(filter.value);
           }) &&
           notNullFilters.every((filter) => (row as Record<string, unknown>)[filter.column] !== null) &&
           (orSearch
@@ -560,6 +574,14 @@ function createSupabaseMock(
         },
         lt(column: string, value: unknown) {
           lessThanFilters.push({ column, value });
+          return builder;
+        },
+        gte(column: string, value: unknown) {
+          greaterEqualFilters.push({ column, value });
+          return builder;
+        },
+        lte(column: string, value: unknown) {
+          lessEqualFilters.push({ column, value });
           return builder;
         },
         not(column: string, operator: string, value: unknown) {
@@ -1984,6 +2006,63 @@ describe("signals editorial workflow", () => {
       "Existing Signal 5",
     ]);
     expect(rows.every((row) => row.is_live === true)).toBe(true);
+  });
+
+  // Track 2 P4 (cross-date) — Layer 1 runs INSIDE the real production persist
+  // entry point (persistSignalPostsForBriefing, which the decoupled cron's RSS
+  // stage calls at fetch-news.ts:225). Proven empirically against a real SF Fed
+  // evergreen URL: a prior appearance >= MAX_CONSECUTIVE_DAYS days ago is skipped
+  // cross-date, while fresh candidates still persist. (The dry-run harness cannot
+  // exercise this — it skips persistence by its zero-write contract.)
+  it("skips a cross-date recurring URL (real SF Fed evergreen) while persisting fresh candidates", async () => {
+    const EVERGREEN_URL =
+      "https://www.frbsf.org/research-and-insights/blog/sf-fed-blog/2025/12/19/economic-letter-countdown-most-read-topics-2025/";
+    // Seed a prior appearance 21 days before today's briefing (inside the 30-day
+    // lookback, older than MAX_CONSECUTIVE_DAYS) — mirrors the real 21-date
+    // recurrence of this exact URL in production signal_posts.
+    const rows: SignalPostRow[] = [
+      createRow({
+        id: "prior-evergreen",
+        briefing_date: "2026-05-10",
+        rank: 1,
+        title: "Economic Letter Countdown: Most Read Topics from 2025",
+        source_url: EVERGREEN_URL,
+        editorial_status: "approved",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-05-31",
+      items: [
+        // Candidate 1 = the recurring evergreen URL → must be skipped cross-date.
+        {
+          ...createBriefingItem(1),
+          title: "Economic Letter Countdown: Most Read Topics from 2025",
+          sources: [{ title: "SF Fed Research and Insights", url: EVERGREEN_URL }],
+          relatedArticles: [
+            {
+              title: "SF Fed Research and Insights",
+              url: EVERGREEN_URL,
+              sourceName: "SF Fed Research and Insights",
+              note: "Lead coverage",
+            },
+          ],
+        },
+        // Candidates 2-5 = fresh URLs → must persist (and backfill the slate).
+        ...Array.from({ length: 4 }, (_, index) => createBriefingItem(index + 2)),
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    // Only the 4 fresh candidates were inserted; the recurring evergreen was dropped.
+    expect(result.insertedCount).toBe(4);
+    const insertedUrls = rows
+      .filter((row) => row.briefing_date === "2026-05-31")
+      .map((row) => row.source_url);
+    expect(insertedUrls).toHaveLength(4);
+    expect(insertedUrls).not.toContain(EVERGREEN_URL);
   });
 
   // Task 3 — legacy template generator provenance stamps. Every row written by
