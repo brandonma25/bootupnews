@@ -399,6 +399,20 @@ async function executePipelineWork(briefingDate: string) {
   }
 
   const { newsletter, rss, editorialStaging } = pipelineResult;
+  // This endpoint currently runs the full stage set (default), so all three
+  // results are present. (runEditorialIngestionPipeline can return null per
+  // stage when invoked with a stage SUBSET — used by the decoupled endpoints.)
+  if (!newsletter || !rss || !editorialStaging) {
+    logServerEvent("error", "Ingestion pipeline returned an incomplete stage set", {
+      route: "/api/cron/fetch-editorial-inputs",
+      briefingDate,
+      hasNewsletter: Boolean(newsletter),
+      hasRss: Boolean(rss),
+      hasEditorialStaging: Boolean(editorialStaging),
+    });
+    await finalizeRunLock(briefingDate, "fail");
+    return;
+  }
   // #272 — Run-success is owned by the CRITICAL leg (RSS). Newsletter is
   // a supplementary input source; an empty Gmail label or an OAuth
   // expiry there must DEGRADE the run, not fail it. The legacy boolean
