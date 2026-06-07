@@ -7,6 +7,11 @@ import {
   parseEditorialWhyItMattersContent,
   type EditorialWhyItMattersContent,
 } from "@/lib/editorial-content";
+import {
+  CROSS_DATE_LOOKBACK_DAYS,
+  computeCrossDateWindow,
+  partitionByCrossDateRecurrence,
+} from "@/lib/editorial/cross-date-url-dedup";
 import { logServerEvent } from "@/lib/observability";
 import {
   createSupabaseServiceRoleClient,
@@ -1348,14 +1353,22 @@ async function persistSignalPostCandidates(
     };
   }
 
+  // Track 2 — soften the >=5 floor to match runDailyNewsCron's degraded path.
+  // The zero case is handled above (hard fail). A thin slate of 1-4 source-ready
+  // candidates now PERSISTS in "degraded" mode instead of being refused outright.
+  // Rationale: the old hard >=5 floor zeroed the ENTIRE slate on evergreen-heavy
+  // days once the P7 evergreen filter removed the padding (it took down the
+  // 2026-06-07 on-demand run -> empty slate; see
+  // docs/engineering/bug-fixes/evergreen-restaging-with-floor-softening-2026-06-08.md).
+  // A thin CLEAN slate (real items, no evergreens) beats a 5-item slate padded
+  // with evergreens, and beats an empty slate. These rows are needs_review
+  // (not auto-published), so a short review queue is safe.
   if (mode !== "draft_only" && sourceReadyCandidates.length < TOP_SIGNAL_SET_SIZE) {
-    return {
-      ok: false,
+    logServerEvent("warn", "Signal snapshot persisting in degraded mode (below target count)", {
       briefingDate,
-      insertedCount: 0,
-      skippedCandidates,
-      message: `The current signal pipeline returned ${sourceReadyCandidates.length} source-ready signal posts. Persisting the daily snapshot requires at least five.`,
-    };
+      sourceReadyCount: sourceReadyCandidates.length,
+      targetCount: TOP_SIGNAL_SET_SIZE,
+    });
   }
 
   const existingResult = await client
@@ -1493,6 +1506,63 @@ async function persistSignalPostCandidates(
     };
   }
 
+  // Track 2 P4 (cross-date) — drop candidates whose NORMALIZED URL already
+  // appeared in signal_posts on a prior briefing_date older than the grace
+  // window. The same-day filter above handles within-day idempotency; this
+  // handles cross-date RECURRENCE (the evergreen re-staging that put 21 copies
+  // of one URL across 21 briefing dates). Dedup is on the exact normalized URL
+  // only — never by title/topic — and the grace window preserves genuine
+  // multi-day developing stories (which reuse the same URL on consecutive
+  // days). Best-effort: a lookup error must not block today's run.
+  let candidatesAfterRecurrence = candidatesToInsert;
+  let crossDateRecurrenceSkippedCount = 0;
+  const recurrenceWindow = computeCrossDateWindow(briefingDate);
+  if (recurrenceWindow) {
+    const priorResult = await client
+      .from("signal_posts")
+      .select("source_url, briefing_date")
+      .gte("briefing_date", recurrenceWindow.startDate)
+      .lte("briefing_date", recurrenceWindow.endDate)
+      .not("source_url", "is", null);
+
+    if (priorResult.error) {
+      logServerEvent("warn", "signal_posts cross-date recurrence lookup failed; proceeding without it", {
+        briefingDate,
+        recurrenceWindow,
+        errorMessage: priorResult.error.message,
+      });
+    } else {
+      const { kept, skipped } = partitionByCrossDateRecurrence(
+        candidatesToInsert,
+        (priorResult.data ?? []) as Array<{ source_url: string | null; briefing_date: string | null }>,
+      );
+      candidatesAfterRecurrence = kept;
+      crossDateRecurrenceSkippedCount = skipped.length;
+      for (const entry of skipped) {
+        logServerEvent("info", "signal_posts candidate skipped: cross_date_recurrence", {
+          briefingDate,
+          reason: "cross_date_recurrence",
+          source_url: entry.candidate.sourceUrl,
+          normalizedUrl: entry.normalizedUrl,
+          matchedPriorBriefingDate: entry.matchedPriorBriefingDate,
+          lookbackWindow: recurrenceWindow,
+        });
+      }
+    }
+  }
+
+  if (candidatesAfterRecurrence.length === 0) {
+    return {
+      ok: true,
+      briefingDate,
+      insertedCount: 0,
+      insertedPostIds: [],
+      skippedCandidates,
+      mode,
+      message: `No new signal posts persisted: all ${crossDateRecurrenceSkippedCount} candidate URL(s) already appeared within the last ${CROSS_DATE_LOOKBACK_DAYS} days (cross-date recurrence).`,
+    };
+  }
+
   // Task 3 — Legacy template generator provenance stamps. The witm_draft_*
   // columns were left NULL on every legacy-path row in production, making the
   // boilerplate output indistinguishable from v2 LLM bridge rows. Stamping
@@ -1509,7 +1579,7 @@ async function persistSignalPostCandidates(
   //   - why_it_matters_validation_status: still defaults to 'passed' from the
   //     CHECK default. Task 6 lands the 'not_run' enum addition.
   const insertResult = await client.from("signal_posts").insert(
-    candidatesToInsert.map((post) => ({
+    candidatesAfterRecurrence.map((post) => ({
       briefing_date: briefingDate,
       rank: post.rank,
       title: post.title,
@@ -1568,7 +1638,7 @@ async function persistSignalPostCandidates(
   return {
     ok: true,
     briefingDate,
-    insertedCount: missingCandidates.length,
+    insertedCount: candidatesAfterRecurrence.length,
     insertedPostIds: ((insertResult.data ?? []) as Array<{ id: string | null }>)
       .map((row) => row.id)
       .filter((id): id is string => Boolean(id)),
@@ -1576,7 +1646,7 @@ async function persistSignalPostCandidates(
     mode,
     message:
       buildSignalPostPersistenceMessage(
-        missingCandidates.length,
+        candidatesAfterRecurrence.length,
         newsletterRankReservation.reservedRanks.size,
       ),
   };
