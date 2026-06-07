@@ -2,30 +2,28 @@ import { NextResponse, after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import {
-  runEditorialIngestionPipeline,
-  type EditorialPipelineResults,
-  type EditorialPipelineStageRunner,
-} from "@/lib/pipeline/editorial-ingestion-pipeline";
-import { runNeedsReviewSweep } from "@/lib/editorial-sweep/needs-review-sweep";
-import { errorContext, logServerEvent } from "@/lib/observability";
+  isCronAuthorized,
+  runEditorialStagesWithTiming,
+  todayTaipei,
+} from "@/lib/cron/cron-endpoint-runtime";
+import { logServerEvent } from "@/lib/observability";
 import { writePipelineLogEntry } from "@/lib/observability/pipeline-log";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
+// Track 2 leg decoupling: this endpoint now runs RSS → staging ONLY. The
+// newsletter leg moved to /api/cron/ingest-newsletters and the P8 sweep to
+// /api/cron/sweep, so each leg gets its own Vercel 60s budget and the newsletter
+// fetch (~33s) can no longer starve RSS+staging. Staging still sources newsletter
+// candidates from the DB (fetchNewsletterCandidates), written by the newsletter
+// endpoint that the cron schedule fires ~10 min earlier.
+//
+// RUN-LOCK DESIGN (no-migration constraint): cron_runs' PK is briefing_date
+// alone, so only ONE endpoint can hold the day's lock row. THIS endpoint keeps
+// it — it owns the non-idempotent writes (signal_posts snapshot + Notion
+// staging) that most need double-fire protection. The newsletter + sweep
+// endpoints run lock-free (newsletter relies on the gmail_message_id UNIQUE
+// index for conflict-safe dedup; sweep is a bounded idempotent UPDATE).
 const CRON_NAME = "fetch-editorial-inputs";
-
-/**
- * Briefing-date the run-lock keys on. Mirrors the Taipei-calendar logic in
- * src/lib/editorial-staging/runner.ts so a run-lock claim and the editorial
- * staging step that follows always agree on which day is "today".
- */
-function todayTaipei(now: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-}
 
 type LockAcquireReason =
   | "fresh"               // PK insert succeeded — no prior row for today
@@ -227,191 +225,51 @@ async function finalizeRunLock(
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type EditorialInputTaskName = "rss" | "newsletter" | "editorial_staging";
-
-
-// Hard internal wall for the after() pipeline. Sits below the function-level
-// maxDuration (60s in vercel.json) so we always trip this guard first and
-// produce an explicit Sentry IngestionTimeoutInternal event with the offending
-// stage — never a silent function-level kill.
-const INTERNAL_PIPELINE_TIMEOUT_MS = 55_000;
-
-function isAuthorized(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret) return false;
-
-  const headerSecret = request.headers.get("x-cron-secret")?.trim() ?? "";
-  if (headerSecret === cronSecret) return true;
-
-  // Rollback escape hatch: honor the legacy Vercel Cron `Authorization: Bearer`
-  // header only when ALLOW_VERCEL_CRON_FALLBACK is explicitly enabled. Default
-  // auth is x-cron-secret header only.
-  if (process.env.ALLOW_VERCEL_CRON_FALLBACK === "true") {
-    const authHeader = request.headers.get("authorization")?.trim() ?? "";
-    if (authHeader === `Bearer ${cronSecret}`) return true;
-  }
-
-  return false;
-}
-
-class IngestionTimeoutInternalError extends Error {
-  readonly stage: EditorialInputTaskName;
-  readonly timeoutMs: number;
-
-  constructor(stage: EditorialInputTaskName, timeoutMs: number) {
-    super(`Ingestion pipeline exceeded internal ${timeoutMs}ms budget during stage "${stage}".`);
-    this.name = "IngestionTimeoutInternal";
-    this.stage = stage;
-    this.timeoutMs = timeoutMs;
-  }
-}
-
-function runWithInternalTimeout<T>(
-  stageRef: { current: EditorialInputTaskName },
-  work: Promise<T>,
-  timeoutMs: number,
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const timeoutPromise = new Promise<T>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new IngestionTimeoutInternalError(stageRef.current, timeoutMs));
-    }, timeoutMs);
-  });
-
-  return Promise.race([work, timeoutPromise]).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
-}
-
-async function runIngestionPipeline(stageRef: {
-  current: EditorialInputTaskName;
-}): Promise<EditorialPipelineResults> {
-  // The stage SEQUENCE + dry threading live in the shared
-  // runEditorialIngestionPipeline (Track 2 unification) so this prod cron and
-  // the dry-run harness execute byte-for-byte the same legs in the same order
-  // (newsletter before RSS for rank-slot reservation). The route injects its own
-  // stage wrapper: per-stage timeout attribution via stageRef, plus the
-  // degrade-don't-throw catch that keeps one leg's failure from aborting the
-  // rest (newsletter dying must not stop RSS/staging).
-  const runStage: EditorialPipelineStageRunner = async <T>(
-    name: EditorialInputTaskName,
-    run: () => Promise<T>,
-  ): Promise<T> => {
-    stageRef.current = name;
-    try {
-      return await run();
-    } catch (error) {
-      logServerEvent("error", "Combined editorial input cron task failed before completion", {
-        route: "/api/cron/fetch-editorial-inputs",
-        task: name,
-        ...errorContext(error),
-      });
-      return {
-        success: false,
-        timestamp: new Date().toISOString(),
-        summary: { message: `${name} task failed before completion.` },
-      } as unknown as T;
-    }
-  };
-
-  // dryRun: false — this IS the real 12:00 UTC cron. Persists everything.
-  return runEditorialIngestionPipeline({ dryRun: false, runStage });
-}
-
 async function executePipelineWork(briefingDate: string) {
-  const stageRef: { current: EditorialInputTaskName } = { current: "newsletter" };
-
-  logServerEvent("info", "Combined editorial input cron pipeline started", {
+  logServerEvent("info", "Editorial briefing cron pipeline started (RSS → staging)", {
     route: "/api/cron/fetch-editorial-inputs",
     briefingDate,
-    internalTimeoutMs: INTERNAL_PIPELINE_TIMEOUT_MS,
   });
 
-  // P8-precondition — needs_review TTL sweep. Runs FIRST, before any fetch leg,
-  // and is fully decoupled from the fetch run's outcome:
-  //   - A fetch failure later can never skip the sweep, because the sweep
-  //     already ran.
-  //   - A sweep fault never flips the fetch run's success or pipelineLogStatus.
-  //     runNeedsReviewSweep() is best-effort and never throws; we additionally
-  //     guard here so even an unexpected throw is swallowed.
-  //   - It is OUTSIDE runWithInternalTimeout so a slow fetch can't starve it;
-  //     the sweep is a single bounded UPDATE.
-  try {
-    await runNeedsReviewSweep();
-  } catch (error) {
-    logServerEvent("error", "needs_review sweep threw out of module (swallowed; fetch continues)", {
-      route: "/api/cron/fetch-editorial-inputs",
-      ...errorContext(error),
-    });
+  // Run RSS → staging ONLY, with the shared internal-timeout + per-stage
+  // StageTimer. Newsletter is decoupled to /api/cron/ingest-newsletters; staging
+  // reads its candidates from the DB. The sweep is decoupled to /api/cron/sweep.
+  const run = await runEditorialStagesWithTiming({
+    routeName: "/api/cron/fetch-editorial-inputs",
+    stages: ["rss", "editorial_staging"],
+  });
+
+  if (run.timedOut) {
+    // runEditorialStagesWithTiming already captured + flushed the Sentry timeout
+    // event naming the in-flight stage (run.inFlightStage) and logged the partial
+    // stage_ms. Finalize the lock so the day isn't stranded.
+    await finalizeRunLock(briefingDate, "timeout");
+    return;
   }
 
-  let pipelineResult: EditorialPipelineResults | null = null;
-
-  try {
-    pipelineResult = await runWithInternalTimeout(
-      stageRef,
-      runIngestionPipeline(stageRef),
-      INTERNAL_PIPELINE_TIMEOUT_MS,
-    );
-  } catch (error) {
-    if (error instanceof IngestionTimeoutInternalError) {
-      Sentry.captureException(error, {
-        level: "error",
-        tags: {
-          route: "/api/cron/fetch-editorial-inputs",
-          stage: error.stage,
-          failure_type: "ingestion_timeout_internal",
-        },
-        extra: {
-          internalTimeoutMs: error.timeoutMs,
-        },
-      });
-      // The 55s internal wall fires ~5s before the 60s Vercel function kill,
-      // and Sentry's nextjs SDK buffers events in memory. Force a flush so
-      // captured timeout/error events ship before the function instance
-      // is frozen. Failure to flush is swallowed — never blocks shutdown.
-      await Sentry.flush(2_000).catch(() => { /* best-effort */ });
-      logServerEvent("error", "Ingestion pipeline hit internal timeout", {
-        route: "/api/cron/fetch-editorial-inputs",
-        stage: error.stage,
-        internalTimeoutMs: error.timeoutMs,
-      });
-      await finalizeRunLock(briefingDate, "timeout");
-      return;
-    }
-
-    // runTask catches per-task errors, so anything reaching here is unexpected
-    // (e.g. a bug in runTask itself or in the timeout wiring).
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        route: "/api/cron/fetch-editorial-inputs",
-        failure_type: "ingestion_pipeline_unexpected_error",
-      },
-    });
-    await Sentry.flush(2_000).catch(() => { /* best-effort */ });
-    logServerEvent("error", "Ingestion pipeline failed unexpectedly", {
+  const { rss, editorialStaging } = run.results;
+  // This endpoint runs only RSS + staging; newsletter is null by design (it ran
+  // in /api/cron/ingest-newsletters and staging reads its candidates from the DB).
+  if (!rss || !editorialStaging) {
+    logServerEvent("error", "Briefing pipeline returned an incomplete stage set", {
       route: "/api/cron/fetch-editorial-inputs",
-      ...errorContext(error),
+      briefingDate,
+      hasRss: Boolean(rss),
+      hasEditorialStaging: Boolean(editorialStaging),
+      stageMs: run.stageMs,
     });
     await finalizeRunLock(briefingDate, "fail");
     return;
   }
 
-  const { newsletter, rss, editorialStaging } = pipelineResult;
-  // #272 — Run-success is owned by the CRITICAL leg (RSS). Newsletter is
-  // a supplementary input source; an empty Gmail label or an OAuth
-  // expiry there must DEGRADE the run, not fail it. The legacy boolean
-  // (`rss.success && newsletter.success`) marked every RSS-healthy run
-  // as `fail` from 2026-05-18 onward when newsletter ingestion broke,
-  // hiding actual ingestion-pipeline health behind a false-fail signal.
+  // #272 — Run-success is owned by the CRITICAL leg (RSS).
   const success = rss.success;
 
-  logServerEvent(success ? "info" : "error", "Combined editorial input cron completed", {
+  logServerEvent(success ? "info" : "error", "Editorial briefing cron completed", {
     route: "/api/cron/fetch-editorial-inputs",
     rssSuccess: rss.success,
-    newsletterSuccess: newsletter.success,
     editorialStagingSuccess: editorialStaging.success,
+    stageMs: run.stageMs,
   });
 
   // Pipeline Log write — best-effort, never fails the cron.
@@ -425,22 +283,21 @@ async function executePipelineWork(briefingDate: string) {
   const skipped = stagingSummary?.notionRowsSkippedHumanEdited ?? 0;
   const stagingErrors = stagingSummary?.notionErrors ?? [];
 
-  // #272 — Three-state Pipeline Log status:
+  // #272 — Three-state Pipeline Log status for the briefing endpoint:
   //   - fail: the critical leg (RSS) broke.
-  //   - warn: RSS healthy BUT newsletter degraded OR editorial-staging
-  //           surfaced row-level errors. Visible to operators without
-  //           paging.
-  //   - ok:   RSS healthy AND newsletter healthy AND no staging errors.
+  //   - warn: RSS healthy BUT editorial-staging surfaced row-level errors.
+  //   - ok:   RSS healthy AND no staging errors.
+  // (Newsletter health is now logged by /api/cron/ingest-newsletters, not here.)
   const pipelineLogStatus = !rss.success
     ? "fail"
-    : (!newsletter.success || stagingErrors.length > 0)
+    : stagingErrors.length > 0
       ? "warn"
       : "ok";
 
   const pipelineLogMessage =
     pipelineLogStatus === "fail"
-      ? `Ingestion failed: RSS=fail, newsletter=${newsletter.success ? "ok" : "fail"}.`
-      : `Ingestion completed: RSS=ok, newsletter=${newsletter.success ? "ok" : "degraded"}, editorial staging inserted=${inserted} updated=${updated} skipped=${skipped}${stagingErrors.length > 0 ? `; staging errors=${stagingErrors.length}` : ""}.`;
+      ? "Briefing failed: RSS=fail."
+      : `Briefing completed: RSS=ok, editorial staging inserted=${inserted} updated=${updated} skipped=${skipped}${stagingErrors.length > 0 ? `; staging errors=${stagingErrors.length}` : ""}.`;
 
   if (briefingDateForLog) {
     await writePipelineLogEntry({
@@ -451,12 +308,12 @@ async function executePipelineWork(briefingDate: string) {
       briefingDate: briefingDateForLog,
       sourceHealth: {
         rssSuccess: rss.success,
-        newsletterSuccess: newsletter.success,
         editorialStagingSuccess: editorialStaging.success,
         notionRowsInserted: inserted,
         notionRowsUpdated: updated,
         notionRowsSkippedHumanEdited: skipped,
         stagingErrorCount: stagingErrors.length,
+        stageMs: run.stageMs,
       },
     });
   } else {
@@ -480,7 +337,7 @@ async function executePipelineWork(briefingDate: string) {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!isCronAuthorized(request)) {
     logServerEvent("warn", "Unauthorized combined editorial input cron request rejected", {
       route: "/api/cron/fetch-editorial-inputs",
       hasCronSecret: Boolean(process.env.CRON_SECRET?.trim()),

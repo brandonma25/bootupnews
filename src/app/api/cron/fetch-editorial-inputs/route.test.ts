@@ -279,7 +279,7 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     expect(capturedAfterCallback).not.toBeNull();
     await runCapturedAfter();
     expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
-    expect(runNewsletterIngestion).toHaveBeenCalledTimes(1);
+    expect(runEditorialStaging).toHaveBeenCalledTimes(1);
   });
 
   it("still rejects wrong legacy Bearer when ALLOW_VERCEL_CRON_FALLBACK=true", async () => {
@@ -296,69 +296,38 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     expect(runNewsletterIngestion).not.toHaveBeenCalled();
   });
 
-  it("responds 202 immediately and runs newsletter, then RSS, then editorial staging via after()", async () => {
+  it("responds 202 immediately and runs RSS, then editorial staging via after() (decoupled briefing endpoint)", async () => {
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     const response = await GET(buildRequest("local-cron-secret"));
-    const body = await response.json();
 
     expect(response.status).toBe(202);
-    expect(body).toMatchObject({
-      success: true,
-      summary: {
-        message: expect.stringContaining("Ingestion accepted"),
-      },
-    });
     // Pipeline has not yet run — it's only scheduled.
     expect(runDailyNewsCron).not.toHaveBeenCalled();
-    expect(runNewsletterIngestion).not.toHaveBeenCalled();
     expect(runEditorialStaging).not.toHaveBeenCalled();
 
     await runCapturedAfter();
 
-    expect(runNewsletterIngestion).toHaveBeenCalledWith({ writeCandidates: true });
+    // Track 2 leg decoupling: this endpoint runs RSS → staging ONLY.
     expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
     expect(runEditorialStaging).toHaveBeenCalledTimes(1);
-    // Newsletter runs before RSS so rank slots are reserved before the RSS snapshot fills them.
-    expect(runNewsletterIngestion.mock.invocationCallOrder[0]).toBeLessThan(
-      runDailyNewsCron.mock.invocationCallOrder[0],
-    );
     expect(runDailyNewsCron.mock.invocationCallOrder[0]).toBeLessThan(
       runEditorialStaging.mock.invocationCallOrder[0],
     );
   });
 
-  // P8-precondition — the needs_review sweep must run FIRST, before any fetch
-  // leg, so a fetch failure can never skip it.
-  it("runs the needs_review sweep before the fetch legs", async () => {
+  it("does NOT run the newsletter leg or the P8 sweep here (they are decoupled to their own endpoints)", async () => {
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     await GET(buildRequest("local-cron-secret"));
     await runCapturedAfter();
 
-    expect(runNeedsReviewSweep).toHaveBeenCalledTimes(1);
-    expect(runNeedsReviewSweep.mock.invocationCallOrder[0]).toBeLessThan(
-      runNewsletterIngestion.mock.invocationCallOrder[0],
-    );
-  });
-
-  // P8-precondition — a sweep failure must NOT stop the fetch or flip the run
-  // status. The route swallows a sweep throw and proceeds.
-  it("continues the fetch pipeline when the needs_review sweep throws", async () => {
-    runNeedsReviewSweep.mockRejectedValue(new Error("sweep boom"));
-
-    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
-    const response = await GET(buildRequest("local-cron-secret"));
-    expect(response.status).toBe(202);
-
-    await runCapturedAfter();
-
-    // Fetch legs still ran; the run still wrote its Pipeline Log as ok.
-    expect(runNewsletterIngestion).toHaveBeenCalledTimes(1);
+    // The whole point of the split: the ~33s newsletter fetch + the sweep run in
+    // /api/cron/ingest-newsletters and /api/cron/sweep, so neither competes for
+    // this endpoint's 60s budget. Staging still sources newsletter candidates
+    // from the DB (written by the newsletter endpoint), not from an in-process call.
+    expect(runNewsletterIngestion).not.toHaveBeenCalled();
+    expect(runNeedsReviewSweep).not.toHaveBeenCalled();
     expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
     expect(runEditorialStaging).toHaveBeenCalledTimes(1);
-    const ingestionLog = writePipelineLogEntry.mock.calls.find(
-      ([entry]) => entry.runType === "ingestion",
-    );
-    expect(ingestionLog?.[0].status).toBe("ok");
   });
 
   it("writes a Pipeline Log entry on completion with status=ok when all branches succeed", async () => {
@@ -398,22 +367,27 @@ describe("/api/cron/fetch-editorial-inputs", () => {
   // boolean `rss.success && newsletter.success` was marking every RSS-
   // healthy run since 2026-05-18 as fail because the Gmail credential
   // expired around then. This regression test pins the new contract.
-  it("writes Pipeline Log status=warn (NOT fail) and cron_runs status=warn when newsletter fails but RSS is healthy (#272)", async () => {
-    // Track 2 P1 rev: cron_runs.status must mirror the Pipeline Log's
-    // three-state ladder. A degraded leg = warn (not 'ok'). 'ok' would
-    // collapse the signal — cron_runs becomes useless as a gauge if
-    // every RSS-healthy run reads as 'ok' regardless of newsletter death.
+  // #272 — three-state ladder. On the decoupled briefing endpoint, 'warn' is
+  // RSS healthy BUT editorial staging surfaced row-level errors. (Newsletter
+  // health now lives on /api/cron/ingest-newsletters, not here.) cron_runs.status
+  // must mirror the Pipeline Log so the guard table stays a useful gauge.
+  it("writes Pipeline Log status=warn and cron_runs status=warn when RSS is healthy but staging has row errors (#272)", async () => {
     const client = buildLockClient(null);
     createSupabaseServiceRoleClient.mockReturnValue(client);
 
-    runNewsletterIngestion.mockResolvedValue({
-      success: false,
-      timestamp: "2026-05-12T10:15:01.000Z",
+    // RSS healthy (beforeEach default); staging surfaces row-level Notion errors.
+    runEditorialStaging.mockResolvedValue({
+      success: true,
+      timestamp: "2026-05-12T10:15:02.000Z",
       summary: {
-        message: "Newsletter ingestion failed closed before completion.",
+        message: "Editorial staging completed with row errors.",
+        briefingDate: "2026-05-12",
+        notionRowsInserted: 5,
+        notionRowsUpdated: 0,
+        notionRowsSkippedHumanEdited: 0,
+        notionErrors: ["row 6 failed", "row 7 failed"],
       },
     });
-    // RSS + editorial staging stay healthy via the beforeEach defaults.
 
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     await GET(buildRequest("local-cron-secret"));
@@ -425,10 +399,8 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       status: "warn",
     });
     expect(writePipelineLogEntry.mock.calls[0][0].message).toMatch(/RSS=ok/);
-    expect(writePipelineLogEntry.mock.calls[0][0].message).toMatch(/newsletter=degraded/);
+    expect(writePipelineLogEntry.mock.calls[0][0].message).toMatch(/staging errors=2/);
 
-    // cron_runs finalize wrote 'warn' (not 'ok') so the guard table
-    // surfaces the degraded leg without paging cron-job.org.
     expect(client._state.row?.status).toBe("warn");
     expect(client._state.row?.finished_at).not.toBeNull();
   });
@@ -457,48 +429,35 @@ describe("/api/cron/fetch-editorial-inputs", () => {
     expect(client._state.row?.status).toBe("ok");
   });
 
-  it("still attempts newsletter ingestion when the RSS path fails closed", async () => {
-    runDailyNewsCron.mockResolvedValue({
-      success: false,
-      timestamp: "2026-05-12T10:15:00.000Z",
-      summary: {
-        message: "Daily news cron failed before completion.",
-      },
-    });
-
-    const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
-    await GET(buildRequest("local-cron-secret"));
-    await runCapturedAfter();
-
-    expect(runNewsletterIngestion).toHaveBeenCalledTimes(1);
-    expect(runDailyNewsCron).toHaveBeenCalledTimes(1);
-    expect(writePipelineLogEntry.mock.calls[0][0].status).toBe("fail");
-  });
-
-  it("a thrown task error is caught by runTask and reported via the pipeline log without crashing the after() callback", async () => {
+  it("a thrown stage error is caught (degrade-don't-throw) and reported via the pipeline log without crashing after()", async () => {
     runDailyNewsCron.mockRejectedValue(new Error("rss explosion"));
 
     const { GET } = await import("@/app/api/cron/fetch-editorial-inputs/route");
     const response = await GET(buildRequest("local-cron-secret"));
 
     expect(response.status).toBe(202);
-    // Should not throw out of after():
+    // The shared createTimedStageRunner catches the throw → returns a failure
+    // result → the run degrades rather than crashing the after() callback.
     await expect(runCapturedAfter()).resolves.not.toThrow();
 
-    // logServerEvent should record the per-task failure.
+    // The shared stage runner logs the per-stage failure.
     const errorLog = logServerEvent.mock.calls.find(
-      ([level, message]) => level === "error" && typeof message === "string" && message.includes("task failed before completion"),
+      ([level, message]) =>
+        level === "error" &&
+        typeof message === "string" &&
+        message.includes("Cron stage failed before completion"),
     );
     expect(errorLog).toBeTruthy();
+    // RSS failure → Pipeline Log status=fail.
     expect(writePipelineLogEntry.mock.calls[0][0].status).toBe("fail");
   });
 
-  it("captures IngestionTimeoutInternal to Sentry when the pipeline exceeds the internal budget", async () => {
+  it("captures a StageTimeoutError to Sentry when the briefing pipeline exceeds the internal budget", async () => {
     vi.useFakeTimers();
     try {
-      // Stall the very first stage (newsletter) so the internal timeout fires
-      // while stageRef.current === "newsletter".
-      runNewsletterIngestion.mockImplementation(
+      // Stall the first stage (RSS — newsletter is decoupled now) so the internal
+      // timeout fires while stageRef.current === "rss".
+      runDailyNewsCron.mockImplementation(
         () => new Promise(() => {
           /* never resolves */
         }),
@@ -518,12 +477,12 @@ describe("/api/cron/fetch-editorial-inputs", () => {
       expect(sentryCaptureException).toHaveBeenCalledTimes(1);
       const [capturedError, captureContext] = sentryCaptureException.mock.calls[0];
       expect(capturedError).toBeInstanceOf(Error);
-      expect((capturedError as Error).name).toBe("IngestionTimeoutInternal");
+      expect((capturedError as Error).name).toBe("StageTimeoutError");
       expect(captureContext).toMatchObject({
         level: "error",
         tags: {
           route: "/api/cron/fetch-editorial-inputs",
-          stage: "newsletter",
+          stage: "rss",
           failure_type: "ingestion_timeout_internal",
         },
         extra: {

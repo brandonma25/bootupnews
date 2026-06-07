@@ -130,6 +130,21 @@ export async function insertNewsletterEmail(input: {
     .single();
 
   if (insertResult.error) {
+    // Conflict-safe insert (Track 2 leg decoupling): the new /api/cron/ingest-newsletters
+    // endpoint runs WITHOUT a cron_runs run-lock, so a concurrent double-fire can
+    // race past the check-then-insert above and both attempt the INSERT. The
+    // loser hits the gmail_message_id UNIQUE index
+    // (newsletter_emails_gmail_message_id_key → Postgres code 23505). Treat that
+    // as "already inserted by the racing run", not an error — re-read and report
+    // skipped_existing. This is what makes the lock-free endpoint correct rather
+    // than merely usually-fine.
+    const code = (insertResult.error as { code?: string }).code;
+    if (code === "23505") {
+      const raced = await getExistingNewsletterEmailByGmailId(input.db, input.messageRef.id);
+      if (raced) {
+        return { status: "skipped_existing", email: raced };
+      }
+    }
     throw new Error(`newsletter_emails insert failed: ${insertResult.error.message}`);
   }
 

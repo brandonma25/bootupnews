@@ -19,7 +19,11 @@ import { errorContext, logServerEvent } from "@/lib/observability";
 const NOTION_API_VERSION = "2022-06-28";
 const NOTION_PAGES_URL = "https://api.notion.com/v1/pages";
 
-export type PipelineLogRunType = "ingestion" | "health_check" | "needs_review_sweep";
+export type PipelineLogRunType =
+  | "ingestion"
+  | "newsletter_ingestion"
+  | "health_check"
+  | "needs_review_sweep";
 export type PipelineLogStatus = "ok" | "warn" | "fail";
 
 export type PipelineLogEntry = {
@@ -117,6 +121,14 @@ export async function writePipelineLogEntry(
         : "";
 
   const properties: Record<string, unknown> = {
+    // FIX 2 — every Pipeline Log row gets a non-empty Name title so the Notion
+    // table is scannable, e.g. "ingestion — 2026-06-07",
+    // "newsletter_ingestion — 2026-06-07", "sweep — 2026-06-07".
+    Name: {
+      title: [
+        { text: { content: `${entry.runType} — ${(entry.briefingDate ?? "").slice(0, 10) || "unknown-date"}` } },
+      ],
+    },
     "Run Type": { select: { name: entry.runType } },
     Status: { select: { name: entry.status } },
     "Row Count": { number: entry.rowCount },

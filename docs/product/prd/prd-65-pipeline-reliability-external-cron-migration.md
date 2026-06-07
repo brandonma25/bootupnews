@@ -280,6 +280,32 @@ Each consumer injects a `runStage` wrapper for its own concerns (the route: per-
 
 **Still does NOT certify the Vercel 60s fit** (`certifies60sFit: false`). That requires a deployed test — the next step is a guarded, read-only `?dryRun=1` trigger on the cron route so the unified body can be run on a preview deployment under the real serverless budget on demand (no 24h wait).
 
+### Phase 7.7 — Ingestion-leg decoupling: the structural 60s-timeout cure (Track 2, 2026-06-07)
+
+**Root cause (confirmed across sessions + data):** one HTTP request ran newsletter → RSS → staging inside a single 60s Vercel function. After Gmail was restored, the newsletter leg actually fetches/parses (~33s) and STARVED RSS + staging — the 06-06 12:00 UTC tick staged 11 rows, ALL newsletter-sourced, ZERO RSS, and `cron_runs` recorded `timeout` (06-06/05 `timeout`, 04/03 `fail`). The fix is to stop sharing one 60s clock: give each leg its own invocation/budget. This does NOT create 120s — it creates two INDEPENDENT 60s budgets so neither leg can starve the other. It changes WHERE work runs, not WHAT it produces.
+
+**New topology** (each endpoint = its own Vercel function = its own 60s budget; all go through the ONE shared `runEditorialIngestionPipeline` via the `stages` subset + the shared `cron-endpoint-runtime`, no fork):
+
+| Endpoint | Stages | Run-lock |
+| --- | --- | --- |
+| `/api/cron/fetch-editorial-inputs` | RSS → staging (the briefing pipeline) | **keeps** `cron_runs[briefing_date]` |
+| `/api/cron/ingest-newsletters` (NEW) | newsletter | lock-free |
+| `/api/cron/sweep` (NEW) | P8 needs_review sweep | lock-free |
+
+**Newsletter → staging hand-off is DB-based** (investigation, settled): the newsletter endpoint writes `newsletter_emails` + `newsletter_story_extractions`; the briefing endpoint's `runEditorialStaging` READS them back (`fetchNewsletterCandidates`, keyed on the day's `received_at` window). No in-memory hand-off — decoupling is clean. **Schedule ordering is load-bearing:** the newsletter endpoint must fire ~10 min BEFORE the briefing endpoint (e.g. 11:50 UTC) so the extractions exist when staging reads them.
+
+**Run-lock design (no-migration constraint):** `cron_runs`' PK is `briefing_date` ALONE (verified), so three endpoints can't each hold a per-day lock row without a migration (out of scope). The **briefing endpoint keeps the lock** — it owns the non-idempotent writes (signal_posts snapshot + Notion staging) that most need double-fire protection. The newsletter + sweep endpoints run **lock-free**, safe because:
+- **Newsletter:** `insertNewsletterEmail` is now conflict-safe — a `gmail_message_id` UNIQUE-violation (Postgres 23505) is caught and reported `skipped_existing` (no throw, no duplicate row) on a concurrent double-fire. Email-level dedup is DB-enforced by `newsletter_emails_gmail_message_id_key`.
+- **Sweep:** `runNeedsReviewSweep` is a bounded, idempotent UPDATE with no non-idempotent side effects — a double-fire converges to the same end state.
+
+**Instrumentation:** each endpoint emits `stage_ms` (its stages + total) via the shared `StageTimer` → `logServerEvent` + a Pipeline Log entry, with a best-effort Sentry flush on internal timeout naming the in-flight stage. **FIX 2:** Pipeline Log rows now set `Name = ${runType} — ${YYYY-MM-DD}` on every write (new `newsletter_ingestion` run type added).
+
+**Equivalence:** the combined output of (newsletter + briefing + sweep) equals the prior single-request run given the same inputs — a unit test proves the decoupled flow calls the same leaf functions with the same args as a single-request run. 962 unit tests green; lint + build clean.
+
+**Honesty:** the `?dryRun=1` preview trigger remains the explicitly-deferred follow-up. The decouple does NOT itself certify the 60s fit — the first real decoupled tick (after BM adds the cron-job.org entries) is the proof: expect `fetch-editorial-inputs` well under 60s (`ok`, not `timeout`) and RSS contributing again.
+
+**BM actions:** add cron-job.org entries for `/api/cron/ingest-newsletters` (~11:50 UTC, before the briefing) + `/api/cron/sweep`; keep the existing `/api/cron/fetch-editorial-inputs` entry (now RSS→staging); set `NOTION_SOURCE_HEALTH_LOG_DB_ID` in Vercel + delete the orphan `NOTION_SOURCE_HEALTH_DB_ID` (FIX 1).
+
 ## Closeout Checklist
 
 - Scope completed: all phases (0–5) plus the cron-job.org sync tooling landing.

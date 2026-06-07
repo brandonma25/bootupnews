@@ -132,6 +132,11 @@ export async function runFullPipelineDryRun(options: FullDryRunOptions = {}): Pr
     now,
     runStage,
   });
+  // The harness always runs the full stage set, so every result is present.
+  // (Stage subsets — used by the decoupled endpoints — can return null per stage.)
+  if (!nl || !rssResult || !st) {
+    throw new Error("Full dry-run harness expected all stages to run, but a stage result was null.");
+  }
 
   // ---- map newsletter ----
   const nlItems = (nl.summary as { fetchedMessageCount?: number }).fetchedMessageCount ?? 0;
