@@ -65,10 +65,23 @@ function buildFailureResult(timestamp: string, message: string): DailyNewsCronRu
   };
 }
 
-export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
+export async function runDailyNewsCron(
+  options: { dryRun?: boolean } = {},
+): Promise<DailyNewsCronRunResult> {
+  // Track 2 pipeline unification: in dry mode the RSS leg runs the SAME
+  // generateDailyBriefing core but persists NOTHING — no article candidates
+  // (persistPipelineCandidates: false), no signal_posts snapshot — and does not
+  // ping the production RSS cron monitor. dryRun defaults false so the prod cron
+  // path (route.ts) is byte-for-byte unchanged.
+  const dryRun = options.dryRun ?? false;
   const timestamp = new Date().toISOString();
   const startedAtMs = Date.now();
-  const checkInId = captureRssCronCheckIn("in_progress");
+  const checkInId = dryRun ? undefined : captureRssCronCheckIn("in_progress");
+  // Cron-monitor check-ins are skipped entirely in dry mode — a dry run must not
+  // ping the production RSS monitor and corrupt its schedule tracking.
+  const recordCheckIn = (...args: Parameters<typeof captureRssCronCheckIn>): void => {
+    if (!dryRun) captureRssCronCheckIn(...args);
+  };
 
   logServerEvent("info", "Daily news cron started", {
     // Track 2 P5: /api/cron/fetch-news endpoint removed (orphan, never
@@ -90,7 +103,11 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
     // /api/cron/fetch-editorial-inputs. Log tag follows the live caller.
     route: "/api/cron/fetch-editorial-inputs",
       },
-      () => generateDailyBriefing(demoTopics, sources, { suppliedByManifest: sourcePlan.suppliedByManifest }),
+      () =>
+        generateDailyBriefing(demoTopics, sources, {
+          suppliedByManifest: sourcePlan.suppliedByManifest,
+          persistPipelineCandidates: !dryRun,
+        }),
     );
     const briefingDate = briefing.briefingDate.slice(0, 10);
     const stagedItemCount = briefing.items.length;
@@ -141,7 +158,7 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
           feedFailureCount: pipelineRun.feed_failures.length,
         },
       });
-      captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
+      recordCheckIn("error", checkInId, durationSeconds(startedAtMs));
 
       return result;
     }
@@ -184,7 +201,7 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
           feedFailureCount: pipelineRun.feed_failures.length,
         },
       });
-      captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
+      recordCheckIn("error", checkInId, durationSeconds(startedAtMs));
 
       return result;
     }
@@ -203,10 +220,12 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       });
     }
 
-    const snapshot = await persistSignalPostsForBriefing({
-      briefingDate,
-      items: briefing.items,
-    });
+    const snapshot = dryRun
+      ? { ok: true, insertedCount: 0, message: "Dry-run: signal_posts snapshot persistence skipped (zero writes)." }
+      : await persistSignalPostsForBriefing({
+          briefingDate,
+          items: briefing.items,
+        });
     const result = {
       success: snapshot.ok,
       timestamp,
@@ -243,7 +262,7 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
       });
     }
 
-    captureRssCronCheckIn(snapshot.ok ? "ok" : "error", checkInId, durationSeconds(startedAtMs));
+    recordCheckIn(snapshot.ok ? "ok" : "error", checkInId, durationSeconds(startedAtMs));
 
     return result;
   } catch (error) {
@@ -269,7 +288,7 @@ export async function runDailyNewsCron(): Promise<DailyNewsCronRunResult> {
     route: "/api/cron/fetch-editorial-inputs",
       },
     });
-    captureRssCronCheckIn("error", checkInId, durationSeconds(startedAtMs));
+    recordCheckIn("error", checkInId, durationSeconds(startedAtMs));
 
     return result;
   }

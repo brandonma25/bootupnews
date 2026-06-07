@@ -1,26 +1,27 @@
 /**
  * Full-pipeline dry-run harness (Track 2 — end the 24-hour feedback loop).
  *
- * Runs the ENTIRE pipeline — preflight → sweep → newsletter → RSS → staging —
- * by calling the SAME production functions in dry mode, writing NOTHING to prod,
- * and emitting one report: a capability matrix (PART 0), per-stage timing
- * (PART 2), and feature-validation visibility (PART 3). Validates LOGIC +
- * RELATIVE stage timing in <1 min instead of waiting ~24h for the cron tick.
+ * Runs the ENTIRE pipeline — sweep → newsletter → RSS → staging — by calling the
+ * EXACT SAME shared body the production cron runs (runEditorialIngestionPipeline),
+ * just with dryRun: true. Writes NOTHING to prod, and emits one report: a
+ * capability matrix pre-check (PART 0), per-stage timing (PART 2), and
+ * feature-validation visibility (PART 3).
+ *
+ * RUN-ALL-LIKE-PROD: every stage executes, exactly as the 12:00 UTC cron would.
+ * The capability matrix is a PRE-CHECK that names which dependencies are present;
+ * a missing one surfaces as that stage's real error/degrade (not a tidy skip),
+ * so the dry run's control flow is identical to prod's.
  *
  * SCOPE BOUNDARY: a local node process has NO 60s ceiling. A green run here does
- * NOT certify the Vercel timeout is fixed — `report.certifies60sFit` is always
- * false. "Does it fit in 60s on Vercel" requires a deployed test.
- *
- * Every stage is forced dry: the sweep gets NEEDS_REVIEW_SWEEP_DRY_RUN=true,
- * newsletter/staging get { dryRun: true }, RSS runs PIPELINE_RUN_MODE=dry_run.
- * No signal_posts writes, no Notion writes, no email, no sweep mutation.
+ * NOT certify the Vercel timeout is fixed — `certifies60sFit` is always false.
+ * "Does it fit in 60s on Vercel" requires a deployed test (the PR-2 trigger).
  */
 
 import { runNeedsReviewSweep } from "@/lib/editorial-sweep/needs-review-sweep";
-import { runEditorialStaging } from "@/lib/editorial-staging/runner";
-import { runNewsletterIngestion } from "@/lib/newsletter-ingestion/runner";
-import { resolveControlledPipelineConfig } from "@/lib/pipeline/controlled-execution";
-import { runControlledPipeline } from "@/lib/pipeline/controlled-runner";
+import {
+  runEditorialIngestionPipeline,
+  type EditorialPipelineStageName,
+} from "@/lib/pipeline/editorial-ingestion-pipeline";
 import {
   formatCapabilityMatrix,
   runPreflight,
@@ -30,9 +31,9 @@ import {
 } from "@/lib/pipeline/preflight";
 import { StageTimer, type StageMs } from "@/lib/pipeline/stage-timing";
 
-export type StageOutcome = "ran" | "skipped" | "degraded" | "error";
+export type StageOutcome = "ran" | "degraded" | "error";
 
-type StageBase = { outcome: StageOutcome; skipReason?: string; error?: string };
+type StageBase = { outcome: StageOutcome; note?: string; error?: string };
 
 export type FullDryRunReport = {
   startedAt: string;
@@ -47,7 +48,8 @@ export type FullDryRunReport = {
     rss: StageBase & {
       candidateCount?: number;
       clusterCount?: number;
-      insufficientReason?: string | null;
+      degraded?: boolean;
+      message?: string;
     };
     staging: StageBase & {
       wouldStage?: number;
@@ -56,14 +58,14 @@ export type FullDryRunReport = {
       evergreenFiltered?: number;
       crossDateWouldSkip?: number;
       detail?: unknown;
-      p4DedupNote?: string;
+      message?: string;
     };
   };
 };
 
 const SCOPE_NOTE =
-  "Local dry-run: validates pipeline LOGIC + RELATIVE stage timing with zero prod writes. " +
-  "Does NOT certify the Vercel 60s fit — that requires a deployed (preview/prod) test.";
+  "Local dry-run: runs the SAME pipeline body as the 12:00 UTC cron (dryRun) with zero prod writes. " +
+  "Validates LOGIC + RELATIVE stage timing. Does NOT certify the Vercel 60s fit — that needs a deployed test.";
 
 export type FullDryRunOptions = {
   env?: NodeJS.ProcessEnv;
@@ -71,6 +73,12 @@ export type FullDryRunOptions = {
   /** Forwarded to the preflight (injectable probes for tests). */
   preflight?: Omit<PreflightDeps, "env">;
 };
+
+/** The matrix pre-check note for a stage (named missing dep), used to explain a failure. */
+function predictedNote(matrix: CapabilityMatrix, stage: StageName): string | undefined {
+  const cap = matrix.stages.find((s) => s.stage === stage);
+  return cap?.willRun === "ready" ? undefined : cap?.skipReason;
+}
 
 export async function runFullPipelineDryRun(options: FullDryRunOptions = {}): Promise<FullDryRunReport> {
   const baseEnv = options.env ?? process.env;
@@ -80,11 +88,10 @@ export async function runFullPipelineDryRun(options: FullDryRunOptions = {}): Pr
 
   const timer = new StageTimer();
   const matrix = await runPreflight({ env, ...(options.preflight ?? {}) });
-  const cap = (s: StageName) => matrix.stages.find((x) => x.stage === s);
 
-  // ---- sweep ----
+  // ---- sweep ---- (runs first, like prod's executePipelineWork; best-effort)
   let sweep: FullDryRunReport["stages"]["sweep"];
-  if (cap("sweep")?.willRun === "ready") {
+  try {
     const summary = await timer.time("sweep", () => runNeedsReviewSweep({ env, now }));
     sweep = {
       outcome: summary.error ? "error" : "ran",
@@ -92,72 +99,82 @@ export async function runFullPipelineDryRun(options: FullDryRunOptions = {}): Pr
       flagged: summary.flaggedCount,
       mutated: summary.mutated,
       error: summary.error,
+      note: summary.error ? predictedNote(matrix, "sweep") : undefined,
     };
-  } else {
-    timer.markSkipped("sweep");
-    sweep = { outcome: "skipped", skipReason: cap("sweep")?.skipReason };
+  } catch (error) {
+    sweep = {
+      outcome: "error",
+      error: error instanceof Error ? error.message : String(error),
+      note: predictedNote(matrix, "sweep"),
+    };
   }
 
-  // ---- newsletter ----
-  let newsletter: FullDryRunReport["stages"]["newsletter"];
-  if (cap("newsletter")?.willRun === "ready") {
-    const result = await timer.time("newsletter", () => runNewsletterIngestion({ dryRun: true, now }));
-    const items = (result.summary as { fetchedMessageCount?: number }).fetchedMessageCount ?? 0;
-    newsletter = {
-      outcome: !result.success ? "error" : items === 0 ? "degraded" : "ran",
-      itemsProcessed: items,
-      // `truncated` is produced by the time-box from the timeout bundle; surface
-      // it if present, otherwise undefined (not yet built).
-      truncated: (result.summary as { newsletterTruncated?: boolean }).newsletterTruncated,
-      message: result.summary.message,
-    };
-  } else {
-    timer.markSkipped("newsletter");
-    newsletter = { outcome: "skipped", skipReason: cap("newsletter")?.skipReason };
-  }
+  // ---- newsletter → RSS → staging ---- via the SHARED prod pipeline body, dry.
+  // The harness's stage runner times each leg and catches an unexpected throw so
+  // one leg's failure never aborts the rest (degrade-like-prod).
+  const threw: Partial<Record<EditorialPipelineStageName, string>> = {};
+  const runStage = async <T>(name: EditorialPipelineStageName, run: () => Promise<T>): Promise<T> =>
+    timer.time(name, async () => {
+      try {
+        return await run();
+      } catch (error) {
+        threw[name] = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          timestamp: now.toISOString(),
+          summary: { message: `${name} threw: ${threw[name]}` },
+        } as unknown as T;
+      }
+    });
 
-  // ---- RSS ----
-  let rss: FullDryRunReport["stages"]["rss"];
-  if (cap("rss")?.willRun === "ready") {
-    const rssReport = await timer.time("rss", () =>
-      runControlledPipeline(resolveControlledPipelineConfig({ ...env, PIPELINE_RUN_MODE: "dry_run" })),
-    );
-    rss = {
-      outcome: rssReport.candidate_pool_insufficient ? "degraded" : "ran",
-      candidateCount: rssReport.candidateCount,
-      clusterCount: rssReport.clusterCount,
-      insufficientReason: rssReport.candidate_pool_insufficient
-        ? rssReport.candidate_pool_insufficient_reason
-        : null,
-    };
-  } else {
-    // Skipped (e.g. no egress) — NOT a "0 candidates" degraded run. The
-    // capability matrix names the reason; the timer records N/A.
-    timer.markSkipped("rss");
-    rss = { outcome: "skipped", skipReason: cap("rss")?.skipReason };
-  }
+  const { newsletter: nl, rss: rssResult, editorialStaging: st } = await runEditorialIngestionPipeline({
+    dryRun: true,
+    now,
+    runStage,
+  });
 
-  // ---- staging ----
-  let staging: FullDryRunReport["stages"]["staging"];
-  if (cap("staging")?.willRun === "ready") {
-    const result = await timer.time("staging", () => runEditorialStaging({ dryRun: true, now }));
-    const d = result.summary;
-    staging = {
-      outcome: result.success ? "ran" : "error",
-      wouldStage: d.candidateCount,
-      core: d.coreCount,
-      context: d.contextCount,
-      evergreenFiltered: d.candidatesFilteredEvergreen,
-      crossDateWouldSkip: d.notionRowsSkippedDuplicateAcrossDates,
-      detail: d.dryRunDetail,
-      // If Notion was unreachable/uncredentialed, the P4 cross-date dedup leg is
-      // degraded even though selection ran — surface that, never hide it.
-      p4DedupNote: cap("staging")?.skipReason,
-    };
-  } else {
-    timer.markSkipped("staging");
-    staging = { outcome: "skipped", skipReason: cap("staging")?.skipReason };
-  }
+  // ---- map newsletter ----
+  const nlItems = (nl.summary as { fetchedMessageCount?: number }).fetchedMessageCount ?? 0;
+  const newsletter: FullDryRunReport["stages"]["newsletter"] = {
+    outcome: threw.newsletter ? "error" : !nl.success ? "error" : nlItems === 0 ? "degraded" : "ran",
+    itemsProcessed: nlItems,
+    truncated: (nl.summary as { newsletterTruncated?: boolean }).newsletterTruncated,
+    message: nl.summary.message,
+    error: threw.newsletter,
+    note: !nl.success || threw.newsletter ? predictedNote(matrix, "newsletter") : undefined,
+  };
+
+  // ---- map RSS ----
+  const rssSummary = rssResult.summary as {
+    rawItemCount?: number;
+    clusterCount?: number;
+    degraded?: boolean;
+    message?: string;
+  };
+  const rss: FullDryRunReport["stages"]["rss"] = {
+    outcome: threw.rss ? "error" : !rssResult.success ? "error" : rssSummary.degraded ? "degraded" : "ran",
+    candidateCount: rssSummary.rawItemCount,
+    clusterCount: rssSummary.clusterCount,
+    degraded: rssSummary.degraded,
+    message: rssSummary.message,
+    error: threw.rss,
+    note: !rssResult.success || threw.rss ? predictedNote(matrix, "rss") : undefined,
+  };
+
+  // ---- map staging ----
+  const d = st.summary;
+  const staging: FullDryRunReport["stages"]["staging"] = {
+    outcome: threw.editorial_staging ? "error" : st.success ? "ran" : "error",
+    wouldStage: d.candidateCount,
+    core: d.coreCount,
+    context: d.contextCount,
+    evergreenFiltered: d.candidatesFilteredEvergreen,
+    crossDateWouldSkip: d.notionRowsSkippedDuplicateAcrossDates,
+    detail: d.dryRunDetail,
+    message: d.message,
+    error: threw.editorial_staging,
+    note: !st.success || threw.editorial_staging ? predictedNote(matrix, "staging") : undefined,
+  };
 
   return {
     startedAt: now.toISOString(),
@@ -175,16 +192,18 @@ export function formatFullDryRunReport(report: FullDryRunReport): string {
   lines.push("=== Full-pipeline dry-run report ===");
   lines.push(report.note);
   lines.push("");
+  lines.push("pre-check (capability matrix — names missing deps; stages run anyway, like prod):");
   lines.push(formatCapabilityMatrix(report.capabilityMatrix));
   lines.push("");
   lines.push(`stage_ms: ${Object.entries(report.stageMs).map(([k, v]) => `${k}=${v}`).join(" ")}`);
   lines.push("");
   for (const [name, s] of Object.entries(report.stages)) {
     const extra = Object.entries(s)
-      .filter(([k]) => !["outcome", "skipReason", "error", "detail"].includes(k))
+      .filter(([k]) => !["outcome", "note", "error", "detail"].includes(k))
       .map(([k, v]) => `${k}=${v}`)
       .join(" ");
-    lines.push(`${name.padEnd(11)} ${String(s.outcome).toUpperCase().padEnd(9)} ${s.skipReason ?? s.error ?? ""} ${extra}`.trimEnd());
+    const reason = s.error ?? s.note ?? "";
+    lines.push(`${name.padEnd(11)} ${String(s.outcome).toUpperCase().padEnd(9)} ${reason} ${extra}`.trimEnd());
   }
   return lines.join("\n");
 }

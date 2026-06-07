@@ -1,9 +1,11 @@
 import { NextResponse, after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
-import { runDailyNewsCron, type DailyNewsCronRunResult } from "@/lib/cron/fetch-news";
-import { runNewsletterIngestion, type NewsletterIngestionRunResult } from "@/lib/newsletter-ingestion/runner";
-import { runEditorialStaging, type EditorialStagingRunResult } from "@/lib/editorial-staging/runner";
+import {
+  runEditorialIngestionPipeline,
+  type EditorialPipelineResults,
+  type EditorialPipelineStageRunner,
+} from "@/lib/pipeline/editorial-ingestion-pipeline";
 import { runNeedsReviewSweep } from "@/lib/editorial-sweep/needs-review-sweep";
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { writePipelineLogEntry } from "@/lib/observability/pipeline-log";
@@ -227,15 +229,6 @@ export const runtime = "nodejs";
 
 type EditorialInputTaskName = "rss" | "newsletter" | "editorial_staging";
 
-type EditorialInputTaskResult = {
-  success: boolean;
-  timestamp: string | null;
-  summary:
-    | DailyNewsCronRunResult["summary"]
-    | NewsletterIngestionRunResult["summary"]
-    | EditorialStagingRunResult["summary"]
-    | null;
-};
 
 // Hard internal wall for the after() pipeline. Sits below the function-level
 // maxDuration (60s in vercel.json) so we always trip this guard first and
@@ -259,35 +252,6 @@ function isAuthorized(request: Request) {
   }
 
   return false;
-}
-
-async function runTask<T extends DailyNewsCronRunResult | NewsletterIngestionRunResult | EditorialStagingRunResult>(
-  name: EditorialInputTaskName,
-  task: () => Promise<T>,
-): Promise<EditorialInputTaskResult> {
-  try {
-    const result = await task();
-
-    return {
-      success: result.success,
-      timestamp: result.timestamp,
-      summary: result.summary,
-    };
-  } catch (error) {
-    logServerEvent("error", "Combined editorial input cron task failed before completion", {
-      route: "/api/cron/fetch-editorial-inputs",
-      task: name,
-      ...errorContext(error),
-    });
-
-    return {
-      success: false,
-      timestamp: new Date().toISOString(),
-      summary: {
-        message: `${name} task failed before completion.`,
-      } as EditorialInputTaskResult["summary"],
-    };
-  }
 }
 
 class IngestionTimeoutInternalError extends Error {
@@ -319,24 +283,39 @@ function runWithInternalTimeout<T>(
   });
 }
 
-async function runIngestionPipeline(stageRef: { current: EditorialInputTaskName }) {
-  // Newsletter must run before RSS so that reserveNewsletterCandidateRanksForRssSnapshot
-  // can push newsletter rows to high rank slots and leave low ranks free for the RSS snapshot.
-  // If RSS runs first it fills all 20 rank slots, leaving no room for newsletter promotion.
-  stageRef.current = "newsletter";
-  const newsletter = await runTask("newsletter", () =>
-    runNewsletterIngestion({
-      writeCandidates: true,
-    }),
-  );
+async function runIngestionPipeline(stageRef: {
+  current: EditorialInputTaskName;
+}): Promise<EditorialPipelineResults> {
+  // The stage SEQUENCE + dry threading live in the shared
+  // runEditorialIngestionPipeline (Track 2 unification) so this prod cron and
+  // the dry-run harness execute byte-for-byte the same legs in the same order
+  // (newsletter before RSS for rank-slot reservation). The route injects its own
+  // stage wrapper: per-stage timeout attribution via stageRef, plus the
+  // degrade-don't-throw catch that keeps one leg's failure from aborting the
+  // rest (newsletter dying must not stop RSS/staging).
+  const runStage: EditorialPipelineStageRunner = async <T>(
+    name: EditorialInputTaskName,
+    run: () => Promise<T>,
+  ): Promise<T> => {
+    stageRef.current = name;
+    try {
+      return await run();
+    } catch (error) {
+      logServerEvent("error", "Combined editorial input cron task failed before completion", {
+        route: "/api/cron/fetch-editorial-inputs",
+        task: name,
+        ...errorContext(error),
+      });
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        summary: { message: `${name} task failed before completion.` },
+      } as unknown as T;
+    }
+  };
 
-  stageRef.current = "rss";
-  const rss = await runTask("rss", () => runDailyNewsCron());
-
-  stageRef.current = "editorial_staging";
-  const editorialStaging = await runTask("editorial_staging", () => runEditorialStaging());
-
-  return { newsletter, rss, editorialStaging };
+  // dryRun: false — this IS the real 12:00 UTC cron. Persists everything.
+  return runEditorialIngestionPipeline({ dryRun: false, runStage });
 }
 
 async function executePipelineWork(briefingDate: string) {
@@ -366,9 +345,7 @@ async function executePipelineWork(briefingDate: string) {
     });
   }
 
-  let pipelineResult:
-    | { newsletter: EditorialInputTaskResult; rss: EditorialInputTaskResult; editorialStaging: EditorialInputTaskResult }
-    | null = null;
+  let pipelineResult: EditorialPipelineResults | null = null;
 
   try {
     pipelineResult = await runWithInternalTimeout(
