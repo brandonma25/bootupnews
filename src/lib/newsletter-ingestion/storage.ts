@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { summarizeChromeRejections } from "@/lib/newsletter-ingestion/chrome-filter";
 import { parseRawNewsletterEmail } from "@/lib/newsletter-ingestion/email-content";
 import type { GmailApiClient, GmailMessageRef } from "@/lib/newsletter-ingestion/gmail";
 import {
@@ -232,11 +233,25 @@ export async function extractStoriesFromEmail(input: {
     // Politico /ss/c/ tracking redirectors, etc.). We roll them up into a
     // Source Health Log entry so operators can see which sender is leaking
     // junk and tune the filter / sender format detection.
-    const { stories, junkRejections } = parseNewsletterStoriesDetailed({
+    const { stories, junkRejections, chromeRejections } = parseNewsletterStoriesDetailed({
       sender: email.sender,
       subject: email.subject ?? "",
       rawContent,
     });
+
+    // Track 2 — newsletter chrome reject-filter telemetry. Counts candidates the
+    // Layer-2 filter dropped as email chrome (footer/social/app-promo CTAs,
+    // CAN-SPAM addresses, bare-URL titles, tracking/shortener links) so the
+    // 2026-06-06 "100% chrome staged slate" class of failure is observable.
+    if (chromeRejections.length > 0) {
+      const chromeSummary = summarizeChromeRejections(chromeRejections);
+      logServerEvent("info", "Newsletter parser rejected chrome candidates", {
+        newsletterEmailId: input.newsletterEmailId,
+        sender: email.sender || "unknown-newsletter",
+        rejectionCount: chromeSummary.count,
+        byReason: chromeSummary.byReason,
+      });
+    }
 
     if (junkRejections.length > 0) {
       const summary = summarizeJunkRejections(junkRejections);

@@ -187,9 +187,7 @@ describe("newsletter story extraction parser", () => {
     it("still extracts a story when a real article URL appears alongside trackers", () => {
       const mixedBody = [
         "AI chip export controls expand",
-        "U.S. officials widened restrictions on advanced accelerators, forcing cloud vendors and chip suppliers to reassess shipments across the supply chain.",
-        "More: https://example.com/articles/chips-expansion",
-        "Tracking pixel: https://url4027.email.politico.com/ss/c/abc/redirect",
+        "U.S. officials widened restrictions on advanced accelerators, forcing cloud vendors and chip suppliers to reassess shipments. Read more: https://example.com/articles/chips-expansion (via https://url4027.email.politico.com/ss/c/abc/redirect)",
       ].join("\n");
 
       const result = parseNewsletterStoriesDetailed({
@@ -200,10 +198,11 @@ describe("newsletter story extraction parser", () => {
 
       expect(result.stories).toHaveLength(1);
       expect(result.stories[0].sourceUrl).toBe("https://example.com/articles/chips-expansion");
-      // The tracker that appeared AFTER the chosen article URL is not iterated
-      // (extractFirstArticleUrl returns on the first match), so it is not
-      // recorded in junkRejections in this fixture. Acceptable: we only count
-      // rejections we actually had to skip past.
+      // The real article title survives — NOT a "More: <link>" read-more line as
+      // the headline, and with the tracking URL stripped out of the title.
+      expect(result.stories[0].headline).toBe("AI chip export controls expand");
+      // The tracker appears AFTER the chosen article URL, so extractFirstArticleUrl
+      // returns on the first match and never iterates to it.
     });
   });
 });
