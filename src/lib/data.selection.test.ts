@@ -86,6 +86,33 @@ function createEligibility(
   };
 }
 
+describe("selectPublicBriefingItems — PRD-53 widened editorial pool", () => {
+  function eligibleItems(count: number): BriefingItem[] {
+    const topics = ["Tech", "Finance", "Politics", "World"];
+    return Array.from({ length: count }, (_, index) =>
+      createItem({
+        id: `pool-item-${index}`,
+        topicId: `topic-${index}`,
+        topicName: topics[index % topics.length],
+        title: `Eligible signal ${index}`,
+        importanceScore: 90 - index,
+      }),
+    );
+  }
+
+  it("defaults to the public top-5 cap when no limit is passed (homepage display unchanged)", () => {
+    expect(selectPublicBriefingItems(eligibleItems(25))).toHaveLength(5);
+  });
+
+  it("widens to the editorial pool size when a larger limit is passed (e.g. 22)", () => {
+    expect(selectPublicBriefingItems(eligibleItems(25), 22)).toHaveLength(22);
+  });
+
+  it("degrades gracefully: returns all eligible items when the pool is thinner than the ceiling", () => {
+    expect(selectPublicBriefingItems(eligibleItems(8), 22)).toHaveLength(8);
+  });
+});
+
 describe("selectPublicBriefingItems", () => {
   it("places a high-structural-importance, lower-coverage item above a high-coverage low-importance item", () => {
     const strategicPolicyShift = createItem({

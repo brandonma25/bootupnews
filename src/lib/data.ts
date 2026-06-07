@@ -1244,6 +1244,14 @@ export async function generateDailyBriefing(
      * preview behaviour is unchanged.
      */
     filterEvergreens?: boolean;
+    /**
+     * PRD-53 remediation — editorial/review pool ceiling. When set, the daily
+     * selection returns up to this many candidates for the editorial surface
+     * (signal_posts at needs_review) instead of the public top-5. Defaults to the
+     * public selection size, so non-cron callers (homepage / dashboard preview)
+     * are unchanged. The cron passes resolveSurfacePoolSize() (default 22).
+     */
+    surfacePoolSize?: number;
   } = {},
 ): Promise<{
   briefing: DailyBriefing;
@@ -1411,7 +1419,10 @@ export async function generateDailyBriefing(
     selectableItems = kept;
   }
 
-  const items = selectPublicBriefingItems(selectableItems).map((item, index) => ({
+  // PRD-53 remediation — widen the editorial/review pool when the caller asks
+  // (cron). Undefined preserves selectPublicBriefingItems' public default, so the
+  // homepage / dashboard display cap is unchanged.
+  const items = selectPublicBriefingItems(selectableItems, options.surfacePoolSize).map((item, index) => ({
     ...item,
     priority: index < 5 ? ("top" as const) : ("normal" as const),
   }));
