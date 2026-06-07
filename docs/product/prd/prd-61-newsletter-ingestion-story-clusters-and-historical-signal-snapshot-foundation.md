@@ -174,6 +174,14 @@ Remaining operational follow-up:
   - Existing explicit public `signal_posts` select lists in `src/lib/signals-editorial.ts`, `src/lib/homepage-editorial-overrides.ts`, and `src/app/health/rss/route.ts`
 - Confidence: high for additive schema package; runtime ingestion, clustering, browsing, and evolution inference remain intentionally unimplemented.
 
+## Operational History - Newsletter chrome extraction fix (2026-06-07)
+
+After Gmail ingestion was restored (token expired 2026-05-18 -> ~06-05), the heuristic newsletter extractor (`parseNewsletterStoriesDetailed`) was found to emit **email chrome** as story candidates: bare angle-bracket links and tracking/redirect URLs as titles, footer/social/app-promo CTAs ("Follow Us", "READ IN APP", "View this post on the web at"), a CAN-SPAM postal address, and undecoded HTML entities with a leading-`}` CSS segmentation artifact. The 2026-06-06 cron staged 11 newsletter rows, all chrome and all `requires_human_rewrite` (a 100% unpublishable slate).
+
+Fixed with a two-layer defense: Layer 1 extraction-quality hardening in `parser.ts` (HTML entity decode, full CSS selector-block stripping, URL-only/stray-brace headline rejection, headline link-wrapper cleaning) + Layer 2 mechanism-agnostic `chrome-filter.ts` reject-filter (bare-URL / tracking-domain / boilerplate-phrase / postal-address / below-min-prose), applied before staging and logged with count + per-reason breakdown. The `why_it_matters` validator was left unchanged as the last line of defense. Validated against the real 2026-06-06 bodies (captured as hermetic fixtures). Full diagnosis + fix: [`docs/engineering/bug-fixes/newsletter-extractor-chrome-2026-06-07.md`](../../engineering/bug-fixes/newsletter-extractor-chrome-2026-06-07.md).
+
+Scope boundary: this fixes newsletter extraction QUALITY only. It does NOT address RSS Fed-source concentration (the 06-06 slate had zero RSS rows - a separate ingestion problem) or the 60s cron timeout.
+
 ## Closeout Checklist
 
 - Scope completed:

@@ -56,6 +56,7 @@ const TRACKING_HOST_PATTERNS = [
   "click.mailchimpapp.com",
   "ctrk.klclick.com",
   ".rs6.net",                 // Constant Contact wrapper
+  ".everestengagement.com",   // 1440 / Everest open-tracker (join1440.everestengagement.com)
 ];
 
 /**
@@ -67,6 +68,8 @@ const NON_ARTICLE_PATH_PATTERNS = [
   "/click/",
   "/redirect",
   "/redir/",
+  "/app-link",                // substack.com/app-link/post?… (open-in-app wrapper)
+  "/account/newsletters",     // bloomberg.com subscription-management link
   "/unsubscribe",
   "/preferences",
   "/manage-subscription",

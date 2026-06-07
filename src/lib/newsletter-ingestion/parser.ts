@@ -1,4 +1,9 @@
 import {
+  classifyNewsletterChrome,
+  isBareUrlTitle,
+  type ChromeRejection,
+} from "@/lib/newsletter-ingestion/chrome-filter";
+import {
   classifyUrlForArticleEligibility,
   type JunkRejection,
 } from "@/lib/url-filtering";
@@ -29,6 +34,8 @@ export type ParsedNewsletterStory = {
 export type NewsletterParseResult = {
   stories: ParsedNewsletterStory[];
   junkRejections: JunkRejection[];
+  /** Layer-2 chrome reject-filter hits (footer/nav/address/tracking), for telemetry. */
+  chromeRejections: ChromeRejection[];
 };
 
 type NewsletterFormat = "morning_brew" | "semafor" | "tldr" | "ap_wire" | "1440" | "unknown";
@@ -51,6 +58,15 @@ const NOISE_PATTERN =
  */
 const STYLE_BLOCK_PATTERN = /<style\b[\s\S]*?<\/style>/giu;
 const CSS_AT_RULE_PATTERN = /@(?:font-face|media|supports|keyframes|charset|import|page)\b[^{;]*\{[\s\S]*?\}/giu;
+/**
+ * Plain CSS selector blocks (`selector { declarations }`) that survive in the
+ * plain-text body of HTML newsletters. The Axios fix only stripped @-rules, but
+ * Money Stuff leaked `a{text-decoration:none} body{width:100%…}` into a snippet
+ * and 1440 leaked `} blockquote #_two50 { background-image:url('…tracker…') }`
+ * — a leading "}" that became a story headline. Single-level (no nested braces),
+ * applied in two passes for adjacent rules.
+ */
+const CSS_RULE_BLOCK_PATTERN = /[^\n{}]*\{[^{}]*\}/gu;
 
 /**
  * Lines that look like CSS source rather than story content. Used to reject
@@ -58,12 +74,62 @@ const CSS_AT_RULE_PATTERN = /@(?:font-face|media|supports|keyframes|charset|impo
  */
 const CSS_LIKE_LINE_PATTERN = /\b(?:src\s*:|url\s*\(|format\s*\(|font-family\s*:|font-style\s*:|font-weight\s*:|@font-face|@media|@import)/iu;
 
-function normalizeText(value: string | null | undefined) {
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  mdash: "\u2014",
+  ndash: "\u2013",
+  hellip: "\u2026",
+  rsquo: "\u2019",
+  lsquo: "\u2018",
+  rdquo: "\u201d",
+  ldquo: "\u201c",
+  copy: "\u00a9",
+  reg: "\u00ae",
+  trade: "\u2122",
+};
+
+// Zero-width / invisible code points newsletters inject as preview-text padding
+// (the a16z body was hundreds of `&#847; &#8199; &#173;` runs). Strip entirely.
+const INVISIBLE_CODEPOINTS = new Set([0x00ad, 0x034f, 0x200b, 0x200c, 0x200d, 0x2060, 0xfeff]);
+
+function codePointToText(codePoint: number): string {
+  if (!Number.isFinite(codePoint) || codePoint <= 0) return "";
+  if (INVISIBLE_CODEPOINTS.has(codePoint)) return "";
+  if (codePoint === 0x2007 || codePoint === 0x00a0) return " "; // figure space / nbsp \u2192 space
+  try {
+    return String.fromCodePoint(codePoint);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Decode the HTML entities newsletters leave un-rendered in plain-text bodies:
+ * numeric (`&#8217;` \u2192 \u2019, `&#x2019;`), named (`&amp;`, `&mdash;`, `&hellip;`),
+ * and the invisible preview-padding runs (`&#847;`, `&#173;`) which are removed.
+ * Before this, "Lil&#8217; Biotech" and "&#847; &#8199; &#173;" reached
+ * headlines/snippets verbatim.
+ */
+function decodeHtmlEntities(value: string): string {
   return value
-    ?.replace(/\u00a0/g, " ")
+    .replace(/&#x([0-9a-f]+);/giu, (_match, hex: string) => codePointToText(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/gu, (_match, dec: string) => codePointToText(Number.parseInt(dec, 10)))
+    .replace(/&([a-z][a-z0-9]*);/giu, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match);
+}
+
+function normalizeText(value: string | null | undefined) {
+  if (!value) return "";
+  return decodeHtmlEntities(value)
+    .replace(/[\u00ad\u034f\u200b-\u200d\u2060\ufeff]/gu, "") // literal invisibles
+    .replace(/[\u00a0\u2007]/gu, " ")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
-    .trim() ?? "";
+    .trim();
 }
 
 function normalizeLine(value: string) {
@@ -73,6 +139,20 @@ function normalizeLine(value: string) {
       .replace(/^\d+[.)]\s+/u, "")
       .replace(/^#{1,6}\s+/u, ""),
   );
+}
+
+/**
+ * Strip URL / angle-bracket / parenthetical link wrappers out of a chosen
+ * headline so a real title is never stored with a tracking link glued on.
+ */
+function cleanHeadline(line: string): string {
+  return normalizeText(
+    line
+      .replace(/\(\s*https?:\/\/[^\s)]+\s*\)/giu, " ")
+      .replace(/<\s*https?:\/\/[^\s>]+\s*>/giu, " ")
+      .replace(/https?:\/\/[^\s)<>"'\]]+/giu, " ")
+      .replace(/\[\s*\]|\(\s*\)|<\s*>/gu, " "),
+  ).trim();
 }
 
 function detectNewsletterFormat(input: NewsletterStoryExtractionInput): NewsletterFormat {
@@ -168,10 +248,21 @@ function extractFirstArticleUrl(value: string, rejections: JunkRejection[]) {
 function stripInlineCss(rawContent: string): string {
   return rawContent
     .replace(STYLE_BLOCK_PATTERN, "\n")
-    .replace(CSS_AT_RULE_PATTERN, "\n");
+    .replace(CSS_AT_RULE_PATTERN, "\n")
+    .replace(CSS_RULE_BLOCK_PATTERN, "\n")
+    .replace(CSS_RULE_BLOCK_PATTERN, "\n") // second pass: adjacent "a{}b{}" rules
+    .replace(/^[ \t]*\}[ \t]*/gmu, ""); // leftover leading stray "}" on a line
 }
 
 function isLikelyHeadline(line: string) {
+  // A line that is only a link / angle-bracket URL, or starts with a stray CSS
+  // brace, is chrome — not a story title. Money Stuff staged
+  // "<https://bloom.bg/3PWd74F>" as a headline; 1440 a leading-"}" CSS fragment.
+  // Reject before the length/keyword checks.
+  if (/^[{}]/u.test(line.trim()) || isBareUrlTitle(line)) {
+    return false;
+  }
+
   if (line.length < MIN_HEADLINE_LENGTH || line.length > MAX_HEADLINE_LENGTH) {
     return false;
   }
@@ -256,15 +347,19 @@ function buildStoryFromBlock(
   format: NewsletterFormat,
   rejections: JunkRejection[],
 ): ParsedNewsletterStory | null {
-  const headline = block.find(isLikelyHeadline) ?? "";
-  const headlineIndex = block.indexOf(headline);
+  const headlineLine = block.find(isLikelyHeadline) ?? "";
+  const headlineIndex = block.indexOf(headlineLine);
+  // Strip any URL / link wrapper glued onto the chosen title so a real headline
+  // is never stored with a tracking URL appended, e.g.
+  // "Charts of the Week: Retail to the Moon (https://substack.com/redirect/…)".
+  const headline = cleanHeadline(headlineLine);
   const snippetLines = block
     .slice(Math.max(0, headlineIndex + 1))
     .filter((line) => !URL_PATTERN.test(line) || line.replace(URL_PATTERN, "").trim().length > 0)
     .slice(0, 3);
   const snippet = normalizeText(snippetLines.join(" "));
 
-  if (!headline || snippet.length < MIN_SNIPPET_LENGTH) {
+  if (!headline || headline.length < MIN_HEADLINE_LENGTH || snippet.length < MIN_SNIPPET_LENGTH) {
     return null;
   }
 
@@ -330,13 +425,37 @@ export function parseNewsletterStoriesDetailed(
 ): NewsletterParseResult {
   const format = detectNewsletterFormat(input);
   const junkRejections: JunkRejection[] = [];
-  const stories = splitCandidateBlocks(input.rawContent)
+  const chromeRejections: ChromeRejection[] = [];
+  const built = splitCandidateBlocks(input.rawContent)
     .map((block) => buildStoryFromBlock(block, format, junkRejections))
     .filter((story): story is ParsedNewsletterStory => Boolean(story))
     .filter((story) => story.extractionConfidence >= (format === "1440" ? 0.48 : 0.55));
 
+  // Layer 2 — mechanism-agnostic chrome reject-filter. Anything chrome-shaped
+  // that survived the Layer-1 heuristics (bare-URL title, footer/social/app-promo
+  // phrase, postal address, tracking/shortener source) is dropped here with a
+  // logged reason. Never a silent drop.
+  const stories = built.filter((story) => {
+    const verdict = classifyNewsletterChrome({
+      headline: story.headline,
+      snippet: story.snippet,
+      sourceUrl: story.sourceUrl,
+      sourceDomain: story.sourceDomain,
+    });
+    if (verdict.rejected) {
+      chromeRejections.push({
+        headline: story.headline.slice(0, 80),
+        reason: verdict.reason,
+        detail: verdict.detail,
+      });
+      return false;
+    }
+    return true;
+  });
+
   return {
     stories: dedupeStories(stories).slice(0, MAX_STORIES_PER_EMAIL),
     junkRejections,
+    chromeRejections,
   };
 }
