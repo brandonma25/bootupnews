@@ -7,7 +7,7 @@ import {
   extractDateFromUrl,
   resolveEvergreenFilterConfig,
   type EvergreenFilterConfig,
-} from "@/lib/editorial/evergreen-filter";
+} from "@/lib/editorial-staging/evergreen-filter";
 
 /**
  * Track 2 P7 — labeled fixture from the 2026-06-01..06-03 review window.
