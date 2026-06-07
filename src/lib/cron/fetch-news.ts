@@ -107,10 +107,6 @@ export async function runDailyNewsCron(
         generateDailyBriefing(demoTopics, sources, {
           suppliedByManifest: sourcePlan.suppliedByManifest,
           persistPipelineCandidates: !dryRun,
-          // Track 2 P7 — exclude evergreen/explainer candidates from the slate
-          // that gets written to signal_posts (the cockpit surface). Enabled on
-          // the cron write path only.
-          filterEvergreens: true,
         }),
     );
     const briefingDate = briefing.briefingDate.slice(0, 10);
