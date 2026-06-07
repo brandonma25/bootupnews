@@ -261,6 +261,25 @@ The specific trap this closes: newsletter with a missing Gmail credential now re
 
 **No schema changes, no migrations, no P4/P7 logic changes, no stage moved off the critical path** (that is the decouple-legs PR). Read-only fetches against prod Supabase/Notion are intentional (real P4 dedup data); zero writes occur.
 
+### Phase 7.6 — Pipeline-body unification: harness runs the real prod sequence (Track 2, 2026-06-07)
+
+**Problem this closes (found in the Phase 7.5 pre-merge review):** the dry-run harness had its own COPY of the stage sequence and ran the RSS leg through `runControlledPipeline(dry_run)` instead of the production `runDailyNewsCron`. A green `npm run pipeline:dry` therefore did not exercise the function prod actually calls for RSS — `runDailyNewsCron`'s seed-fallback gate, degraded-flag logic, and signal_posts snapshot path were all unvalidated by the harness. The fork could silently drift from prod.
+
+**Fix — one shared body.** New `src/lib/pipeline/editorial-ingestion-pipeline.ts` exports `runEditorialIngestionPipeline({ dryRun, now, runStage })`: the single newsletter → RSS → staging sequence (prod order; newsletter first for rank-slot reservation). It is called by BOTH:
+
+- the production cron `/api/cron/fetch-editorial-inputs` (`dryRun: false`, inside the existing run-lock + 55s internal-timeout + Pipeline-Log/Source-Health wrapper), and
+- the harness `runFullPipelineDryRun` (`dryRun: true`).
+
+Each consumer injects a `runStage` wrapper for its own concerns (the route: per-stage timeout attribution + degrade-don't-throw; the harness: `StageTimer` timing + outcome capture). After this, **the only difference between a dry run and the real 12:00 UTC run is that dry mode persists nothing.**
+
+**`runDailyNewsCron` gained a `dryRun` param** that threads `persistPipelineCandidates: !dryRun` into `generateDailyBriefing`, skips the `persistSignalPostsForBriefing` snapshot write, and skips the RSS cron-monitor check-in. `dryRun` defaults `false`, so the prod call is byte-for-byte unchanged (the 23 route tests stay green). The RSS dry leg is genuinely zero-write — verified: `ingestRawItems` performs no Supabase writes, and the only writers (`persistNormalizedArticleCandidates` / cluster / ranking) sit inside `if (shouldPersistArticleCandidates)`.
+
+**Harness behavior change — run-all-like-prod.** The harness now RUNS every stage exactly as prod would; the capability matrix is a **pre-check** that names missing dependencies. A missing credential surfaces as that stage's real `error`/`degrade` (with the matrix reason attached), not a tidy `skipped`. This is strictly more faithful: the dry run's control flow is identical to the cron's. (The earlier skip-on-missing behavior from Phase 7.5 is replaced.)
+
+**Evidence:** 925 unit tests green (incl. 23 route tests unchanged + rewritten harness tests asserting run-all + dryRun threading + the shared body). `npm run pipeline:dry` against a no-creds sandbox now exercises the real `runDailyNewsCron` and correctly reports its seed-fallback gate as an RSS error — proof the real prod RSS path is now in the loop. Lint + build clean.
+
+**Still does NOT certify the Vercel 60s fit** (`certifies60sFit: false`). That requires a deployed test — the next step is a guarded, read-only `?dryRun=1` trigger on the cron route so the unified body can be run on a preview deployment under the real serverless budget on demand (no 24h wait).
+
 ## Closeout Checklist
 
 - Scope completed: all phases (0–5) plus the cron-job.org sync tooling landing.
