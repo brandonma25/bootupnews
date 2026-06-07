@@ -6,7 +6,7 @@ import { sendEditorialCompletionEmail } from "@/lib/editorial-staging/email";
 import {
   applyEvergreenFilter,
   resolveEvergreenFilterConfig,
-} from "@/lib/editorial-staging/evergreen-filter";
+} from "@/lib/editorial/evergreen-filter";
 
 type Category = "Tech" | "Finance" | "Politics";
 
@@ -55,7 +55,7 @@ export type EditorialStagingRunSummary = {
    */
   dryRunDetail?: {
     selected: Array<{ headline: string; slot: "Core" | "Context" }>;
-    evergreenRejected: Array<{ headline: string; reason: "title" | "source" }>;
+    evergreenRejected: Array<{ headline: string; reason: "title" | "source" | "feed" }>;
     crossDateSkipped: Array<{ headline: string; existingBriefingDate?: string }>;
   };
 };

@@ -8,6 +8,7 @@ import {
   getMvpDefaultPublicSources,
 } from "@/lib/demo-data";
 import { assembleExplanationPacket } from "@/lib/explanation-support";
+import { classifyEvergreen, resolveEvergreenFilterConfig } from "@/lib/editorial/evergreen-filter";
 import { isAiConfigured } from "@/lib/env";
 import { buildEventIntelligence } from "@/lib/event-intelligence";
 import {
@@ -1231,7 +1232,19 @@ export async function getBriefingDetailPageState(dateKey: string, route = `/brie
 export async function generateDailyBriefing(
   topics: Topic[] = demoTopics,
   sources: Source[] = getMvpDefaultPublicSources(),
-  options: { suppliedByManifest?: boolean; persistPipelineCandidates?: boolean } = {},
+  options: {
+    suppliedByManifest?: boolean;
+    persistPipelineCandidates?: boolean;
+    /**
+     * Track 2 P7 — when true, evergreen/explainer candidates (SF Fed/FRED
+     * research feeds + explainer/listicle title shapes) are removed from the
+     * pool BEFORE the Top-N selection cap, so real stories backfill the freed
+     * slots. The cron RSS stage passes true (it writes signal_posts, the
+     * cockpit surface). Defaults false so the live dashboard/controlled-runner
+     * preview behaviour is unchanged.
+     */
+    filterEvergreens?: boolean;
+  } = {},
 ): Promise<{
   briefing: DailyBriefing;
   publicRankedItems: BriefingItem[];
@@ -1360,7 +1373,45 @@ export async function generateDailyBriefing(
         : undefined,
     };
   });
-  const items = selectPublicBriefingItems(candidateItems).map((item, index) => ({
+  // Track 2 P7 — evergreen/explainer exclusion (the DEBUT catch). Runs BEFORE
+  // the Top-N selection cap so a dropped evergreen frees its slot for a real
+  // story (filtering inside the persist step downstream cannot backfill — it
+  // only sees the already-capped slate). Shared classifier; gated by the cron
+  // so only the signal_posts write path is affected.
+  let selectableItems = candidateItems;
+  if (options.filterEvergreens) {
+    const evergreenConfig = resolveEvergreenFilterConfig();
+    const kept: typeof candidateItems = [];
+    let evergreenDropped = 0;
+    for (const candidate of candidateItems) {
+      const primarySource = candidate.sources?.[0];
+      const verdict = classifyEvergreen(
+        { title: candidate.title, source: primarySource?.title, url: primarySource?.url },
+        evergreenConfig,
+      );
+      if (verdict.isEvergreen) {
+        evergreenDropped += 1;
+        logServerEvent("info", "Briefing selection: evergreen candidate excluded", {
+          reason: "evergreen",
+          signal: verdict.signal,
+          title: candidate.title.slice(0, 90),
+          url: primarySource?.url ?? null,
+        });
+      } else {
+        kept.push(candidate);
+      }
+    }
+    if (evergreenDropped > 0) {
+      logServerEvent("info", "Briefing selection: evergreen filter summary", {
+        candidatesBefore: candidateItems.length,
+        candidatesAfter: kept.length,
+        evergreenDropped,
+      });
+    }
+    selectableItems = kept;
+  }
+
+  const items = selectPublicBriefingItems(selectableItems).map((item, index) => ({
     ...item,
     priority: index < 5 ? ("top" as const) : ("normal" as const),
   }));

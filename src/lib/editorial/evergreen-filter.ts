@@ -57,6 +57,16 @@ export type EvergreenFilterConfig = {
    */
   sourceDenylist: string[];
   /**
+   * Evergreen-prone FEED patterns — case-insensitive SUBSTRING match against
+   * the candidate URL (host+path). The PRIMARY evergreen signal: some feeds
+   * publish almost exclusively non-time-sensitive research/explainers, so a
+   * URL under one of these prefixes is flagged evergreen regardless of its
+   * title. Seeded with the three feeds that produced all eight quantified
+   * recurring evergreens (SF Fed research blog, FRED Blog, NY Fed Liberty
+   * Street Economics). Tunable via the env-var override.
+   */
+  evergreenProneFeedUrlPatterns: string[];
+  /**
    * Maximum age (days) of a date embedded in the URL path before the date-
    * path-drift penalty kicks in. Calibrated for "today minus N days" — a 14-
    * day window covers weekly newsletters and Sunday-edition recaps without
@@ -72,19 +82,43 @@ export type EvergreenFilterConfig = {
 };
 
 /**
+ * Confirmed evergreen-prone feeds (host+path prefixes). These three feeds
+ * produced ALL EIGHT quantified recurring evergreens in production
+ * (signal_posts 2026-04..06): SF Fed research blog, FRED Blog, and NY Fed
+ * Liberty Street Economics. Content under these prefixes is non-time-sensitive
+ * research/explainer material and is flagged evergreen by SOURCE — the only
+ * signal that catches title-clean offenders like "The AI Investing Landscape".
+ * Exported so it is auditable + reusable; tunable via the env-var override.
+ */
+export const EVERGREEN_PRONE_FEEDS = [
+  "frbsf.org/research-and-insights/blog/sf-fed-blog",
+  "fredblog.stlouisfed.org",
+  "libertystreeteconomics.newyorkfed.org",
+];
+
+/**
  * Built-in defaults. Used when env var EVERGREEN_FILTER_CONFIG_JSON is
  * unset/invalid. Reflect the patterns the editor flagged manually in the
  * 2026-06-01..06-03 review window — kept short enough to audit, broad enough
  * to catch the common-case evergreens.
  *
  * Production overrides this via env var; the defaults are starting points.
+ * NOTE: per-field fallback in resolveEvergreenFilterConfig means a prod
+ * override of `titlePatterns` does NOT drop `evergreenProneFeedUrlPatterns`
+ * (and vice-versa) — the feed (PRIMARY) signal stays active even if an old
+ * env override only customised the title list.
  */
 export const DEFAULT_EVERGREEN_FILTER_CONFIG: EvergreenFilterConfig = {
   titlePatterns: [
     // "What is X" / "What are X"
     "^\\s*what\\s+(?:is|are|was|were)\\b",
-    // "How X works" / "How to X" (instructional/explainer prefix)
-    "^\\s*how\\s+(?:does|do|did|to|the)\\b.*\\b(?:work|works|worked|explain|guide)?\\b",
+    // "How are/is/does X measured/work…" — CLOSED GAP: added are|is so
+    // "How are benchmark borrowing costs measured?" is now caught (the old
+    // pattern only listed does|do|did|to|the).
+    "^\\s*how\\s+(?:are|is|do|does|did|to|the)\\b",
+    // "Why exclude/do/does/is/are …" explainer prefix — CLOSED GAP: catches
+    // "Why exclude food and energy from inflation measures?".
+    "^\\s*why\\s+(?:exclude|do|does|is|are)\\b",
     // "Explained" / "Explainer"
     "\\bexplain(?:ed|er)\\b",
     // "Year in review" / "Decade in review"
@@ -103,6 +137,7 @@ export const DEFAULT_EVERGREEN_FILTER_CONFIG: EvergreenFilterConfig = {
     // Intentionally empty by default. Operator adds entries via env-var
     // override once a per-feed reputation pattern is established.
   ],
+  evergreenProneFeedUrlPatterns: EVERGREEN_PRONE_FEEDS,
   urlDatePathMaxAgeDays: 14,
   urlDatePathPenalty: 30,
 };
@@ -127,6 +162,9 @@ export function resolveEvergreenFilterConfig(
       sourceDenylist: Array.isArray(parsed.sourceDenylist)
         ? parsed.sourceDenylist.filter((s): s is string => typeof s === "string")
         : DEFAULT_EVERGREEN_FILTER_CONFIG.sourceDenylist,
+      evergreenProneFeedUrlPatterns: Array.isArray(parsed.evergreenProneFeedUrlPatterns)
+        ? parsed.evergreenProneFeedUrlPatterns.filter((s): s is string => typeof s === "string")
+        : DEFAULT_EVERGREEN_FILTER_CONFIG.evergreenProneFeedUrlPatterns,
       urlDatePathMaxAgeDays:
         typeof parsed.urlDatePathMaxAgeDays === "number" && parsed.urlDatePathMaxAgeDays > 0
           ? parsed.urlDatePathMaxAgeDays
@@ -198,9 +236,62 @@ function calendarDaysOlder(
   return Math.round((briefingMs - urlMs) / (24 * 60 * 60 * 1000));
 }
 
+/**
+ * Which signal flagged a candidate as evergreen:
+ *   - "feed"   — URL matched an evergreen-prone feed prefix (PRIMARY signal).
+ *   - "source" — source name matched the source denylist.
+ *   - "title"  — headline matched a title regex pattern.
+ */
+export type EvergreenSignal = "feed" | "source" | "title";
+
+/**
+ * Generic, shape-agnostic evergreen classifier — the SINGLE SOURCE OF TRUTH
+ * for "is this candidate evergreen?". Used by BOTH the briefing-selection path
+ * (data.ts, on BriefingItem) and the editorial-staging backstop (runner.ts,
+ * via applyEvergreenFilter on MergedCandidate). Signal precedence: feed →
+ * source → title (the order they are most reliable). Pure; no I/O.
+ */
+export function classifyEvergreen(
+  input: { title?: string | null; source?: string | null; url?: string | null },
+  config: EvergreenFilterConfig,
+): { isEvergreen: boolean; signal: EvergreenSignal | null } {
+  // 1. PRIMARY — evergreen-prone feed (case-insensitive URL substring).
+  const urlLower = (input.url || "").toLowerCase();
+  if (urlLower) {
+    for (const feed of config.evergreenProneFeedUrlPatterns) {
+      const needle = feed.trim().toLowerCase();
+      if (needle && urlLower.includes(needle)) {
+        return { isEvergreen: true, signal: "feed" };
+      }
+    }
+  }
+
+  // 2. Source denylist (case-insensitive exact match).
+  const sourceLower = (input.source || "").trim().toLowerCase();
+  if (sourceLower) {
+    for (const denied of config.sourceDenylist) {
+      if (denied.trim().toLowerCase() === sourceLower) {
+        return { isEvergreen: true, signal: "source" };
+      }
+    }
+  }
+
+  // 3. Title regex denylist.
+  const headline = input.title || "";
+  if (headline) {
+    for (const regex of compilePatterns(config.titlePatterns)) {
+      if (regex.test(headline)) {
+        return { isEvergreen: true, signal: "title" };
+      }
+    }
+  }
+
+  return { isEvergreen: false, signal: null };
+}
+
 export type EvergreenFilterResult = {
   passed: MergedCandidate[];
-  rejected: Array<{ candidate: MergedCandidate; reason: "title" | "source" }>;
+  rejected: Array<{ candidate: MergedCandidate; reason: EvergreenSignal }>;
   /**
    * Mirrors PR #296 / P4's `candidatesFilteredCrossDateDedup` counter.
    * Equals `rejected.length`, but surfaced separately so the runner.ts
@@ -234,32 +325,18 @@ export function applyEvergreenFilter(
   },
 ): EvergreenFilterResult {
   const { config, briefingDate } = options;
-  const titleRegexes = compilePatterns(config.titlePatterns);
-  const sourceDenyLower = new Set(
-    config.sourceDenylist.map((s) => s.trim().toLowerCase()).filter(Boolean),
-  );
-
   const passed: MergedCandidate[] = [];
   const rejected: EvergreenFilterResult["rejected"] = [];
   let penalized = 0;
 
   for (const candidate of candidates) {
-    const sourceLower = (candidate.source || "").trim().toLowerCase();
-    if (sourceLower && sourceDenyLower.has(sourceLower)) {
-      rejected.push({ candidate, reason: "source" });
-      continue;
-    }
-
-    const headline = candidate.headline || "";
-    let titleHit = false;
-    for (const regex of titleRegexes) {
-      if (regex.test(headline)) {
-        titleHit = true;
-        break;
-      }
-    }
-    if (titleHit) {
-      rejected.push({ candidate, reason: "title" });
+    // Hard reject via the shared classifier (precedence: feed → source → title).
+    const verdict = classifyEvergreen(
+      { title: candidate.headline, source: candidate.source, url: candidate.url },
+      config,
+    );
+    if (verdict.isEvergreen && verdict.signal) {
+      rejected.push({ candidate, reason: verdict.signal });
       continue;
     }
 
