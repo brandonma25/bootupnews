@@ -12,29 +12,27 @@
  * already appeared in signal_posts on a prior briefing_date OLDER than a grace
  * window, within a lookback window.
  *
- * ── Grace math (load-bearing — verified against real "Local Police" data) ──
- * GRACE_DAYS is the number of consecutive grace days AFTER a story's first
- * appearance during which re-staging the same URL is still allowed. A story can
- * therefore run on its first day + up to GRACE_DAYS following days
- * (= GRACE_DAYS + 1 consecutive days total) before the dedup kicks in. This
+ * ── Recurrence math (load-bearing — verified against real "Local Police" data) ──
+ * MAX_CONSECUTIVE_DAYS is the most days a single URL may appear before dedup kicks
+ * in. A story can run on days 1..MAX_CONSECUTIVE_DAYS; on day MAX_CONSECUTIVE_DAYS+1
+ * (or any reappearance MAX_CONSECUTIVE_DAYS+ days later) it is skipped. This
  * protects genuine multi-day developing news — which, in the real data, REUSES
- * the identical URL across consecutive days (e.g. heatmap.news/am/china-uk-
- * nuclear on 06-02 AND 06-03) — while still killing sustained/gapped evergreen
- * recurrence.
+ * the identical URL across consecutive days (e.g. heatmap.news/am/china-uk-nuclear
+ * on 06-02 AND 06-03) — while still killing sustained/gapped evergreen recurrence.
  *
  * Concretely, a candidate is skipped iff its URL appears on some prior
- * briefing_date `d` with `GRACE_DAYS < (briefingDate - d) <= LOOKBACK_DAYS`,
- * i.e. `d` in the window `[briefingDate - LOOKBACK_DAYS, briefingDate - (GRACE_DAYS + 1)]`.
+ * briefing_date `d` with `MAX_CONSECUTIVE_DAYS <= (briefingDate - d) <= LOOKBACK_DAYS`,
+ * i.e. `d` in the window `[briefingDate - LOOKBACK_DAYS, briefingDate - MAX_CONSECUTIVE_DAYS]`.
  *
- * Worked example with GRACE_DAYS=2 (URL "alabama-nebius-data-center-police"
+ * Worked example with MAX_CONSECUTIVE_DAYS=3 (URL "alabama-nebius-data-center-police"
  * staged 05-30, 05-31, 06-01):
  *   - day 06-01 (3rd consecutive): window = [05-02, 05-29]. Priors 05-30/05-31
- *     are NOT in the window (they are only 1–2 days old) → KEPT. ✓
+ *     are NOT in the window (only 1–2 days old) → KEPT. ✓
  *   - day 06-02 (hypothetical 4th): window = [05-03, 05-30]. Prior 05-30 (3 days
  *     old) IS in the window → SKIPPED. ✓
- * (The original spec said `d <= briefingDate - GRACE_DAYS`, but that off-by-one
- * drops the legitimate 3rd day; the Local-Police example is the binding
- * acceptance criterion, so we use `- (GRACE_DAYS + 1)`.)
+ * (Named MAX_CONSECUTIVE_DAYS=3 rather than a grace-of-2 so the "up to 3 days"
+ * semantics are self-evident at the call site — the window simply ends at
+ * today - MAX_CONSECUTIVE_DAYS.)
  *
  * Dedup is on the NORMALIZED exact URL — NEVER by title or topic, so a genuine
  * new development (a different article = a different URL) is never suppressed.
@@ -45,8 +43,14 @@
  * windowed signal_posts query and owns the observability logging.
  */
 
-/** Consecutive grace days after first appearance (story may run GRACE_DAYS + 1 days). */
-export const CROSS_DATE_GRACE_DAYS = 2;
+/**
+ * Max consecutive days a single URL may appear before cross-date dedup kicks in.
+ * A story can run on days 1..MAX_CONSECUTIVE_DAYS; on day MAX_CONSECUTIVE_DAYS+1
+ * (or any gapped reappearance ≥ MAX_CONSECUTIVE_DAYS days later) it is skipped.
+ * Set to 3 so genuine multi-day developing news survives (real developing stories
+ * reuse the identical URL across consecutive days).
+ */
+export const MAX_CONSECUTIVE_DAYS = 3;
 /** How far back to look for a recurring URL. */
 export const CROSS_DATE_LOOKBACK_DAYS = 30;
 
@@ -106,21 +110,24 @@ export function normalizeUrlForDedup(rawUrl: string | null | undefined): string 
 /**
  * The prior-briefing-date window to check for recurrence. Returns `null` when
  * `briefingDate` is unparseable or when the window is empty (a misconfig where
- * GRACE_DAYS + 1 > LOOKBACK_DAYS).
+ * MAX_CONSECUTIVE_DAYS > LOOKBACK_DAYS).
  */
 export function computeCrossDateWindow(
   briefingDate: string,
-  opts: { graceDays?: number; lookbackDays?: number } = {},
+  opts: { maxConsecutiveDays?: number; lookbackDays?: number } = {},
 ): { startDate: string; endDate: string } | null {
-  const graceDays = opts.graceDays ?? CROSS_DATE_GRACE_DAYS;
+  const maxConsecutiveDays = opts.maxConsecutiveDays ?? MAX_CONSECUTIVE_DAYS;
   const lookbackDays = opts.lookbackDays ?? CROSS_DATE_LOOKBACK_DAYS;
 
   const baseMs = Date.parse(`${briefingDate}T00:00:00Z`);
   if (Number.isNaN(baseMs)) return null;
 
   const startDate = new Date(baseMs - lookbackDays * MS_PER_DAY).toISOString().slice(0, 10);
-  // Upper bound excludes the grace days (today-1 … today-GRACE_DAYS) and today.
-  const endDate = new Date(baseMs - (graceDays + 1) * MS_PER_DAY).toISOString().slice(0, 10);
+  // Window ends at today - MAX_CONSECUTIVE_DAYS: the most-recent (MAX_CONSECUTIVE_DAYS - 1)
+  // days plus today are NOT treated as recurrence, so a story may run up to
+  // MAX_CONSECUTIVE_DAYS consecutive days; only an appearance MAX_CONSECUTIVE_DAYS+
+  // days ago triggers a skip.
+  const endDate = new Date(baseMs - maxConsecutiveDays * MS_PER_DAY).toISOString().slice(0, 10);
 
   if (endDate < startDate) return null;
   return { startDate, endDate };

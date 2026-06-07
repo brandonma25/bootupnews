@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  CROSS_DATE_GRACE_DAYS,
   CROSS_DATE_LOOKBACK_DAYS,
+  MAX_CONSECUTIVE_DAYS,
   computeCrossDateWindow,
   normalizeUrlForDedup,
   partitionByCrossDateRecurrence,
@@ -17,7 +17,7 @@ import {
  *   - Developing stories that reuse the SAME URL across 2 consecutive days MUST
  *     stay (Google/Anthropic, China/Britain Nuclear, China-Canada Wind).
  *   - "Local Police" ran 3 consecutive days (05-30/31, 06-01) and MUST stay on
- *     ALL three — this is what pins GRACE_DAYS=2.
+ *     ALL three — this is what pins MAX_CONSECUTIVE_DAYS=3.
  *   - The two Climate Tech stories use DIFFERENT URLs and MUST both survive
  *     (proves dedup is URL-based, not title/topic-based).
  *   - Evergreens (same URL recurring with gaps over weeks) MUST be skipped on
@@ -34,7 +34,7 @@ const HISTORY: Array<{ date: string; url: string }> = [
   { date: "2026-06-03", url: "https://heatmap.news/am/china-uk-nuclear" },
   { date: "2026-06-01", url: "https://heatmap.news/am/china-canada-wind" },
   { date: "2026-06-02", url: "https://heatmap.news/am/china-canada-wind" },
-  // Developing — 3 consecutive days (pins GRACE_DAYS = 2).
+  // Developing — 3 consecutive days (pins MAX_CONSECUTIVE_DAYS = 3).
   { date: "2026-05-30", url: "https://heatmap.news/plus/the-fight/hotspots/alabama-nebius-data-center-police" },
   { date: "2026-05-31", url: "https://heatmap.news/plus/the-fight/hotspots/alabama-nebius-data-center-police" },
   { date: "2026-06-01", url: "https://heatmap.news/plus/the-fight/hotspots/alabama-nebius-data-center-police" },
@@ -97,8 +97,8 @@ describe("cross-date URL dedup — real production data", () => {
   });
 
   describe("computeCrossDateWindow", () => {
-    it("excludes the grace days: window upper bound is briefingDate-(GRACE+1)", () => {
-      expect(CROSS_DATE_GRACE_DAYS).toBe(2);
+    it("window ends at briefingDate - MAX_CONSECUTIVE_DAYS (allows up to 3 consecutive days)", () => {
+      expect(MAX_CONSECUTIVE_DAYS).toBe(3);
       expect(CROSS_DATE_LOOKBACK_DAYS).toBe(30);
       const w = computeCrossDateWindow("2026-06-07");
       expect(w).toEqual({ startDate: "2026-05-08", endDate: "2026-06-04" });
@@ -119,11 +119,11 @@ describe("cross-date URL dedup — real production data", () => {
     });
   });
 
-  describe("MUST STAY all 3 days — Local Police (pins GRACE_DAYS=2)", () => {
+  describe("MUST STAY all 3 days — Local Police (pins MAX_CONSECUTIVE_DAYS=3)", () => {
     const url = "https://heatmap.news/plus/the-fight/hotspots/alabama-nebius-data-center-police";
     it("day 2 (05-31) stays", () => expect(wouldSkip("2026-05-31", url)).toBe(false));
     it("day 3 (06-01) stays — the binding case", () => expect(wouldSkip("2026-06-01", url)).toBe(false));
-    it("a hypothetical day 4 (06-02) WOULD be skipped (cap = GRACE+1 = 3 days)", () => {
+    it("a hypothetical day 4 (06-02) WOULD be skipped (cap = MAX_CONSECUTIVE_DAYS = 3 days)", () => {
       expect(wouldSkip("2026-06-02", url)).toBe(true);
     });
   });
