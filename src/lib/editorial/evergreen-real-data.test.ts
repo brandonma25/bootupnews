@@ -94,4 +94,31 @@ describe("evergreen classifier — real production data", () => {
       expect(v.signal).toBeNull();
     });
   });
+
+  describe("title-pattern audit — real-news questions must NOT be suppressed (non-feed URL)", () => {
+    // These are real news framed as how/why questions. The original #307 broad
+    // ^how (are|is|…) / ^why (is|are|…) patterns would have wrongly suppressed
+    // them; the tightened patterns (explainer-tail / narrowed why) must let them pass.
+    it.each([
+      "How the Fed raised rates faster than expected",
+      "How are markets reacting to the jobs report",
+      "Why are mortgage rates rising again",
+      "Why is inflation cooling this quarter",
+    ])("passes real-news question %p", (title) => {
+      const v = verdict({ title, url: "https://www.reuters.com/markets/2026/06/08/story" });
+      expect(v.isEvergreen).toBe(false);
+    });
+
+    // Genuine explainers are still caught (by title), independent of feed.
+    it.each([
+      "How does the Fed work?",
+      "How to read an earnings report",
+      "How are benchmark borrowing costs measured?",
+      "Why exclude food and energy from inflation measures?",
+    ])("still flags genuine explainer %p", (title) => {
+      const v = verdict({ title, url: "https://example.com/syndicated-copy" });
+      expect(v.isEvergreen).toBe(true);
+      expect(v.signal).toBe("title");
+    });
+  });
 });

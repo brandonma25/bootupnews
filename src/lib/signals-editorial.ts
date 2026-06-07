@@ -1353,14 +1353,22 @@ async function persistSignalPostCandidates(
     };
   }
 
+  // Track 2 — soften the >=5 floor to match runDailyNewsCron's degraded path.
+  // The zero case is handled above (hard fail). A thin slate of 1-4 source-ready
+  // candidates now PERSISTS in "degraded" mode instead of being refused outright.
+  // Rationale: the old hard >=5 floor zeroed the ENTIRE slate on evergreen-heavy
+  // days once the P7 evergreen filter removed the padding (it took down the
+  // 2026-06-07 on-demand run -> empty slate; see
+  // docs/engineering/bug-fixes/evergreen-restaging-with-floor-softening-2026-06-08.md).
+  // A thin CLEAN slate (real items, no evergreens) beats a 5-item slate padded
+  // with evergreens, and beats an empty slate. These rows are needs_review
+  // (not auto-published), so a short review queue is safe.
   if (mode !== "draft_only" && sourceReadyCandidates.length < TOP_SIGNAL_SET_SIZE) {
-    return {
-      ok: false,
+    logServerEvent("warn", "Signal snapshot persisting in degraded mode (below target count)", {
       briefingDate,
-      insertedCount: 0,
-      skippedCandidates,
-      message: `The current signal pipeline returned ${sourceReadyCandidates.length} source-ready signal posts. Persisting the daily snapshot requires at least five.`,
-    };
+      sourceReadyCount: sourceReadyCandidates.length,
+      targetCount: TOP_SIGNAL_SET_SIZE,
+    });
   }
 
   const existingResult = await client

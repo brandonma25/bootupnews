@@ -2065,6 +2065,25 @@ describe("signals editorial workflow", () => {
     expect(insertedUrls).not.toContain(EVERGREEN_URL);
   });
 
+  // Track 2 (re-ship) — soften the >=5 persist floor. After the P7 evergreen
+  // filter removes a Fed-heavy pool, the thin CLEAN remainder (1-4 real items)
+  // must PERSIST in degraded mode, not hard-fail to an empty slate (the bug that
+  // took down the 2026-06-07 run and forced the #307 revert).
+  it("persists a thin clean slate (3 source-ready) in degraded mode instead of hard-failing <5", async () => {
+    const rows: SignalPostRow[] = [];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-05-31",
+      items: Array.from({ length: 3 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.insertedCount).toBe(3);
+    expect(rows.filter((row) => row.briefing_date === "2026-05-31")).toHaveLength(3);
+  });
+
   // Task 3 — legacy template generator provenance stamps. Every row written by
   // the legacy heuristic-template path (persistSignalPostCandidates) must
   // carry deterministic_template provenance so post-deploy queries can tell

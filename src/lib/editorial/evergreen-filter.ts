@@ -112,13 +112,19 @@ export const DEFAULT_EVERGREEN_FILTER_CONFIG: EvergreenFilterConfig = {
   titlePatterns: [
     // "What is X" / "What are X"
     "^\\s*what\\s+(?:is|are|was|were)\\b",
-    // "How are/is/does X measured/work…" — CLOSED GAP: added are|is so
-    // "How are benchmark borrowing costs measured?" is now caught (the old
-    // pattern only listed does|do|did|to|the).
-    "^\\s*how\\s+(?:are|is|do|does|did|to|the)\\b",
-    // "Why exclude/do/does/is/are …" explainer prefix — CLOSED GAP: catches
-    // "Why exclude food and energy from inflation measures?".
-    "^\\s*why\\s+(?:exclude|do|does|is|are)\\b",
+    // "How to X" — instructional guide prefix (reliably evergreen).
+    "^\\s*how\\s+to\\b",
+    // "How are/is/does X measured/works/explained" — AUDIT (re-ship): require an
+    // explainer verb to follow, so real news framed as a question ("How the Fed
+    // raised rates", "How are markets reacting") is NOT suppressed. Still catches
+    // "How are benchmark borrowing costs measured?" and "How does the Fed work?".
+    "^\\s*how\\s+(?:are|is|do|does|did|the)\\b.*\\b(?:work|works|worked|measured|calculated|computed|defined|determined|explained|explain)\\b",
+    // "Why exclude/do/does …" explainer prefix — AUDIT (re-ship): narrowed to
+    // exclude|do|does (dropped is|are) so real-news questions ("Why are rates
+    // rising?", "Why is inflation high?") pass; catches "Why exclude food and
+    // energy from inflation measures?". (Fed-blog why-explainers are also caught
+    // by the feed signal regardless.)
+    "^\\s*why\\s+(?:exclude|do|does)\\b",
     // "Explained" / "Explainer"
     "\\bexplain(?:ed|er)\\b",
     // "Year in review" / "Decade in review"
