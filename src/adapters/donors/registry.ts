@@ -99,6 +99,45 @@ const REGULATORY_ACTION_SIGNALS = [
   "antitrust suit", "antitrust lawsuit",
 ] as const;
 
+// ── PRD-38 follow-up: business/markets news ─────────────────────────────────
+// Same proven structure as the conflict/legislation lift, but with a STRICT
+// magnitude gate. Most business headlines are routine PR / product / minor-move
+// noise, so the boost fires ONLY when a genuine business EVENT co-occurs with a
+// SCALE signal (a large dollar magnitude OR a mega-cap actor doing a
+// market-moving action). A small funding round, a routine earnings line, a
+// product launch, or generic mega-cap chatter never qualifies. NO keyword-list
+// change — the gated boost alone carries the lift, so generic business
+// vocabulary can never nudge filler upward.
+const BUSINESS_EVENT_TERMS = [
+  "ipo", "initial public offering", "acquisition", "acquires", "acquire",
+  "merger", "buyout", "takeover", "raises", "raised", "funding round",
+  "valuation", "earnings", "revenue", "guidance", "rout", "plunge", "wipeout",
+  "spinoff", "spin-off", "layoffs", "antitrust", "bankruptcy",
+] as const;
+// Mega-cap / market-moving actors — word-boundary matched so "meta" never
+// matches "metal". A mega-cap doing a major action is market-moving on its own.
+const MEGA_CAP_ACTOR_RE =
+  /\b(apple|microsoft|google|alphabet|amazon|nvidia|tesla|meta|openai|anthropic|broadcom|spacex|tsmc|samsung|intel|oracle|qualcomm|netflix|boeing|honeywell|jpmorgan|goldman sachs|berkshire|exxon|walmart)\b/i;
+// Mega-cap actions that are market-moving WITHOUT a dollar figure (earnings,
+// structural events, regulatory) — deliberately excludes funding/raises, which
+// must show a real dollar magnitude instead.
+const MAJOR_COMPANY_ACTIONS = [
+  "earnings", "revenue", "guidance", "rout", "plunge", "wipeout", "spinoff",
+  "spin-off", "layoffs", "antitrust", "acquisition", "acquires", "merger",
+  "buyout", "takeover", "bankruptcy",
+] as const;
+
+/**
+ * Major dollar magnitude: any billions/trillions, or >= $500M. The numeric floor
+ * is the filler firewall — a "$20M Series A" or a "$255M" minor round never
+ * clears it; only genuinely market-scale figures do.
+ */
+function hasMajorDollarMagnitude(corpus: string): boolean {
+  if (/\$\s?\d[\d.,]*\s?(?:tn|trillion|bn|billion|b)\b/i.test(corpus)) return true;
+  const m = corpus.match(/\$\s?(\d{3,})(?:[.,]\d+)?\s?(?:m|mn|million)\b/i);
+  return Boolean(m && Number(m[1].replace(/,/g, "")) >= 500);
+}
+
 function normalizeFeedMetadata(feed: DonorFeed): CanonicalSourceMetadata {
   return {
     sourceId: feed.id,
@@ -845,6 +884,20 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
         // lean on, so the boost itself carries the weight. The noun+verb gate
         // keeps procedural filler (no passage event) out.
         addCalibrationBoost({ structural: 44, downstream: 34, actor: 26, crossDomain: 26, actionability: 38, persistence: 22 });
+      }
+
+      // PRD-38 follow-up — business/markets boost. Fires ONLY when a business
+      // EVENT co-occurs with a SCALE signal: a large dollar magnitude
+      // (>=$500M / billions) OR a mega-cap actor performing a market-moving
+      // action. This strict magnitude gate keeps routine business PR (small
+      // rounds, minor earnings, product launches, mega-cap chatter) below 52
+      // while lifting SpaceX-IPO / Broadcom-rout / Ramp-class events to it.
+      const hasBusinessScale =
+        hasMajorDollarMagnitude(corpus) ||
+        (MEGA_CAP_ACTOR_RE.test(corpus) && includesAny(corpus, [...MAJOR_COMPANY_ACTIONS]));
+      const hasBusinessEvent = includesAny(corpus, [...BUSINESS_EVENT_TERMS]);
+      if (hasBusinessScale && hasBusinessEvent) {
+        addCalibrationBoost({ structural: 46, downstream: 38, actor: 28, crossDomain: 28, actionability: 38, persistence: 24 });
       }
 
       // PRD-38 — evergreen penalty (LOAD-BEARING). Importance must learn what the

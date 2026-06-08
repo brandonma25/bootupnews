@@ -29,10 +29,9 @@ type Row = {
   imp: number; score: number; etype: string; elig: string;
 };
 
-const fixturePath = path.resolve(
-  process.cwd(),
-  "tests/fixtures/importance-recalibration/pool-2026-06-08.json",
-);
+const fixturePath = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.resolve(process.cwd(), "tests/fixtures/importance-recalibration/pool-2026-06-08.json");
 const rows: Row[] = JSON.parse(readFileSync(fixturePath, "utf8"));
 
 const provider = getRankingFeatureProviders()[0]?.provider;
