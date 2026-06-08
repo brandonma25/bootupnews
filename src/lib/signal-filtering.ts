@@ -367,20 +367,40 @@ export function classifyEventType(
     `${candidate.topicName ?? ""} ${candidate.title} ${candidate.summaryText ?? ""}`,
   );
 
-  if (/\b(opinion|editorial|op-ed)\b/.test(text)) return "opinion_only";
+  // Opinion / think-piece / first-person-column framing. A piece ABOUT a topic is
+  // not an instance of that topic — an opinion column on AI policy is opinion, not
+  // policy_regulation. Tight markers only, so genuine news framed as a question
+  // ("Why are rates rising?") is not swept up.
+  if (/\b(opinion|editorial|op-ed|making us (lose|dumber|smarter|sicker|poorer|anxious|stupid)|lose control of (our|your)|the case (for|against)|why you should|is it time to|in (defense|praise) of|a love letter to|we need to talk about|i'?ve been (at|to)|i sat down with|in my (view|opinion))\b/.test(text)) return "opinion_only";
+  // Profile / ambition speculation ("What does X want now/next?") — a soft profile,
+  // not a hard event. Tight: requires the "want now/next" speculation tail.
+  if (/\bwhat (do|does) .{2,40} want (now|next)\b/.test(text)) return "opinion_only";
   if (/\b(promoted|sponsored|advertisement|sale|discount|deal of the day)\b/.test(text)) return "promotional";
   if (/\b(celebrity|movie|tv|festival|fashion|sports|entertainment)\b/.test(text)) return "culture_filler";
   if (/\b(human interest|viral|heartwarming|lifestyle)\b/.test(text)) return "human_interest_low_relevance";
   if (/\b(live updates?|what we know|what to know|recap|roundup|timeline)\b/.test(text)) return "repetitive_followup_no_new_info";
   if (/\b(minor update|small update|feature update|beta feature|ui tweak|bug fix)\b/.test(text)) return "minor_feature_update";
+  // Process / maneuvering / gossip framing. Political jockeying and blame-shifting
+  // are not policy or accountability ACTIONS, so they must not borrow a core type
+  // just because the body mentions "policy"/"victims".
+  if (/\b(plot(s|ting)? (a |its |their )?response|punts? blame|blame game|tit-for-tat|loyalty test|jockey(ing)? for|political posturing)\b/.test(text)) return "generic_commentary";
   if (/\b(shutdown|federal workers?|tsa officers?|agency staff|agency capacity|workforce attrition|quit amid shutdown|resignations?)\b/.test(text)) return "government_capacity";
   if (/\b(purdue settlement|opioid settlement|settlement money|victims?|low-income residents?|towing companies|ignoring new law|enforcement|legal accountability)\b/.test(text)) return "public_interest_legal_accountability";
   if (/\b(android|app store|platform|distribution|search|ai distribution|market access)\b.*\b(antitrust|regulation|rules?|open up|intervention|probe)\b/.test(text)) return "platform_regulation";
   if (/\b(payroll employment|consumer price index|cpi|unemployment rate|jobs report|employment situation|productivity|ppi|producer price|bureau of labor statistics|major economic indicators)\b/.test(text)) return "macro_data_release";
   if (/\b(fomc|federal reserve|fed chair|central bank|monetary policy|discount rate|interest rates?)\b/.test(text)) return "central_bank_policy";
   if (/\b(ai data centers?|data centers?|grid|permitting|power demand|energy capacity|ai infrastructure)\b/.test(text)) return "ai_infrastructure_policy";
-  if (/\b(cyberattacks?|hacker|extradited|indicted|state-linked|state linked|cyber enforcement)\b/.test(text)) return "cybersecurity_enforcement";
+  if (
+    /\b(cyberattacks?|cyber attack|data breach|ransomware|malware|phishing|hacker|extradited|indicted|state-linked|state linked|cyber enforcement)\b/.test(text) ||
+    // "hack"/"breach"/"attackers" only count as security when a breach context follows
+    // (keeps "growth hack"/"life hack" out).
+    /\b(hacked?|hacks|hacking|breached?|attackers?)\b.*\b(account|accounts|breach|steal|stole|stolen|broke into|compromis|exploit|credential|security)\b/.test(text)
+  ) return "cybersecurity_enforcement";
   if (/\b(national science board|national science foundation|science governance|board fired|institutional governance)\b/.test(text)) return "institutional_governance";
+  // Legislative action — a bill passing / advancing IS a policy event even when the
+  // headline carries no "policy"/"regulation" word (e.g. "House Passes a Bipartisan
+  // Package of Bills to Boost Geothermal" was falling through to generic_commentary).
+  if (/\b((house|senate|congress|lawmakers?|chamber) (passed?|passes|approved?|advances?|votes? to (pass|approve))|passed the (house|senate)|signed into law|enacted into law|enacted|vetoes?|bipartisan (bill|package|legislation)|aid package|spending bill|appropriations bill|defense bill|funding bill)\b/.test(text)) return "policy_regulation";
   if (/\b(approves?|bans?|tariffs?|sanctions?|restrictions?|export controls?|regulation|regulatory|policy|rules?|executive order|antitrust rules)\b/.test(text)) return "policy_regulation";
   if (/\b(earnings|revenue|profit|guidance|quarterly|results?|forecast)\b/.test(text)) return "earnings_financials";
   if (/\b(acquires?|acquisition|merger|buyout|funding|raises? \$|series [abcde]|venture round|ipo)\b/.test(text)) return "mna_funding";
@@ -390,7 +410,7 @@ export function classifyEventType(
   if (/\b(sues?|lawsuit|probe|investigation|antitrust|charges?|settlement|doj|sec)\b/.test(text)) return "legal_investigation";
   if (/\b(partners? with|partnership|joint venture|supply deal|distribution deal|collaboration)\b/.test(text)) return "partnership_major";
   if (/\b(outage|shutdown|shortage|strike|halts?|delays?|recall|factory fire|port closure)\b/.test(text)) return "supply_chain_disruption";
-  if (/\b(fed|inflation|rates?|treasury|gdp|jobs report|central bank|markets? tumble|stocks? slide|currency swings?)\b/.test(text)) return "macro_market_move";
+  if (/\b(fed|inflation|rates?|treasury|gdp|jobs report|central bank|markets? tumble|stocks? slide|currency swings?|market rout|sell-?off|stocks? (plunge|tumble|soar|surge|crash|rout)|\$\d[\d.,]*\s?(bn|tn|billion|trillion)\s?(rout|wipeout|sell-?off))\b/.test(text)) return "macro_market_move";
   if (/\b(analysis|commentary|view|outlook|preview)\b/.test(text)) return "generic_commentary";
 
   return "generic_commentary";
