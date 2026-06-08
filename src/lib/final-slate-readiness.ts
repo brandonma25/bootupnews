@@ -1,7 +1,9 @@
 export type FinalSlateTier = "core" | "context";
 
 export const FINAL_SLATE_MIN_PUBLIC_ROWS = 1;
-export const FINAL_SLATE_MAX_PUBLIC_ROWS = 5;
+// PRD-36 (amended): the public slate holds the full final-slate set —
+// 5 core ("Signal") + 2 context ("Context") = 7 rows.
+export const FINAL_SLATE_MAX_PUBLIC_ROWS = 7;
 export const FINAL_SLATE_CORE_RANKS = [1, 2, 3, 4, 5] as const;
 export const FINAL_SLATE_CONTEXT_RANKS = [6, 7] as const;
 export const FINAL_SLATE_RANKS = [
@@ -145,14 +147,14 @@ export function validateFinalSlateReadiness(
   if (selectedRows.length < FINAL_SLATE_MIN_PUBLIC_ROWS) {
     addFailure({
       code: "empty_public_slate",
-      message: "Cannot publish an empty slate. Select 1-5 rows before publishing.",
+      message: "Cannot publish an empty slate. Select 1-7 rows before publishing.",
     });
   }
 
   if (selectedRows.length > FINAL_SLATE_MAX_PUBLIC_ROWS) {
     addFailure({
       code: "prd36_public_slate_cap",
-      message: `PRD-36 caps the public slate at 5 rows. Current count: ${selectedRows.length}.`,
+      message: `PRD-36 caps the public slate at ${FINAL_SLATE_MAX_PUBLIC_ROWS} rows. Current count: ${selectedRows.length}.`,
     });
   }
 

@@ -173,7 +173,8 @@ const PUBLISHED_SLATE_ITEM_SELECT = PUBLISHED_SLATE_ITEM_REQUIRED_COLUMNS.join("
 
 const EDITORIAL_PAGE_SIZE = 20;
 const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
-const TOP_SIGNAL_SET_SIZE = 5;
+// The full public slate size (PRD-36 amended): 5 core + 2 context = 7.
+const TOP_SIGNAL_SET_SIZE = 7;
 // signal_posts.rank CHECK is `between 1 and 20`; append mode caps post-max ranks here.
 const SIGNAL_POST_RANK_MAX = 20;
 const CONTEXT_SIGNAL_SET_SIZE = 2;
@@ -2341,13 +2342,13 @@ export async function getEditorialReviewState(
 }
 
 function getEditorialStorageWarning(postCount: number, scope: EditorialScopeFilter) {
-  if (postCount < 5) {
+  if (postCount < FINAL_SLATE_MAX_PUBLIC_ROWS) {
     return scope === "historical"
       ? `Editorial archive currently has ${postCount} matching historical signal posts.`
       : `Editorial storage currently has ${postCount} matching signal posts. Publishing requires a validated ${FINAL_SLATE_MIN_PUBLIC_ROWS}-${FINAL_SLATE_MAX_PUBLIC_ROWS} row final slate.`;
   }
 
-  if (postCount > 5 && scope === "all") {
+  if (postCount > FINAL_SLATE_MAX_PUBLIC_ROWS && scope === "all") {
     return `Editorial storage has ${postCount} matching signal posts. This page is paginated; publishing still uses only the latest validated final slate.`;
   }
 

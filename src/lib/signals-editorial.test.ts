@@ -1208,7 +1208,7 @@ describe("signals editorial workflow", () => {
       ok: false,
       code: "publish_blocked",
     });
-    expect(result.message).toContain("Cannot publish an empty slate. Select 1-5 rows before publishing.");
+    expect(result.message).toContain("Cannot publish an empty slate. Select 1-7 rows before publishing.");
     expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
     expect(rows.every((row) => row.is_live === false)).toBe(true);
     expect(rows.every((row) => row.published_at === null)).toBe(true);
@@ -1216,8 +1216,8 @@ describe("signals editorial workflow", () => {
     expect(supabase.publishedSlateItems).toHaveLength(0);
   });
 
-  it("blocks final-slate publishing above the PRD-36 five-row cap", async () => {
-    const rows = createValidFinalSlate().slice(0, 6);
+  it("blocks final-slate publishing above the PRD-36 seven-row cap", async () => {
+    const rows = createPartialFinalSlate(8);
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
@@ -1233,7 +1233,7 @@ describe("signals editorial workflow", () => {
       ok: false,
       code: "publish_blocked",
     });
-    expect(result.message).toContain("PRD-36 caps the public slate at 5 rows. Current count: 6.");
+    expect(result.message).toContain("PRD-36 caps the public slate at 7 rows. Current count: 8.");
     expect(rows.every((row) => row.editorial_status === "approved")).toBe(true);
     expect(rows.every((row) => row.is_live === false)).toBe(true);
     expect(rows.every((row) => row.published_at === null)).toBe(true);
@@ -2189,7 +2189,7 @@ describe("signals editorial workflow", () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe("publish_blocked");
     expect(result.message).toBe(
-      "Individual signal publishing is disabled. Use Publish Final Slate after a validated 1-5 row slate passes validation.",
+      "Individual signal publishing is disabled. Use Publish Final Slate after a validated 1-7 row slate passes validation.",
     );
     expect(rows[0].editorial_status).toBe("approved");
     expect(rows[0].is_live).toBe(false);
@@ -2699,6 +2699,8 @@ describe("signals editorial workflow", () => {
       "legacy-live-3",
       "legacy-live-4",
       "legacy-live-5",
+      "legacy-live-6",
+      "legacy-live-7",
     ]);
     expect(homepageSnapshot.errorMessage).toBeUndefined();
   });
@@ -2792,6 +2794,8 @@ describe("signals editorial workflow", () => {
       "slot-3",
       "slot-4",
       "slot-5",
+      "slot-6",
+      "slot-7",
     ]);
     expect(homepageSnapshot.depthPosts.map((post) => post.id)).toEqual([
       "slot-1-promoted-rank-8",
@@ -2946,7 +2950,15 @@ describe("signals editorial workflow", () => {
 
     expect(snapshot.source).toBe("published_live");
     expect(snapshot.briefingDate).toBe("2026-04-26");
-    expect(snapshot.posts.map((post) => post.id)).toEqual(["live-1", "live-2", "live-3", "live-4", "live-5"]);
+    expect(snapshot.posts.map((post) => post.id)).toEqual([
+      "live-1",
+      "live-2",
+      "live-3",
+      "live-4",
+      "live-5",
+      "live-6",
+      "live-7",
+    ]);
     expect(snapshot.depthPosts.map((post) => post.id)).toEqual([
       "live-1",
       "live-2",

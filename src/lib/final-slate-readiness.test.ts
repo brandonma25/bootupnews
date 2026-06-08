@@ -38,7 +38,7 @@ function validSlate(overrides: Record<number, Partial<FinalSlateValidationRow>> 
 }
 
 describe("final slate readiness", () => {
-  it.each([1, 2, 3, 4, 5])("passes a valid partial public slate with %s selected rows", (count) => {
+  it.each([1, 2, 3, 4, 5, 6, 7])("passes a valid partial public slate with %s selected rows", (count) => {
     const result = validateFinalSlateReadiness(validSlate().slice(0, count));
 
     expect(result.ready).toBe(true);
@@ -51,16 +51,16 @@ describe("final slate readiness", () => {
 
     expect(result.ready).toBe(false);
     expect(result.failures.map((failure) => failure.message)).toContain(
-      "Cannot publish an empty slate. Select 1-5 rows before publishing.",
+      "Cannot publish an empty slate. Select 1-7 rows before publishing.",
     );
   });
 
   it("fails when the slate exceeds the PRD-36 public cap", () => {
-    const result = validateFinalSlateReadiness(validSlate().slice(0, 6));
+    const result = validateFinalSlateReadiness([...validSlate(), makeRow(8)]);
 
     expect(result.ready).toBe(false);
     expect(result.failures.map((failure) => failure.message)).toContain(
-      "PRD-36 caps the public slate at 5 rows. Current count: 6.",
+      "PRD-36 caps the public slate at 7 rows. Current count: 8.",
     );
   });
 
@@ -95,10 +95,10 @@ describe("final slate readiness", () => {
       }),
     );
 
-    expect(result.ready).toBe(false);
-    expect(result.failures.map((failure) => failure.message)).toContain(
-      "PRD-36 caps the public slate at 5 rows. Current count: 6.",
-    );
+    // With the cap at 7, a 6-row partial slate (rank-6 slot left empty) is
+    // valid — the unfilled slot must not register as a publish blocker.
+    expect(result.ready).toBe(true);
+    expect(result.failures).toEqual([]);
     expect(result.slotFailures[6]).toBeUndefined();
   });
 

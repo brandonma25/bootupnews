@@ -114,8 +114,8 @@ function SlotPanelBody({
   return (
     <>
       <div className="mt-[var(--bu-space-4)] space-y-[var(--bu-space-4)]">
-        <SlotGroup label="Core · 5 slots" slots={coreSlots} />
-        <SlotGroup label="Context · 2 slots" slots={contextSlots} />
+        <SlotGroup label={`Core · ${coreSlots.length} slots`} slots={coreSlots} />
+        <SlotGroup label={`Context · ${contextSlots.length} slots`} slots={contextSlots} />
       </div>
       {publishCounts ? (
         <p
