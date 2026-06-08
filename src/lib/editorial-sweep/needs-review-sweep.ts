@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureMessageSafe, flushSafe } from "@/lib/sentry-config";
 
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { errorContext, logServerEvent } from "@/lib/observability";
@@ -227,11 +227,11 @@ export async function runNeedsReviewSweep(options: {
       error: "Supabase service role client is not configured.",
     };
     logServerEvent("error", "needs_review sweep skipped: no service-role client", toLogSummary(summary));
-    Sentry.captureMessage("needs_review sweep could not run: service-role client unavailable.", {
+    captureMessageSafe("needs_review sweep could not run: service-role client unavailable.", {
       level: "error",
       tags: { failure_type: "needs_review_sweep_no_client" },
     });
-    await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+    await flushSafe(2_000).catch(() => { /* best-effort */ });
     return summary;
   }
 
@@ -256,12 +256,12 @@ export async function runNeedsReviewSweep(options: {
         ...toLogSummary(summary),
         ...errorContext(result.error),
       });
-      Sentry.captureMessage("needs_review sweep read failed.", {
+      captureMessageSafe("needs_review sweep read failed.", {
         level: "error",
         tags: { failure_type: "needs_review_sweep_read_failed" },
         extra: { reason: result.error.message },
       });
-      await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+      await flushSafe(2_000).catch(() => { /* best-effort */ });
       return summary;
     }
 
@@ -275,11 +275,11 @@ export async function runNeedsReviewSweep(options: {
       ...toLogSummary(summary),
       ...errorContext(error),
     });
-    Sentry.captureMessage("needs_review sweep read threw.", {
+    captureMessageSafe("needs_review sweep read threw.", {
       level: "error",
       tags: { failure_type: "needs_review_sweep_read_threw" },
     });
-    await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+    await flushSafe(2_000).catch(() => { /* best-effort */ });
     return summary;
   }
 
@@ -302,7 +302,7 @@ export async function runNeedsReviewSweep(options: {
       ...toLogSummary(summary),
       max: config.max,
     });
-    Sentry.captureMessage(
+    captureMessageSafe(
       `needs_review sweep aborted: ${disposeRows.length} aged-never-drafted rows exceed cap ${config.max}. ` +
         "A purge this large must be a human decision.",
       {
@@ -311,7 +311,7 @@ export async function runNeedsReviewSweep(options: {
         extra: { disposeSetSize: disposeRows.length, cap: config.max, cutoffDate },
       },
     );
-    await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+    await flushSafe(2_000).catch(() => { /* best-effort */ });
     await writeSweepPipelineLog(summary, runDate, config);
     return summary;
   }
@@ -351,12 +351,12 @@ export async function runNeedsReviewSweep(options: {
           ...toLogSummary(summary),
           ...errorContext(updateResult.error),
         });
-        Sentry.captureMessage("needs_review sweep update failed.", {
+        captureMessageSafe("needs_review sweep update failed.", {
           level: "error",
           tags: { failure_type: "needs_review_sweep_update_failed" },
           extra: { reason: updateResult.error.message },
         });
-        await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+        await flushSafe(2_000).catch(() => { /* best-effort */ });
         await writeSweepPipelineLog(summary, runDate, config);
         return summary;
       }
@@ -384,11 +384,11 @@ export async function runNeedsReviewSweep(options: {
         ...toLogSummary(summary),
         ...errorContext(error),
       });
-      Sentry.captureMessage("needs_review sweep update threw.", {
+      captureMessageSafe("needs_review sweep update threw.", {
         level: "error",
         tags: { failure_type: "needs_review_sweep_update_threw" },
       });
-      await Sentry.flush(2_000).catch(() => { /* best-effort */ });
+      await flushSafe(2_000).catch(() => { /* best-effort */ });
       await writeSweepPipelineLog(summary, runDate, config);
       return summary;
     }
@@ -449,7 +449,7 @@ async function writeSweepPipelineLog(
   } catch (error) {
     // writePipelineLogEntry is documented never to throw; guard anyway.
     logServerEvent("warn", "needs_review sweep pipeline-log write threw", errorContext(error));
-    Sentry.captureMessage("needs_review sweep pipeline-log writer threw.", {
+    captureMessageSafe("needs_review sweep pipeline-log writer threw.", {
       level: "warning",
       tags: { failure_type: "needs_review_sweep_pipeline_log_threw" },
     });
@@ -459,7 +459,7 @@ async function writeSweepPipelineLog(
   if (!result.written && !/not configured/i.test(result.reason)) {
     // The writer is down (Notion API failure), not merely unconfigured.
     logServerEvent("warn", "needs_review sweep pipeline-log write failed", { reason: result.reason });
-    Sentry.captureMessage("needs_review sweep pipeline-log write failed (writer down).", {
+    captureMessageSafe("needs_review sweep pipeline-log write failed (writer down).", {
       level: "warning",
       tags: { failure_type: "needs_review_sweep_pipeline_log_failed" },
       extra: { reason: result.reason },

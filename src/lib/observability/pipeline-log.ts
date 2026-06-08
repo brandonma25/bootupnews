@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureExceptionSafe, captureMessageSafe } from "@/lib/sentry-config";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
 
@@ -67,7 +67,7 @@ function richText(content: string) {
  * specific reason + run metadata for the issue body.
  */
 function captureWriterNoop(reason: string, extra: Record<string, unknown>) {
-  Sentry.captureMessage("Pipeline log writer no-op", {
+  captureMessageSafe("Pipeline log writer no-op", {
     level: "warning",
     fingerprint: ["pipeline-log-writer-noop", reason],
     tags: {
@@ -190,7 +190,7 @@ export async function writePipelineLogEntry(
       briefingDate: entry.briefingDate,
       ...errorContext(error),
     });
-    Sentry.captureException(error, {
+    captureExceptionSafe(error, {
       tags: {
         observability_surface: "pipeline_log",
         writer_noop_reason: "threw",

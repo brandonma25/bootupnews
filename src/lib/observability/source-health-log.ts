@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureExceptionSafe, captureMessageSafe } from "@/lib/sentry-config";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
 
@@ -179,7 +179,7 @@ function buildProperties(
  * across the entire run, not one per source fetched (38 sources/day).
  */
 function captureSourceHealthNoop(reason: string, extra: Record<string, unknown>) {
-  Sentry.captureMessage("Source health log writer no-op", {
+  captureMessageSafe("Source health log writer no-op", {
     level: "warning",
     fingerprint: ["source-health-log-writer-noop", reason],
     tags: {
@@ -292,7 +292,7 @@ export async function writeSourceHealthEntry(
       date: entry.date,
       ...errorContext(error),
     });
-    Sentry.captureException(error, {
+    captureExceptionSafe(error, {
       tags: {
         observability_surface: "source_health_log",
         writer_noop_reason: "threw",

@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 const DEFAULT_TRACES_SAMPLE_RATE = 0.05;
 const DEFAULT_REPLAYS_SESSION_SAMPLE_RATE = 0;
 const DEFAULT_REPLAYS_ON_ERROR_SAMPLE_RATE = 0.05;
@@ -35,6 +37,44 @@ export function readSentryDsn(runtime: "server" | "client" = "server") {
 
 export function isSentryConfigured(runtime: "server" | "client" = "server") {
   return Boolean(readSentryDsn(runtime));
+}
+
+/**
+ * tsx-safe Sentry capture/flush wrappers.
+ *
+ * Outside the Next.js server runtime (the `npm run pipeline:dry` harness, any
+ * CLI/tsx process, CI) the `@sentry/nextjs` SDK functions can be undefined even
+ * when SENTRY_DSN is set. A bare `Sentry.captureMessage(...)` then throws
+ * "Sentry.captureMessage is not a function" and crashes the caller on first use
+ * — which silently broke every RSS source-health write + the needs_review sweep
+ * in `pipeline:dry`, collapsing the dry-run to seed-fallback. These wrappers
+ * no-op unless Sentry is BOTH configured AND actually live (the same
+ * `isSentryConfigured` + `typeof` guard the RSS observability helpers already
+ * use), so best-effort pipeline telemetry can never crash the run.
+ */
+export function captureMessageSafe(...args: Parameters<typeof Sentry.captureMessage>): void {
+  if (!isSentryConfigured("server") || typeof Sentry.captureMessage !== "function") {
+    return;
+  }
+  Sentry.captureMessage(...args);
+}
+
+export function captureExceptionSafe(...args: Parameters<typeof Sentry.captureException>): void {
+  if (!isSentryConfigured("server") || typeof Sentry.captureException !== "function") {
+    return;
+  }
+  Sentry.captureException(...args);
+}
+
+export async function flushSafe(timeoutMs = 2000): Promise<boolean> {
+  if (!isSentryConfigured("server") || typeof Sentry.flush !== "function") {
+    return true;
+  }
+  try {
+    return await Sentry.flush(timeoutMs);
+  } catch {
+    return false;
+  }
 }
 
 export function readSentryEnvironment() {
