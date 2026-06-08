@@ -15,6 +15,7 @@ import {
   approveSignalPosts,
   assignSignalPostToFinalSlateSlot,
   holdSignalPost,
+  includeSignalPostInSlate,
   publishApprovedSignals,
   publishSignalPost,
   rejectSignalPost,
@@ -315,6 +316,38 @@ export async function assignFinalSlateSlotInlineAction(postId: string, finalSlat
 
   if (result.ok) {
     revalidateEditorialReviewRoute();
+  }
+
+  return result;
+}
+
+/**
+ * Include a card in the slate (Pick → Publish): assign the given slot AND
+ * approve in one step. Called by the CandidateRow "Include" toggle, which
+ * picks the lowest open rank. Returns the result so the client can surface
+ * an inline error (e.g. WITM rewrite required) without a full navigation.
+ */
+export async function includeCardInSlateAction(postId: string, finalSlateRank: number) {
+  const result = await includeSignalPostInSlate({ postId, finalSlateRank });
+
+  if (result.ok) {
+    revalidateEditorialRoutes();
+  }
+
+  return result;
+}
+
+/**
+ * Remove a card from the slate (Pick → Publish "Remove"). Clears the slot
+ * assignment; the card stays `approved` but unassigned, so the publish gate
+ * (which only acts on slot-assigned rows) excludes it. Re-including re-approves
+ * idempotently.
+ */
+export async function removeCardFromSlateInlineAction(postId: string) {
+  const result = await removeSignalPostFromFinalSlate({ postId });
+
+  if (result.ok) {
+    revalidateEditorialRoutes();
   }
 
   return result;

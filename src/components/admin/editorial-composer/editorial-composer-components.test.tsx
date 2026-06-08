@@ -257,29 +257,28 @@ describe("editorial composer components", () => {
     expect(screen.queryByTestId("publish-confirm-dialog")).not.toBeInTheDocument();
   });
 
-  it("shows WITM inline and assigns a candidate through the picker", () => {
-    const onAssign = vi.fn().mockResolvedValue(undefined);
+  it("includes a candidate via the one-click Include button (Pick → Publish)", () => {
+    const onInclude = vi.fn().mockResolvedValue(undefined);
 
     render(
       <CandidateRow
         candidate={createCandidate()}
         openSlots={[1, 2, 6]}
         storageReady
-        onAssign={onAssign}
+        onInclude={onInclude}
+        onRemove={vi.fn()}
       />,
     );
 
     expect(screen.getByText("WITM passed")).toBeInTheDocument();
     expect(screen.getByText("This matters because it changes the operating context.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/Assign Candidate title to a slot/i), {
-      target: { value: "2" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /Include Candidate title in the slate/i }));
 
-    expect(onAssign).toHaveBeenCalledWith("candidate-1", "2");
+    expect(onInclude).toHaveBeenCalledWith("candidate-1");
   });
 
-  it("blocks assignment for rewrite-required candidates", () => {
+  it("blocks Include for rewrite-required candidates", () => {
     render(
       <CandidateRow
         candidate={createCandidate({
@@ -288,13 +287,34 @@ describe("editorial composer components", () => {
         })}
         openSlots={[1]}
         storageReady
-        onAssign={vi.fn()}
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
     expect(screen.getByText("Needs rewrite")).toBeInTheDocument();
     expect(screen.getByText(/Template placeholder language detected/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Assign Candidate title to a slot/i)).toBeDisabled();
+    const includeButton = screen.getByRole("button", { name: /Include Candidate title in the slate/i });
+    expect(includeButton).toBeDisabled();
+    expect(includeButton).toHaveTextContent("Rewrite first");
+  });
+
+  it("offers Remove for an already-included candidate (Pick → Publish)", () => {
+    const onRemove = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <CandidateRow
+        candidate={createCandidate({ finalSlateRank: 2, finalSlateTier: "core" })}
+        openSlots={[1, 3]}
+        storageReady
+        onInclude={vi.fn()}
+        onRemove={onRemove}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Remove Candidate title from the slate/i }));
+
+    expect(onRemove).toHaveBeenCalledWith("candidate-1");
   });
 
   // #321 — the card must surface all three editorial layers at a glance,
@@ -310,7 +330,8 @@ describe("editorial composer components", () => {
         })}
         openSlots={[1]}
         storageReady
-        onAssign={vi.fn()}
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
@@ -330,7 +351,8 @@ describe("editorial composer components", () => {
         candidate={createCandidate({ editedWhyItMatters: "Only the signal." })}
         openSlots={[1]}
         storageReady
-        onAssign={vi.fn()}
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 

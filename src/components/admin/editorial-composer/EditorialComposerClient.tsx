@@ -3,11 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { assignFinalSlateSlotInlineAction } from "@/app/dashboard/signals/editorial-review/actions";
 import {
-  BulkApproveForm,
-  isEligibleForBulkApprove,
-} from "@/components/admin/editorial-composer/BulkApproveForm";
+  includeCardInSlateAction,
+  removeCardFromSlateInlineAction,
+} from "@/app/dashboard/signals/editorial-review/actions";
 import { CandidateRow } from "@/components/admin/editorial-composer/CandidateRow";
 import {
   SlotPanel,
@@ -41,11 +40,6 @@ export function EditorialComposerClient({
   const slots = useMemo(() => buildSlots(localCandidates), [localCandidates]);
   const openSlots = slots.filter((slot) => !slot.post).map((slot) => slot.rank);
 
-  const bulkApproveCandidates = useMemo(
-    () => localCandidates.filter((candidate) => isEligibleForBulkApprove(candidate, storageReady)),
-    [localCandidates, storageReady],
-  );
-
   const publishCounts = useMemo<PublishCounts>(
     () => computePublishCounts(localCandidates),
     [localCandidates],
@@ -66,11 +60,16 @@ export function EditorialComposerClient({
           : publishDisabledReason;
   const canPublish = readiness.selectedRows.length > 0 && !effectivePublishDisabledReason;
 
-  async function handleAssign(postId: string, slotId: string) {
-    const finalSlateRank = Number(slotId);
-    const finalSlateTier = getFinalSlateTierForRank(finalSlateRank);
+  // Pick → Publish "Include": assign the lowest open slot AND approve in one
+  // step. Optimistically reflects the approval + slot so the card moves into
+  // the slate immediately; reverts to the server snapshot on failure (e.g. a
+  // WITM rewrite is required).
+  async function handleInclude(postId: string) {
+    const finalSlateRank = openSlots[0];
+    const finalSlateTier = finalSlateRank ? getFinalSlateTierForRank(finalSlateRank) : null;
 
-    if (!finalSlateTier) {
+    if (!finalSlateRank || !finalSlateTier) {
+      setInlineError("The slate is full — remove a card before including another.");
       return;
     }
 
@@ -82,12 +81,41 @@ export function EditorialComposerClient({
               ...candidate,
               finalSlateRank,
               finalSlateTier,
+              editorialStatus: "approved",
+              editorialDecision: "approved",
             }
           : candidate,
       ),
     );
 
-    const result = await assignFinalSlateSlotInlineAction(postId, finalSlateRank);
+    const result = await includeCardInSlateAction(postId, finalSlateRank);
+
+    if (!result.ok) {
+      setInlineError(result.message);
+      setLocalCandidates(candidates);
+      return;
+    }
+
+    router.refresh();
+  }
+
+  // "Remove": clear the slot assignment. The card stays approved but unassigned
+  // so the publish gate (slot-assigned rows only) excludes it.
+  async function handleRemove(postId: string) {
+    setInlineError(null);
+    setLocalCandidates((current) =>
+      current.map((candidate) =>
+        candidate.id === postId
+          ? {
+              ...candidate,
+              finalSlateRank: null,
+              finalSlateTier: null,
+            }
+          : candidate,
+      ),
+    );
+
+    const result = await removeCardFromSlateInlineAction(postId);
 
     if (!result.ok) {
       setInlineError(result.message);
@@ -120,8 +148,6 @@ export function EditorialComposerClient({
           </p>
         </div>
 
-        <BulkApproveForm eligibleCandidates={bulkApproveCandidates} />
-
         {inlineError ? (
           <p className="mb-[var(--bu-space-3)] rounded-[var(--bu-radius-md)] bg-[var(--bu-status-danger-bg)] px-3 py-2 text-[var(--bu-size-meta)] text-[var(--bu-status-danger-text)]">
             {inlineError}
@@ -136,7 +162,8 @@ export function EditorialComposerClient({
                 candidate={candidate}
                 openSlots={openSlots}
                 storageReady={storageReady}
-                onAssign={handleAssign}
+                onInclude={handleInclude}
+                onRemove={handleRemove}
               />
             ))}
           </div>

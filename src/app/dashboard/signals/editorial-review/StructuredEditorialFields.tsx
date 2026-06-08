@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import {
   AlertTriangle,
   Check,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ExternalLink,
@@ -15,7 +14,6 @@ import {
 } from "lucide-react";
 
 import {
-  approveSignalPostAction,
   autosaveSignalDraftAction,
   holdSignalPostAction,
   rejectSignalPostAction,
@@ -212,20 +210,9 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
           />
 
           <div className="flex flex-wrap gap-2">
-            {/* #282 Approve hidden on currently-live-published cards
-                — see isCurrentlyLivePublished comment. Re-publish is
-                the safe path. */}
-            {isCurrentlyLivePublished ? null : (
-              <Button
-                type="submit"
-                formAction={approveSignalPostAction}
-                disabled={controlsDisabled}
-                className="gap-2"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Approve
-              </Button>
-            )}
+            {/* Pick → Publish: approval now happens via the card's "Include"
+                toggle (assign slot + approve in one click), so the standalone
+                Approve button is gone. Live cards still use Re-publish. */}
             <Button
               type="submit"
               formAction={resetSignalPostToAiDraftAction}

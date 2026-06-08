@@ -2370,6 +2370,84 @@ describe("signals editorial workflow", () => {
     expect(rows[0].published_at).toBeNull();
   });
 
+  it("include assigns a slot AND approves the card in one step (Pick → Publish)", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "needs_review",
+        edited_why_it_matters: createValidWhyItMatters(),
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { includeSignalPostInSlate } = await loadEditorialModule();
+    const result = await includeSignalPostInSlate({ postId: "signal-1", finalSlateRank: 6 });
+
+    expect(result.ok).toBe(true);
+    expect(rows[0].editorial_status).toBe("approved");
+    expect(rows[0].editorial_decision).toBe("approved");
+    expect(rows[0].approved_by).toBe("admin@example.com");
+    expect(rows[0].final_slate_rank).toBe(6);
+    expect(rows[0].final_slate_tier).toBe("context");
+    expect(rows[0].is_live).toBe(false);
+    expect(rows[0].published_at).toBeNull();
+  });
+
+  it("include refuses a card whose WITM fails validation, leaving it unassigned", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "needs_review",
+        edited_why_it_matters:
+          "This changes capital availability, competitive positioning, or market structure.",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { includeSignalPostInSlate } = await loadEditorialModule();
+    const result = await includeSignalPostInSlate({ postId: "signal-1", finalSlateRank: 1 });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("publish_blocked");
+    expect(rows[0].editorial_status).toBe("needs_review");
+    expect(rows[0].final_slate_rank).toBeNull();
+  });
+
+  it("include refuses a live/published card (use Re-publish instead)", async () => {
+    const rows = [
+      createRow({
+        id: "signal-1",
+        editorial_status: "published",
+        edited_why_it_matters: createValidWhyItMatters(),
+        is_live: true,
+        published_at: "2026-05-01T00:00:00.000Z",
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+
+    const { includeSignalPostInSlate } = await loadEditorialModule();
+    const result = await includeSignalPostInSlate({ postId: "signal-1", finalSlateRank: 1 });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("publish_blocked");
+    expect(rows[0].final_slate_rank).toBeNull();
+  });
+
   it("demote moves a Core row to Context placement without rejecting it", async () => {
     const rows = [
       createRow({
