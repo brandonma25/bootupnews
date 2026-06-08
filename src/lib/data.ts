@@ -477,7 +477,7 @@ function mapHomepageSignalPostToBriefingItem(
     sourceCount: post.sourceUrl ? 1 : 0,
     estimatedMinutes: 4,
     read: false,
-    priority: post.rank <= 5 ? "top" : "normal",
+    priority: post.rank <= 7 ? "top" : "normal",
     matchedKeywords: post.tags,
     importanceScore: post.signalScore ?? undefined,
     importanceLabel: getImportanceLabel(post.signalScore ?? undefined),
@@ -1459,7 +1459,7 @@ export async function generateDailyBriefing(
   // homepage / dashboard display cap is unchanged.
   const items = selectPublicBriefingItems(selectableItems, options.surfacePoolSize).map((item, index) => ({
     ...item,
-    priority: index < 5 ? ("top" as const) : ("normal" as const),
+    priority: index < 7 ? ("top" as const) : ("normal" as const),
   }));
 
   const briefing =
@@ -1529,7 +1529,7 @@ function resolvePipelineTopic(
   return fallbackTopic;
 }
 
-export function selectPublicBriefingItems(items: BriefingItem[], limit = 5) {
+export function selectPublicBriefingItems(items: BriefingItem[], limit = 7) {
   const sorted = items.slice().sort(compareBriefingItemsByRanking);
   const selected: BriefingItem[] = [];
   const topicCounts = new Map<string, number>();
@@ -2084,7 +2084,7 @@ export async function buildMatchedBriefing(
     .sort(compareBriefingItemsByRanking)
     .map((item, index) => ({
       ...item,
-      priority: index < 5 ? ("top" as const) : ("normal" as const),
+      priority: index < 7 ? ("top" as const) : ("normal" as const),
     }));
 
   if (!items.length) {

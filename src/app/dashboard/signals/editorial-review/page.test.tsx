@@ -22,6 +22,7 @@ vi.mock("@/lib/signals-editorial", async (importOriginal) => {
 vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
   approveAllSignalPostsAction: vi.fn(),
   saveSignalDraftAction: vi.fn(),
+  autosaveSignalDraftAction: vi.fn().mockResolvedValue({ ok: true, code: "draft_saved", message: "Saved" }),
   approveSignalPostAction: vi.fn(),
   resetSignalPostToAiDraftAction: vi.fn(),
   publishFinalSlateAction: vi.fn(),
@@ -179,16 +180,9 @@ describe("signals editorial review page", () => {
         .every((button) => button.hasAttribute("disabled")),
     ).toBe(true);
     expect(screen.queryByText("Published Slate Audit")).not.toBeInTheDocument();
-    // Bulk approve is rendered at the top of the candidate pool with the
-    // WITM-passed-bounded label. Neither test post has been assigned to
-    // a slot, so the button is disabled with the documented tooltip.
-    const bulkApproveButton = screen.getByTestId("bulk-approve-submit");
-    expect(bulkApproveButton).toHaveTextContent("Approve all WITM-passed");
-    expect(bulkApproveButton).toBeDisabled();
-    expect(bulkApproveButton).toHaveAttribute(
-      "title",
-      "No WITM-passed candidates assigned to slots",
-    );
+    // Pick → Publish: the standalone Bulk-approve bar was removed; approval
+    // now happens via each card's one-click Include toggle.
+    expect(screen.queryByTestId("bulk-approve-submit")).not.toBeInTheDocument();
   }, 10000);
 
   it("enables the publish CTA when the selected slate passes existing readiness gates", async () => {
@@ -233,7 +227,7 @@ describe("signals editorial review page", () => {
 
     expect(screen.getByText("Needs rewrite")).toBeInTheDocument();
     expect(screen.getByText(/Template placeholder language detected/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Assign Signal 1 to a slot/i)).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Include Signal 1 in the slate/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Open rewrite" })).toBeInTheDocument();
   }, 10000);
 

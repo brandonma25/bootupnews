@@ -100,8 +100,8 @@ describe("selectPublicBriefingItems — PRD-53 widened editorial pool", () => {
     );
   }
 
-  it("defaults to the public top-5 cap when no limit is passed (homepage display unchanged)", () => {
-    expect(selectPublicBriefingItems(eligibleItems(25))).toHaveLength(5);
+  it("defaults to the public top-7 cap when no limit is passed", () => {
+    expect(selectPublicBriefingItems(eligibleItems(25))).toHaveLength(7);
   });
 
   it("widens to the editorial pool size when a larger limit is passed (e.g. 22)", () => {

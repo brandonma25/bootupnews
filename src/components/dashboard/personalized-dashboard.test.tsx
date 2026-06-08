@@ -126,14 +126,16 @@ describe("PersonalizedDashboard", () => {
     });
   });
 
-  it("caps the display at five ranked signals and splits them into core and context tiers", () => {
+  it("caps the display at seven ranked signals and splits them into core and context tiers", () => {
     const items = [
-      createItem({ id: "sixth", title: "Sixth ranked", importanceScore: 40 }),
-      createItem({ id: "second", title: "Second ranked", importanceScore: 90 }),
-      createItem({ id: "fifth", title: "Fifth ranked", importanceScore: 60 }),
+      createItem({ id: "eighth", title: "Eighth ranked", importanceScore: 40 }),
+      createItem({ id: "second", title: "Second ranked", importanceScore: 92 }),
+      createItem({ id: "fifth", title: "Fifth ranked", importanceScore: 74 }),
       createItem({ id: "first", title: "First ranked", importanceScore: 98 }),
-      createItem({ id: "fourth", title: "Fourth ranked", importanceScore: 70 }),
-      createItem({ id: "third", title: "Third ranked", importanceScore: 80 }),
+      createItem({ id: "seventh", title: "Seventh ranked", importanceScore: 62 }),
+      createItem({ id: "fourth", title: "Fourth ranked", importanceScore: 80 }),
+      createItem({ id: "sixth", title: "Sixth ranked", importanceScore: 68 }),
+      createItem({ id: "third", title: "Third ranked", importanceScore: 86 }),
     ];
 
     render(
@@ -147,14 +149,16 @@ describe("PersonalizedDashboard", () => {
 
     expect(screen.getByRole("heading", { name: "Core Signals" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Context Signals" })).toBeInTheDocument();
-    expect(screen.getAllByText("Core Signal")).toHaveLength(3);
+    expect(screen.getAllByText("Core Signal")).toHaveLength(5);
     expect(screen.getAllByText("Context Signal")).toHaveLength(2);
     expect(screen.getByText("First ranked")).toBeInTheDocument();
     expect(screen.getByText("Second ranked")).toBeInTheDocument();
     expect(screen.getByText("Third ranked")).toBeInTheDocument();
     expect(screen.getByText("Fourth ranked")).toBeInTheDocument();
     expect(screen.getByText("Fifth ranked")).toBeInTheDocument();
-    expect(screen.queryByText("Sixth ranked")).not.toBeInTheDocument();
+    expect(screen.getByText("Sixth ranked")).toBeInTheDocument();
+    expect(screen.getByText("Seventh ranked")).toBeInTheDocument();
+    expect(screen.queryByText("Eighth ranked")).not.toBeInTheDocument();
     const hiddenMetric = screen.getByText("Hidden beyond cap").closest("div");
     expect(hiddenMetric).not.toBeNull();
     expect(within(hiddenMetric as HTMLElement).getByText("1")).toBeInTheDocument();

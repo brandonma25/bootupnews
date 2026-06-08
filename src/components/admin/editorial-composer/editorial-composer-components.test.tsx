@@ -1,10 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  BulkApproveForm,
-  isEligibleForBulkApprove,
-} from "@/components/admin/editorial-composer/BulkApproveForm";
 import { CandidateRow } from "@/components/admin/editorial-composer/CandidateRow";
 import {
   SlotPanel,
@@ -17,6 +13,7 @@ vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
   approveAllSignalPostsAction: vi.fn(),
   publishFinalSlateAction: vi.fn(),
   saveSignalDraftAction: vi.fn(),
+  autosaveSignalDraftAction: vi.fn().mockResolvedValue({ ok: true, code: "draft_saved", message: "Saved" }),
   approveSignalPostAction: vi.fn(),
   holdSignalPostAction: vi.fn(),
   rejectSignalPostAction: vi.fn(),
@@ -187,7 +184,7 @@ describe("editorial composer components", () => {
     ).toBe(true);
   });
 
-  it("opens the confirm dialog with title list and tier breakdown when Publish is clicked", () => {
+  it("opens the confirm dialog with title list and tier breakdown when Publish is clicked", async () => {
     const pending = [
       createCandidate({
         id: "p1",
@@ -219,7 +216,7 @@ describe("editorial composer components", () => {
 
     fireEvent.click(screen.getAllByTestId("publish-slate-open")[0]);
 
-    const dialog = screen.getByTestId("publish-confirm-dialog");
+    const dialog = await screen.findByTestId("publish-confirm-dialog");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByTestId("publish-confirm-tier-breakdown")).toHaveTextContent(
       "1 Core · 1 Context",
@@ -229,7 +226,7 @@ describe("editorial composer components", () => {
     expect(titleList).toHaveTextContent("Context candidate one");
   });
 
-  it("closes the confirm dialog when Cancel is pressed without submitting", () => {
+  it("closes the confirm dialog when Cancel is pressed without submitting", async () => {
     const pending = [
       createCandidate({
         id: "p1",
@@ -249,36 +246,35 @@ describe("editorial composer components", () => {
     );
 
     fireEvent.click(screen.getAllByTestId("publish-slate-open")[0]);
-    expect(screen.getByTestId("publish-confirm-dialog")).toBeInTheDocument();
+    expect(await screen.findByTestId("publish-confirm-dialog")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByTestId("publish-confirm-cancel")[0]);
 
     expect(screen.queryByTestId("publish-confirm-dialog")).not.toBeInTheDocument();
   });
 
-  it("shows WITM inline and assigns a candidate through the picker", () => {
-    const onAssign = vi.fn().mockResolvedValue(undefined);
+  it("includes a candidate via the one-click Include button (Pick → Publish)", () => {
+    const onInclude = vi.fn().mockResolvedValue(undefined);
 
     render(
       <CandidateRow
         candidate={createCandidate()}
         openSlots={[1, 2, 6]}
         storageReady
-        onAssign={onAssign}
+        onInclude={onInclude}
+        onRemove={vi.fn()}
       />,
     );
 
     expect(screen.getByText("WITM passed")).toBeInTheDocument();
     expect(screen.getByText("This matters because it changes the operating context.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/Assign Candidate title to a slot/i), {
-      target: { value: "2" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /Include Candidate title in the slate/i }));
 
-    expect(onAssign).toHaveBeenCalledWith("candidate-1", "2");
+    expect(onInclude).toHaveBeenCalledWith("candidate-1");
   });
 
-  it("blocks assignment for rewrite-required candidates", () => {
+  it("blocks Include for rewrite-required candidates", () => {
     render(
       <CandidateRow
         candidate={createCandidate({
@@ -287,13 +283,50 @@ describe("editorial composer components", () => {
         })}
         openSlots={[1]}
         storageReady
-        onAssign={vi.fn()}
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
     expect(screen.getByText("Needs rewrite")).toBeInTheDocument();
     expect(screen.getByText(/Template placeholder language detected/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Assign Candidate title to a slot/i)).toBeDisabled();
+    const includeButton = screen.getByRole("button", { name: /Include Candidate title in the slate/i });
+    expect(includeButton).toBeDisabled();
+    expect(includeButton).toHaveTextContent("Rewrite first");
+  });
+
+  it("offers Remove for an already-included candidate (Pick → Publish)", () => {
+    const onRemove = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <CandidateRow
+        candidate={createCandidate({ finalSlateRank: 2, finalSlateTier: "core" })}
+        openSlots={[1, 3]}
+        storageReady
+        onInclude={vi.fn()}
+        onRemove={onRemove}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Remove Candidate title from the slate/i }));
+
+    expect(onRemove).toHaveBeenCalledWith("candidate-1");
+  });
+
+  it("disables Include with a 'Slate full' label when no slots are open", () => {
+    render(
+      <CandidateRow
+        candidate={createCandidate()}
+        openSlots={[]}
+        storageReady
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    const includeButton = screen.getByRole("button", { name: /Include Candidate title in the slate/i });
+    expect(includeButton).toBeDisabled();
+    expect(includeButton).toHaveTextContent("Slate full");
   });
 
   // #321 — the card must surface all three editorial layers at a glance,
@@ -309,7 +342,8 @@ describe("editorial composer components", () => {
         })}
         openSlots={[1]}
         storageReady
-        onAssign={vi.fn()}
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
@@ -329,166 +363,14 @@ describe("editorial composer components", () => {
         candidate={createCandidate({ editedWhyItMatters: "Only the signal." })}
         openSlots={[1]}
         storageReady
-        onAssign={vi.fn()}
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
       />,
     );
 
     expect(screen.getByText("Only the signal.")).toBeInTheDocument();
     expect(screen.getByText("No Before This draft yet.")).toBeInTheDocument();
     expect(screen.getByText("No Ripple draft yet.")).toBeInTheDocument();
-  });
-});
-
-describe("BulkApproveForm", () => {
-  it("renders the WITM-passed label and a hidden input per eligible candidate", () => {
-    const candidates = [
-      createCandidate({
-        id: "ready-1",
-        title: "Ready candidate 1",
-        finalSlateRank: 1,
-        editorialStatus: "needs_review",
-        editorialDecision: null,
-      }),
-      createCandidate({
-        id: "ready-2",
-        title: "Ready candidate 2",
-        finalSlateRank: 2,
-        editorialStatus: "draft",
-        editorialDecision: null,
-      }),
-    ];
-
-    render(<BulkApproveForm eligibleCandidates={candidates} />);
-
-    expect(screen.getByText(/2 candidates ready/i)).toBeInTheDocument();
-
-    const button = screen.getByTestId("bulk-approve-submit");
-    expect(button).toBeEnabled();
-    expect(button).toHaveTextContent("Approve all WITM-passed");
-
-    const form = screen.getByTestId("bulk-approve-form") as HTMLFormElement;
-    const postIdInputs = form.querySelectorAll('input[name="postId"]');
-    expect(Array.from(postIdInputs).map((input) => (input as HTMLInputElement).value)).toEqual([
-      "ready-1",
-      "ready-2",
-    ]);
-  });
-
-  it("renders disabled with the expected tooltip when zero candidates qualify", () => {
-    render(<BulkApproveForm eligibleCandidates={[]} />);
-
-    const button = screen.getByTestId("bulk-approve-submit");
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", "No WITM-passed candidates assigned to slots");
-    expect(
-      screen.getByText("No WITM-passed candidates currently assigned to a slot."),
-    ).toBeInTheDocument();
-  });
-});
-
-describe("isEligibleForBulkApprove", () => {
-  it("requires WITM passed status", () => {
-    expect(
-      isEligibleForBulkApprove(
-        createCandidate({
-          editorialStatus: "needs_review",
-          editorialDecision: null,
-          finalSlateRank: 1,
-          whyItMattersValidationStatus: "requires_human_rewrite",
-        }),
-        true,
-      ),
-    ).toBe(false);
-  });
-
-  it("requires a slot assignment", () => {
-    expect(
-      isEligibleForBulkApprove(
-        createCandidate({
-          editorialStatus: "needs_review",
-          editorialDecision: null,
-          finalSlateRank: null,
-          whyItMattersValidationStatus: "passed",
-        }),
-        true,
-      ),
-    ).toBe(false);
-  });
-
-  it("excludes already-approved candidates", () => {
-    expect(
-      isEligibleForBulkApprove(
-        createCandidate({
-          editorialStatus: "approved",
-          editorialDecision: "approved",
-          finalSlateRank: 1,
-          whyItMattersValidationStatus: "passed",
-        }),
-        true,
-      ),
-    ).toBe(false);
-  });
-
-  it("excludes published / live candidates", () => {
-    expect(
-      isEligibleForBulkApprove(
-        createCandidate({
-          editorialStatus: "published",
-          editorialDecision: "approved",
-          finalSlateRank: 1,
-          whyItMattersValidationStatus: "passed",
-          isLive: true,
-          publishedAt: "2026-05-13T12:00:00.000Z",
-        }),
-        true,
-      ),
-    ).toBe(false);
-  });
-
-  it("excludes candidates with blocking editorial decisions", () => {
-    for (const blocking of ["rejected", "held", "rewrite_requested", "removed_from_slate"]) {
-      expect(
-        isEligibleForBulkApprove(
-          createCandidate({
-            editorialStatus: "needs_review",
-            editorialDecision: blocking,
-            finalSlateRank: 1,
-            whyItMattersValidationStatus: "passed",
-          }),
-          true,
-        ),
-      ).toBe(false);
-    }
-  });
-
-  it("requires storage to be ready", () => {
-    expect(
-      isEligibleForBulkApprove(
-        createCandidate({
-          editorialStatus: "needs_review",
-          editorialDecision: null,
-          finalSlateRank: 1,
-          whyItMattersValidationStatus: "passed",
-        }),
-        false,
-      ),
-    ).toBe(false);
-  });
-
-  it("returns true for the happy path", () => {
-    expect(
-      isEligibleForBulkApprove(
-        createCandidate({
-          editorialStatus: "needs_review",
-          editorialDecision: null,
-          finalSlateRank: 1,
-          whyItMattersValidationStatus: "passed",
-          isLive: false,
-          publishedAt: null,
-        }),
-        true,
-      ),
-    ).toBe(true);
   });
 });
 

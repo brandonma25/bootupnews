@@ -6,6 +6,7 @@ import { Send } from "lucide-react";
 import { publishFinalSlateAction } from "@/app/dashboard/signals/editorial-review/actions";
 import { PublishConfirmDialog } from "@/components/admin/editorial-composer/PublishConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { flushAllPendingAutosaves } from "@/lib/editorial-autosave-coordinator";
 import type { EditorialSignalPost } from "@/lib/signals-editorial";
 import { cn } from "@/lib/utils";
 
@@ -114,8 +115,8 @@ function SlotPanelBody({
   return (
     <>
       <div className="mt-[var(--bu-space-4)] space-y-[var(--bu-space-4)]">
-        <SlotGroup label="Core · 5 slots" slots={coreSlots} />
-        <SlotGroup label="Context · 2 slots" slots={contextSlots} />
+        <SlotGroup label={`Core · ${coreSlots.length} slots`} slots={coreSlots} />
+        <SlotGroup label={`Context · ${contextSlots.length} slots`} slots={contextSlots} />
       </div>
       {publishCounts ? (
         <p
@@ -156,10 +157,13 @@ function PublishSlateControls({
     ? "No approved candidates pending publish."
     : publishDisabledReason ?? "Sticky · stays visible on scroll";
 
-  function openConfirm() {
+  async function openConfirm() {
     if (isDisabled) {
       return;
     }
+    // Drain pending autosaves so the publish gate promotes the latest edits,
+    // not a stale debounce snapshot.
+    await flushAllPendingAutosaves();
     setConfirmOpen(true);
   }
 

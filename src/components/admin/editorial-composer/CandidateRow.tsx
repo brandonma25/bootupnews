@@ -12,19 +12,27 @@ type CandidateRowProps = {
   candidate: EditorialSignalPost;
   openSlots: number[];
   storageReady: boolean;
-  onAssign: (postId: string, slotId: string) => Promise<void>;
+  onInclude: (postId: string) => Promise<void>;
+  onRemove: (postId: string) => Promise<void>;
 };
 
 export function CandidateRow({
   candidate,
   openSlots,
   storageReady,
-  onAssign,
+  onInclude,
+  onRemove,
 }: CandidateRowProps) {
   const [rewriteOpen, setRewriteOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const requiresRewrite = candidate.whyItMattersValidationStatus === "requires_human_rewrite";
-  const canAssign = isCandidateAssignable(candidate, storageReady) && !requiresRewrite;
+  const isIncluded = candidate.finalSlateRank !== null;
+  const slateFull = openSlots.length === 0;
+  // Pick → Publish: "Include" assigns the next open slot AND approves the card
+  // in one click. Disabled for rewrite-required / non-assignable cards and when
+  // the 7-slot slate is full.
+  const canInclude =
+    isCandidateAssignable(candidate, storageReady) && !requiresRewrite && !slateFull;
   const status = getCandidateStatus(candidate);
   const signalBody = getCandidateSignalBody(candidate);
   const beforeThisBody = getCandidateBeforeThisBody(candidate);
@@ -74,42 +82,54 @@ export function CandidateRow({
         </div>
 
         <div className="space-y-[var(--bu-space-2)]">
-          <label htmlFor={`slot-${candidate.id}`} className="sr-only">
-            Assign {candidate.title} to a slot
-          </label>
-          <select
-            id={`slot-${candidate.id}`}
-            value=""
-            disabled={!canAssign || isPending}
-            className="w-full rounded-[var(--bu-radius-md)] border border-[var(--bu-border-default)] bg-[var(--bu-bg-surface)] px-2 py-2 text-[var(--bu-size-meta)] text-[var(--bu-text-primary)] disabled:text-[var(--bu-text-tertiary)]"
-            onChange={(event) => {
-              const slotId = event.target.value;
-              if (!slotId) {
-                return;
-              }
-
-              startTransition(() => {
-                void onAssign(candidate.id, slotId);
-              });
-            }}
-          >
-            <option value="">
-              {requiresRewrite ? "Blocked · rewrite first" : candidate.finalSlateRank ? "Assigned" : "Assign to slot…"}
-            </option>
-            {openSlots.map((slot) => (
-              <option key={slot} value={slot}>
-                {formatSlotLabel(slot).replace(" slot ", " ")}
-              </option>
-            ))}
-          </select>
+          {isIncluded ? (
+            <>
+              <p
+                className="rounded-[var(--bu-radius-md)] border border-[var(--bu-border-default)] bg-[var(--bu-bg-subtle)] px-2 py-2 text-center text-[var(--bu-size-meta)] font-medium text-[var(--bu-text-primary)]"
+                data-testid={`slot-assignment-${candidate.id}`}
+              >
+                {candidate.finalSlateRank
+                  ? formatSlotLabel(candidate.finalSlateRank).replace(" slot ", " ")
+                  : "Included"}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full px-3 text-[var(--bu-size-meta)]"
+                disabled={!storageReady || isPending}
+                aria-label={`Remove ${candidate.title} from the slate`}
+                onClick={() => {
+                  startTransition(() => {
+                    void onRemove(candidate.id);
+                  });
+                }}
+              >
+                Remove
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              className="w-full px-3 text-[var(--bu-size-meta)]"
+              disabled={!canInclude || isPending}
+              aria-label={`Include ${candidate.title} in the slate`}
+              onClick={() => {
+                startTransition(() => {
+                  void onInclude(candidate.id);
+                });
+              }}
+            >
+              {requiresRewrite ? "Rewrite first" : slateFull ? "Slate full" : "Include"}
+            </Button>
+          )}
 
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             className="w-full px-3 text-[var(--bu-size-meta)]"
             onClick={() => setRewriteOpen((value) => !value)}
           >
-            {requiresRewrite ? "Open rewrite" : "Rewrite WITM"}
+            {rewriteOpen ? "Close editor" : requiresRewrite ? "Open rewrite" : "Edit"}
           </Button>
         </div>
       </div>
