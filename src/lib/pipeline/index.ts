@@ -29,6 +29,9 @@ export async function runClusterFirstPipeline(options: {
   sources?: Source[];
   suppliedByManifest?: boolean;
   persistArticleCandidates?: boolean;
+  /** Forwarded to ingestRawItems — canonical_url → extracted body from the
+   * decoupled extraction stage. Absent ⇒ unchanged behavior. */
+  extractedBodyByCanonicalUrl?: Map<string, string>;
 } = {}): Promise<ClusterFirstPipelineResult> {
   const runId = `pipeline-${Date.now()}`;
   const run = createEmptyPipelineRun(runId);

@@ -174,6 +174,8 @@ const PUBLISHED_SLATE_ITEM_SELECT = PUBLISHED_SLATE_ITEM_REQUIRED_COLUMNS.join("
 const EDITORIAL_PAGE_SIZE = 20;
 const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
 const TOP_SIGNAL_SET_SIZE = 5;
+// signal_posts.rank CHECK is `between 1 and 20`; append mode caps post-max ranks here.
+const SIGNAL_POST_RANK_MAX = 20;
 const CONTEXT_SIGNAL_SET_SIZE = 2;
 const PUBLIC_SIGNAL_SET_SIZE = TOP_SIGNAL_SET_SIZE + CONTEXT_SIGNAL_SET_SIZE;
 const NEWSLETTER_DISCOVERY_SELECTION_REASON = "Newsletter discovery candidate; BM review required.";
@@ -459,7 +461,7 @@ export type SignalSnapshotPersistenceResult = {
   message: string;
 };
 
-export type SignalPostPersistenceMode = "normal" | "draft_only";
+export type SignalPostPersistenceMode = "normal" | "draft_only" | "append";
 
 export type HomepageSignalSnapshot = {
   source: "published_live" | "recent_published" | "none";
@@ -1419,7 +1421,21 @@ async function persistSignalPostCandidates(
       .map((row) => row.rank)
       .filter((rank): rank is number => typeof rank === "number"),
   );
-  const missingCandidates = candidatesForPersistence.filter((post) => !existingRanks.has(post.rank));
+  // Highest rank currently occupied for this briefing_date. Append mode places
+  // newly-unblocked items AFTER it so they never collide with / overwrite the
+  // existing slate (see persistAppendedSignalPostsForBriefing).
+  const existingMaxRank = newsletterRankReservation.rows.reduce(
+    (max, row) => (typeof row.rank === "number" && row.rank > max ? row.rank : max),
+    0,
+  );
+  // Append mode (decoupled CRON-2 restage-with-bodies): URL-keyed ADDITIVE —
+  // bypass the rank-collision guard so a newly-eligible item is not dropped for
+  // sharing a rank with an existing row. The same-day URL dedup below still
+  // prevents duplicates; survivors get POST-MAX ranks before insert.
+  const missingCandidates =
+    mode === "append"
+      ? candidatesForPersistence
+      : candidatesForPersistence.filter((post) => !existingRanks.has(post.rank));
 
   if (missingCandidates.length === 0) {
     return {
@@ -1563,6 +1579,35 @@ async function persistSignalPostCandidates(
     };
   }
 
+  // Append mode: assign POST-MAX ranks (existing max + 1, +2, …) so appended
+  // items never collide with / overwrite existing rows, capped at the rank<=20
+  // CHECK (overflow dropped — current ~2-5/day volume makes this non-binding).
+  let appendOverflowDropped = 0;
+  const candidatesToWrite =
+    mode === "append"
+      ? candidatesAfterRecurrence.reduce<typeof candidatesAfterRecurrence>((acc, post, index) => {
+          const rank = existingMaxRank + 1 + index;
+          if (rank <= SIGNAL_POST_RANK_MAX) {
+            acc.push({ ...post, rank });
+          } else {
+            appendOverflowDropped += 1;
+          }
+          return acc;
+        }, [])
+      : candidatesAfterRecurrence;
+
+  if (candidatesToWrite.length === 0) {
+    return {
+      ok: true,
+      briefingDate,
+      insertedCount: 0,
+      insertedPostIds: [],
+      skippedCandidates,
+      mode,
+      message: `No signal posts appended: all ${appendOverflowDropped} newly-eligible candidate(s) exceeded the rank<=${SIGNAL_POST_RANK_MAX} cap.`,
+    };
+  }
+
   // Task 3 — Legacy template generator provenance stamps. The witm_draft_*
   // columns were left NULL on every legacy-path row in production, making the
   // boilerplate output indistinguishable from v2 LLM bridge rows. Stamping
@@ -1579,7 +1624,7 @@ async function persistSignalPostCandidates(
   //   - why_it_matters_validation_status: still defaults to 'passed' from the
   //     CHECK default. Task 6 lands the 'not_run' enum addition.
   const insertResult = await client.from("signal_posts").insert(
-    candidatesAfterRecurrence.map((post) => ({
+    candidatesToWrite.map((post) => ({
       briefing_date: briefingDate,
       rank: post.rank,
       title: post.title,
@@ -1638,7 +1683,7 @@ async function persistSignalPostCandidates(
   return {
     ok: true,
     briefingDate,
-    insertedCount: candidatesAfterRecurrence.length,
+    insertedCount: candidatesToWrite.length,
     insertedPostIds: ((insertResult.data ?? []) as Array<{ id: string | null }>)
       .map((row) => row.id)
       .filter((id): id is string => Boolean(id)),
@@ -1646,7 +1691,7 @@ async function persistSignalPostCandidates(
     mode,
     message:
       buildSignalPostPersistenceMessage(
-        candidatesAfterRecurrence.length,
+        candidatesToWrite.length,
         newsletterRankReservation.reservedRanks.size,
       ),
   };
@@ -1817,6 +1862,47 @@ export async function persistSignalPostsForBriefing(input: {
     candidates: builtCandidates.candidates,
     skippedCandidates: builtCandidates.skippedCandidates,
     mode: input.mode,
+  });
+}
+
+/**
+ * Decoupled same-cycle restage (CRON-2 /api/cron/restage-with-bodies): append the
+ * newly-unblocked, core-eligible items from a body-enriched re-run of
+ * generateDailyBriefing into TODAY's signal_posts WITHOUT churning the existing
+ * slate. URL-keyed (same-day source_url already present → skipped) and
+ * post-max-ranked via persistSignalPostCandidates mode="append" — so existing
+ * rows (incl. human-edited ones) are never overwritten or duplicated, and the
+ * `rank <= 20` CHECK is respected. Reuses the exact normal-path row mapping +
+ * cross-date dedup; no row-shape drift. Best-effort: no client / pre-migration
+ * → returns ok:false / inserts nothing, leaving today's slate untouched.
+ */
+export async function persistAppendedSignalPostsForBriefing(input: {
+  briefingDate: string;
+  items: BriefingItem[];
+}): Promise<SignalSnapshotPersistenceResult> {
+  const client = createSupabaseServiceRoleClient();
+  const briefingDate = normalizeDateValue(input.briefingDate) ?? new Date().toISOString().slice(0, 10);
+
+  if (!client) {
+    return {
+      ok: false,
+      briefingDate,
+      insertedCount: 0,
+      message: "Editorial storage is unavailable. Configure Supabase and SUPABASE_SERVICE_ROLE_KEY.",
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(client);
+  if (!schemaPreflight.ok) {
+    return { ok: false, briefingDate, insertedCount: 0, message: schemaPreflight.message };
+  }
+
+  const builtCandidates = buildSignalPostCandidates(input.items);
+  return persistSignalPostCandidates(client, {
+    briefingDate: input.briefingDate,
+    candidates: builtCandidates.candidates,
+    skippedCandidates: builtCandidates.skippedCandidates,
+    mode: "append",
   });
 }
 

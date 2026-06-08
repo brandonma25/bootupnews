@@ -1707,6 +1707,61 @@ describe("signals editorial workflow", () => {
     expect(newsletterRows.map((row) => row.rank)).toEqual([16, 17, 18, 19, 20]);
   });
 
+  it("append mode adds only new-URL items at POST-MAX ranks without churning existing rows (CRON-2)", async () => {
+    // Today's existing slate from the 12:00 main run: ranks 1-2 (one already approved).
+    const rows = [
+      createRow({ id: "existing-1", briefing_date: "2026-06-08", rank: 1, source_url: "https://example.com/source-1", editorial_status: "needs_review" }),
+      createRow({ id: "existing-2", briefing_date: "2026-06-08", rank: 2, source_url: "https://example.com/source-2", editorial_status: "approved" }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistAppendedSignalPostsForBriefing } = await loadEditorialModule();
+    // CRON-2's re-gated slate: source-1 already present + source-3/source-4 newly unblocked.
+    const result = await persistAppendedSignalPostsForBriefing({
+      briefingDate: "2026-06-08",
+      items: [createBriefingItem(1), createBriefingItem(3), createBriefingItem(4)],
+    });
+
+    expect(result.ok).toBe(true);
+    // (b) same-cycle: only the two NEW URLs are appended for today's briefing_date.
+    expect(result.insertedCount).toBe(2);
+    const inserted = rows.filter((row) => row.id.startsWith("inserted-"));
+    expect(inserted.map((row) => row.source_url).sort()).toEqual([
+      "https://example.com/source-3",
+      "https://example.com/source-4",
+    ]);
+    // (b) POST-MAX ranks: existing max is 2 → appended at 3, 4 (no collision).
+    expect(inserted.map((row) => row.rank).sort((a, b) => a - b)).toEqual([3, 4]);
+    expect(inserted.every((row) => row.briefing_date === "2026-06-08")).toBe(true);
+    // (c) no churn: existing rows untouched (same ranks) and not duplicated.
+    expect(rows.filter((row) => row.source_url === "https://example.com/source-1")).toHaveLength(1);
+    expect(rows.find((row) => row.id === "existing-1")?.rank).toBe(1);
+    expect(rows.find((row) => row.id === "existing-2")?.rank).toBe(2);
+    expect(rows.find((row) => row.id === "existing-2")?.editorial_status).toBe("approved");
+  });
+
+  it("append mode holds the rank<=20 invariant near the cap (drops overflow)", async () => {
+    // Existing max rank is 19 → only ONE more (rank 20) can be appended.
+    const rows = [
+      createRow({ id: "existing-19", briefing_date: "2026-06-08", rank: 19, source_url: "https://example.com/source-19" }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistAppendedSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistAppendedSignalPostsForBriefing({
+      briefingDate: "2026-06-08",
+      items: [createBriefingItem(30), createBriefingItem(31), createBriefingItem(32)],
+    });
+
+    expect(result.ok).toBe(true);
+    // (d) rank <= 20 held: only the rank-20 slot fits; 21 and 22 are dropped.
+    expect(result.insertedCount).toBe(1);
+    const inserted = rows.filter((row) => row.id.startsWith("inserted-"));
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0].rank).toBe(20);
+    expect(rows.every((row) => typeof row.rank === "number" && (row.rank as number) <= 20)).toBe(true);
+  });
+
   it("draft_only mode persists only review rows with validation details", async () => {
     const rows: SignalPostRow[] = [];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));

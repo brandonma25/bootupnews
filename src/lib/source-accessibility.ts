@@ -15,7 +15,9 @@ import { cleanText } from "@/lib/pipeline/shared/text";
 
 const FULL_TEXT_THRESHOLD = 1_200;
 const SUBSTANTIAL_PARTIAL_THRESHOLD = 500;
-const SUBSTANTIAL_ABSTRACT_THRESHOLD = 800;
+// Exported (value UNCHANGED) so the decoupled extraction stage can reuse the
+// abstract-core bar as its selection ceiling without duplicating the magic number.
+export const SUBSTANTIAL_ABSTRACT_THRESHOLD = 800;
 const CONTEXT_PARTIAL_THRESHOLD = 300;
 const CONTEXT_ABSTRACT_THRESHOLD = 500;
 const DEPTH_TEXT_THRESHOLD = 120;

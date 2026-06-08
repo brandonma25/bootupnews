@@ -68,6 +68,7 @@ async function runClusterFirstPipelineSafely(options: {
   sources?: Source[];
   suppliedByManifest?: boolean;
   persistArticleCandidates?: boolean;
+  extractedBodyByCanonicalUrl?: Map<string, string>;
 } = {}): Promise<ClusterFirstPipelineResult> {
   const { runClusterFirstPipeline } = await import("@/lib/pipeline");
   return runClusterFirstPipeline(options);
@@ -1253,16 +1254,34 @@ export async function generateDailyBriefing(
      * are unchanged. The cron passes resolveSurfacePoolSize() (default 22).
      */
     surfacePoolSize?: number;
+    /**
+     * Decoupled extraction (CRON-2 restage-with-bodies) ONLY. When true, load
+     * extracted_body_text from a prior CRON-1 run and merge the longer-of-
+     * native-vs-extracted body in ingestion so abstract-only genuine news clears
+     * the coreSupported gate THIS run. Defaults false → the main cron
+     * (fetch-editorial-inputs), dashboard, and preview are byte-for-byte unchanged.
+     */
+    useExtractedBodies?: boolean;
   } = {},
 ): Promise<{
   briefing: DailyBriefing;
   publicRankedItems: BriefingItem[];
   pipelineRun: ClusterFirstPipelineResult["run"];
 }> {
+  // Decoupled-extraction integration (CRON-2 restage-with-bodies ONLY): load any
+  // bodies a prior CRON-1 run persisted so ingestion can lift abstract-only
+  // genuine news over the coreSupported gate THIS run. Gated on an EXPLICIT
+  // opt-in (useExtractedBodies) so the main cron (fetch-editorial-inputs) +
+  // dashboard/preview never load the map and stay byte-for-byte unchanged.
+  // Best-effort (empty map ⇒ unchanged).
+  const extractedBodyByCanonicalUrl = options.useExtractedBodies
+    ? await (await import("@/lib/pipeline/article-candidates")).loadRecentExtractedBodies()
+    : undefined;
   const pipelineOptions: Parameters<typeof runClusterFirstPipelineSafely>[0] = {
     sources,
     suppliedByManifest: options.suppliedByManifest,
     persistArticleCandidates: options.persistPipelineCandidates,
+    extractedBodyByCanonicalUrl,
   };
   const { run, ranked_clusters } = await runClusterFirstPipelineSafely(pipelineOptions);
   const topicFallback = topics[0] ?? demoTopics[0];
