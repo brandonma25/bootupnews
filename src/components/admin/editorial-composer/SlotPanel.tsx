@@ -6,6 +6,7 @@ import { Send } from "lucide-react";
 import { publishFinalSlateAction } from "@/app/dashboard/signals/editorial-review/actions";
 import { PublishConfirmDialog } from "@/components/admin/editorial-composer/PublishConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { flushAllPendingAutosaves } from "@/lib/editorial-autosave-coordinator";
 import type { EditorialSignalPost } from "@/lib/signals-editorial";
 import { cn } from "@/lib/utils";
 
@@ -156,10 +157,13 @@ function PublishSlateControls({
     ? "No approved candidates pending publish."
     : publishDisabledReason ?? "Sticky · stays visible on scroll";
 
-  function openConfirm() {
+  async function openConfirm() {
     if (isDisabled) {
       return;
     }
+    // Drain pending autosaves so the publish gate promotes the latest edits,
+    // not a stale debounce snapshot.
+    await flushAllPendingAutosaves();
     setConfirmOpen(true);
   }
 

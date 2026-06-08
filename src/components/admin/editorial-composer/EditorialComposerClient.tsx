@@ -13,6 +13,7 @@ import {
   type ComposerSlot,
   type PublishCounts,
 } from "@/components/admin/editorial-composer/SlotPanel";
+import { flushPendingAutosave } from "@/lib/editorial-autosave-coordinator";
 import {
   FINAL_SLATE_RANKS,
   getFinalSlateTierForRank,
@@ -65,7 +66,7 @@ export function EditorialComposerClient({
   // the slate immediately; reverts to the server snapshot on failure (e.g. a
   // WITM rewrite is required).
   async function handleInclude(postId: string) {
-    const finalSlateRank = openSlots[0];
+    const finalSlateRank = openSlots.length ? Math.min(...openSlots) : null;
     const finalSlateTier = finalSlateRank ? getFinalSlateTierForRank(finalSlateRank) : null;
 
     if (!finalSlateRank || !finalSlateTier) {
@@ -74,6 +75,9 @@ export function EditorialComposerClient({
     }
 
     setInlineError(null);
+    // Drain any pending autosave for this card first, so Include approves the
+    // latest edited_* content rather than a stale debounce snapshot.
+    await flushPendingAutosave(postId);
     setLocalCandidates((current) =>
       current.map((candidate) =>
         candidate.id === postId

@@ -34,6 +34,7 @@ import {
   normalizeEditorialWhyItMattersContent,
   type EditorialWhyItMattersContent,
 } from "@/lib/editorial-content";
+import { registerAutosaveFlusher } from "@/lib/editorial-autosave-coordinator";
 import type { EditorialSignalPost } from "@/lib/signals-editorial";
 
 type StructuredEditorialFieldsProps = {
@@ -356,14 +357,22 @@ export function StructuredEditorialFields({
   // refresh). No-op when canAutosave is false (live-published cards, etc.).
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const hasAutosaveMountedRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestEditsRef = useRef({ fullEditorialText, content, editedWhatLedToIt, editedWhatItConnectsTo });
   useEffect(() => {
     latestEditsRef.current = { fullEditorialText, content, editedWhatLedToIt, editedWhatItConnectsTo };
   });
 
+  // Flush now: cancel any pending debounce and persist the latest edits
+  // immediately. Awaited by Include / Publish via the autosave coordinator so
+  // those actions never read stale edited_* (closes the type-then-Include race).
   const flushAutosave = useCallback(async () => {
     if (!canAutosave) {
       return;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
     const snapshot = latestEditsRef.current;
     setAutosaveStatus("saving");
@@ -381,6 +390,15 @@ export function StructuredEditorialFields({
     }
   }, [canAutosave, postId]);
 
+  // Register this card's flush so Include / Publish can drain the pending
+  // autosave before they read persisted content. Self-unregisters on unmount.
+  useEffect(() => {
+    if (!canAutosave) {
+      return;
+    }
+    return registerAutosaveFlusher(postId, flushAutosave);
+  }, [canAutosave, postId, flushAutosave]);
+
   useEffect(() => {
     if (!canAutosave) {
       return;
@@ -390,10 +408,14 @@ export function StructuredEditorialFields({
       hasAutosaveMountedRef.current = true;
       return;
     }
-    const timer = setTimeout(() => {
+    debounceTimerRef.current = setTimeout(() => {
       void flushAutosave();
     }, 1500);
-    return () => clearTimeout(timer);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, [canAutosave, flushAutosave, fullEditorialText, structuredJson, editedWhatLedToIt, editedWhatItConnectsTo]);
 
   return (

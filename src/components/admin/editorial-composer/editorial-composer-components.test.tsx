@@ -184,7 +184,7 @@ describe("editorial composer components", () => {
     ).toBe(true);
   });
 
-  it("opens the confirm dialog with title list and tier breakdown when Publish is clicked", () => {
+  it("opens the confirm dialog with title list and tier breakdown when Publish is clicked", async () => {
     const pending = [
       createCandidate({
         id: "p1",
@@ -216,7 +216,7 @@ describe("editorial composer components", () => {
 
     fireEvent.click(screen.getAllByTestId("publish-slate-open")[0]);
 
-    const dialog = screen.getByTestId("publish-confirm-dialog");
+    const dialog = await screen.findByTestId("publish-confirm-dialog");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByTestId("publish-confirm-tier-breakdown")).toHaveTextContent(
       "1 Core · 1 Context",
@@ -226,7 +226,7 @@ describe("editorial composer components", () => {
     expect(titleList).toHaveTextContent("Context candidate one");
   });
 
-  it("closes the confirm dialog when Cancel is pressed without submitting", () => {
+  it("closes the confirm dialog when Cancel is pressed without submitting", async () => {
     const pending = [
       createCandidate({
         id: "p1",
@@ -246,7 +246,7 @@ describe("editorial composer components", () => {
     );
 
     fireEvent.click(screen.getAllByTestId("publish-slate-open")[0]);
-    expect(screen.getByTestId("publish-confirm-dialog")).toBeInTheDocument();
+    expect(await screen.findByTestId("publish-confirm-dialog")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByTestId("publish-confirm-cancel")[0]);
 
@@ -311,6 +311,22 @@ describe("editorial composer components", () => {
     fireEvent.click(screen.getByRole("button", { name: /Remove Candidate title from the slate/i }));
 
     expect(onRemove).toHaveBeenCalledWith("candidate-1");
+  });
+
+  it("disables Include with a 'Slate full' label when no slots are open", () => {
+    render(
+      <CandidateRow
+        candidate={createCandidate()}
+        openSlots={[]}
+        storageReady
+        onInclude={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    const includeButton = screen.getByRole("button", { name: /Include Candidate title in the slate/i });
+    expect(includeButton).toBeDisabled();
+    expect(includeButton).toHaveTextContent("Slate full");
   });
 
   // #321 — the card must surface all three editorial layers at a glance,
