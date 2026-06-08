@@ -153,16 +153,21 @@ function buildSweepClient(rows: Row[]) {
 }
 
 describe("needs_review TTL sweep", () => {
+  const originalDsn = process.env.SENTRY_DSN;
+
   beforeEach(() => {
     logServerEvent.mockReset();
     writePipelineLogEntry.mockReset();
     writePipelineLogEntry.mockResolvedValue({ written: true, pageId: "log-1" });
     sentryCaptureMessage.mockReset();
     sentryFlush.mockClear();
+    process.env.SENTRY_DSN = "https://test@example.test/1"; // wrappers only emit when Sentry is configured
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    if (originalDsn === undefined) delete process.env.SENTRY_DSN;
+    else process.env.SENTRY_DSN = originalDsn;
   });
 
   const liveEnv = {

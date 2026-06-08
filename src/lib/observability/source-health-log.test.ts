@@ -19,10 +19,12 @@ describe("writeSourceHealthEntry — observability hygiene (#272 P2)", () => {
   const originalFetch = globalThis.fetch;
   const originalDbId = process.env.NOTION_SOURCE_HEALTH_LOG_DB_ID;
   const originalToken = process.env.NOTION_TOKEN;
+  const originalDsn = process.env.SENTRY_DSN;
 
   beforeEach(() => {
     vi.resetModules();
     vi.resetAllMocks();
+    process.env.SENTRY_DSN = "https://test@example.test/1"; // wrappers only emit when Sentry is configured
     delete process.env.NOTION_SOURCE_HEALTH_LOG_DB_ID;
     delete process.env.NOTION_TOKEN;
   });
@@ -33,6 +35,8 @@ describe("writeSourceHealthEntry — observability hygiene (#272 P2)", () => {
     else process.env.NOTION_SOURCE_HEALTH_LOG_DB_ID = originalDbId;
     if (originalToken === undefined) delete process.env.NOTION_TOKEN;
     else process.env.NOTION_TOKEN = originalToken;
+    if (originalDsn === undefined) delete process.env.SENTRY_DSN;
+    else process.env.SENTRY_DSN = originalDsn;
   });
 
   const entry = {
