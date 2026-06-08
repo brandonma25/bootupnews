@@ -34,6 +34,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import {
   persistNormalizedArticleCandidates,
+  updateArticleCandidateEligibilitySignals,
   updateArticleCandidateRankingOutcomes,
 } from "@/lib/pipeline/article-candidates";
 
@@ -99,5 +100,63 @@ describe("article-candidates observability (PRD-53)", () => {
     const reasons = captured.updates.map((update) => update.drop_reason);
     expect(reasons).toContain("editorial_excluded"); // the eligibility-rejected article
     expect(reasons).toContain("low_cluster_score"); // deduped-but-unranked article
+  });
+});
+
+describe("updateArticleCandidateEligibilitySignals (PRD-53 eligibility observability)", () => {
+  it("persists event_importance + event_type + eligibility_tier per cluster", async () => {
+    await updateArticleCandidateEligibilitySignals({
+      runId: "run-1",
+      items: [
+        {
+          id: "generated-cluster-a",
+          selectionEligibility: {
+            tier: "core_signal_eligible",
+            structuralImportanceScore: 57.6,
+            eventType: "geopolitics",
+          },
+          eventIntelligence: { eventType: "geopolitics" },
+        },
+        {
+          id: "generated-cluster-b",
+          selectionEligibility: {
+            tier: "context_signal_eligible",
+            structuralImportanceScore: 48,
+            eventType: "policy_regulation",
+          },
+        },
+      ],
+    });
+
+    const eligibilityUpdates = captured.updates.filter((update) => "eligibility_tier" in update);
+    expect(eligibilityUpdates).toHaveLength(2);
+    expect(eligibilityUpdates[0]).toMatchObject({
+      event_importance: 57.6,
+      event_type: "geopolitics",
+      eligibility_tier: "core_signal_eligible",
+    });
+    expect(eligibilityUpdates[1]).toMatchObject({
+      event_importance: 48,
+      event_type: "policy_regulation",
+      eligibility_tier: "context_signal_eligible",
+    });
+  });
+
+  it("writes null signals when absent and dedups clusters by id (first per cluster wins)", async () => {
+    await updateArticleCandidateEligibilitySignals({
+      runId: "run-1",
+      items: [
+        { id: "generated-cluster-a" }, // no eligibility/intelligence -> all-null row
+        { id: "generated-cluster-a", selectionEligibility: { tier: "core_signal_eligible" } }, // dup cluster, ignored
+      ],
+    });
+
+    const eligibilityUpdates = captured.updates.filter((update) => "eligibility_tier" in update);
+    expect(eligibilityUpdates).toHaveLength(1);
+    expect(eligibilityUpdates[0]).toMatchObject({
+      event_importance: null,
+      event_type: null,
+      eligibility_tier: null,
+    });
   });
 });

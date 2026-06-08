@@ -431,3 +431,107 @@ export async function updateArticleCandidateRankingOutcomes({
     });
   });
 }
+
+/**
+ * PRD-53 remediation (observability) — per-cluster selection-eligibility signals.
+ *
+ * The 11-news -> 2-placed collapse is entirely Gate 1 (core-eligibility): only
+ * tier=core_signal_eligible reaches the slate. The three signals that decide the
+ * tier are computed downstream of the rank/persist step (in generateDailyBriefing
+ * via evaluateSignalSelectionEligibility + buildEventIntelligence), so they are
+ * written back here, keyed by cluster_id, rather than in
+ * updateArticleCandidateRankingOutcomes:
+ *   - event_importance  = selectionEligibility.structuralImportanceScore
+ *                         (== groupedScores.event_importance; the `>= 52` core gate).
+ *   - event_type        = eventIntelligence.eventType (CORE_EVENT_TYPES gate).
+ *   - eligibility_tier  = selectionEligibility.tier.
+ *
+ * Makes the collapse attributable from pipeline_article_candidates alone (no log
+ * scraping). Best-effort + additive: when the columns are absent (migration not
+ * yet applied) the missing-column UPDATE error is swallowed (logged info) so the
+ * run is unaffected — mirrors the insert-ladder graceful-degrade in
+ * persistNormalizedArticleCandidates.
+ */
+type EligibilitySignalItem = {
+  id: string;
+  selectionEligibility?: {
+    tier?: string | null;
+    structuralImportanceScore?: number | null;
+    eventType?: string | null;
+  } | null;
+  eventIntelligence?: { eventType?: string | null } | null;
+};
+
+function getClusterIdFromItemId(itemId: string): string {
+  return itemId.startsWith("generated-") ? itemId.slice("generated-".length) : itemId;
+}
+
+export async function updateArticleCandidateEligibilitySignals({
+  runId,
+  items,
+}: {
+  runId: string;
+  items: EligibilitySignalItem[];
+}) {
+  // One row of eligibility signals per cluster (signals are cluster-level; they
+  // apply to every article in the cluster). First item per cluster_id wins —
+  // candidateItems carry one item per ranked cluster, so collisions are inert.
+  const byCluster = new Map<
+    string,
+    { event_importance: number | null; event_type: string | null; eligibility_tier: string | null }
+  >();
+  for (const item of items) {
+    const clusterId = getClusterIdFromItemId(item.id);
+    if (!clusterId || byCluster.has(clusterId)) {
+      continue;
+    }
+    const eligibility = item.selectionEligibility ?? null;
+    byCluster.set(clusterId, {
+      event_importance:
+        typeof eligibility?.structuralImportanceScore === "number"
+          ? eligibility.structuralImportanceScore
+          : null,
+      event_type: item.eventIntelligence?.eventType ?? eligibility?.eventType ?? null,
+      eligibility_tier: eligibility?.tier ?? null,
+    });
+  }
+
+  if (!byCluster.size) {
+    return;
+  }
+
+  await schedulePipelineCandidateWrite("eligibility_signal_update", runId, async (client) => {
+    const entries = [...byCluster.entries()];
+    const results = await Promise.all(
+      entries.map(([clusterId, values]) =>
+        client
+          .from(PIPELINE_ARTICLE_CANDIDATES_TABLE)
+          .update(values)
+          .eq("run_id", runId)
+          .eq("cluster_id", clusterId),
+      ),
+    );
+
+    const error = results.find((result) => result.error)?.error;
+    if (error) {
+      // Expected during the migration window: the eligibility columns are not yet
+      // applied, so every UPDATE returns a missing-column error. Swallow (info) so
+      // the run is unaffected; any OTHER error rethrows into the best-effort
+      // wrapper, which warns without blocking the run.
+      if (isMissingColumnError(error)) {
+        logPipelineEvent(
+          "info",
+          "Eligibility observability columns absent; eligibility signals not persisted (pre-migration)",
+          { run_id: runId, cluster_count: entries.length },
+        );
+        return;
+      }
+      throw error;
+    }
+
+    logPipelineEvent("info", "Updated article candidate eligibility signals", {
+      run_id: runId,
+      cluster_count: entries.length,
+    });
+  });
+}
