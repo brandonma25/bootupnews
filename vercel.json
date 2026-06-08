@@ -2,6 +2,12 @@
   "functions": {
     "src/app/api/cron/fetch-editorial-inputs/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/cron/extract-article-bodies/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/restage-with-bodies/route.ts": {
+      "maxDuration": 60
     }
   }
 }

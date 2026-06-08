@@ -71,4 +71,35 @@ export const cronJobs: CronJobConfig[] = [
     enabled: true,
     notifyOnFailure: true,
   },
+
+  // Decoupled full-text extraction — CRON-1 of the source_accessibility unblock
+  // (fetch + cache article bodies ONLY). Fires at 12:20 UTC, AFTER the 12:00
+  // ingestion + 12:15 health, so it reads the freshest candidate set and never
+  // shares a budget with fetch-editorial-inputs. notifyOnFailure is false: a
+  // best-effort enhancement leg — a miss means "no improvement today", not a
+  // broken briefing, so it must not page the operator.
+  {
+    title: "bootup-extract-bodies-1220-utc",
+    url: `${BASE ?? "<BOOTUP_PRODUCTION_URL>"}/api/cron/extract-article-bodies`,
+    method: "GET",
+    schedule: { timezone: "Etc/UTC", hours: [12], minutes: [20] },
+    headers: { "x-cron-secret": SECRET ?? "" },
+    enabled: true,
+    notifyOnFailure: false,
+  },
+
+  // Same-cycle restage-with-bodies — CRON-2 of the unblock (re-gate the real
+  // pipeline with the cached bodies, append newly-unblocked items to today's
+  // signal_posts, re-stage to Notion). Fires 5 min after CRON-1 (12:25 UTC, same
+  // briefing_date, feed still fresh) on its OWN ≤60s budget. fetch-editorial-
+  // inputs is untouched. notifyOnFailure false (best-effort enhancement leg).
+  {
+    title: "bootup-restage-with-bodies-1225-utc",
+    url: `${BASE ?? "<BOOTUP_PRODUCTION_URL>"}/api/cron/restage-with-bodies`,
+    method: "GET",
+    schedule: { timezone: "Etc/UTC", hours: [12], minutes: [25] },
+    headers: { "x-cron-secret": SECRET ?? "" },
+    enabled: true,
+    notifyOnFailure: false,
+  },
 ];

@@ -535,3 +535,53 @@ export async function updateArticleCandidateEligibilitySignals({
     });
   });
 }
+
+/**
+ * Decoupled-extraction read-back: canonical_url → extracted body text for
+ * candidates a prior extraction run successfully populated. The main pipeline
+ * loads this once per run and hands it to ingestion (toRawItem) so a freshly-
+ * extracted body counts toward coreSupported. Best-effort: no client /
+ * pre-migration columns / any error ⇒ empty map, and the main run behaves
+ * exactly as today (reads an empty extracted_body_text).
+ */
+export async function loadRecentExtractedBodies(
+  options: { sinceHours?: number; limit?: number } = {},
+): Promise<Map<string, string>> {
+  const client = getPipelineCandidateClient();
+  if (!client) return new Map();
+
+  const sinceHours = options.sinceHours ?? 72;
+  const limit = options.limit ?? 500;
+  const cutoff = new Date(Date.now() - sinceHours * 3_600_000).toISOString();
+  const map = new Map<string, string>();
+
+  try {
+    const result = await client
+      .from(PIPELINE_ARTICLE_CANDIDATES_TABLE)
+      .select("canonical_url, extracted_body_text, extracted_text_length, extraction_attempted_at")
+      .gt("extracted_text_length", 0)
+      .gte("extraction_attempted_at", cutoff)
+      .order("extraction_attempted_at", { ascending: false })
+      .limit(limit);
+
+    if (result.error) {
+      if (isMissingColumnError(result.error)) return map; // pre-migration window: no-op
+      throw result.error;
+    }
+
+    type ExtractedRow = { canonical_url: string | null; extracted_body_text: string | null };
+    for (const row of (result.data ?? []) as ExtractedRow[]) {
+      const key = (row.canonical_url ?? "").toLowerCase();
+      const body = row.extracted_body_text;
+      if (key && typeof body === "string" && body.length > 0 && !map.has(key)) {
+        map.set(key, body);
+      }
+    }
+  } catch (error) {
+    logPipelineEvent("warn", "loadRecentExtractedBodies failed (non-blocking)", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return map;
+}

@@ -26,7 +26,7 @@ import {
 import type { SourceAccessibilityDiagnostics } from "@/lib/source-accessibility-types";
 import { getPublicSourceGovernance } from "@/lib/source-manifest";
 import { classifySourcePreference } from "@/lib/source-policy";
-import { cleanText, stableId } from "@/lib/pipeline/shared/text";
+import { cleanText, normalizeUrl, stableId } from "@/lib/pipeline/shared/text";
 
 import { seedRawItems } from "./seed-items";
 
@@ -238,25 +238,53 @@ async function fetchSourceWithAdapter(source: SourceDefinition) {
   return items;
 }
 
-function toRawItem(entry: Awaited<ReturnType<typeof fetchSourceWithAdapter>>[number]): RawItem {
-  const sourceAccessibility = buildArticleSourceAccessibility(entry.article, entry.sourceDefinition);
+/** Same canonical key the candidate table persists (article-candidates.ts), so
+ * an extracted body keyed on canonical_url matches the freshly-fetched article. */
+function canonicalUrlKey(article: { url: string; discoveryMetadata?: { normalizedUrl?: string | null } | null }): string {
+  return (article.discoveryMetadata?.normalizedUrl ?? normalizeUrl(article.url)).toLowerCase();
+}
+
+function toRawItem(
+  entry: Awaited<ReturnType<typeof fetchSourceWithAdapter>>[number],
+  extractedBodyByCanonicalUrl?: Map<string, string>,
+): RawItem {
+  // Decoupled-extraction integration point (the source_accessibility unblock):
+  // if a prior extraction run supplied a LONGER article body for this URL, use
+  // it so the EXISTING source-accessibility classifier reclassifies the
+  // otherwise abstract-only article as full/partial text. No threshold changes.
+  // Absent map / no match / shorter body ⇒ byte-identical to before.
+  const nativeContent = entry.article.contentText ?? "";
+  const extractedBody = extractedBodyByCanonicalUrl?.get(canonicalUrlKey(entry.article));
+  // Override contentText only; buildArticleSourceAccessibility derives the
+  // extraction method from content presence, so the longer body reclassifies as
+  // full/partial text without us re-labeling it.
+  const article =
+    extractedBody && extractedBody.length > nativeContent.length
+      ? { ...entry.article, contentText: extractedBody }
+      : entry.article;
+
+  const sourceAccessibility = buildArticleSourceAccessibility(article, entry.sourceDefinition);
 
   return {
-    id: entry.article.stableId ?? stableId(entry.sourceDefinition.source, entry.article.url, entry.article.publishedAt),
-    source: entry.article.sourceName || entry.sourceDefinition.source,
-    title: cleanText(entry.article.title),
-    url: entry.article.url,
-    published_at: entry.article.publishedAt,
-    raw_content: cleanText(entry.article.contentText ?? entry.article.summaryText),
+    id: article.stableId ?? stableId(entry.sourceDefinition.source, article.url, article.publishedAt),
+    source: article.sourceName || entry.sourceDefinition.source,
+    title: cleanText(article.title),
+    url: article.url,
+    published_at: article.publishedAt,
+    raw_content: cleanText(article.contentText ?? article.summaryText),
     source_metadata: entry.sourceMetadata,
     source_accessibility: sourceAccessibility,
-    discovery_metadata: entry.article.discoveryMetadata,
+    discovery_metadata: article.discoveryMetadata,
   };
 }
 
 export async function ingestRawItems(options: {
   sources?: Source[];
   suppliedByManifest?: boolean;
+  /** Optional canonical_url → extracted body map from the decoupled extraction
+   * stage. When present, a longer body overrides the feed abstract before
+   * accessibility classification. Absent ⇒ unchanged behavior. */
+  extractedBodyByCanonicalUrl?: Map<string, string>;
 } = {}): Promise<IngestionResult> {
   const sources = resolveIngestionSources(options);
   const sourceResolution = buildRuntimeSourceResolutionSnapshot({
@@ -272,7 +300,7 @@ export async function ingestRawItems(options: {
       try {
         const items = await fetchSourceWithAdapter(source);
         const maxItems = source.fetch.maxItems ?? 6;
-        return items.slice(0, maxItems).map(toRawItem);
+        return items.slice(0, maxItems).map((entry) => toRawItem(entry, options.extractedBodyByCanonicalUrl));
       } catch (error) {
         const failureType = classifyRssFailure(error);
         const errorMessage = error instanceof Error ? error.message : String(error);
