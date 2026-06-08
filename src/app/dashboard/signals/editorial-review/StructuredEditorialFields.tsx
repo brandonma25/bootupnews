@@ -392,6 +392,13 @@ export function StructuredEditorialFields({
         readOnly
       />
 
+      {/* The Signal — the lead editorial layer (why it matters). The rich
+          structured editor below composes the homepage teaser/expanded
+          payload; its hidden inputs (above) save to edited_why_it_matters. */}
+      <LayerHeading
+        title="The Signal"
+        help="Why it matters — the lead layer. Saves to edited_why_it_matters and is promoted to published_why_it_matters on publish. The homepage teaser and expanded view render from this layer."
+      />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
         <div className="space-y-4">
           <FieldBlock
@@ -529,12 +536,14 @@ export function StructuredEditorialFields({
       {/* #274 Before This + The Ripple. Simple textareas, no structured
           editor — the publish gate writes both the text and a
           legacy-text-derived payload to published_what_*. The editor can
-          clear either layer by emptying the textarea before saving. */}
-      <div className="grid gap-4 lg:grid-cols-2">
+          clear either layer by emptying the textarea before saving.
+          Presented as two labeled peer sections after The Signal, so the
+          three layers read in order: The Signal → Before This → The Ripple. */}
+      <div className="border-t border-[var(--border)] pt-5">
         <FieldBlock
           id={`editedWhatLedToIt-${postId}`}
-          label="Before This (what led to this)"
-          help="Causal / preceding context. Promoted to published_what_led_to_it on publish. Leave empty to suppress the layer from the public foldback."
+          label="Before This"
+          help="Causal / preceding context (what led to this). Saves to edited_what_led_to_it; promoted to published_what_led_to_it on publish. Leave empty to suppress the layer from the public foldback."
         >
           <textarea
             id={`editedWhatLedToIt-${postId}`}
@@ -544,10 +553,12 @@ export function StructuredEditorialFields({
             className="w-full resize-y rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm leading-6 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
           />
         </FieldBlock>
+      </div>
+      <div className="border-t border-[var(--border)] pt-5">
         <FieldBlock
           id={`editedWhatItConnectsTo-${postId}`}
-          label="The Ripple (what it connects to)"
-          help="Trajectory / downstream implications. Promoted to published_what_it_connects_to on publish. Leave empty to suppress the layer from the public foldback."
+          label="The Ripple"
+          help="Trajectory / downstream implications (what it connects to). Saves to edited_what_it_connects_to; promoted to published_what_it_connects_to on publish. Leave empty to suppress the layer from the public foldback."
         >
           <textarea
             id={`editedWhatItConnectsTo-${postId}`}
@@ -580,6 +591,22 @@ function FieldBlock({
       </label>
       <span className="mt-1 block text-sm leading-6 text-[var(--text-secondary)]">{help}</span>
       <span className="mt-2 block">{children}</span>
+    </div>
+  );
+}
+
+/**
+ * Section heading for a top-level editorial layer. Mirrors FieldBlock's
+ * label + help typography so the three layers — The Signal, Before This,
+ * The Ripple — read as uniform peer sections. Used for The Signal, which
+ * wraps a composite editor rather than a single labelled input; Before
+ * This / The Ripple reuse FieldBlock directly.
+ */
+function LayerHeading({ title, help }: { title: string; help: string }) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
+      <span className="mt-1 block text-sm leading-6 text-[var(--text-secondary)]">{help}</span>
     </div>
   );
 }

@@ -26,7 +26,9 @@ export function CandidateRow({
   const requiresRewrite = candidate.whyItMattersValidationStatus === "requires_human_rewrite";
   const canAssign = isCandidateAssignable(candidate, storageReady) && !requiresRewrite;
   const status = getCandidateStatus(candidate);
-  const witmBody = getCandidateWitmBody(candidate);
+  const signalBody = getCandidateSignalBody(candidate);
+  const beforeThisBody = getCandidateBeforeThisBody(candidate);
+  const rippleBody = getCandidateRippleBody(candidate);
 
   return (
     <article className="rounded-[var(--bu-radius-lg)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)] p-[var(--bu-space-4)]">
@@ -43,16 +45,32 @@ export function CandidateRow({
             {candidate.title}
           </h3>
 
-          <p
-            className={cn(
-              "mt-2 font-heading text-[var(--bu-size-meta)] leading-[1.5] text-[var(--bu-text-secondary)]",
-              requiresRewrite && "italic text-[var(--bu-text-tertiary)]",
-            )}
-          >
-            {requiresRewrite
-              ? "Template placeholder language detected. WITM requires editorial rewrite before this candidate is publishable."
-              : witmBody}
-          </p>
+          {/* Three-layer at-a-glance preview (read-only), mirroring the
+              editor and the Notion three-layer view in the fixed order
+              The Signal → Before This → The Ripple. Each layer sources from
+              the same fields the editor reads (edited_* → published_* →
+              ai_*). The Signal keeps the WITM rewrite-gate placeholder. */}
+          <div className="mt-3 space-y-[var(--bu-space-3)]">
+            <CardLayerPreview
+              label="The Signal"
+              body={requiresRewrite ? "" : signalBody}
+              emptyText={
+                requiresRewrite
+                  ? "Template placeholder language detected. WITM requires editorial rewrite before this candidate is publishable."
+                  : "No WITM draft available."
+              }
+            />
+            <CardLayerPreview
+              label="Before This"
+              body={beforeThisBody}
+              emptyText="No Before This draft yet."
+            />
+            <CardLayerPreview
+              label="The Ripple"
+              body={rippleBody}
+              emptyText="No Ripple draft yet."
+            />
+          </div>
         </div>
 
         <div className="space-y-[var(--bu-space-2)]">
@@ -132,12 +150,62 @@ function getCandidateStatus(candidate: EditorialSignalPost) {
   return "failed" as const;
 }
 
-function getCandidateWitmBody(candidate: EditorialSignalPost) {
+// At-a-glance layer bodies. Same precedence the card has always used for
+// WITM (edited_* → published_* → ai_*); returns "" when every source is
+// empty so CardLayerPreview can render the labeled empty state. NEVER reads
+// the human_* override — that is a bridge-only field, not an editorial layer.
+function getCandidateSignalBody(candidate: EditorialSignalPost) {
   return (
     candidate.editedWhyItMatters ||
     candidate.publishedWhyItMatters ||
     candidate.aiWhyItMatters ||
-    "No WITM draft available."
+    ""
+  );
+}
+
+function getCandidateBeforeThisBody(candidate: EditorialSignalPost) {
+  return (
+    candidate.editedWhatLedToIt ||
+    candidate.publishedWhatLedToIt ||
+    candidate.aiWhatLedToIt ||
+    ""
+  );
+}
+
+function getCandidateRippleBody(candidate: EditorialSignalPost) {
+  return (
+    candidate.editedWhatItConnectsTo ||
+    candidate.publishedWhatItConnectsTo ||
+    candidate.aiWhatItConnectsTo ||
+    ""
+  );
+}
+
+function CardLayerPreview({
+  label,
+  body,
+  emptyText,
+}: {
+  label: string;
+  body: string;
+  emptyText: string;
+}) {
+  const hasBody = body.trim().length > 0;
+
+  return (
+    <div className="min-w-0">
+      <p className="text-[var(--bu-size-micro)] font-medium uppercase tracking-[0.08em] text-[var(--bu-text-tertiary)]">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 font-heading text-[var(--bu-size-meta)] leading-[1.5] line-clamp-2",
+          hasBody ? "text-[var(--bu-text-secondary)]" : "italic text-[var(--bu-text-tertiary)]",
+        )}
+      >
+        {hasBody ? body : emptyText}
+      </p>
+    </div>
   );
 }
 
