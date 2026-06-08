@@ -277,7 +277,19 @@ These have cost this project real time. Recognize them on sight:
 
 ---
 
-## 14. Required Output Format
+## 14. Diagnosis discipline
+
+When investigating a question that will gate a code change, before giving any recommendation:
+
+1. **Ground every load-bearing claim.** List the claims your recommendation depends on. For each, paste the governing code (the actual predicate/function, not a paraphrase) with file:line — OR mark it `INFERRED — not verified`. A recommendation resting on an inferred claim is a hypothesis, not a finding. Confidence and citations are not evidence; the pasted code is.
+
+2. **State a falsifier.** End every diagnosis with: "This conclusion is WRONG if [specific observable]." If you can't name what would disprove it, you haven't tested it.
+
+3. **Steelman the alternative.** Before recommending, make the strongest case for the opposite choice and read the code that would make it correct. Only then recommend.
+
+---
+
+## 15. Required Output Format
 
 After every completed task, your final message must include:
 
