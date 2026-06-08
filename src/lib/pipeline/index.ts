@@ -68,6 +68,7 @@ export async function runClusterFirstPipeline(options: {
       normalizedArticles: normalized,
       dedupedArticles: deduped,
       rankedClusters: rankedStoryClusters,
+      filterEvaluations: filterDiagnosticById,
     });
   } else {
     logPipelineEvent("info", "Pipeline article candidate persistence skipped by run mode", {

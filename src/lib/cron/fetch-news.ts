@@ -6,6 +6,7 @@ import {
   captureRssFailure,
   withRssSpan,
 } from "@/lib/observability/rss";
+import { resolveSurfacePoolSize } from "@/lib/pipeline/surface-pool";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 import { getPublicSourcePlanForSurface, getRequiredSourcesForPublicSurface } from "@/lib/source-manifest";
 
@@ -111,6 +112,10 @@ export async function runDailyNewsCron(
           // that gets written to signal_posts (the cockpit surface). Enabled on
           // the cron write path only.
           filterEvergreens: true,
+          // PRD-53 remediation — widen the editorial/review pool (default 22) so
+          // the editor selects from a real menu, not a machine-curated ~6. Cron
+          // write path only; public homepage display cap is unchanged.
+          surfacePoolSize: resolveSurfacePoolSize(),
         }),
     );
     const briefingDate = briefing.briefingDate.slice(0, 10);

@@ -3,6 +3,16 @@
 Project-level changelog. Per-PR detail lives in GitHub PR metadata; this file
 records durable, reviewer-facing milestones — usually multi-PR initiatives.
 
+## 2026-06-08 — Surfacing pool widening + diversity (PRD-53 / PRD-38)
+
+Surfacing had collapsed to an effective hard top-N≈6 cap feeding a 5-slot public set (≈72% institutional research; audience-relevant news ≈0), so the machine curated the editorial slate instead of the editor. This three-PR initiative restores editorial selection authority and addresses the ranking skew at its root.
+
+| Phase | Summary | PR |
+| --- | --- | --- |
+| PR 1 | Widen the editorial review pool (`SURFACE_POOL_SIZE`, default 22) + observability (`source_class`/`category` on candidates, `editorial_excluded` drop_reason) | this PR |
+| PR 2 | Hard `source_class` diversity guard at selection (institutional ≤ ~40% of the pool) | pending |
+| PR 3 | Realize `event_importance` (PRD-38) — the placeholder constant that lets source authority dominate ranking | pending |
+
 ## 2026-05-18 — Documentation architecture overhaul
 
 Resolved structural drift in the docs system: scattered templates consolidated to a single canonical location, three governance bugs fixed (PR template terminology reference, missing incidents folder, change-records folder lane mismatch), AGENTS.md redesigned to retire the 9-document required-reading list, new ADR and incident templates introduced, folder structure flattened where single-file subfolders existed, PRD operational-history index system introduced with CI enforcement.
