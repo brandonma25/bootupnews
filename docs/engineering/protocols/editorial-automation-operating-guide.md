@@ -10,6 +10,28 @@
 3. BM reviews rows in Notion, sets status to `Approved`, then triggers the push endpoint.
 4. The push endpoint reads approved rows from Notion and inserts them into `signal_posts`.
 
+## Editorial Composer — Pick → Publish workflow (cap 7)
+The in-app composer (`/dashboard/signals/editorial-review`) composes the public
+slate from reviewed candidates. As of the Pick → Publish change (PRD-53 / PRD-36
+amendments):
+- **Cap is 7** — 5 Core ("Signal", ranks 1–5) + 2 Context (ranks 6–7). The
+  publish gate, the public homepage/`/signals`, and the signed-in dashboard all
+  surface 7.
+- **Autosave** persists the three editorial layers (`edited_*`) ~1.5s after
+  typing stops (and on blur / before Include / before Publish) via a quiet save
+  that does not refresh the page. There is no manual "Save Edits" button.
+- **Include** (one click per card) assigns the next open slot **and** approves
+  the card in one atomic step (`includeSignalPostInSlate`). Because edits are
+  already autosaved, approve only flips status + sets the slot. It replaces the
+  old slot dropdown, the per-card Approve button, and the Bulk-approve bar.
+  **Remove** clears the slot; the card stays `approved` but unassigned, so the
+  publish gate (slot-assigned rows only) excludes it.
+- **Publish** (with its confirmation dialog) and the publish-readiness gate are
+  unchanged: an included card is `approved` + slot-assigned, exactly what
+  readiness requires. A small autosave coordinator flushes pending edits before
+  Include / Publish so they never act on stale content.
+- **Live cards** keep the **Re-publish** path (autosave is off for them).
+
 ## Endpoints
 - `GET /api/editorial/push-approved?token=<EDITORIAL_PUSH_SECRET>` — promotes approved Notion rows to `signal_posts`.
 - `GET /api/cron/fetch-editorial-inputs` — daily ingestion. Authenticates via the `x-cron-secret` HTTP header matching `CRON_SECRET`. Triggered externally by cron-job.org (see Triggering below). Writes a Pipeline Log row on completion (see Operational Logging).
