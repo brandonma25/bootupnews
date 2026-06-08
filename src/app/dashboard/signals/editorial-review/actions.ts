@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import {
   normalizeEditorialWhyItMattersContent,
   parseEditorialWhyItMattersContent,
+  type EditorialWhyItMattersContent,
 } from "@/lib/editorial-content";
 import {
   PUBLIC_SIGNALS_ROUTE,
@@ -102,6 +103,31 @@ export async function saveSignalDraftAction(formData: FormData) {
   }
 
   redirectWithResult(result);
+}
+
+/**
+ * Quiet autosave for the three editorial layers (Pick → Publish workflow).
+ * Persists edited_* via saveSignalDraft but intentionally does NOT revalidate
+ * — autosave runs while the editor is typing, so a full-page refresh would
+ * steal focus and flicker. It returns the mutation result so the client can
+ * show a "Saving / Saved / Couldn't save" indicator. The composer reads fresh
+ * edited_* on its next natural navigation (Include / Publish), so skipping
+ * revalidation here is safe. Replaces the manual "Save Edits" button.
+ */
+export async function autosaveSignalDraftAction(input: {
+  postId: string;
+  editedWhyItMatters: string;
+  editedWhyItMattersStructured: EditorialWhyItMattersContent | null;
+  editedWhatLedToIt: string;
+  editedWhatItConnectsTo: string;
+}): Promise<EditorialMutationResult> {
+  return saveSignalDraft({
+    postId: input.postId,
+    editedWhyItMatters: input.editedWhyItMatters,
+    editedWhyItMattersStructured: input.editedWhyItMattersStructured,
+    editedWhatLedToIt: input.editedWhatLedToIt,
+    editedWhatItConnectsTo: input.editedWhatItConnectsTo,
+  });
 }
 
 export async function approveSignalPostAction(formData: FormData) {

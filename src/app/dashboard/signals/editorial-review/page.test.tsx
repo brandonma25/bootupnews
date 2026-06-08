@@ -22,6 +22,7 @@ vi.mock("@/lib/signals-editorial", async (importOriginal) => {
 vi.mock("@/app/dashboard/signals/editorial-review/actions", () => ({
   approveAllSignalPostsAction: vi.fn(),
   saveSignalDraftAction: vi.fn(),
+  autosaveSignalDraftAction: vi.fn().mockResolvedValue({ ok: true, code: "draft_saved", message: "Saved" }),
   approveSignalPostAction: vi.fn(),
   resetSignalPostToAiDraftAction: vi.fn(),
   publishFinalSlateAction: vi.fn(),

@@ -1,26 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Loader2,
   RefreshCw,
   RotateCcw,
-  Save,
 } from "lucide-react";
 
 import {
   approveSignalPostAction,
+  autosaveSignalDraftAction,
   holdSignalPostAction,
   rejectSignalPostAction,
   republishLiveSignalPostAction,
   requestRewriteAction,
   resetSignalPostToAiDraftAction,
-  saveSignalDraftAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,13 @@ type StructuredEditorialFieldsProps = {
    * break; the next scoped cleanup can drop it.
    */
   eligibleForApproveAll: boolean;
+  /**
+   * Whether autosave is allowed for this card (Pick → Publish workflow).
+   * False for non-persisted cards, when storage is unavailable, or for
+   * currently-live-published cards (those use the Re-publish path). When
+   * false the editor shows no autosave indicator and never writes.
+   */
+  canAutosave?: boolean;
 };
 
 type SignalPostEditorProps = {
@@ -200,19 +208,10 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
             initialEditedWhatLedToIt={initialEditedWhatLedToIt}
             initialEditedWhatItConnectsTo={initialEditedWhatItConnectsTo}
             eligibleForApproveAll={eligibleForApproveAll}
+            canAutosave={!controlsDisabled && !isCurrentlyLivePublished}
           />
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="submit"
-              formAction={saveSignalDraftAction}
-              variant="secondary"
-              disabled={controlsDisabled}
-              className="gap-2"
-            >
-              <Save className="h-4 w-4" />
-              Save Edits
-            </Button>
             {/* #282 Approve hidden on currently-live-published cards
                 — see isCurrentlyLivePublished comment. Re-publish is
                 the safe path. */}
@@ -326,6 +325,7 @@ export function StructuredEditorialFields({
   // Vestigial after the bulk-approve refactor; see prop docs above.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   eligibleForApproveAll: _eligibleForApproveAll,
+  canAutosave = false,
 }: StructuredEditorialFieldsProps) {
   const initialContent =
     structuredContent ?? createEditorialContentFromLegacyText(legacyText || aiWhyItMatters);
@@ -363,8 +363,67 @@ export function StructuredEditorialFields({
   );
   const structuredJson = JSON.stringify(content);
 
+  // Autosave (Pick → Publish): debounce edits to the three layers ~1.5s after
+  // typing stops, and flush when focus leaves the editor. Replaces the manual
+  // "Save Edits" button; writes via the quiet autosave action (no page
+  // refresh). No-op when canAutosave is false (live-published cards, etc.).
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const hasAutosaveMountedRef = useRef(false);
+  const latestEditsRef = useRef({ fullEditorialText, content, editedWhatLedToIt, editedWhatItConnectsTo });
+  useEffect(() => {
+    latestEditsRef.current = { fullEditorialText, content, editedWhatLedToIt, editedWhatItConnectsTo };
+  });
+
+  const flushAutosave = useCallback(async () => {
+    if (!canAutosave) {
+      return;
+    }
+    const snapshot = latestEditsRef.current;
+    setAutosaveStatus("saving");
+    try {
+      const result = await autosaveSignalDraftAction({
+        postId,
+        editedWhyItMatters: snapshot.fullEditorialText,
+        editedWhyItMattersStructured: snapshot.content,
+        editedWhatLedToIt: snapshot.editedWhatLedToIt,
+        editedWhatItConnectsTo: snapshot.editedWhatItConnectsTo,
+      });
+      setAutosaveStatus(result.ok ? "saved" : "error");
+    } catch {
+      setAutosaveStatus("error");
+    }
+  }, [canAutosave, postId]);
+
+  useEffect(() => {
+    if (!canAutosave) {
+      return;
+    }
+    if (!hasAutosaveMountedRef.current) {
+      // Skip the initial render — only autosave actual edits.
+      hasAutosaveMountedRef.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void flushAutosave();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [canAutosave, flushAutosave, fullEditorialText, structuredJson, editedWhatLedToIt, editedWhatItConnectsTo]);
+
   return (
-    <div className="space-y-5">
+    <div
+      className="space-y-5"
+      onBlur={(event) => {
+        // Flush immediately when focus leaves the whole editor (not when
+        // tabbing between fields inside it).
+        if (!canAutosave || !hasAutosaveMountedRef.current) {
+          return;
+        }
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          return;
+        }
+        void flushAutosave();
+      }}
+    >
       <input
         type="hidden"
         name="editedWhyItMatters"
@@ -391,6 +450,30 @@ export function StructuredEditorialFields({
         value={editedWhatItConnectsTo}
         readOnly
       />
+
+      {canAutosave ? (
+        <p
+          className="flex items-center gap-1.5 text-[var(--bu-size-micro)] text-[var(--text-secondary)]"
+          aria-live="polite"
+          data-testid={`autosave-status-${postId}`}
+        >
+          {autosaveStatus === "saving" ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+            </>
+          ) : autosaveStatus === "saved" ? (
+            <>
+              <Check className="h-3.5 w-3.5" /> Saved
+            </>
+          ) : autosaveStatus === "error" ? (
+            <span className="text-[var(--bu-status-danger-text)]">
+              Couldn’t save — keep editing to retry.
+            </span>
+          ) : (
+            "Edits save automatically."
+          )}
+        </p>
+      ) : null}
 
       {/* The Signal — the lead editorial layer (why it matters). The rich
           structured editor below composes the homepage teaser/expanded
