@@ -84,3 +84,20 @@ These are deterministic heuristics derived from cluster text, actor/entity prese
   - `src/lib/observability/pipeline-run.ts`
   - `src/lib/scoring/scoring-engine.test.ts`
 - Confidence: Medium-high for deterministic local behavior and inspectability; medium for real-world editorial fit because importance remains heuristic.
+
+## Operational history
+
+### 2026-06-08 — importance recalibration (inversion fix)
+
+Measured against the persisted 2026-06-08 candidate pool, `event_importance` was **inverted**: its features were scored as keyword-presence over economic-policy-only vocabulary (plus a conflict-blind actor regex and FOMC/macro-only calibration boosts), so interstate-conflict and major-legislation events floored near base (~20-27) while vocab-dense Fed/research explainers ceilinged (58-88). Consequence: the core pool filled with evergreen explainers (which the publish-path evergreen filter then stripped, leaving a 2-card slate) while genuine breaking news never reached the ≥52 core gate.
+
+Recalibration — all in `mapClusterToRankingFeatures` (`src/adapters/donors/registry.ts`), no change to the ≥52 gate, the `ranked.score` floor, the blend weights, or the evergreen-filter code:
+
+- Extended `structural_impact` / `downstream_consequence` / `actionability` keyword lists with **specific** interstate-conflict (kinetic) and major-legislation (multi-word) terms; added conflict actors (Israel, Iran, Ukraine, Russia, Gaza, Hezbollah, Hamas, NATO, North Korea) to the `actor_significance` regex.
+- Added two tightly-gated calibration boosts: interstate-conflict (gated on hard kinetic terms only — never "trade war"/"culture war") and major-legislative/regulatory action (gated on a legislative NOUN + ACTION verb, or a formal regulatory action such as a Senate hearing / export-control / executive order).
+- Added a **load-bearing** negative calibration (the evergreen penalty) reusing the publish-path evergreen classifier (`classifyEvergreen`), so vocab-dense explainers fall below 52 by score rather than only being deleted downstream. Without it the keyword lift re-inflates the explainers.
+
+Measured outcome (filter-disabled, 2026-06-08 pool): core-eligible pool 10 → 8 with **0 evergreens** remaining (all 15 evergreen clusters dropped below 52; e.g. Economic Letter 87.6→39.6, food/energy 66.8→18.8) and **0 filler** crossing 52; genuine conflict/legislation/regulatory clusters crossed (Ukraine aid 25.5→73.9, Israel/Iran strikes 27.1→69.0, Nvidia/China-chip Senate hearing 49.3→80.0). Because importance is the dominant `ranked.score` group weight (0.42), the lift cascades into the score floor, clearing it for most lifted clusters without touching the floor itself.
+
+- Repo evidence: `src/adapters/donors/registry.ts`, `src/adapters/donors/registry.importance-recalibration.test.ts`, `scripts/measure-importance-recalibration.ts`, `tests/fixtures/importance-recalibration/pool-2026-06-08.json`.
+- Known residuals (out of scope here): a few genuine conflict/legislation clusters clear ≥52 but sit just under the `ranked.score` ≥58 floor (the next constraint, deliberately untouched); non-kinetic conflict phrasing ("Israel hits Beirut's suburbs") is under-credited by the keyword approach; the MIT TR "The Download" newsletter roundup remains core-eligible (pre-existing; not an evergreen-prone feed).

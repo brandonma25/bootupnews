@@ -37,6 +37,67 @@ import {
   overlapSimilarity,
   tokenize,
 } from "@/lib/pipeline/shared/text";
+import {
+  classifyEvergreen,
+  resolveEvergreenFilterConfig,
+} from "@/lib/editorial/evergreen-filter";
+
+/**
+ * PRD-38 — event_importance realization. The importance feature-provider below
+ * scored importance as keyword-presence over economic-policy-only vocabulary, so
+ * interstate-conflict and major-legislation events floored near base (~20-27)
+ * while vocab-dense Fed/research explainers ceilinged (58-88) — an inversion
+ * (measured 2026-06-08). These constants extend the keyword/actor signals and
+ * gate two calibration boosts + one evergreen penalty so genuinely-important news
+ * clears the ≥52 core gate and evergreen explainers fall below it. No threshold,
+ * blend weight, or gate is changed here — only the feature inputs.
+ *
+ * Gating is deliberately tight (zero-filler requirement): the conflict boost
+ * fires only on HARD kinetic terms (not "trade war"/"culture war"); the
+ * legislation boost requires a legislative NOUN and an ACTION verb together (not
+ * a bare "House"/"Senate" mention); the evergreen penalty reuses the same
+ * classifier the publish-path evergreen filter already uses.
+ */
+// SPECIFIC kinetic terms — used BOTH in the keyword lists and as the conflict-
+// boost gate. Deliberately narrow: NO bare "war"/"strike"/"offensive", because
+// those match incidental filler ("trade war", "labor strike", "charm offensive",
+// an aside like "...not about the war in Iran...") and would lift non-news. Every
+// term here denotes active interstate conflict on its own.
+const INTERSTATE_CONFLICT_TERMS = [
+  "missile", "airstrike", "air strike", "missile strike", "ceasefire",
+  "bombardment", "shelling", "incursion", "troops", "air raid",
+  "rocket attack", "drone strike",
+] as const;
+// SPECIFIC legislative-action phrases — used in the keyword lists. Multi-word so a
+// bare "House"/"Senate"/"bill"/"vote" in political-process filler never matches;
+// the bare-term lift was the measured filler-leak failure mode.
+const MAJOR_LEGISLATION_TERMS = [
+  "aid package", "spending bill", "defense bill", "funding bill",
+  "passed the house", "passed the senate", "passes the house",
+  "passes the senate", "signed into law", "enacted", "appropriations bill",
+  "sanctions package",
+] as const;
+// Conflict actors added to the actor_significance regex (line ~642).
+const CONFLICT_ACTOR_PATTERN = "israel|iran|ukraine|russia|gaza|hezbollah|hamas|nato|north korea";
+// Legislation-boost gate — a NOUN and an ACTION verb must co-occur, so a bare
+// "bill"/"House" mention without a passage event never lifts.
+const LEGISLATION_NOUNS = [
+  "bill", "legislation", "resolution", "appropriations", "aid package",
+  "spending package", "defense package", "funding bill",
+] as const;
+const LEGISLATION_VERBS = [
+  "passed", "passes", "approved", "enacted", "signed into law", "voted to",
+  "clears", "advances",
+] as const;
+// Formal regulatory/policy ACTIONS that aren't bill passages but are the same
+// "major legislative/regulatory action" class (the Nvidia-chip-hearing case).
+// Each is a specific institutional event, so everyday political coverage that
+// merely names a chamber never qualifies.
+const REGULATORY_ACTION_SIGNALS = [
+  "senate hearing", "congressional hearing", "house hearing", "testify before",
+  "subpoena", "export control", "export controls", "executive order",
+  "antitrust suit", "antitrust lawsuit",
+] as const;
 
 function normalizeFeedMetadata(feed: DonorFeed): CanonicalSourceMetadata {
   return {
@@ -584,6 +645,9 @@ const fnsDiversitySupport: DiversitySupport = {
 function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): RankingFeatureProvider {
   const knownSources = feeds.map(normalizeFeedMetadata);
   const sourceIndex = new Map(knownSources.map((source) => [source.source.toLowerCase(), source]));
+  // PRD-38 — resolve the evergreen classifier config once per provider (env-driven,
+  // same source of truth as the publish-path evergreen filter).
+  const evergreenFilterConfig = resolveEvergreenFilterConfig();
 
   function scoreKeywordPresence(corpus: string, keywords: string[], base = 20, hitWeight = 14, max = 100) {
     const hits = keywords.filter((keyword) => corpus.includes(keyword)).length;
@@ -640,7 +704,9 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
         ...cluster.articles.flatMap((article) => article.entities),
       ].map((entry) => entry.toLowerCase());
       const actorHits = actors.filter((actor) =>
-        /(federal reserve|ecb|bank of japan|china|u\.s\.|united states|european union|apple|microsoft|google|amazon|openai|nvidia|tesla|congress|white house|sec|doj|opec|taiwan)/.test(actor),
+        new RegExp(
+          `(federal reserve|ecb|bank of japan|china|u\\.s\\.|united states|european union|apple|microsoft|google|amazon|openai|nvidia|tesla|congress|white house|sec|doj|opec|taiwan|${CONFLICT_ACTOR_PATTERN})`,
+        ).test(actor),
       ).length;
       let structuralImpact = scoreKeywordPresence(
         corpus,
@@ -659,13 +725,22 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
           "military",
           "security",
           "geopolit",
+          // PRD-38 — interstate-conflict + major-legislation structural signals.
+          ...INTERSTATE_CONFLICT_TERMS,
+          ...MAJOR_LEGISLATION_TERMS,
         ],
         18,
         12,
       );
       let downstreamConsequence = scoreKeywordPresence(
         corpus,
-        ["pricing", "repric", "guidance", "outlook", "forecast", "supply chain", "capital", "procurement", "compliance", "rollout", "export", "trade", "chip", "semiconductor"],
+        [
+          "pricing", "repric", "guidance", "outlook", "forecast", "supply chain", "capital",
+          "procurement", "compliance", "rollout", "export", "trade", "chip", "semiconductor",
+          // PRD-38 — conflict/legislation carry real downstream consequence.
+          ...INTERSTATE_CONFLICT_TERMS,
+          ...MAJOR_LEGISLATION_TERMS,
+        ],
         16,
         11,
       );
@@ -678,7 +753,13 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
       );
       let actionability = scoreKeywordPresence(
         corpus,
-        ["review", "restrict", "control", "raise", "cut", "delay", "approve", "launch", "guidance", "forecast", "hearing", "tariff", "export"],
+        [
+          "review", "restrict", "control", "raise", "cut", "delay", "approve", "launch",
+          "guidance", "forecast", "hearing", "tariff", "export",
+          // PRD-38 — conflict/legislation are high-actionability state decisions.
+          ...INTERSTATE_CONFLICT_TERMS,
+          ...MAJOR_LEGISLATION_TERMS,
+        ],
         24,
         8,
       );
@@ -696,12 +777,15 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
         actionability?: number;
         persistence?: number;
       }) => {
-        structuralImpact = Math.min(100, structuralImpact + (boost.structural ?? 0));
-        downstreamConsequence = Math.min(100, downstreamConsequence + (boost.downstream ?? 0));
-        actorSignificance = Math.min(100, actorSignificance + (boost.actor ?? 0));
-        crossDomainRelevance = Math.min(100, crossDomainRelevance + (boost.crossDomain ?? 0));
-        actionability = Math.min(100, actionability + (boost.actionability ?? 0));
-        persistence = Math.min(100, persistence + (boost.persistence ?? 0));
+        // Clamp to [0,100]: boosts may now be NEGATIVE (the PRD-38 evergreen
+        // penalty), so a feature must never fall below 0.
+        const clamp01 = (value: number) => Math.max(0, Math.min(100, value));
+        structuralImpact = clamp01(structuralImpact + (boost.structural ?? 0));
+        downstreamConsequence = clamp01(downstreamConsequence + (boost.downstream ?? 0));
+        actorSignificance = clamp01(actorSignificance + (boost.actor ?? 0));
+        crossDomainRelevance = clamp01(crossDomainRelevance + (boost.crossDomain ?? 0));
+        actionability = clamp01(actionability + (boost.actionability ?? 0));
+        persistence = clamp01(persistence + (boost.persistence ?? 0));
       };
 
       if (includesAny(corpus, ["shutdown", "federal workers", "tsa officers", "agency capacity", "workforce attrition", "quit amid shutdown"])) {
@@ -737,6 +821,50 @@ function createRankingFeatureProvider(feeds: DonorFeed[], donor: DonorId): Ranki
 
       if (includesAny(corpus, ["national science board", "national science foundation", "science governance", "institutional governance"])) {
         addCalibrationBoost({ structural: 22, downstream: 12, actor: 10, crossDomain: 12, actionability: 8, persistence: 12 });
+      }
+
+      // PRD-38 — interstate-conflict boost. Gated on HARD kinetic terms only, so
+      // "trade war"/"culture war" and mere actor mentions never qualify. Lifts
+      // active interstate conflict (Iran missiles, Israel strikes) over the ≥52
+      // core gate; the lift also cascades into ranked.score via the importance
+      // group weight, clearing the score floor as a consequence (no floor change).
+      const hasHardConflict = includesAny(corpus, [...INTERSTATE_CONFLICT_TERMS]);
+      if (hasHardConflict) {
+        addCalibrationBoost({ structural: 26, downstream: 18, actor: 18, crossDomain: 16, actionability: 18, persistence: 12 });
+      }
+
+      // PRD-38 — major-legislation boost. Requires a legislative NOUN AND an
+      // ACTION verb together (a passed/enacted bill/package/resolution), so a
+      // bare "House"/"Senate" mention in political-process filler never lifts.
+      const hasLegislativeAction =
+        (includesAny(corpus, [...LEGISLATION_NOUNS]) && includesAny(corpus, [...LEGISLATION_VERBS])) ||
+        includesAny(corpus, [...REGULATORY_ACTION_SIGNALS]);
+      if (hasLegislativeAction) {
+        // Sized so a passed major bill/package (base importance ~25) clears the
+        // ≥52 core gate with margin; legislation has no conflict-actor lift to
+        // lean on, so the boost itself carries the weight. The noun+verb gate
+        // keeps procedural filler (no passage event) out.
+        addCalibrationBoost({ structural: 44, downstream: 34, actor: 26, crossDomain: 26, actionability: 38, persistence: 22 });
+      }
+
+      // PRD-38 — evergreen penalty (LOAD-BEARING). Importance must learn what the
+      // publish-path evergreen filter already knows: vocab-dense Fed/research
+      // explainers are durable reference material, not breaking importance. Reuses
+      // the SAME classifier (feed-URL / explainer-title signals) so the two stay
+      // consistent. Without this, the lift above re-inflates the explainers (they
+      // saturate the economic-vocabulary lists) and the inversion persists. The
+      // magnitude drops even the highest observed evergreen (≈88) below 52.
+      const evergreenVerdict = classifyEvergreen(
+        {
+          title: cluster.representative_article.title,
+          source: cluster.representative_article.source,
+          url: cluster.representative_article.url,
+        },
+        evergreenFilterConfig,
+      );
+      if (evergreenVerdict.isEvergreen) {
+        const p = -48;
+        addCalibrationBoost({ structural: p, downstream: p, actor: p, crossDomain: p, actionability: p, persistence: p });
       }
 
       return {
