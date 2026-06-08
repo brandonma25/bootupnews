@@ -14,6 +14,21 @@
 - 2026-04-30 implementation checkpoint: minimal published-slate audit/history in review
 - 2026-04-30 readiness label: `ready_for_prd_53_minimal_published_slate_audit_history_review`
 
+> **Amended — Pick → Publish workflow + cap 5 → 7.** The slate is now the
+> 7-row public set (5 Core "Signal" + 2 Context; see PRD-36 amendment). The
+> editor workflow was simplified to **Pick → Publish**:
+> - **Autosave** persists the three editorial layers (~1.5s after typing +
+>   on blur) via a quiet save; the manual **Save Edits** button is removed.
+> - A one-click **Include** toggle on each candidate card assigns the next
+>   open slot **and** approves the card in one atomic step (`edited_*` is
+>   already current from autosave, so approve only flips status + sets the
+>   slot). It replaces the per-card slot dropdown, the per-card **Approve**
+>   button, and the top **Bulk approve** bar. **Remove** clears the slot
+>   (the card stays approved-but-unassigned, which the publish gate excludes).
+> - **Publish** (with its existing confirmation dialog) and the publish gate
+>   are unchanged: included cards are `approved` + slot-assigned, exactly what
+>   readiness already required.
+
 ## Objective
 
 Add a private in-app editorial review workflow for the public Top 5 Signals list so an authorized editor can review AI-drafted “Why it matters” copy, write the human editorial version, approve each signal, and publish the final list.
