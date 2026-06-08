@@ -25,6 +25,7 @@ import {
   rankNewsClusters,
 } from "@/lib/ranking";
 import type { ClusterFirstPipelineResult } from "@/lib/pipeline";
+import { updateArticleCandidateEligibilitySignals } from "@/lib/pipeline/article-candidates";
 import type { FeedArticle } from "@/lib/rss";
 import { getSourcesForPublicSurface } from "@/lib/source-manifest";
 import { evaluateSourceAccessibilitySupport } from "@/lib/source-accessibility";
@@ -1381,6 +1382,21 @@ export async function generateDailyBriefing(
         : undefined,
     };
   });
+
+  // PRD-53 remediation (observability) — persist per-cluster eligibility signals
+  // (event_importance, event_type, tier) so the core-eligibility selection
+  // collapse is measurable from pipeline_article_candidates alone (no log
+  // scraping). Cron write path only (same gate as the pipeline candidate
+  // persistence above); best-effort + graceful-degrade when the columns are
+  // absent (migration applied out-of-band). Uses the full ranked set
+  // (candidateItems), pre-evergreen-filter, so every ranked cluster is recorded.
+  if (options.persistPipelineCandidates) {
+    await updateArticleCandidateEligibilitySignals({
+      runId: run.run_id,
+      items: candidateItems,
+    });
+  }
+
   // Track 2 P7 — evergreen/explainer exclusion (the DEBUT catch). Runs BEFORE
   // the Top-N selection cap so a dropped evergreen frees its slot for a real
   // story (filtering inside the persist step downstream cannot backfill — it
