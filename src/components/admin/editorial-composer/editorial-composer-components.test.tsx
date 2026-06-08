@@ -295,6 +295,48 @@ describe("editorial composer components", () => {
     expect(screen.getByText(/Template placeholder language detected/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Assign Candidate title to a slot/i)).toBeDisabled();
   });
+
+  // #321 — the card must surface all three editorial layers at a glance,
+  // labeled and in fixed order, each from its own column. Regression guard
+  // against the "one block per signal" bug where only WITM was shown.
+  it("renders all three layers labeled in order, each from its own column (#321)", () => {
+    render(
+      <CandidateRow
+        candidate={createCandidate({
+          editedWhyItMatters: "Signal body — what this means now.",
+          editedWhatLedToIt: "Before This body — what produced it.",
+          editedWhatItConnectsTo: "Ripple body — what it implies next.",
+        })}
+        openSlots={[1]}
+        storageReady
+        onAssign={vi.fn()}
+      />,
+    );
+
+    const labels = screen
+      .getAllByText(/^(The Signal|Before This|The Ripple)$/u)
+      .map((node) => node.textContent);
+    expect(labels).toEqual(["The Signal", "Before This", "The Ripple"]);
+
+    expect(screen.getByText("Signal body — what this means now.")).toBeInTheDocument();
+    expect(screen.getByText("Before This body — what produced it.")).toBeInTheDocument();
+    expect(screen.getByText("Ripple body — what it implies next.")).toBeInTheDocument();
+  });
+
+  it("shows labeled empty states for absent depth layers without leaking WITM (#321)", () => {
+    render(
+      <CandidateRow
+        candidate={createCandidate({ editedWhyItMatters: "Only the signal." })}
+        openSlots={[1]}
+        storageReady
+        onAssign={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Only the signal.")).toBeInTheDocument();
+    expect(screen.getByText("No Before This draft yet.")).toBeInTheDocument();
+    expect(screen.getByText("No Ripple draft yet.")).toBeInTheDocument();
+  });
 });
 
 describe("BulkApproveForm", () => {
