@@ -15,7 +15,7 @@ import {
 } from "@/lib/newsletter-ingestion/gmail";
 import { parseRawNewsletterEmail } from "@/lib/newsletter-ingestion/email-content";
 import { parseNewsletterStories } from "@/lib/newsletter-ingestion/parser";
-import { promoteNewsletterStoryToCandidate, type NewsletterPromotionResult } from "@/lib/newsletter-ingestion/promotion";
+import { promoteNewsletterStoryBatch, type NewsletterPromotionResult } from "@/lib/newsletter-ingestion/promotion";
 import {
   extractStoriesFromEmail,
   insertNewsletterEmail,
@@ -34,6 +34,13 @@ export type NewsletterIngestionRunOptions = {
   label?: string;
   testRunId?: string | null;
   now?: Date;
+  /**
+   * The run's internal-timeout AbortSignal (threaded from the cron endpoint's
+   * 55s wall). When it fires, in-flight Gmail fetches abort, the email loop
+   * stops, and the atomic candidate write is skipped — so a timeout leaves a
+   * clean, empty briefing slate rather than partial junk rows.
+   */
+  signal?: AbortSignal;
 };
 
 export type NewsletterIngestionRunSummary = {
@@ -213,19 +220,34 @@ async function processWritableRun(input: {
   config: NewsletterIngestionConfig;
   briefingDate: string;
   now: Date;
+  signal?: AbortSignal;
 }) {
   let storedEmailCount = 0;
   let extractedStoryCount = 0;
   let failedEmailCount = 0;
-  const promotions: NewsletterPromotionResult[] = [];
+  // Stories are buffered ACROSS the whole email loop and promoted in a SINGLE
+  // atomic bulk insert after the loop (see promoteNewsletterStoryBatch). The
+  // newsletter_emails / newsletter_story_extractions writes stay incremental —
+  // they are idempotent (gmail_message_id / email-id keyed) and are NOT the
+  // public slate; only the signal_posts write must be all-or-nothing.
+  const candidateStories: NewsletterStoryExtractionRow[] = [];
+  const canWriteCandidates =
+    input.config.writeCandidates && canWriteNewsletterIngestionRecords(input.config);
 
   for (const ref of input.refs) {
+    // Stop pulling new emails once the run's deadline has fired; the buffered
+    // stories are discarded (never written) by the aborted batch below.
+    if (input.signal?.aborted) {
+      break;
+    }
+
     try {
       const inserted = await insertNewsletterEmail({
         db: input.db,
         gmailClient: input.gmailClient,
         messageRef: ref,
         label: input.config.label,
+        signal: input.signal,
       });
       const newsletterEmailId = inserted.email.id;
 
@@ -245,31 +267,35 @@ async function processWritableRun(input: {
 
       extractedStoryCount += extraction.stories.length;
 
-      if (!input.config.writeCandidates || !canWriteNewsletterIngestionRecords(input.config)) {
-        continue;
-      }
-
-      for (const story of extraction.stories) {
-        const promotion = await promoteNewsletterStoryToCandidate({
-          db: input.db,
-          extractionId: story.id,
-          briefingDate: input.briefingDate,
-          now: input.now,
-        });
-        promotions.push(promotion);
-
-        if (promotion.status === "skipped") {
-          logServerEvent("warn", "Newsletter ingestion: story promotion skipped", {
-            reason: promotion.reason,
-            extractionId: promotion.extractionId,
-          });
-        }
+      if (canWriteCandidates) {
+        candidateStories.push(...extraction.stories);
       }
     } catch (error) {
       failedEmailCount += 1;
       logServerEvent("warn", "Newsletter ingestion skipped one email after a safe processing failure", {
         gmailMessageId: ref.id,
         ...errorContext(error),
+      });
+    }
+  }
+
+  // SINGLE atomic candidate write for the whole run. A timeout anywhere in the
+  // loop above means control reaches the batch with the signal already aborted
+  // (or never reaches it because the awaiter rejected) — either way ZERO partial
+  // signal_posts rows are persisted for the briefing_date.
+  const promotions: NewsletterPromotionResult[] = await promoteNewsletterStoryBatch({
+    db: input.db,
+    briefingDate: input.briefingDate,
+    stories: candidateStories,
+    now: input.now,
+    signal: input.signal,
+  });
+
+  for (const promotion of promotions) {
+    if (promotion.status === "skipped") {
+      logServerEvent("warn", "Newsletter ingestion: story promotion skipped", {
+        reason: promotion.reason,
+        extractionId: promotion.extractionId,
       });
     }
   }
@@ -288,6 +314,7 @@ async function processWritableRun(input: {
 
     logServerEvent("info", "Newsletter ingestion: promotion summary", {
       briefingDate: input.briefingDate,
+      aborted: Boolean(input.signal?.aborted),
       promotedCandidateCount: promotionSummary.promotedCandidateCount,
       linkedExistingCandidateCount: promotionSummary.linkedExistingCandidateCount,
       skippedPromotionCount: promotionSummary.skippedPromotionCount,
@@ -458,6 +485,7 @@ route: "/api/cron/fetch-editorial-inputs",
       config,
       briefingDate,
       now,
+      signal: options.signal,
     });
 
     return buildResult({

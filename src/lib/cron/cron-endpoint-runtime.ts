@@ -72,15 +72,22 @@ export class StageTimeoutError extends Error {
   }
 }
 
-/** Race `work` against the internal budget; on timeout, reject naming `stageRef.current`. */
+/**
+ * Race `work` against the internal budget; on timeout, reject naming
+ * `stageRef.current`. `onTimeout` fires synchronously when the budget expires
+ * (before the rejection propagates) so the caller can abort the in-flight work —
+ * the rejection alone never cancels `work`, it only stops the awaiter.
+ */
 export function runWithStageTimeout<T>(
   stageRef: { current: string },
   work: Promise<T>,
   timeoutMs: number,
+  onTimeout?: () => void,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<T>((_, reject) => {
     timer = setTimeout(() => {
+      onTimeout?.();
       reject(new StageTimeoutError(stageRef.current, timeoutMs));
     }, timeoutMs);
   });
@@ -148,12 +155,24 @@ export async function runEditorialStagesWithTiming(input: {
   const timer = new StageTimer();
   const stageRef: { current: EditorialPipelineStageName } = { current: input.stages[0] };
   const runStage = createTimedStageRunner({ stageRef, timer, routeName: input.routeName });
+  // When the internal budget expires, abort the in-flight pipeline so the
+  // newsletter stage hard-stops BEFORE its atomic candidate write (zero partial
+  // rows). The signal is forwarded only to the newsletter stage; rss/staging
+  // ignore it. The Promise.race rejection still drives the timeout finalize.
+  const abortController = new AbortController();
 
   try {
     const results = await runWithStageTimeout(
       stageRef,
-      runEditorialIngestionPipeline({ dryRun: false, now: input.now, runStage, stages: input.stages }),
+      runEditorialIngestionPipeline({
+        dryRun: false,
+        now: input.now,
+        runStage,
+        stages: input.stages,
+        signal: abortController.signal,
+      }),
       INTERNAL_STAGE_TIMEOUT_MS,
+      () => abortController.abort(new StageTimeoutError(stageRef.current, INTERNAL_STAGE_TIMEOUT_MS)),
     );
     return { results, stageMs: timer.snapshot(), timedOut: false, inFlightStage: stageRef.current };
   } catch (error) {
