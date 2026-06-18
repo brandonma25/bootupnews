@@ -107,7 +107,7 @@ export async function runEditorialIngestionPipeline(options: {
 
   if (stages.includes("editorial_staging")) {
     results.editorialStaging = await runStage("editorial_staging", () =>
-      runEditorialStaging({ dryRun, now }),
+      runEditorialStaging({ dryRun, now, signal: options.signal }),
     );
   }
 

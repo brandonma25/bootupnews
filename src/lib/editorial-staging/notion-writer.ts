@@ -125,6 +125,7 @@ async function findExistingRow(
         page_size: 5,
       }),
     },
+    { idempotent: true },
   );
 
   if (!response.ok) {
@@ -283,6 +284,7 @@ async function findCrossDateMatch(
         page_size: 5,
       }),
     },
+    { idempotent: true },
   );
 
   if (!response.ok) {

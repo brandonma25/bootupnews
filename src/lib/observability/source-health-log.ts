@@ -109,7 +109,7 @@ async function findExistingRow(
       },
       page_size: 1,
     }),
-  });
+  }, { idempotent: true });
   if (!response.ok) {
     const text = await response.text().catch(() => "(no body)");
     throw new Error(`Source-health query failed (${response.status}): ${text}`);
