@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/observability";
+import { secretsMatch } from "@/lib/security/secret-compare";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -597,10 +598,24 @@ async function pushApprovedRow(
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const provided = url.searchParams.get("token")?.trim();
   const expected = process.env.EDITORIAL_PUSH_SECRET?.trim();
 
-  if (!expected || provided !== expected) {
+  // Prefer the header (keeps the secret out of access/proxy/Referer logs).
+  const headerSecret = request.headers.get("x-editorial-push-secret");
+  const querySecret = url.searchParams.get("token");
+
+  // DEPRECATED: query-string token leaks into logs. Still accepted so the manual
+  // trigger doesn't break, but every use logs a migration warning. Once the
+  // trigger uses the header (and EDITORIAL_PUSH_SECRET is rotated), drop this.
+  if (!headerSecret && querySecret) {
+    logServerEvent("warn", "Editorial push: secret supplied via DEPRECATED query string", {
+      route: "/api/editorial/push-approved",
+      migrateTo: "x-editorial-push-secret header (+ rotate EDITORIAL_PUSH_SECRET)",
+    });
+  }
+
+  const matches = secretsMatch(headerSecret, expected) || secretsMatch(querySecret, expected);
+  if (!matches) {
     logServerEvent("warn", "Editorial push: unauthorized request rejected", {
       route: "/api/editorial/push-approved",
       hasSecret: Boolean(expected),

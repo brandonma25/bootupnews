@@ -32,4 +32,10 @@ Executes the council-reviewed, security-updated consolidated plan from the code-
 - **Fix:** `src/lib/security/rate-limit.ts` (in-memory fixed-window, per-IP). Telemetry: 120/min/IP → 429+Retry-After. Signup: 5 per 10 min/IP → `/?auth=rate-limited` (new message). **CAVEAT (documented):** per-instance on serverless; back with Vercel KV/Upstash for a global cap (follow-up).
 - **QA:** limiter unit tests (window, reset, isolation, IP extraction); typecheck 0; tests green.
 
+### 5. push-secret → header + REVOKE anon DML grants (MEDIUM/HIGH)
+- **5a — secret in URL query string (`push-approved/route.ts:600`):** leaked into access/proxy/Referer logs. Now reads `x-editorial-push-secret` header (preferred), constant-time compared (`secretsMatch` / `crypto.timingSafeEqual`). Query `?token=` kept as a **deprecated fallback** (logs a migration warning) so the manual trigger doesn't break.
+  - **⚠️ REQUIRED MANUAL STEPS:** switch your push trigger to send `-H "x-editorial-push-secret: <secret>"` (instead of `?token=`), then **rotate `EDITORIAL_PUSH_SECRET`** (the old value may already be in logs). After that we remove the query fallback.
+- **5b — anon DML grants (HIGH):** confirmed live that `anon`+`authenticated` held INSERT/UPDATE/DELETE/**TRUNCATE** on `signal_posts`+`cron_runs` — RLS-deny was the SOLE gate on the browser-shipped anon key. Migration `20260618120000_revoke_anon_dml_signal_posts_cron_runs.sql` revokes the write grants (SELECT retained; reads stay RLS-governed). **Applied to prod via Supabase MCP + verified** (anon now holds SELECT only); committed matching repo file. No permissive policies added (would re-expose data).
+- **QA:** secret-compare unit tests; push-approved tests green; typecheck 0; grants re-queried post-migration.
+
 <!-- subsequent items appended below as they land -->
