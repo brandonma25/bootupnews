@@ -178,11 +178,18 @@ jobs:
         with:
           node-version: "20"
 
-      # Reads package-lock.json directly (no install needed). Fails the gate
-      # only on high/critical advisories so a transient low/moderate never
-      # blocks a merge; the Next.js bump in this PR cleared the prior highs.
-      - name: Audit dependencies (fail on high or critical advisories)
-        run: npm audit --audit-level=high
+      # Reads package-lock.json directly (no install needed). Scope:
+      #  --audit-level=high : low/moderate advisories never block a merge.
+      #  --omit=dev         : audit PRODUCTION dependencies only. A high/critical
+      #                       in dev-only tooling (e.g. jsdom -> undici, esbuild)
+      #                       has zero production blast radius, so it must not
+      #                       red-block product merges. The Next.js bump in PR
+      #                       #326 cleared the prior highs in the production tree.
+      # NOTE: npm audit queries the LIVE advisory DB, so a future high in a
+      # production dependency will (intentionally) start failing this gate even
+      # with no code change — that is the gate doing its job; bump/patch the dep.
+      - name: Audit production dependencies (fail on high or critical advisories)
+        run: npm audit --audit-level=high --omit=dev
 
   pr-summary:
     name: pr-summary
