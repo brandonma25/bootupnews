@@ -52,8 +52,24 @@ export type GmailApiClient = {
     sinceDate: Date;
     maxResults: number;
   }): Promise<GmailMessageRef[]>;
-  getRawMessage(messageId: string): Promise<GmailRawMessage>;
+  getRawMessage(messageId: string, options?: { signal?: AbortSignal }): Promise<GmailRawMessage>;
 };
+
+/**
+ * Combine an outer run-deadline AbortSignal with a per-call timeout controller so
+ * a single Gmail fetch aborts on WHICHEVER fires first. Returns the per-call
+ * signal alone when no outer signal is supplied (the common case).
+ */
+function combineAbortSignals(perCall: AbortSignal, outer?: AbortSignal): AbortSignal {
+  if (!outer) return perCall;
+  if (typeof AbortSignal.any === "function") return AbortSignal.any([perCall, outer]);
+  if (outer.aborted) return outer;
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  perCall.addEventListener("abort", onAbort, { once: true });
+  outer.addEventListener("abort", onAbort, { once: true });
+  return controller.signal;
+}
 
 type GmailListResponse = {
   messages?: Array<{
@@ -141,11 +157,12 @@ async function fetchWithTimeout(
   init: RequestInit,
   failureLabel: string,
   timeoutMs: number = GMAIL_PER_CALL_TIMEOUT_MS,
+  outerSignal?: AbortSignal,
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetchImpl(url, { ...init, signal: controller.signal });
+    return await fetchImpl(url, { ...init, signal: combineAbortSignals(controller.signal, outerSignal) });
   } catch (error) {
     const aborted =
       (error instanceof DOMException && error.name === "AbortError") ||
@@ -223,12 +240,22 @@ async function gmailFetchJson<T>(
     failureLabel: string;
     fetchImpl: GmailFetch;
     maxRetries?: number;
+    /** Outer run-deadline signal — once fired, stop fetching and DON'T retry. */
+    signal?: AbortSignal;
   },
 ): Promise<T> {
   const maxRetries = input.maxRetries ?? 2;
   let attempt = 0;
 
   while (true) {
+    // Past the run deadline a retry is pointless — fail fast, non-retryable.
+    if (input.signal?.aborted) {
+      throw new GmailApiError(`${input.failureLabel} aborted: run deadline reached.`, {
+        status: null,
+        retryable: false,
+      });
+    }
+
     let response: Response;
     try {
       response = await fetchWithTimeout(
@@ -240,15 +267,19 @@ async function gmailFetchJson<T>(
           },
         },
         input.failureLabel,
+        GMAIL_PER_CALL_TIMEOUT_MS,
+        input.signal,
       );
     } catch (error) {
       // fetchWithTimeout already converts AbortError -> retryable
       // GmailApiError. Apply the same retry policy as for HTTP failures
-      // so a transient timeout is retried with backoff.
+      // so a transient timeout is retried with backoff — UNLESS the outer
+      // run deadline fired, in which case we stop immediately.
       if (
         error instanceof GmailApiError &&
         error.retryable &&
-        attempt < maxRetries
+        attempt < maxRetries &&
+        !input.signal?.aborted
       ) {
         attempt += 1;
         await wait(100 * attempt);
@@ -263,7 +294,8 @@ async function gmailFetchJson<T>(
       if (
         error instanceof GmailApiError &&
         error.retryable &&
-        attempt < maxRetries
+        attempt < maxRetries &&
+        !input.signal?.aborted
       ) {
         attempt += 1;
         await wait(100 * attempt);
@@ -335,7 +367,7 @@ export function createGmailApiClient(input: {
         }));
     },
 
-    async getRawMessage(messageId) {
+    async getRawMessage(messageId, options) {
       const accessToken = await getAccessToken();
       const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}`);
       url.searchParams.set("format", "raw");
@@ -345,6 +377,7 @@ export function createGmailApiClient(input: {
         accessToken,
         fetchImpl,
         failureLabel: "Gmail raw message fetch",
+        signal: options?.signal,
       });
 
       if (!body.id || !body.threadId || !body.raw) {

@@ -67,7 +67,11 @@ describe("/api/cron/ingest-newsletters", () => {
 
     await runAfter();
 
-    expect(runNewsletterIngestion).toHaveBeenCalledWith({ writeCandidates: true });
+    // The newsletter stage now receives the run's internal-timeout AbortSignal so
+    // its atomic candidate write can hard-stop on the 55s wall (zero partial rows).
+    expect(runNewsletterIngestion).toHaveBeenCalledWith(
+      expect.objectContaining({ writeCandidates: true, signal: expect.any(AbortSignal) }),
+    );
     // Decoupled: this endpoint runs ONLY newsletter — never RSS / staging / sweep.
     expect(runDailyNewsCron).not.toHaveBeenCalled();
     expect(runEditorialStaging).not.toHaveBeenCalled();

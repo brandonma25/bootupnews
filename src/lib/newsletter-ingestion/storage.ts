@@ -95,6 +95,8 @@ export async function insertNewsletterEmail(input: {
   gmailClient: GmailApiClient;
   messageRef: GmailMessageRef;
   label: string;
+  /** Run deadline signal — aborts the in-flight Gmail raw-message fetch on timeout. */
+  signal?: AbortSignal;
 }): Promise<InsertNewsletterEmailResult> {
   const existing = await getExistingNewsletterEmailByGmailId(input.db, input.messageRef.id);
 
@@ -105,7 +107,7 @@ export async function insertNewsletterEmail(input: {
     };
   }
 
-  const rawMessage = await input.gmailClient.getRawMessage(input.messageRef.id);
+  const rawMessage = await input.gmailClient.getRawMessage(input.messageRef.id, { signal: input.signal });
   const parsed = parseRawNewsletterEmail(rawMessage.raw, {
     internalDate: rawMessage.internalDate,
   });
