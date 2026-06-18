@@ -163,11 +163,40 @@ jobs:
           path: playwright-report
           if-no-files-found: ignore
 
+  audit:
+    name: pr-audit
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Reads package-lock.json directly (no install needed). Scope:
+      #  --audit-level=high : low/moderate advisories never block a merge.
+      #  --omit=dev         : audit PRODUCTION dependencies only. A high/critical
+      #                       in dev-only tooling (e.g. jsdom -> undici, esbuild)
+      #                       has zero production blast radius, so it must not
+      #                       red-block product merges. The Next.js bump in PR
+      #                       #326 cleared the prior highs in the production tree.
+      # NOTE: npm audit queries the LIVE advisory DB, so a future high in a
+      # production dependency will (intentionally) start failing this gate even
+      # with no code change — that is the gate doing its job; bump/patch the dep.
+      - name: Audit production dependencies (fail on high or critical advisories)
+        run: npm audit --audit-level=high --omit=dev
+
   pr-summary:
     name: pr-summary
     runs-on: ubuntu-latest
     needs:
       - lint
+      - audit
       - unit-tests
       - build
       - e2e-chromium
