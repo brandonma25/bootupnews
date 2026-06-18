@@ -227,10 +227,14 @@ export async function signUpWithPasswordAction(formData: FormData) {
     redirect("/?auth=rate-limited");
   }
 
-  const { email, password } = credentialsSchema.parse({
+  const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  if (!parsed.success) {
+    redirect("/?auth=invalid");
+  }
+  const { email, password } = parsed.data;
   const redirectTo = safePostAuthRedirectPath(formData.get("redirectTo")?.toString());
 
   if (!isSupabaseConfigured) {
@@ -279,10 +283,14 @@ export async function signUpWithPasswordAction(formData: FormData) {
 }
 
 export async function signInWithPasswordAction(formData: FormData) {
-  const { email, password } = credentialsSchema.parse({
+  const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  if (!parsed.success) {
+    redirect("/?auth=invalid");
+  }
+  const { email, password } = parsed.data;
   const redirectTo = safePostAuthRedirectPath(formData.get("redirectTo")?.toString());
 
   if (!isSupabaseConfigured) {

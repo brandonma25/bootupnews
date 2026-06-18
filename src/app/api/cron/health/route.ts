@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { writePipelineLogEntry, type PipelineLogStatus } from "@/lib/observability/pipeline-log";
+import { secretsMatch } from "@/lib/security/secret-compare";
 import { getRequiredSourcesForPublicSurface } from "@/lib/source-manifest";
 
 export const dynamic = "force-dynamic";
@@ -43,12 +44,12 @@ function isAuthorized(request: Request) {
   if (!cronSecret) return false;
 
   const headerSecret = request.headers.get("x-cron-secret")?.trim() ?? "";
-  if (headerSecret === cronSecret) return true;
+  if (secretsMatch(headerSecret, cronSecret)) return true;
 
   // Rollback escape hatch — matches the ingestion endpoint's contract.
   if (process.env.ALLOW_VERCEL_CRON_FALLBACK === "true") {
     const authHeader = request.headers.get("authorization")?.trim() ?? "";
-    if (authHeader === `Bearer ${cronSecret}`) return true;
+    if (secretsMatch(authHeader, `Bearer ${cronSecret}`)) return true;
   }
 
   return false;

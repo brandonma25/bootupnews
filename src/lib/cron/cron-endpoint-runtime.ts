@@ -15,6 +15,7 @@
 import * as Sentry from "@sentry/nextjs";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
+import { secretsMatch } from "@/lib/security/secret-compare";
 import {
   runEditorialIngestionPipeline,
   type EditorialPipelineResults,
@@ -37,13 +38,13 @@ export function isCronAuthorized(request: Request): boolean {
   if (!cronSecret) return false;
 
   const headerSecret = request.headers.get("x-cron-secret")?.trim() ?? "";
-  if (headerSecret === cronSecret) return true;
+  if (secretsMatch(headerSecret, cronSecret)) return true;
 
   // Rollback escape hatch: honor the legacy Vercel Cron `Authorization: Bearer`
   // header only when ALLOW_VERCEL_CRON_FALLBACK is explicitly enabled.
   if (process.env.ALLOW_VERCEL_CRON_FALLBACK === "true") {
     const authHeader = request.headers.get("authorization")?.trim() ?? "";
-    if (authHeader === `Bearer ${cronSecret}`) return true;
+    if (secretsMatch(authHeader, `Bearer ${cronSecret}`)) return true;
   }
 
   return false;

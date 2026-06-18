@@ -38,4 +38,14 @@ Executes the council-reviewed, security-updated consolidated plan from the code-
 - **5b — anon DML grants (HIGH):** confirmed live that `anon`+`authenticated` held INSERT/UPDATE/DELETE/**TRUNCATE** on `signal_posts`+`cron_runs` — RLS-deny was the SOLE gate on the browser-shipped anon key. Migration `20260618120000_revoke_anon_dml_signal_posts_cron_runs.sql` revokes the write grants (SELECT retained; reads stay RLS-governed). **Applied to prod via Supabase MCP + verified** (anon now holds SELECT only); committed matching repo file. No permissive policies added (would re-expose data).
 - **QA:** secret-compare unit tests; push-approved tests green; typecheck 0; grants re-queried post-migration.
 
+### 7 + S-2. Constant-time secret compares + safeParse auth inputs (LOW)
+- **7:** cron + health secret checks used `===` (timing oracle). Now `secretsMatch` (`crypto.timingSafeEqual`, length-guarded so it never throws). Applied in `cron-endpoint-runtime.ts` (`isCronAuthorized`) and `health/route.ts`.
+- **S-2:** auth actions used Zod `.parse()` (throws → unhandled ZodError → Sentry noise). `signUpWithPasswordAction` / `signInWithPasswordAction` now `safeParse` → `redirect("/?auth=invalid")`.
+- **QA:** cron + health + auth suites green (53); typecheck 0.
+
+### 6. Next.js ≥16.2.7 — **SEPARATE PR** (deploy-and-soak)
+Per the council, the framework bump (highest blast radius) ships independently so it's attributable/revertable. Tracked separately; gate on clean `next build` + full suite + typecheck + smoke-render `/` and `/signals` + confirm the daily cron fires.
+
+---
+## Phase 1 — reliability (publish/cron path)
 <!-- subsequent items appended below as they land -->
