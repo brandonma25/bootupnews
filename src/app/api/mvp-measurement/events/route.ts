@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { logServerEvent } from "@/lib/observability";
 import { validateMvpMeasurementEvent } from "@/lib/mvp-measurement";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import {
   createSupabaseServiceRoleClient,
   safeGetUser,
@@ -10,7 +11,21 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Unauthenticated, service-role-backed telemetry sink — rate-limit per IP so a
+// script can't flood mvp_measurement_events (metric poisoning / table bloat).
+const TELEMETRY_RATE_LIMIT = 120;
+const TELEMETRY_RATE_WINDOW_MS = 60_000;
+
 export async function POST(request: Request) {
+  const clientIp = getClientIp(request.headers);
+  const limit = checkRateLimit(`mvp-events:${clientIp}`, TELEMETRY_RATE_LIMIT, TELEMETRY_RATE_WINDOW_MS);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   let body: unknown;
 
   try {

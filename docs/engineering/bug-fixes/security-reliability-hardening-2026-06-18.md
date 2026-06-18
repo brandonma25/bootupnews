@@ -27,4 +27,9 @@ Executes the council-reviewed, security-updated consolidated plan from the code-
 - **Residual (tracked):** a narrow DNS-rebinding TOCTOU between the resolve-check and undici's connect remains; closing it fully needs a connect-time IP pin (custom undici dispatcher `lookup`). The guard blocks every documented exploit.
 - **QA:** 24-case guard suite (literal IPs v4/v6/mapped, localhost, *.local, file/ftp, creds, resolve-to-private, redirect-to-internal, redirect cap); typecheck 0; **full suite 1100 green**.
 
+### 3. Rate limiting on the public abuse surfaces (MEDIUM)
+- **Problem:** the unauthenticated service-role telemetry writer (`mvp-measurement/events`) and open signup had no rate limit — metric-poisoning/table-bloat and mailbomb/quota-burn primitives.
+- **Fix:** `src/lib/security/rate-limit.ts` (in-memory fixed-window, per-IP). Telemetry: 120/min/IP → 429+Retry-After. Signup: 5 per 10 min/IP → `/?auth=rate-limited` (new message). **CAVEAT (documented):** per-instance on serverless; back with Vercel KV/Upstash for a global cap (follow-up).
+- **QA:** limiter unit tests (window, reset, isolation, IP extraction); typecheck 0; tests green.
+
 <!-- subsequent items appended below as they land -->

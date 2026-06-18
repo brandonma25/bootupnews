@@ -15,6 +15,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
 import { buildMatchedBriefing, persistRawArticles, syncEventClusters, syncTopicMatches } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { isSafePublicUrl } from "@/lib/security/url-safety";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 import { parseKeywordList } from "@/lib/topic-matching";
@@ -219,6 +220,13 @@ export async function requestMagicLinkAction(formData: FormData) {
 }
 
 export async function signUpWithPasswordAction(formData: FormData) {
+  // Open signup + a transactional email per call = mailbomb / quota-burn primitive.
+  // Throttle per IP (best-effort, per-instance) before doing any work.
+  const signupHeaders = await headers();
+  if (!checkRateLimit(`signup:${getClientIp(signupHeaders)}`, 5, 10 * 60_000).ok) {
+    redirect("/?auth=rate-limited");
+  }
+
   const { email, password } = credentialsSchema.parse({
     email: formData.get("email"),
     password: formData.get("password"),
