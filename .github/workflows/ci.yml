@@ -30,6 +30,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Production type-safety gate (src/ + scripts/, excludes the *.test.* fixture
+      # backlog). Catches type drift that vitest — which strips types — cannot.
+      - name: Typecheck
+        run: npm run typecheck
+
   unit-tests:
     name: pr-unit-tests
     runs-on: ubuntu-latest
