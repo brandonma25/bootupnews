@@ -295,6 +295,13 @@ export async function signUpWithPasswordAction(formData: FormData) {
 }
 
 export async function signInWithPasswordAction(formData: FormData) {
+  // Throttle password sign-in per IP — the credential-stuffing / brute-force
+  // target. A bit more lenient than signup (legit users mistype passwords).
+  const signinHeaders = await headers();
+  if (!checkRateLimit(`signin:${getClientIp(signinHeaders)}`, 10, 10 * 60_000).ok) {
+    redirect("/?auth=rate-limited");
+  }
+
   const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),

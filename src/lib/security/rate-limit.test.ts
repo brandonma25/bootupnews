@@ -31,11 +31,22 @@ describe("checkRateLimit (fixed window)", () => {
 });
 
 describe("getClientIp", () => {
-  it("prefers the first x-forwarded-for hop", () => {
-    expect(getClientIp(new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" }))).toBe("203.0.113.7");
+  it("prefers the platform-trusted x-real-ip over a (spoofable) x-forwarded-for", () => {
+    expect(
+      getClientIp(new Headers({ "x-real-ip": "203.0.113.8", "x-forwarded-for": "6.6.6.6, 203.0.113.8" })),
+    ).toBe("203.0.113.8");
   });
-  it("falls back to x-real-ip then 'unknown'", () => {
-    expect(getClientIp(new Headers({ "x-real-ip": "203.0.113.8" }))).toBe("203.0.113.8");
+
+  it("does NOT trust the leftmost x-forwarded-for hop (client-spoofable)", () => {
+    // Attacker prepends a fake IP; the real (proxy-appended) IP is rightmost.
+    expect(getClientIp(new Headers({ "x-forwarded-for": "6.6.6.6, 203.0.113.7" }))).toBe("203.0.113.7");
+  });
+
+  it("uses x-vercel-forwarded-for when x-real-ip is absent", () => {
+    expect(getClientIp(new Headers({ "x-vercel-forwarded-for": "203.0.113.9, 10.0.0.1" }))).toBe("203.0.113.9");
+  });
+
+  it("falls back to 'unknown' when no proxy headers are present", () => {
     expect(getClientIp(new Headers())).toBe("unknown");
   });
 });

@@ -73,11 +73,24 @@ Per the council, the framework bump (highest blast radius) ships independently s
 - **RLS service-role invariant:** the anon DML revoke shipped in Phase 0 item 5. Verified live: as `anon`, `signal_posts` + `cron_runs` return **0 rows** (RLS deny) and writes are revoked. Invariant: server-side writes use service-role (bypasses grants + RLS); anon reads are RLS-denied; **never add permissive policies** (would re-expose rows).
 - **npm audit CI cadence + `npm audit fix`:** deferred to the dependency/Next.js PR (where the deps are actually bumped), so the gate lands green rather than red against the current 23 advisories.
 
+## Self-review fixes (post adversarial review, before merge)
+A 5-reviewer adversarial self-review caught real issues; the must-fix set was fixed before merge:
+- **Rate-limiter bypass (HIGH):** `getClientIp` keyed on the client-spoofable leftmost `x-forwarded-for` hop → an attacker could rotate fake IPs to evade every limit. Now prefers platform-trusted `x-real-ip` / `x-vercel-forwarded-for`, falling back to the RIGHTMOST XFF hop. Test asserts the spoof-resistant behavior.
+- **Missed Notion fetch (MEDIUM):** the `fetch→notionFetch` sweep missed `rss-circuit-breaker.ts:72` (per-source RSS hot path, no timeout). Routed through `notionFetch` (timeout, no retry — hot-path observability query).
+- **Brute-force gap:** `signInWithPasswordAction` had no limiter while signup did; added per-IP 10/10min.
+- **F-1 incomplete:** `data.ts` still computed the briefing date in UTC at 5 fallback sites; switched to `getTaipeiDateKey()` (removed the now-unused `formatISO` import).
+- **Admin gate honesty (HIGH):** the `email_confirmed_at` gate is **INERT in production until email confirmation is enabled in Supabase Auth** (auto-confirm stamps the field instantly) — tracked as a PENDING item; must not be read as "takeover closed" until the operator step is done. Durable fix (id-keyed RBAC instead of an email allowlist) tracked.
+- **Test gaps:** added a `notionFetch` timeout-actually-fires test; mocked `node:dns/promises` in `rss.test.ts` (a flake regression — safeFetch DNS-resolves).
+- **Validated solid (no change):** literal-IP SSRF defense (no encoding bypass found), the typecheck gate (fails on a real `src` type error), notionFetch no-double-create, R-1 recovery, /health/rss non-breaking, anon-DML revoke, IDOR/CSRF already covered.
+
 ## Required manual follow-ups (operator)
-1. **Enable email confirmation** in Supabase Auth (item 1 — load-bearing for the admin-takeover fix).
+1. **Enable email confirmation** in Supabase Auth — ⚠️ **the admin-takeover fix is INERT until this is done; the takeover is still OPEN until then.**
 2. **Switch the push-approved trigger** to the `x-editorial-push-secret` header and **rotate `EDITORIAL_PUSH_SECRET`** (item 5), then we drop the query fallback.
 3. Back the rate limiter with **Vercel KV/Upstash** for a global (not per-instance) cap (item 3).
 
-## Deferred (tracked)
+## Deferred (tracked, fast-follow)
 - A-1 `signals-editorial.ts` split + `data.ts` split (worktree gate) and the dead-code deletion spike (Phase 2).
-- SSRF connect-time IP pin (DNS-rebind residual), notion retry-budget-vs-stage-timeout abort threading, the 115 `*.test.*` typecheck backlog, push-approved write-side URL validation.
+- **Security observability:** route SSRF-block / repeated-401-429 / deprecated-secret-use events to Sentry alerting (currently log-only).
+- **Secret rotation:** rotate `EDITORIAL_PUSH_SECRET` + delete the deprecated query-token path (dated task).
+- **H-3 retry budget vs the 55s wall:** thread the cron abort signal through `runEditorialStaging` → `notionFetch` (or cap staging to `timeoutMs:5s, maxRetries:1`). Reconciled to fast-follow — degrades to a self-healing timed-out run, not slate poison.
+- **Id-keyed admin RBAC** (replace the email allowlist); **recurring `npm audit`/Dependabot gate**; SSRF connect-time IP pin (DNS-rebind residual) + cross-origin redirect header-strip in `safeFetch`; the 115 `*.test.*` typecheck backlog; push-approved write-side URL validation; SSRF/admin integration tests.

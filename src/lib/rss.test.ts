@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// fetchFeedArticles now routes through safeFetch (SSRF guard), which DNS-resolves
+// the host. Mock it so the suite is deterministic + offline (no real lookup of
+// example.com) and resolves to a public IP so the guard lets the mocked fetch run.
+const dnsLookup = vi.hoisted(() => vi.fn(async () => [{ address: "93.184.216.34", family: 4 }]));
+vi.mock("node:dns/promises", () => ({ default: { lookup: dnsLookup }, lookup: dnsLookup }));
+
 import { fetchFeedArticles } from "@/lib/rss";
 
 const RECENT_TLDR_PUBLISHED_AT = new Date(Date.now() - 12 * 60 * 60 * 1000);

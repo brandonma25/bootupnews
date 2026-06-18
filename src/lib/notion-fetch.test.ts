@@ -57,4 +57,26 @@ describe("notionFetch", () => {
     await expect(notionFetch("https://api.notion.com/v1/pages", { method: "POST" })).rejects.toThrow();
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  it("aborts a hung request when the timeout fires (the core reason the wrapper exists)", async () => {
+    vi.useFakeTimers();
+    try {
+      const spy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((async (_url: string, init: RequestInit) => {
+        // Never resolves on its own — only the timeout's AbortController can end it.
+        return await new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            const err = new Error("aborted"); err.name = "AbortError"; reject(err);
+          });
+        });
+      }) as never);
+
+      const promise = notionFetch("https://api.notion.com/v1/pages", { method: "POST" }, { timeoutMs: 8_000, maxRetries: 0 });
+      const assertion = expect(promise).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(8_001);
+      await assertion;
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

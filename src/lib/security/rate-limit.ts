@@ -51,12 +51,28 @@ export function resetRateLimitState(): void {
   buckets.clear();
 }
 
-/** Best-effort client IP from proxy headers (Vercel sets x-forwarded-for). */
+/**
+ * Best-effort client IP for rate-limit keying.
+ *
+ * SECURITY: do NOT trust the leftmost `x-forwarded-for` hop — Vercel APPENDS the
+ * real client IP to any inbound XFF, so the leftmost token is client-supplied and
+ * an attacker can rotate it per request to evade per-IP limits. Prefer the
+ * platform-set headers (`x-real-ip` / `x-vercel-forwarded-for`), which Vercel
+ * derives from the actual connection and a client cannot spoof. The XFF fallback
+ * uses the RIGHTMOST hop (appended by the nearest trusted proxy), not the left.
+ */
 export function getClientIp(headers: Headers): string {
+  const realIp = headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+
+  const vercelForwarded = headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  if (vercelForwarded) return vercelForwarded;
+
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = forwarded.split(",").map((hop) => hop.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1]!;
   }
-  return headers.get("x-real-ip")?.trim() || "unknown";
+
+  return "unknown";
 }
