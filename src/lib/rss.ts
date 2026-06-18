@@ -15,6 +15,7 @@ import {
   checkCircuitBreaker,
   recordFetchOutcome,
 } from "@/lib/observability/rss-circuit-breaker";
+import { safeFetch } from "@/lib/security/url-safety";
 import { getUrlHost } from "@/lib/sentry-config";
 import type { SourceExtractionMethod } from "@/lib/source-accessibility-types";
 import { fetchTldrFeed, isTldrFeedUrl, type TldrDiscoveryMetadata } from "@/lib/tldr";
@@ -561,7 +562,9 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(url, {
+    // SSRF-hardened: validates the URL + every redirect hop against private/
+    // internal address ranges before fetching (user-added feed URLs are untrusted).
+    return await safeFetch(url, {
       ...init,
       signal: controller.signal,
     });

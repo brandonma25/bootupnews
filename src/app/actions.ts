@@ -15,6 +15,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
 import { buildMatchedBriefing, persistRawArticles, syncEventClusters, syncTopicMatches } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
+import { isSafePublicUrl } from "@/lib/security/url-safety";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 import { parseKeywordList } from "@/lib/topic-matching";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -27,9 +28,18 @@ const topicSchema = z.object({
   excludeKeywords: z.array(z.string().min(1)).default([]),
 });
 
+// SSRF guard at the add-source trust boundary: a feed URL must be a public
+// http(s) address (no internal/loopback/link-local IPs, no file://, no creds).
+// The fetch path re-validates with DNS resolution (see safeFetch).
+const safePublicFeedUrl = z
+  .url()
+  .refine((value) => isSafePublicUrl(value), {
+    message: "Feed URL must be a public http(s) address (private/internal addresses are not allowed).",
+  });
+
 const sourceSchema = z.object({
   name: z.string().min(2).max(60),
-  feedUrl: z.url(),
+  feedUrl: safePublicFeedUrl,
   homepageUrl: z.string().optional(),
   topicId: z.string().optional(),
 });
@@ -39,7 +49,7 @@ const credentialsSchema = z.object({
   password: z.string().min(8).max(72),
 });
 const accountCategorySchema = z.array(z.enum(["tech", "finance", "politics"])).min(1);
-const accountFeedUrlSchema = z.url();
+const accountFeedUrlSchema = safePublicFeedUrl;
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type UserEventStateUpsert = {

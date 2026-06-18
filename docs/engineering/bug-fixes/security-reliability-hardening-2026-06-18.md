@@ -21,4 +21,10 @@ Executes the council-reviewed, security-updated consolidated plan from the code-
 - **Fix:** `if (!isVerifiedAdminUser(user))` → `LockedInternalPage`.
 - **QA:** page test now covers unauth / logged-in-non-admin / verified-admin; 3 tests green.
 
+### 2. SSRF chokepoint at all three fetch sinks (HIGH)
+- **Problem:** user-added feed URLs were validated only by `z.url()` (accepts `169.254.169.254`, `localhost`, `file://`) and fetched server-side at three sinks with no guard — `rss.ts` (feed fetch), `extractor.ts` (article body, **response persisted** = data-returning SSRF), and the add-source actions. Both fetch sinks followed redirects, so a public URL could `302→internal`.
+- **Fix:** new `src/lib/security/url-safety.ts` — `validatePublicUrl` (scheme allowlist, reject credentials + literal private/loopback/link-local/IMDS IPs incl. IPv6 + IPv4-mapped, internal hostnames), `assertHostnameResolvesPublic` (DNS-resolve + block private resolved IPs), and `safeFetch` (`redirect:"manual"` + re-validate every hop). Wired into all three sinks; add-source schemas now use a `safePublicFeedUrl` refinement.
+- **Residual (tracked):** a narrow DNS-rebinding TOCTOU between the resolve-check and undici's connect remains; closing it fully needs a connect-time IP pin (custom undici dispatcher `lookup`). The guard blocks every documented exploit.
+- **QA:** 24-case guard suite (literal IPs v4/v6/mapped, localhost, *.local, file/ftp, creds, resolve-to-private, redirect-to-internal, redirect cap); typecheck 0; **full suite 1100 green**.
+
 <!-- subsequent items appended below as they land -->
