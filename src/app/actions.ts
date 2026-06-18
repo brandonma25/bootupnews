@@ -52,6 +52,18 @@ const credentialsSchema = z.object({
 const accountCategorySchema = z.array(z.enum(["tech", "finance", "politics"])).min(1);
 const accountFeedUrlSchema = safePublicFeedUrl;
 
+// Avoid logging full email addresses (PII). Keep the domain for debuggability,
+// mask the local part: "brandon@x.com" -> "b***n@x.com".
+function maskEmail(email: string | null | undefined): string {
+  const value = (email ?? "").trim();
+  const at = value.indexOf("@");
+  if (at <= 0) return value ? "***" : "";
+  const local = value.slice(0, at);
+  const domain = value.slice(at + 1);
+  const maskedLocal = local.length <= 2 ? `${local[0] ?? ""}*` : `${local[0]}***${local[local.length - 1]}`;
+  return `${maskedLocal}@${domain}`;
+}
+
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type UserEventStateUpsert = {
   event_key: string;
@@ -210,7 +222,7 @@ export async function requestMagicLinkAction(formData: FormData) {
   } catch (error) {
     logServerEvent("error", "Magic link request failed", {
       route: "/",
-      email,
+      email: maskEmail(email),
       ...errorContext(error),
     });
     redirect("/?auth=callback-error");
@@ -258,7 +270,7 @@ export async function signUpWithPasswordAction(formData: FormData) {
     .catch((error) => {
       logServerEvent("error", "Password sign-up failed", {
         route: "/",
-        email,
+        email: maskEmail(email),
         ...errorContext(error),
       });
       redirect("/?auth=signup-error");
@@ -310,7 +322,7 @@ export async function signInWithPasswordAction(formData: FormData) {
     .catch((error) => {
       logServerEvent("error", "Password sign-in failed", {
         route: "/",
-        email,
+        email: maskEmail(email),
         ...errorContext(error),
       });
       redirect("/?auth=invalid");

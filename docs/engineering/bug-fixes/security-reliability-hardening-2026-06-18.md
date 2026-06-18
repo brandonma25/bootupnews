@@ -58,5 +58,24 @@ Per the council, the framework bump (highest blast radius) ships independently s
 - **QA:** `notion-fetch` 5-case suite (429-any-method, 5xx-idempotent-only, no-double-create, no-retry-POST-network); editorial-staging/observability/push-approved/health suites green; **full suite 1115 green**; typecheck 0.
 
 ---
-## Phase 2 — maintainability (re-scoped per council)
-<!-- subsequent items appended below as they land -->
+## Phase 2 — maintainability — DEFERRED (documented, not skipped)
+- **A-1 (signals-editorial.ts split) + data.ts split:** deferred per the council's hard gate — there are ~22 open worktrees holding `signals-editorial.ts`; a total line-move would strand that in-flight work and a non-coder can't resolve the conflicts. Prereq (also deferred): the memo-reset seam + clearing the 115 `*.test.*` typecheck backlog.
+- **Dead-code deletion:** deferred to a separate reviewed spike. The council was divided (Delivery lead recommended cutting it; Architect re-scoped to orphaned-UI-only), it has zero user value, and it is entangled with the untested `actions.ts` and the **live** `clusterNormalizedArticles` / `generateDailyBriefing` / `demo-data.ts` chain — the #1 "empty-homepage-at-next-cron" risk. Needs a reachability trace + build/typecheck/test gating in its own PR, not an autonomous mega-PR.
+
+---
+## Phase 3 — posture
+
+- **#10 — `javascript:`-in-`source_url` XSS sink:** `SignalCard` (related-coverage + source link) and `SignalCardInteractive` rendered `source_url` as an href with no scheme check. Now gated by `isValidSourceUrl` / `^https?://` — a non-http(s) URL renders as non-link text. (Write-side validation in push-approved deferred — render guard fully closes the click-exec sink.)
+- **#12 — PII in auth logs:** `actions.ts` logged full emails on auth-failure paths. Added `maskEmail` (keeps domain, masks local part) at the 3 log sites; the real email still flows to the Supabase auth calls (signUp/signInWithPassword/signInWithOtp).
+- **#13 — `/health/rss` freshness leak:** the unauthenticated service-role read exposed stale/failed-feed detail. Now returns only `status` to public probes; the internal detail is gated behind the cron secret (`isCronAuthorized`). New unauth-status-only test.
+- **RLS service-role invariant:** the anon DML revoke shipped in Phase 0 item 5. Verified live: as `anon`, `signal_posts` + `cron_runs` return **0 rows** (RLS deny) and writes are revoked. Invariant: server-side writes use service-role (bypasses grants + RLS); anon reads are RLS-denied; **never add permissive policies** (would re-expose rows).
+- **npm audit CI cadence + `npm audit fix`:** deferred to the dependency/Next.js PR (where the deps are actually bumped), so the gate lands green rather than red against the current 23 advisories.
+
+## Required manual follow-ups (operator)
+1. **Enable email confirmation** in Supabase Auth (item 1 — load-bearing for the admin-takeover fix).
+2. **Switch the push-approved trigger** to the `x-editorial-push-secret` header and **rotate `EDITORIAL_PUSH_SECRET`** (item 5), then we drop the query fallback.
+3. Back the rate limiter with **Vercel KV/Upstash** for a global (not per-instance) cap (item 3).
+
+## Deferred (tracked)
+- A-1 `signals-editorial.ts` split + `data.ts` split (worktree gate) and the dead-code deletion spike (Phase 2).
+- SSRF connect-time IP pin (DNS-rebind residual), notion retry-budget-vs-stage-timeout abort threading, the 115 `*.test.*` typecheck backlog, push-approved write-side URL validation.
