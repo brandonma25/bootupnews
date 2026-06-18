@@ -1,6 +1,6 @@
 # Security + Reliability Hardening (Phases 0–3) — 2026-06-18
 
-**Canonical PRD required:** `No` — this is an **audit/remediation**-backed security + reliability hardening pass (council-reviewed code-quality audit), not a new product feature. The new modules (`url-safety`, `rate-limit`, `secret-compare`, `notion-fetch`) are guard/infrastructure for the documented fixes below; this bug-fix record is the canonical lane.
+Canonical PRD required: `No` — this is an audit / remediation-backed security + reliability hardening pass (council-reviewed code-quality audit), not a new product feature. The new modules (`url-safety`, `rate-limit`, `secret-compare`, `notion-fetch`) are guard/infrastructure for the documented fixes below; this bug-fix record is the canonical lane.
 
 Executes the council-reviewed, security-updated consolidated plan from the code-quality review. One branch, one commit per item, QA (typecheck + lint + targeted tests) after each. **Deferred by design** (council hard-gate): the `signals-editorial.ts` (A-1) and `data.ts` god-module splits — gated on "zero open branches touching the file" (~22 worktrees currently hold it). The Next.js bump ships as its **own** PR (highest blast radius, must be independently revertable).
 
