@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { formatHomeBriefingDateLabel, getTaipeiDateKey } from "@/lib/utils";
+import { formatBriefingDate, formatHomeBriefingDateLabel, getTaipeiDateKey } from "@/lib/utils";
+
+describe("formatBriefingDate (Taipei-aware)", () => {
+  it("labels a Taipei-today date-key as Today even late in the UTC day", () => {
+    expect(formatBriefingDate("2026-06-18", new Date("2026-06-17T23:30:00.000Z"))).toMatch(/^Today •/);
+  });
+  it("labels an older date as a full date", () => {
+    expect(formatBriefingDate("2026-06-10", new Date("2026-06-17T12:00:00.000Z"))).not.toMatch(/^Today/);
+  });
+});
 
 describe("getTaipeiDateKey (F-1/F-2 Taipei freshness)", () => {
   it("rolls to the next calendar day for the 16:00–24:00 UTC window", () => {

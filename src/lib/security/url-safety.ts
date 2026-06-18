@@ -202,6 +202,10 @@ export async function safeFetch(
       return response;
     }
 
+    // Drain the redirect response body so the connection isn't pinned while we
+    // follow the next hop (3xx bodies are usually empty, but don't leak the socket).
+    await response.body?.cancel().catch(() => { /* best-effort */ });
+
     // Resolve the next hop relative to the current URL and re-validate it.
     currentUrl = new URL(location, currentUrl).toString();
   }

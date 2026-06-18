@@ -6,9 +6,11 @@
  * Retry safety is method/idempotency-aware to avoid double-writes:
  *  - 429 (rate-limited): always safe — the request was rejected before processing.
  *  - 5xx / network / timeout: AMBIGUOUS (may have been applied) — retried ONLY when
- *    the call is idempotent. Notion's "query database" is a POST but read-only, so
- *    callers pass { idempotent: true }; page CREATE (POST /pages) is left
- *    non-idempotent so a possibly-delivered create is never retried.
+ *    the call is idempotent. Page CREATE (POST /pages) defaults non-idempotent so a
+ *    possibly-delivered create is never retried. Notion's "query database" is a POST
+ *    but read-only and IS safe to retry — callers MAY pass { idempotent: true } to
+ *    opt into 5xx-retry; today the read-query call sites do not (they accept the
+ *    8s timeout + 429 retry only), so a transient 5xx on a read fails closed.
  *
  * Budget: keep timeoutMs * (maxRetries+1) well under the cron stage wall so a
  * Notion outage degrades the stage instead of re-triggering the timeout-poison.

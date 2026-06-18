@@ -28,8 +28,9 @@ export function checkRateLimit(
   windowMs: number,
   now: number = Date.now(),
 ): RateLimitResult {
-  // Bound memory: if the map balloons (e.g. spoofed-key flood), drop expired
-  // entries; if still oversized, the oldest windows are reset on next access.
+  // Bound memory: when the map grows past the cap, drop EXPIRED windows. (Note:
+  // an all-unexpired flood of distinct keys still grows until those windows roll
+  // — acceptable for the in-memory tier; the durable KV follow-up removes the cap.)
   if (buckets.size > MAX_TRACKED_KEYS) pruneExpired(now);
 
   const existing = buckets.get(key);
@@ -54,12 +55,14 @@ export function resetRateLimitState(): void {
 /**
  * Best-effort client IP for rate-limit keying.
  *
- * SECURITY: do NOT trust the leftmost `x-forwarded-for` hop — Vercel APPENDS the
- * real client IP to any inbound XFF, so the leftmost token is client-supplied and
- * an attacker can rotate it per request to evade per-IP limits. Prefer the
- * platform-set headers (`x-real-ip` / `x-vercel-forwarded-for`), which Vercel
- * derives from the actual connection and a client cannot spoof. The XFF fallback
- * uses the RIGHTMOST hop (appended by the nearest trusted proxy), not the left.
+ * SECURITY: prefer the platform-set headers `x-real-ip` / `x-vercel-forwarded-for`,
+ * which Vercel derives from the actual connection and a client cannot spoof. On
+ * Vercel, `x-forwarded-for` is also overwritten to a single trusted client IP — but
+ * we don't rely on that: behind a generic appending proxy the leftmost XFF hop IS
+ * client-supplied (rotatable to evade per-IP limits), so the fallback uses the
+ * RIGHTMOST hop (nearest trusted proxy). NB: that fallback only holds for an
+ * appending-proxy topology; on standard Vercel `x-real-ip` is always present, so
+ * the XFF branch is effectively unreached.
  */
 export function getClientIp(headers: Headers): string {
   const realIp = headers.get("x-real-ip")?.trim();
