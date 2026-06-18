@@ -3,9 +3,14 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const safeGetUser = vi.fn();
 const collectMitInternalReviewData = vi.fn();
+const isVerifiedAdminUser = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   safeGetUser,
+}));
+
+vi.mock("@/lib/admin-auth", () => ({
+  isVerifiedAdminUser,
 }));
 
 vi.mock("@/lib/internal/mit-review", () => ({
@@ -65,6 +70,8 @@ describe("MIT internal review page", () => {
   beforeEach(() => {
     safeGetUser.mockReset();
     collectMitInternalReviewData.mockReset();
+    isVerifiedAdminUser.mockReset();
+    isVerifiedAdminUser.mockReturnValue(false);
   });
 
   it("withholds review evidence from unauthenticated requests", async () => {
@@ -82,12 +89,28 @@ describe("MIT internal review page", () => {
     expect(collectMitInternalReviewData).not.toHaveBeenCalled();
   }, 10000);
 
-  it("renders sanitized MIT review evidence for authenticated requests", async () => {
+  it("withholds review evidence from a logged-in NON-admin user", async () => {
     safeGetUser.mockResolvedValue({
-      user: { id: "user-1", email: "analyst@example.com" },
+      user: { id: "user-1", email: "analyst@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
+    isVerifiedAdminUser.mockReturnValue(false);
+
+    const Page = (await import("@/app/internal/mit-review/page")).default;
+    render(await Page());
+
+    expect(screen.getByText("Internal access required")).toBeInTheDocument();
+    expect(collectMitInternalReviewData).not.toHaveBeenCalled();
+  }, 10000);
+
+  it("renders sanitized MIT review evidence for a verified admin", async () => {
+    safeGetUser.mockResolvedValue({
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
+      supabase: {},
+      sessionCookiePresent: true,
+    });
+    isVerifiedAdminUser.mockReturnValue(true);
     collectMitInternalReviewData.mockResolvedValue(reviewData);
 
     const Page = (await import("@/app/internal/mit-review/page")).default;

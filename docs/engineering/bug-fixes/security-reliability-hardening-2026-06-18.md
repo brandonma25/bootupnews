@@ -16,4 +16,9 @@ Executes the council-reviewed, security-updated consolidated plan from the code-
 - **⚠️ REQUIRED MANUAL STEP (load-bearing control):** enable email confirmation in Supabase Auth (Authentication → Email → "Confirm email") so `email_confirmed_at` is only set for owned addresses. With auto-confirm ON the code check passes for attackers too — both controls are needed.
 - **QA:** new `isVerifiedAdminUser` unit tests (confirmed→true, unconfirmed→false, non-admin→false); updated 52 admin mocks across the editorial suite + the summary route mock to a *confirmed* admin. typecheck 0; 113 affected tests green.
 
+### 4. mit-review admin gate (MEDIUM)
+- **Problem:** `/internal/mit-review` was gated on `if (!user)` only — any signed-up user saw internal diagnostics (runtime source IDs, feed samples), inconsistent with every other internal surface.
+- **Fix:** `if (!isVerifiedAdminUser(user))` → `LockedInternalPage`.
+- **QA:** page test now covers unauth / logged-in-non-admin / verified-admin; 3 tests green.
+
 <!-- subsequent items appended below as they land -->
