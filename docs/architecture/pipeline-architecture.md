@@ -10,6 +10,12 @@
 > ⚠️ The sibling working copy at `/Users/bm/dev/bootupnews` is checked out at **`b8faf25` (PRD-53,
 > pre-#312)** and is missing #312–#317 — do not cite it.
 >
+> **§E refresh (2026-06-18):** the public-slate cap rows in §E were re-verified against `origin/main`
+> after **#322** (Pick→Publish; public cap **5→7**) and **#323** (homepage force-dynamic). The public
+> cap is now **7** (5 core + 2 context). Everything else remains as-of `066274e`; in particular, treat
+> §C's per-story newsletter `signal_posts` write as **pre-#324** — PR #324 makes that a single atomic
+> bulk insert, after which §B/§C should be refreshed.
+>
 > **Production:** Supabase project `fwkqjeumreaznfhnlzev`. All data in this doc came from **read-only
 > SELECT** queries run on production.
 >
@@ -518,11 +524,11 @@ Every threshold/constant that governs behavior, current value, location, and wha
 | business-scale magnitude floor | ≥ $500M | `registry.ts:135-139` | #313 business boost |
 | `DEFAULT_SURFACE_POOL_SIZE` | **22** (env `SURFACE_POOL_SIZE`) | `pipeline/surface-pool.ts:18` | editorial pool ceiling |
 | `SIGNAL_POST_CANDIDATE_DEPTH_LIMIT` | **20** | `signals-editorial.ts:175` | candidate depth |
-| `TOP_SIGNAL_SET_SIZE` | **5** | `signals-editorial.ts:176` | degraded-mode floor |
-| `SIGNAL_POST_RANK_MAX` | **20** | `signals-editorial.ts:178` | append rank cap |
-| `FINAL_SLATE_MAX_PUBLIC_ROWS` | **5** | `final-slate-readiness.ts:4` | public publish cap |
+| `TOP_SIGNAL_SET_SIZE` | **7** `[live: #322 5→7]` | `signals-editorial.ts:177` | degraded-mode floor |
+| `SIGNAL_POST_RANK_MAX` | **20** | `signals-editorial.ts:179` | append rank cap |
+| `FINAL_SLATE_MAX_PUBLIC_ROWS` | **7** `[live: #322 5→7]` | `final-slate-readiness.ts:6` | public publish cap |
 | `FINAL_SLATE_MIN_PUBLIC_ROWS` | **1** | `final-slate-readiness.ts:3` | publish floor |
-| core / context ranks | [1-5] / [6,7] | `final-slate-readiness.ts:5-6` | rank→tier |
+| core / context ranks | [1-5] / [6,7] | `final-slate-readiness.ts:7-8` | rank→tier |
 | editorial select top-N | **7** (magic number) | `editorial-staging/runner.ts:211` | Notion queue size |
 | newsletter co-occurrence multiplier | **×10** (magic number) | `editorial-staging/runner.ts:209` | editorial-staging ordering only |
 | newsletter admit threshold | ≥ **2** | `editorial-staging/dedup.ts:121` | newsletter-only story admission |
