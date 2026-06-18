@@ -1,4 +1,5 @@
 import { captureExceptionSafe, captureMessageSafe } from "@/lib/sentry-config";
+import { notionFetch } from "@/lib/notion-fetch";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
 
@@ -92,7 +93,7 @@ async function findExistingRow(
   source: string,
   date: string,
 ): Promise<ExistingRow | null> {
-  const response = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+  const response = await notionFetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -213,7 +214,7 @@ export async function writeSourceHealthEntry(
     const existing = await findExistingRow(env.dbId, env.token, entry.source, entry.date);
 
     if (existing) {
-      const response = await fetch(`https://api.notion.com/v1/pages/${existing.pageId}`, {
+      const response = await notionFetch(`https://api.notion.com/v1/pages/${existing.pageId}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${env.token}`,
@@ -246,7 +247,7 @@ export async function writeSourceHealthEntry(
       return { written: true, pageId: existing.pageId, action: "updated" };
     }
 
-    const response = await fetch(NOTION_PAGES_URL, {
+    const response = await notionFetch(NOTION_PAGES_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.token}`,

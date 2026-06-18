@@ -48,4 +48,15 @@ Per the council, the framework bump (highest blast radius) ships independently s
 
 ---
 ## Phase 1 — reliability (publish/cron path)
+
+### F-1. Taipei freshness date (MEDIUM) — *(committed above)*
+
+### H-3 + R-1. Notion timeout/retry + recoverable writeback (HIGH/MEDIUM)
+- **H-3:** Notion writers were bare `fetch()` — no timeout (a hung socket blocked until the 55s stage wall) and no retry. New `src/lib/notion-fetch.ts` adds an 8s timeout + bounded, **method/idempotency-aware** retry: 429 always retried (honors Retry-After); 5xx/network/timeout retried ONLY for idempotent calls — page **CREATE (POST /pages) is never retried** (no double-create), queries default to non-idempotent (timeout + 429 only), PATCH retries. Routed all Notion sites through it: `editorial-staging/notion-writer.ts` (4), `pipeline-log.ts`, `source-health-log.ts` (3), `push-approved` (notionRequest), `health/route.ts`.
+- **R-1:** the Supabase write commits before the Notion writeback; a writeback throw was mislabeled `failed` (supabaseId:null) → re-pushed next run, churning the editor's slot. New `markNotionRowPushedSafely` swallows + logs the orphan `(supabaseId, pageId)` and the caller reports `inserted_writeback_pending` / `overwrote_writeback_pending` (DB write succeeded, writeback pending). notionFetch already retries the idempotent PATCH; a still-failing writeback re-syncs next run via the select-then-decide dedup (no duplicate).
+- **F-2 (atomic rank upsert): CUT** per council — the push loop is sequential (no live race) and an upsert would add CHECK-violation risk.
+- **QA:** `notion-fetch` 5-case suite (429-any-method, 5xx-idempotent-only, no-double-create, no-retry-POST-network); editorial-staging/observability/push-approved/health suites green; **full suite 1115 green**; typecheck 0.
+
+---
+## Phase 2 — maintainability (re-scoped per council)
 <!-- subsequent items appended below as they land -->

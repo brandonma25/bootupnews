@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { notionFetch } from "@/lib/notion-fetch";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { writePipelineLogEntry, type PipelineLogStatus } from "@/lib/observability/pipeline-log";
@@ -103,7 +104,7 @@ async function queryQueueRowsForBriefingDate(
   token: string,
   briefingDate: string,
 ): Promise<QueueRowSnapshot[]> {
-  const response = await fetch(
+  const response = await notionFetch(
     `https://api.notion.com/v1/databases/${notionDbId}/query`,
     {
       method: "POST",

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/observability";
 import { secretsMatch } from "@/lib/security/secret-compare";
+import { notionFetch } from "@/lib/notion-fetch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -100,7 +101,7 @@ async function notionRequest(
   const token = process.env.NOTION_TOKEN?.trim();
   if (!token) throw new Error("NOTION_TOKEN is not configured.");
 
-  const response = await fetch(`https://api.notion.com/v1${path}`, {
+  const response = await notionFetch(`https://api.notion.com/v1${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -152,6 +153,31 @@ async function markNotionRowPushed(
       },
     },
   });
+}
+
+/**
+ * R-1: the Supabase write commits BEFORE this Notion writeback runs. If the
+ * writeback throws, the row must NOT bubble to the catch as "failed" (which sets
+ * supabaseId:null and implies nothing was written). Swallow the error, log the
+ * orphan (supabaseId, pageId) for reconciliation, and let the caller report a
+ * *_writeback_pending status. notionFetch already retries the idempotent PATCH;
+ * a still-failing writeback leaves Pushed=false so a later run re-selects the row
+ * and the select-then-decide flow re-syncs it (dedup by briefing_date+source_url)
+ * rather than duplicating.
+ */
+async function markNotionRowPushedSafely(pageId: string, supabaseRowId: string): Promise<boolean> {
+  try {
+    await markNotionRowPushed(pageId, supabaseRowId);
+    return true;
+  } catch (error) {
+    logServerEvent("error", "Editorial push: Supabase write committed but Notion writeback failed (orphan; re-syncs next run)", {
+      route: "/api/editorial/push-approved",
+      notionPageId: pageId,
+      supabaseId: supabaseRowId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
 }
 
 /**
@@ -279,6 +305,8 @@ type PushRowStatus =
   | "skipped_missing_source_url"
   | "skipped_missing_slot"
   | "no_rank_slot"
+  | "inserted_writeback_pending"
+  | "overwrote_writeback_pending"
   | "failed";
 
 type PushRowResult = {
@@ -382,7 +410,7 @@ async function pushApprovedRow(
     // Writeback IS called so the Notion row's Pushed flag flips true,
     // preventing future re-attempts. The Supabase content is left untouched.
     if (existing?.witm_draft_generated_by === "llm") {
-      await markNotionRowPushed(page.id, existing.id);
+      await markNotionRowPushedSafely(page.id, existing.id);
       logServerEvent("info", "Editorial push: skipped — v2 row already exists; flipped Notion writeback", {
         headline: headline.slice(0, 60),
         notionPageId: page.id,
@@ -508,20 +536,21 @@ async function pushApprovedRow(
       }
 
       const supabaseId = (updateResult.data as { id: string }).id;
-      await markNotionRowPushed(page.id, supabaseId);
+      const overwriteWritebackOk = await markNotionRowPushedSafely(page.id, supabaseId);
 
       logServerEvent("info", "Editorial push: overwrote legacy template row", {
         headline: headline.slice(0, 60),
         notionPageId: page.id,
         supabaseId,
         previousProvenance: existing.witm_draft_generated_by,
+        writebackOk: overwriteWritebackOk,
       });
 
       return {
         headline,
         notionPageId: page.id,
         supabaseId,
-        status: "overwrote_template",
+        status: overwriteWritebackOk ? "overwrote_template" : "overwrote_writeback_pending",
       };
     }
 
@@ -570,13 +599,13 @@ async function pushApprovedRow(
     }
 
     const supabaseId = (insertResult.data as { id: string }).id;
-    await markNotionRowPushed(page.id, supabaseId);
+    const insertWritebackOk = await markNotionRowPushedSafely(page.id, supabaseId);
 
     return {
       headline,
       notionPageId: page.id,
       supabaseId,
-      status: "inserted",
+      status: insertWritebackOk ? "inserted" : "inserted_writeback_pending",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -675,6 +704,8 @@ export async function GET(request: Request) {
       skipped_missing_source_url: 0,
       skipped_missing_slot: 0,
       no_rank_slot: 0,
+      inserted_writeback_pending: 0,
+      overwrote_writeback_pending: 0,
       failed: 0,
     },
   );
