@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createSupabaseServiceRoleClient = vi.fn();
 const safeGetUser = vi.fn();
-const isAdminUser = vi.fn();
+const isVerifiedAdminUser = vi.fn();
 const logServerEvent = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -11,7 +11,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 vi.mock("@/lib/admin-auth", () => ({
-  isAdminUser,
+  isVerifiedAdminUser,
 }));
 
 vi.mock("@/lib/observability", () => ({
@@ -51,7 +51,7 @@ describe("/api/internal/mvp-measurement/summary", () => {
     safeGetUser.mockResolvedValue({
       user: { id: "user-1", email: "admin@example.com" },
     });
-    isAdminUser.mockReturnValue(true);
+    isVerifiedAdminUser.mockReturnValue(true);
   });
 
   it("requires authentication before reading measurement events", async () => {
@@ -72,7 +72,7 @@ describe("/api/internal/mvp-measurement/summary", () => {
   });
 
   it("requires an admin email before reading measurement events", async () => {
-    isAdminUser.mockReturnValue(false);
+    isVerifiedAdminUser.mockReturnValue(false);
 
     const { GET } = await import("@/app/api/internal/mvp-measurement/summary/route");
     const response = await GET(buildRequest());

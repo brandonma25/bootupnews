@@ -10,4 +10,10 @@ Executes the council-reviewed, security-updated consolidated plan from the code-
 - **Tracked backlog:** 115 `*.test.*` type errors across 21 files — to be cleared before A-1 (the split) is ever attempted, since the full-repo typecheck is the safety net for that refactor.
 - **QA:** `npm run typecheck` → 0 errors.
 
+### 1. Admin-takeover hardening (HIGH)
+- **Problem:** the admin gate trusts the email claim only (`admin-auth.ts:isAdminUser`), and email confirmation is auto-on. A privileged email in `ADMIN_EMAILS` that hasn't registered yet is claimable → instant session → full editorial admin.
+- **Fix (code, defense-in-depth):** new `isVerifiedAdminUser()` requires `email_confirmed_at` in addition to the allowlist; applied at the two server-side gates — `getAdminEditorialContext` (all 17 editorial mutations) and the mvp-measurement summary route. Cosmetic UI `isAdminUser({email})` toggles unchanged.
+- **⚠️ REQUIRED MANUAL STEP (load-bearing control):** enable email confirmation in Supabase Auth (Authentication → Email → "Confirm email") so `email_confirmed_at` is only set for owned addresses. With auto-confirm ON the code check passes for attackers too — both controls are needed.
+- **QA:** new `isVerifiedAdminUser` unit tests (confirmed→true, unconfirmed→false, non-admin→false); updated 52 admin mocks across the editorial suite + the summary route mock to a *confirmed* admin. typecheck 0; 113 affected tests green.
+
 <!-- subsequent items appended below as they land -->

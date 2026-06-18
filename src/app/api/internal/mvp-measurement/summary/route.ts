@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isAdminUser } from "@/lib/admin-auth";
+import { isVerifiedAdminUser } from "@/lib/admin-auth";
 import { logServerEvent } from "@/lib/observability";
 import { readMvpMeasurementSummary } from "@/lib/mvp-measurement-summary";
 import {
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     );
   }
 
-  if (!isAdminUser(user)) {
+  if (!isVerifiedAdminUser(user)) {
     return json(
       {
         ok: false,

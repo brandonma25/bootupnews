@@ -692,7 +692,7 @@ describe("signals editorial workflow", () => {
   it("keeps editorial review render-safe when no stored signal snapshot exists", async () => {
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock([]));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -719,7 +719,7 @@ describe("signals editorial workflow", () => {
       }),
     );
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -774,7 +774,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -827,7 +827,7 @@ describe("signals editorial workflow", () => {
       }),
     );
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -852,7 +852,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -876,7 +876,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -906,7 +906,7 @@ describe("signals editorial workflow", () => {
     const rows = [createRow({ id: "signal-1", editorial_status: "approved" })];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -927,7 +927,7 @@ describe("signals editorial workflow", () => {
     const rows = [createRow({ id: "signal-1", editorial_status: "published" })];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -948,7 +948,7 @@ describe("signals editorial workflow", () => {
     const rows = [createRow({ id: "signal-1" })];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -976,7 +976,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1008,7 +1008,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1038,7 +1038,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1065,7 +1065,7 @@ describe("signals editorial workflow", () => {
     );
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1091,7 +1091,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1117,7 +1117,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1147,7 +1147,7 @@ describe("signals editorial workflow", () => {
     });
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1168,7 +1168,7 @@ describe("signals editorial workflow", () => {
     });
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1196,7 +1196,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1221,7 +1221,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1248,7 +1248,7 @@ describe("signals editorial workflow", () => {
     });
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1275,7 +1275,7 @@ describe("signals editorial workflow", () => {
     });
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1324,7 +1324,7 @@ describe("signals editorial workflow", () => {
     });
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1355,7 +1355,7 @@ describe("signals editorial workflow", () => {
     const rows = createPartialFinalSlate(5, overrides);
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1379,7 +1379,7 @@ describe("signals editorial workflow", () => {
     });
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1401,7 +1401,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1456,7 +1456,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1528,7 +1528,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -1599,7 +1599,7 @@ describe("signals editorial workflow", () => {
     const supabase = createSupabaseMock(rows);
     createSupabaseServiceRoleClient.mockReturnValue(supabase);
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2178,7 +2178,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2209,7 +2209,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2239,7 +2239,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2269,7 +2269,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2300,7 +2300,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2328,7 +2328,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2352,7 +2352,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2380,7 +2380,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2409,7 +2409,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2435,7 +2435,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2460,7 +2460,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2487,7 +2487,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2514,7 +2514,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2548,7 +2548,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2584,7 +2584,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2624,7 +2624,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -2790,7 +2790,7 @@ describe("signals editorial workflow", () => {
       }),
     );
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -3178,7 +3178,7 @@ describe("signals editorial workflow", () => {
     ];
     createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
     safeGetUser.mockResolvedValue({
-      user: { id: "admin-1", email: "admin@example.com" },
+      user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
       supabase: {},
       sessionCookiePresent: true,
     });
@@ -3280,7 +3280,7 @@ describe("signals editorial workflow", () => {
       ];
       createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
       safeGetUser.mockResolvedValue({
-        user: { id: "admin-1", email: "admin@example.com" },
+        user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
         supabase: {},
         sessionCookiePresent: true,
       });
@@ -3336,7 +3336,7 @@ describe("signals editorial workflow", () => {
       ];
       createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
       safeGetUser.mockResolvedValue({
-        user: { id: "admin-1", email: "admin@example.com" },
+        user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
         supabase: {},
         sessionCookiePresent: true,
       });
@@ -3367,7 +3367,7 @@ describe("signals editorial workflow", () => {
       ];
       createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
       safeGetUser.mockResolvedValue({
-        user: { id: "admin-1", email: "admin@example.com" },
+        user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
         supabase: {},
         sessionCookiePresent: true,
       });
@@ -3388,7 +3388,7 @@ describe("signals editorial workflow", () => {
     it("returns not_found when the post id does not resolve to a row", async () => {
       createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock([]));
       safeGetUser.mockResolvedValue({
-        user: { id: "admin-1", email: "admin@example.com" },
+        user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
         supabase: {},
         sessionCookiePresent: true,
       });
@@ -3406,7 +3406,7 @@ describe("signals editorial workflow", () => {
       const rows = createPartialFinalSlate(3);
       createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
       safeGetUser.mockResolvedValue({
-        user: { id: "admin-1", email: "admin@example.com" },
+        user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
         supabase: {},
         sessionCookiePresent: true,
       });
@@ -3460,7 +3460,7 @@ describe("signals editorial workflow", () => {
       ];
       createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
       safeGetUser.mockResolvedValue({
-        user: { id: "admin-1", email: "admin@example.com" },
+        user: { id: "admin-1", email: "admin@example.com", email_confirmed_at: "2026-06-18T00:00:00Z" },
         supabase: {},
         sessionCookiePresent: true,
       });

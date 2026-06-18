@@ -1,6 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 
-import { isAdminUser } from "@/lib/admin-auth";
+import { isVerifiedAdminUser } from "@/lib/admin-auth";
 import {
   buildEditorialWhyItMattersText,
   createEditorialContentFromLegacyText,
@@ -2148,7 +2148,7 @@ async function getAdminEditorialContext(route: string): Promise<
     };
   }
 
-  if (!isAdminUser(user)) {
+  if (!isVerifiedAdminUser(user)) {
     return {
       ok: false,
       code: "not_admin",
