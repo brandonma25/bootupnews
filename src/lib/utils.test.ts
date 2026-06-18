@@ -19,6 +19,13 @@ describe("getTaipeiDateKey (F-1/F-2 Taipei freshness)", () => {
     expect(getTaipeiDateKey(new Date("2026-06-17T12:00:00.000Z"))).toBe("2026-06-17");
   });
 
+  it("pins the exact Taipei-midnight cusp (16:00 UTC = 00:00 Taipei, UTC+8)", () => {
+    // The single most regression-prone input: one millisecond before vs at the
+    // day boundary. Locks the day-key against a future Intl→manual-offset change.
+    expect(getTaipeiDateKey(new Date("2026-06-17T15:59:59.999Z"))).toBe("2026-06-17");
+    expect(getTaipeiDateKey(new Date("2026-06-17T16:00:00.000Z"))).toBe("2026-06-18");
+  });
+
   it("labels a Taipei-today briefing as Today even late in the UTC day (the bug fix)", () => {
     // briefing_date keyed 06-18 (Taipei); 'now' is 23:30 UTC 06-17 = 06-18 Taipei.
     expect(

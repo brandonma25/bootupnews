@@ -59,6 +59,11 @@ Per the council, the framework bump (highest blast radius) ships independently s
 - **F-2 (atomic rank upsert): CUT** per council — the push loop is sequential (no live race) and an upsert would add CHECK-violation risk.
 - **QA:** `notion-fetch` 5-case suite (429-any-method, 5xx-idempotent-only, no-double-create, no-retry-POST-network); editorial-staging/observability/push-approved/health suites green; **full suite 1115 green**; typecheck 0.
 
+### Fast-follows folded in (safe, in-domain)
+- **H-3 staging loop-break:** the cron internal-timeout `AbortSignal` is threaded `pipeline → runEditorialStaging` and the staging loop breaks once it fires, so the stage stops dispatching new Notion writes at the ~55s wall instead of grinding all candidates to Vercel's 60s hard-kill. Per-row writes stay idempotent (insert|update|skip) so a partial run self-heals next tick. Covered by `editorial-staging/runner.test.ts` (aborted → zero writes + deadline warn; not-aborted → all dispatched).
+- **Read-query retries:** the read-only Notion query POSTs (notion-writer dedup lookups, source-health, health check, push-approved) now pass `{ idempotent: true }` so a transient 5xx retries instead of failing closed.
+- **Route coverage added:** `push-approved` now tests the recoverable-writeback path (`*_writeback_pending` with the committed id retained), degrade-and-continue across a batch, and the `x-editorial-push-secret` header auth. `maskEmail` (PII redaction) extracted to `src/lib/security/mask-email.ts` + unit-tested.
+
 ---
 ## Phase 2 — maintainability — DEFERRED (documented, not skipped)
 - **A-1 (signals-editorial.ts split) + data.ts split:** deferred per the council's hard gate — there are ~22 open worktrees holding `signals-editorial.ts`; a total line-move would strand that in-flight work and a non-coder can't resolve the conflicts. Prereq (also deferred): the memo-reset seam + clearing the 115 `*.test.*` typecheck backlog.
@@ -92,5 +97,5 @@ A 5-reviewer adversarial self-review caught real issues; the must-fix set was fi
 - A-1 `signals-editorial.ts` split + `data.ts` split (worktree gate) and the dead-code deletion spike (Phase 2).
 - **Security observability:** route SSRF-block / repeated-401-429 / deprecated-secret-use events to Sentry alerting (currently log-only).
 - **Secret rotation:** rotate `EDITORIAL_PUSH_SECRET` + delete the deprecated query-token path (dated task).
-- **H-3 retry budget vs the 55s wall:** thread the cron abort signal through `runEditorialStaging` → `notionFetch` (or cap staging to `timeoutMs:5s, maxRetries:1`). Reconciled to fast-follow — degrades to a self-healing timed-out run, not slate poison.
+- **H-3 retry budget vs the 55s wall — staging loop-break SHIPPED (see "Fast-follows folded in"); per-call notionFetch budget still deferred:** the cron abort signal now reaches `runEditorialStaging` and breaks the write loop at the deadline. Still-deferred half: threading the signal *into* each in-flight `notionFetch` call (or capping staging to `timeoutMs:5s, maxRetries:1`) so the single in-flight write also aborts rather than running to its own 8s timeout. Low priority — the loop-break already bounds the stage; the in-flight write is capped at notionFetch's 8s.
 - **Id-keyed admin RBAC** (replace the email allowlist); **recurring `npm audit`/Dependabot gate**; SSRF connect-time IP pin (DNS-rebind residual) + cross-origin redirect header-strip in `safeFetch`; the 115 `*.test.*` typecheck backlog; push-approved write-side URL validation; SSRF/admin integration tests.

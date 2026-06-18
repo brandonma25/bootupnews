@@ -357,7 +357,12 @@ export async function runEditorialStaging(options: {
       logServerEvent("warn", "Editorial staging: stopped at run deadline (abort signal)", {
         briefingDate,
         stagedSoFar: notionRowsInserted + notionRowsUpdated,
-        remaining: selected.length - (notionRowsInserted + notionRowsUpdated + notionRowsSkippedDuplicateAcrossDates),
+        remaining:
+          selected.length -
+          (notionRowsInserted +
+            notionRowsUpdated +
+            notionRowsSkippedDuplicateAcrossDates +
+            notionRowsSkippedHumanEdited),
       });
       break;
     }

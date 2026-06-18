@@ -97,19 +97,27 @@ async function notionRequest(
   path: string,
   method: string,
   body?: unknown,
+  opts?: { idempotent?: boolean },
 ): Promise<unknown> {
   const token = process.env.NOTION_TOKEN?.trim();
   if (!token) throw new Error("NOTION_TOKEN is not configured.");
 
-  const response = await notionFetch(`https://api.notion.com/v1${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "Notion-Version": NOTION_API_VERSION,
+  const response = await notionFetch(
+    `https://api.notion.com/v1${path}`,
+    {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Notion-Version": NOTION_API_VERSION,
+      },
+      body: body ? JSON.stringify(body) : undefined,
     },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+    // Pass through undefined when unset so notionFetch keeps its method-based
+    // default (PATCH/GET idempotent, POST create not) — only the read query
+    // opts into idempotent:true explicitly.
+    { idempotent: opts?.idempotent },
+  );
 
   if (!response.ok) {
     const text = await response.text().catch(() => "(no body)");
@@ -128,15 +136,21 @@ async function queryNotionForApprovedRows(
   // rejected / held / killed / draft / needs_review rows are never even
   // candidates for the bridge. Re-running the bridge after writeback flips
   // Pushed=true is therefore a no-op for the same row.
-  const result = (await notionRequest(`/databases/${dbId}/query`, "POST", {
-    filter: {
-      and: [
-        { property: "Status", select: { equals: "approved" } },
-        { property: "Briefing Date", date: { equals: briefingDate } },
-        { property: "Pushed to Supabase", checkbox: { equals: false } },
-      ],
+  const result = (await notionRequest(
+    `/databases/${dbId}/query`,
+    "POST",
+    {
+      filter: {
+        and: [
+          { property: "Status", select: { equals: "approved" } },
+          { property: "Briefing Date", date: { equals: briefingDate } },
+          { property: "Pushed to Supabase", checkbox: { equals: false } },
+        ],
+      },
     },
-  })) as { results: NotionPage[] };
+    // Read-only query (a POST by Notion's API shape); safe to retry a transient 5xx.
+    { idempotent: true },
+  )) as { results: NotionPage[] };
 
   return result.results ?? [];
 }
@@ -409,12 +423,16 @@ async function pushApprovedRow(
     // SKIP-V2: re-push of a row the bridge already wrote (provenance='llm').
     // Writeback IS called so the Notion row's Pushed flag flips true,
     // preventing future re-attempts. The Supabase content is left untouched.
+    // No new Supabase write commits here, so a failed writeback is purely
+    // self-healing: Pushed stays false → the row is re-selected and re-skipped
+    // next run (markNotionRowPushedSafely already logged the orphan).
     if (existing?.witm_draft_generated_by === "llm") {
-      await markNotionRowPushedSafely(page.id, existing.id);
-      logServerEvent("info", "Editorial push: skipped — v2 row already exists; flipped Notion writeback", {
+      const v2WritebackOk = await markNotionRowPushedSafely(page.id, existing.id);
+      logServerEvent("info", "Editorial push: skipped — v2 row already exists", {
         headline: headline.slice(0, 60),
         notionPageId: page.id,
         existingId: existing.id,
+        notionWriteback: v2WritebackOk ? "flipped" : "pending (re-skips next run)",
       });
       return {
         headline,

@@ -8,9 +8,10 @@
  *  - 5xx / network / timeout: AMBIGUOUS (may have been applied) — retried ONLY when
  *    the call is idempotent. Page CREATE (POST /pages) defaults non-idempotent so a
  *    possibly-delivered create is never retried. Notion's "query database" is a POST
- *    but read-only and IS safe to retry — callers MAY pass { idempotent: true } to
- *    opt into 5xx-retry; today the read-query call sites do not (they accept the
- *    8s timeout + 429 retry only), so a transient 5xx on a read fails closed.
+ *    but read-only and IS safe to retry — its read-query call sites (notion-writer
+ *    dedup lookups, source-health, health check, push-approved) pass
+ *    { idempotent: true } to opt into 5xx-retry. PATCH/GET are idempotent by the
+ *    method default, so writebacks retry too; only POST creates fail closed.
  *
  * Budget: keep timeoutMs * (maxRetries+1) well under the cron stage wall so a
  * Notion outage degrades the stage instead of re-triggering the timeout-poison.
@@ -64,12 +65,15 @@ export async function notionFetch(
     if (response.status === 429 && attempt < maxRetries) {
       const retryAfter = Number(response.headers.get("retry-after"));
       attempt += 1;
+      // Drain the discarded body so the socket can be reused (matches safeFetch).
+      await response.body?.cancel().catch(() => {});
       await wait(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_BACKOFF_MS) : backoffMs(attempt));
       continue;
     }
 
     if (response.status >= 500 && idempotent && attempt < maxRetries) {
       attempt += 1;
+      await response.body?.cancel().catch(() => {});
       await wait(backoffMs(attempt));
       continue;
     }

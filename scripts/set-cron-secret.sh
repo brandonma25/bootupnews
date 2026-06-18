@@ -14,9 +14,13 @@ fi
 
 export CRON_SECRET="$secret"
 
-# Write to temp file for Claude Code subprocess access
+# Write to temp file for Claude Code subprocess access.
+# Create it 0600 ATOMICALLY (umask 177 in a subshell) so there is no window
+# where the secret is world-readable between create and chmod. chmod after is a
+# belt-and-suspenders tighten in case the path pre-existed with looser perms.
 tmp_file="/tmp/.bootup_cron_secret"
-printf '%s' "$secret" > "$tmp_file"
+(umask 177; printf '%s' "$secret" > "$tmp_file")
 chmod 600 "$tmp_file"
 
-echo "CRON_SECRET exported (${#secret} chars). Temp file written to $tmp_file"
+# Do NOT print the secret or its length.
+echo "CRON_SECRET exported. Temp file written to $tmp_file"

@@ -123,6 +123,9 @@ async function queryQueueRowsForBriefingDate(
         page_size: 50,
       }),
     },
+    // Read-only query: safe to retry a transient 5xx instead of failing the
+    // health check (HTTP 500 here is the operator-paging trigger).
+    { idempotent: true },
   );
 
   if (!response.ok) {

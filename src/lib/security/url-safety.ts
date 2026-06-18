@@ -83,6 +83,10 @@ function isBlockedIpv6(ip: string): boolean {
   const normalized = ip.toLowerCase().replace(/^\[|\]$/g, "");
   if (normalized === "::1" || normalized === "::") return true;
   // IPv4-mapped, dotted form (::ffff:127.0.0.1) — extract and re-check as v4.
+  // This branch serves the DNS path (dns.lookup() can surface a dotted mapped
+  // address); the URL path never reaches it because new URL() normalizes the
+  // dotted form to hex (handled just below). Keep BOTH — they cover different
+  // input sources.
   const mappedDotted = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
   if (mappedDotted) return isBlockedIpv4(mappedDotted[1]!);
   // IPv4-mapped, hex form (URL normalizes ::ffff:127.0.0.1 -> ::ffff:7f00:1).

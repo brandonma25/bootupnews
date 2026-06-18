@@ -16,6 +16,7 @@ import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
 import { buildMatchedBriefing, persistRawArticles, syncEventClusters, syncTopicMatches } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { maskEmail } from "@/lib/security/mask-email";
 import { isSafePublicUrl } from "@/lib/security/url-safety";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 import { parseKeywordList } from "@/lib/topic-matching";
@@ -51,18 +52,6 @@ const credentialsSchema = z.object({
 });
 const accountCategorySchema = z.array(z.enum(["tech", "finance", "politics"])).min(1);
 const accountFeedUrlSchema = safePublicFeedUrl;
-
-// Avoid logging full email addresses (PII). Keep the domain for debuggability,
-// mask the local part: "brandon@x.com" -> "b***n@x.com".
-function maskEmail(email: string | null | undefined): string {
-  const value = (email ?? "").trim();
-  const at = value.indexOf("@");
-  if (at <= 0) return value ? "***" : "";
-  const local = value.slice(0, at);
-  const domain = value.slice(at + 1);
-  const maskedLocal = local.length <= 2 ? `${local[0] ?? ""}*` : `${local[0]}***${local[local.length - 1]}`;
-  return `${maskedLocal}@${domain}`;
-}
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type UserEventStateUpsert = {

@@ -158,8 +158,9 @@ export async function runEditorialStagesWithTiming(input: {
   const runStage = createTimedStageRunner({ stageRef, timer, routeName: input.routeName });
   // When the internal budget expires, abort the in-flight pipeline so the
   // newsletter stage hard-stops BEFORE its atomic candidate write (zero partial
-  // rows). The signal is forwarded only to the newsletter stage; rss/staging
-  // ignore it. The Promise.race rejection still drives the timeout finalize.
+  // rows) AND the editorial_staging stage breaks its Notion write loop at the
+  // deadline (stops dispatching new writes). Only the rss stage ignores the
+  // signal. The Promise.race rejection still drives the timeout finalize.
   const abortController = new AbortController();
 
   try {

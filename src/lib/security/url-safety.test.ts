@@ -60,6 +60,16 @@ describe("isBlockedIp", () => {
     expect(isBlockedIp("2606:4700:4700::1111")).toBe(false);
     expect(isBlockedIp("fd00::1")).toBe(true);
   });
+
+  it("blocks IPv4-mapped loopback/IMDS in BOTH the dotted (DNS path) and hex (URL path) forms", () => {
+    // Dotted form — as surfaced by dns.lookup().
+    expect(isBlockedIp("::ffff:127.0.0.1")).toBe(true);
+    expect(isBlockedIp("::ffff:169.254.169.254")).toBe(true);
+    // Hex form — as new URL() normalizes ::ffff:127.0.0.1 -> ::ffff:7f00:1.
+    expect(isBlockedIp("::ffff:7f00:1")).toBe(true);
+    // A public IPv4-mapped address must still pass.
+    expect(isBlockedIp("::ffff:8.8.8.8")).toBe(false);
+  });
 });
 
 describe("assertSafeToFetch (DNS layer)", () => {
