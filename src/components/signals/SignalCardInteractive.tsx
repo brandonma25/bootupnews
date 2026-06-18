@@ -73,7 +73,7 @@ export function SignalCardInteractive({
           {sourceAttribution}
         </p>
         <div className="flex shrink-0 items-center gap-3">
-          {sourceUrl ? (
+          {sourceUrl && /^https?:\/\//i.test(sourceUrl) ? (
             <a
               href={sourceUrl}
               target="_blank"

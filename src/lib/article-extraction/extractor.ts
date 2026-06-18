@@ -15,6 +15,7 @@
 import type { FeedArticle } from "@/lib/rss";
 import type { NormalizedArticle } from "@/lib/models/normalized-article";
 import type { SourceDefinition } from "@/lib/integration/subsystem-contracts";
+import { safeFetch } from "@/lib/security/url-safety";
 import {
   buildArticleSourceAccessibility,
   evaluateSourceAccessibilitySupport,
@@ -90,9 +91,11 @@ export async function fetchAndExtractBody(
   perFetchTimeoutMs: number,
 ): Promise<FetchExtractResult> {
   try {
-    const response = await fetch(url, {
+    // SSRF-hardened: the article URL derives from user-influenced feed content
+    // and the response BODY is persisted (data-returning SSRF). safeFetch
+    // validates the URL + each redirect hop against private/internal ranges.
+    const response = await safeFetch(url, {
       headers: ARTICLE_FETCH_HEADERS,
-      redirect: "follow",
       signal: AbortSignal.timeout(perFetchTimeoutMs),
     });
     if (!response.ok) return { ok: false, reason: "failed" };

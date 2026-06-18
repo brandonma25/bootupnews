@@ -1,5 +1,4 @@
 import { createHash } from "crypto";
-import { formatISO } from "date-fns";
 
 import {
   areMvpDefaultPublicSources,
@@ -46,7 +45,7 @@ import { withServerFallback } from "@/lib/server-safety";
 import { createSupabaseServerClient, safeGetUser } from "@/lib/supabase/server";
 import { buildTimelineGroups } from "@/lib/timeline-builder";
 import { matchTopicsForArticle } from "@/lib/topic-matching";
-import { getBriefingDateKey } from "@/lib/utils";
+import { getBriefingDateKey, getTaipeiDateKey } from "@/lib/utils";
 import type {
   BriefingItem,
   DailyBriefing,
@@ -244,7 +243,7 @@ const PUBLIC_BRIEFING_TEMPORARILY_UNAVAILABLE_MESSAGE =
 function createEmptyBriefing(): DailyBriefing {
   return {
     id: `generated-empty-${Date.now()}`,
-    briefingDate: formatISO(new Date()),
+    briefingDate: getTaipeiDateKey(),
     title: "Today's Briefing",
     intro: "No clustered events yet for your current topics. Try adjusting keywords or refreshing your briefing.",
     readingWindow: "0 minutes",
@@ -520,7 +519,7 @@ function buildEmptyPublicHomepageData(
   homepageCategoryArticles = createEmptyHomepageCategoryArticleMap(),
 ): DashboardData {
   const sources = getSourcesForPublicSurface("public.home");
-  const briefingDate = normalizeCalendarSafeBriefingDate(getBriefingDateKey(formatISO(new Date())));
+  const briefingDate = normalizeCalendarSafeBriefingDate(getBriefingDateKey(getTaipeiDateKey()));
 
   return {
     mode: "public",
@@ -559,7 +558,7 @@ async function buildPublicHomepageData(): Promise<DashboardData> {
   const briefingDateKey =
     firstBriefingDate && /^\d{4}-\d{2}-\d{2}$/.test(firstBriefingDate)
       ? firstBriefingDate
-      : getBriefingDateKey(formatISO(new Date()));
+      : getBriefingDateKey(getTaipeiDateKey());
   const briefingDate = normalizeCalendarSafeBriefingDate(briefingDateKey);
   const items = homepageSignalSnapshot.posts.map((post) =>
     mapHomepageSignalPostToBriefingItem(post, homepageSignalSnapshot.source),
@@ -1466,7 +1465,7 @@ export async function generateDailyBriefing(
     items.length > 0
       ? {
           id: `generated-${Date.now()}`,
-          briefingDate: formatISO(new Date()),
+          briefingDate: getTaipeiDateKey(),
           title: "Bootup News",
           intro: "A focused scan of the strongest signals moving right now.",
           readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,
@@ -2104,7 +2103,7 @@ export async function buildMatchedBriefing(
 
   return {
     id: `generated-${Date.now()}`,
-    briefingDate: formatISO(new Date()),
+    briefingDate: getTaipeiDateKey(),
     title: "Today's Briefing",
     intro: "Related reporting is clustered into events so you can scan developments instead of isolated articles.",
     readingWindow: `${items.reduce((sum, item) => sum + item.estimatedMinutes, 0)} minutes`,

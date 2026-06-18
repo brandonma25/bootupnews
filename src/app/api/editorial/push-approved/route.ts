@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { logServerEvent } from "@/lib/observability";
+import { secretsMatch } from "@/lib/security/secret-compare";
+import { notionFetch } from "@/lib/notion-fetch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -95,19 +97,27 @@ async function notionRequest(
   path: string,
   method: string,
   body?: unknown,
+  opts?: { idempotent?: boolean },
 ): Promise<unknown> {
   const token = process.env.NOTION_TOKEN?.trim();
   if (!token) throw new Error("NOTION_TOKEN is not configured.");
 
-  const response = await fetch(`https://api.notion.com/v1${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "Notion-Version": NOTION_API_VERSION,
+  const response = await notionFetch(
+    `https://api.notion.com/v1${path}`,
+    {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Notion-Version": NOTION_API_VERSION,
+      },
+      body: body ? JSON.stringify(body) : undefined,
     },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+    // Pass through undefined when unset so notionFetch keeps its method-based
+    // default (PATCH/GET idempotent, POST create not) — only the read query
+    // opts into idempotent:true explicitly.
+    { idempotent: opts?.idempotent },
+  );
 
   if (!response.ok) {
     const text = await response.text().catch(() => "(no body)");
@@ -126,15 +136,21 @@ async function queryNotionForApprovedRows(
   // rejected / held / killed / draft / needs_review rows are never even
   // candidates for the bridge. Re-running the bridge after writeback flips
   // Pushed=true is therefore a no-op for the same row.
-  const result = (await notionRequest(`/databases/${dbId}/query`, "POST", {
-    filter: {
-      and: [
-        { property: "Status", select: { equals: "approved" } },
-        { property: "Briefing Date", date: { equals: briefingDate } },
-        { property: "Pushed to Supabase", checkbox: { equals: false } },
-      ],
+  const result = (await notionRequest(
+    `/databases/${dbId}/query`,
+    "POST",
+    {
+      filter: {
+        and: [
+          { property: "Status", select: { equals: "approved" } },
+          { property: "Briefing Date", date: { equals: briefingDate } },
+          { property: "Pushed to Supabase", checkbox: { equals: false } },
+        ],
+      },
     },
-  })) as { results: NotionPage[] };
+    // Read-only query (a POST by Notion's API shape); safe to retry a transient 5xx.
+    { idempotent: true },
+  )) as { results: NotionPage[] };
 
   return result.results ?? [];
 }
@@ -151,6 +167,31 @@ async function markNotionRowPushed(
       },
     },
   });
+}
+
+/**
+ * R-1: the Supabase write commits BEFORE this Notion writeback runs. If the
+ * writeback throws, the row must NOT bubble to the catch as "failed" (which sets
+ * supabaseId:null and implies nothing was written). Swallow the error, log the
+ * orphan (supabaseId, pageId) for reconciliation, and let the caller report a
+ * *_writeback_pending status. notionFetch already retries the idempotent PATCH;
+ * a still-failing writeback leaves Pushed=false so a later run re-selects the row
+ * and the select-then-decide flow re-syncs it (dedup by briefing_date+source_url)
+ * rather than duplicating.
+ */
+async function markNotionRowPushedSafely(pageId: string, supabaseRowId: string): Promise<boolean> {
+  try {
+    await markNotionRowPushed(pageId, supabaseRowId);
+    return true;
+  } catch (error) {
+    logServerEvent("error", "Editorial push: Supabase write committed but Notion writeback failed (orphan; re-syncs next run)", {
+      route: "/api/editorial/push-approved",
+      notionPageId: pageId,
+      supabaseId: supabaseRowId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
 }
 
 /**
@@ -278,6 +319,8 @@ type PushRowStatus =
   | "skipped_missing_source_url"
   | "skipped_missing_slot"
   | "no_rank_slot"
+  | "inserted_writeback_pending"
+  | "overwrote_writeback_pending"
   | "failed";
 
 type PushRowResult = {
@@ -380,12 +423,16 @@ async function pushApprovedRow(
     // SKIP-V2: re-push of a row the bridge already wrote (provenance='llm').
     // Writeback IS called so the Notion row's Pushed flag flips true,
     // preventing future re-attempts. The Supabase content is left untouched.
+    // No new Supabase write commits here, so a failed writeback is purely
+    // self-healing: Pushed stays false → the row is re-selected and re-skipped
+    // next run (markNotionRowPushedSafely already logged the orphan).
     if (existing?.witm_draft_generated_by === "llm") {
-      await markNotionRowPushed(page.id, existing.id);
-      logServerEvent("info", "Editorial push: skipped — v2 row already exists; flipped Notion writeback", {
+      const v2WritebackOk = await markNotionRowPushedSafely(page.id, existing.id);
+      logServerEvent("info", "Editorial push: skipped — v2 row already exists", {
         headline: headline.slice(0, 60),
         notionPageId: page.id,
         existingId: existing.id,
+        notionWriteback: v2WritebackOk ? "flipped" : "pending (re-skips next run)",
       });
       return {
         headline,
@@ -507,20 +554,21 @@ async function pushApprovedRow(
       }
 
       const supabaseId = (updateResult.data as { id: string }).id;
-      await markNotionRowPushed(page.id, supabaseId);
+      const overwriteWritebackOk = await markNotionRowPushedSafely(page.id, supabaseId);
 
       logServerEvent("info", "Editorial push: overwrote legacy template row", {
         headline: headline.slice(0, 60),
         notionPageId: page.id,
         supabaseId,
         previousProvenance: existing.witm_draft_generated_by,
+        writebackOk: overwriteWritebackOk,
       });
 
       return {
         headline,
         notionPageId: page.id,
         supabaseId,
-        status: "overwrote_template",
+        status: overwriteWritebackOk ? "overwrote_template" : "overwrote_writeback_pending",
       };
     }
 
@@ -569,13 +617,13 @@ async function pushApprovedRow(
     }
 
     const supabaseId = (insertResult.data as { id: string }).id;
-    await markNotionRowPushed(page.id, supabaseId);
+    const insertWritebackOk = await markNotionRowPushedSafely(page.id, supabaseId);
 
     return {
       headline,
       notionPageId: page.id,
       supabaseId,
-      status: "inserted",
+      status: insertWritebackOk ? "inserted" : "inserted_writeback_pending",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -597,10 +645,24 @@ async function pushApprovedRow(
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const provided = url.searchParams.get("token")?.trim();
   const expected = process.env.EDITORIAL_PUSH_SECRET?.trim();
 
-  if (!expected || provided !== expected) {
+  // Prefer the header (keeps the secret out of access/proxy/Referer logs).
+  const headerSecret = request.headers.get("x-editorial-push-secret");
+  const querySecret = url.searchParams.get("token");
+
+  // DEPRECATED: query-string token leaks into logs. Still accepted so the manual
+  // trigger doesn't break, but every use logs a migration warning. Once the
+  // trigger uses the header (and EDITORIAL_PUSH_SECRET is rotated), drop this.
+  if (!headerSecret && querySecret) {
+    logServerEvent("warn", "Editorial push: secret supplied via DEPRECATED query string", {
+      route: "/api/editorial/push-approved",
+      migrateTo: "x-editorial-push-secret header (+ rotate EDITORIAL_PUSH_SECRET)",
+    });
+  }
+
+  const matches = secretsMatch(headerSecret, expected) || secretsMatch(querySecret, expected);
+  if (!matches) {
     logServerEvent("warn", "Editorial push: unauthorized request rejected", {
       route: "/api/editorial/push-approved",
       hasSecret: Boolean(expected),
@@ -660,6 +722,8 @@ export async function GET(request: Request) {
       skipped_missing_source_url: 0,
       skipped_missing_slot: 0,
       no_rank_slot: 0,
+      inserted_writeback_pending: 0,
+      overwrote_writeback_pending: 0,
       failed: 0,
     },
   );

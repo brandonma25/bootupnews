@@ -1,5 +1,6 @@
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { writeSourceHealthEntry } from "@/lib/observability/source-health-log";
+import { notionFetch } from "@/lib/notion-fetch";
 
 /**
  * RSS source circuit breaker (PRD-65 Phase 4.5).
@@ -69,7 +70,7 @@ async function getTodayFailCount(source: string, date: string): Promise<number> 
   if (!dbId || !token) return 0;
 
   try {
-    const response = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+    const response = await notionFetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -85,7 +86,11 @@ async function getTodayFailCount(source: string, date: string): Promise<number> 
         },
         page_size: 1,
       }),
-    });
+      // No retry on this per-source observability query — it runs once per source
+      // on the RSS hot path; the win here is the 8s timeout ceiling, not retries.
+      // maxRetries:0 also suppresses the default 429 retry (which isn't gated on
+      // idempotency) so a Notion rate-limit can't add backoff latency to ingestion.
+    }, { maxRetries: 0 });
     if (!response.ok) {
       logServerEvent("warn", "Circuit breaker query failed (permissive default applied)", {
         source,

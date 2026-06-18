@@ -161,6 +161,8 @@ function getHomepageAuthMessage(authState?: string) {
       return "The sign-in callback could not be completed. Try signing in again.";
     case "signup-error":
       return "We could not finish account creation. Try again.";
+    case "rate-limited":
+      return "Too many attempts. Please wait a minute and try again.";
     case "invalid":
       return "That sign-in attempt was not accepted. Try again.";
     case "config-error":

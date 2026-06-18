@@ -181,7 +181,7 @@ export function SignalCard({
             {relatedCoverage.map((source) => (
               <a
                 key={`${source.sourceName}-${source.url}-${source.title}`}
-                href={source.url}
+                href={isValidSourceUrl(source.url) ? source.url : undefined}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-start justify-between gap-3 rounded-[var(--bu-radius-md)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)] px-3 py-3 text-[var(--bu-size-meta)] leading-5 text-[var(--bu-text-primary)] transition-colors hover:border-[var(--bu-border-default)] hover:text-[var(--bu-accent)]"
@@ -201,12 +201,12 @@ export function SignalCard({
     </div>
   );
 
-  const sourceLinkNode = signal.sourceUrl ? (
+  const sourceLinkNode = isValidSourceUrl(signal.sourceUrl) ? (
     // Standalone external-link icon — matches the source-link affordance used
     // by category tab article rows so the card face exposes the original
     // article URL at first glance, not behind the Expand toggle.
     <a
-      href={signal.sourceUrl}
+      href={signal.sourceUrl ?? undefined}
       target="_blank"
       rel="noreferrer"
       aria-label={`Read source: ${signal.sourceName ?? "open original article"}`}

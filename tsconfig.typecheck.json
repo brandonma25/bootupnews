@@ -1,0 +1,6 @@
+{
+  "//": "Production type-safety gate. Checks src/ (and operational scripts/) but EXCLUDES *.test.* — the test-fixture type backlog (115 errors at introduction) is tracked separately and burned down before the signals-editorial.ts split (A-1) is ever attempted. See docs/engineering/bug-fixes/security-reliability-hardening-2026-06-18.md.",
+  "extends": "./tsconfig.json",
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx"]
+}

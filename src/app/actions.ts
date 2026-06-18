@@ -15,6 +15,9 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { bootstrapUserDefaults, seedDefaultTopics } from "@/lib/default-topics";
 import { buildMatchedBriefing, persistRawArticles, syncEventClusters, syncTopicMatches } from "@/lib/data";
 import { errorContext, logServerEvent } from "@/lib/observability";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { maskEmail } from "@/lib/security/mask-email";
+import { isSafePublicUrl } from "@/lib/security/url-safety";
 import { persistSignalPostsForBriefing } from "@/lib/signals-editorial";
 import { parseKeywordList } from "@/lib/topic-matching";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -27,9 +30,18 @@ const topicSchema = z.object({
   excludeKeywords: z.array(z.string().min(1)).default([]),
 });
 
+// SSRF guard at the add-source trust boundary: a feed URL must be a public
+// http(s) address (no internal/loopback/link-local IPs, no file://, no creds).
+// The fetch path re-validates with DNS resolution (see safeFetch).
+const safePublicFeedUrl = z
+  .url()
+  .refine((value) => isSafePublicUrl(value), {
+    message: "Feed URL must be a public http(s) address (private/internal addresses are not allowed).",
+  });
+
 const sourceSchema = z.object({
   name: z.string().min(2).max(60),
-  feedUrl: z.url(),
+  feedUrl: safePublicFeedUrl,
   homepageUrl: z.string().optional(),
   topicId: z.string().optional(),
 });
@@ -39,7 +51,7 @@ const credentialsSchema = z.object({
   password: z.string().min(8).max(72),
 });
 const accountCategorySchema = z.array(z.enum(["tech", "finance", "politics"])).min(1);
-const accountFeedUrlSchema = z.url();
+const accountFeedUrlSchema = safePublicFeedUrl;
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type UserEventStateUpsert = {
@@ -199,7 +211,7 @@ export async function requestMagicLinkAction(formData: FormData) {
   } catch (error) {
     logServerEvent("error", "Magic link request failed", {
       route: "/",
-      email,
+      email: maskEmail(email),
       ...errorContext(error),
     });
     redirect("/?auth=callback-error");
@@ -209,10 +221,21 @@ export async function requestMagicLinkAction(formData: FormData) {
 }
 
 export async function signUpWithPasswordAction(formData: FormData) {
-  const { email, password } = credentialsSchema.parse({
+  // Open signup + a transactional email per call = mailbomb / quota-burn primitive.
+  // Throttle per IP (best-effort, per-instance) before doing any work.
+  const signupHeaders = await headers();
+  if (!checkRateLimit(`signup:${getClientIp(signupHeaders)}`, 5, 10 * 60_000).ok) {
+    redirect("/?auth=rate-limited");
+  }
+
+  const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  if (!parsed.success) {
+    redirect("/?auth=invalid");
+  }
+  const { email, password } = parsed.data;
   const redirectTo = safePostAuthRedirectPath(formData.get("redirectTo")?.toString());
 
   if (!isSupabaseConfigured) {
@@ -236,7 +259,7 @@ export async function signUpWithPasswordAction(formData: FormData) {
     .catch((error) => {
       logServerEvent("error", "Password sign-up failed", {
         route: "/",
-        email,
+        email: maskEmail(email),
         ...errorContext(error),
       });
       redirect("/?auth=signup-error");
@@ -261,10 +284,21 @@ export async function signUpWithPasswordAction(formData: FormData) {
 }
 
 export async function signInWithPasswordAction(formData: FormData) {
-  const { email, password } = credentialsSchema.parse({
+  // Throttle password sign-in per IP — the credential-stuffing / brute-force
+  // target. A bit more lenient than signup (legit users mistype passwords).
+  const signinHeaders = await headers();
+  if (!checkRateLimit(`signin:${getClientIp(signinHeaders)}`, 10, 10 * 60_000).ok) {
+    redirect("/?auth=rate-limited");
+  }
+
+  const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  if (!parsed.success) {
+    redirect("/?auth=invalid");
+  }
+  const { email, password } = parsed.data;
   const redirectTo = safePostAuthRedirectPath(formData.get("redirectTo")?.toString());
 
   if (!isSupabaseConfigured) {
@@ -284,7 +318,7 @@ export async function signInWithPasswordAction(formData: FormData) {
     .catch((error) => {
       logServerEvent("error", "Password sign-in failed", {
         route: "/",
-        email,
+        email: maskEmail(email),
         ...errorContext(error),
       });
       redirect("/?auth=invalid");

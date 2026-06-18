@@ -1,3 +1,5 @@
+import { notionFetch } from "@/lib/notion-fetch";
+
 type Slot = "Core" | "Context";
 type Category = "Tech" | "Finance" | "Politics";
 
@@ -104,7 +106,7 @@ async function findExistingRow(
   token: string,
 ): Promise<NotionFindMatch | null> {
   const headlineForQuery = headline.slice(0, NOTION_TITLE_MAX);
-  const response = await fetch(
+  const response = await notionFetch(
     `https://api.notion.com/v1/databases/${notionDbId}/query`,
     {
       method: "POST",
@@ -123,6 +125,7 @@ async function findExistingRow(
         page_size: 5,
       }),
     },
+    { idempotent: true },
   );
 
   if (!response.ok) {
@@ -150,7 +153,7 @@ async function createRow(
   briefingDate: string,
   token: string,
 ): Promise<string> {
-  const response = await fetch(NOTION_PAGES_URL, {
+  const response = await notionFetch(NOTION_PAGES_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -195,7 +198,7 @@ async function updateRow(
 ): Promise<void> {
   // Do not overwrite Status — the row already exists at status=raw and we
   // never want a write to demote a row that may be about to be promoted.
-  const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+  const response = await notionFetch(`https://api.notion.com/v1/pages/${pageId}`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -261,7 +264,7 @@ async function findCrossDateMatch(
   const endISO = new Date(endMs).toISOString().slice(0, 10);
 
   const headlineForQuery = headline.slice(0, NOTION_TITLE_MAX);
-  const response = await fetch(
+  const response = await notionFetch(
     `https://api.notion.com/v1/databases/${notionDbId}/query`,
     {
       method: "POST",
@@ -281,6 +284,7 @@ async function findCrossDateMatch(
         page_size: 5,
       }),
     },
+    { idempotent: true },
   );
 
   if (!response.ok) {

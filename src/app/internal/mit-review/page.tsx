@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, Lock, ShieldCheck } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import { isVerifiedAdminUser } from "@/lib/admin-auth";
 import {
   MIT_INTERNAL_REVIEW_ROUTE,
   collectMitInternalReviewData,
@@ -25,7 +26,9 @@ export const metadata: Metadata = {
 export default async function MitReviewPage() {
   const { user } = await safeGetUser(MIT_INTERNAL_REVIEW_ROUTE);
 
-  if (!user) {
+  // Internal diagnostics (runtime source IDs, feed samples) — admin-only, matching
+  // every other internal surface. A logged-in non-admin must not see this.
+  if (!isVerifiedAdminUser(user)) {
     return <LockedInternalPage />;
   }
 

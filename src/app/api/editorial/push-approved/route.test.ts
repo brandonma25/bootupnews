@@ -188,6 +188,12 @@ type FetchInit = { method?: string; body?: string };
 type FetchCall = { url: string; init: FetchInit };
 let fetchCalls: FetchCall[] = [];
 let notionQueryResponse: unknown = { results: [] };
+// Status the Notion writeback PATCH returns. 200 = success. A non-2xx,
+// non-retryable status (e.g. 409) makes markNotionRowPushed throw on the FIRST
+// attempt (notionFetch only retries 429/5xx), so the writeback-pending branch is
+// exercised without the retry-backoff delay. notionFetch's retry logic itself is
+// covered separately in notion-fetch.test.ts.
+let notionPatchStatus = 200;
 
 function installFetchMock() {
   fetchCalls = [];
@@ -205,8 +211,8 @@ function installFetchMock() {
     }
     // Notion writeback PATCH.
     if (url.includes("/pages/") && initObj.method === "PATCH") {
-      return new Response(JSON.stringify({ id: "page-1" }), {
-        status: 200,
+      return new Response(JSON.stringify(notionPatchStatus === 200 ? { id: "page-1" } : { message: "writeback failed" }), {
+        status: notionPatchStatus,
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -216,6 +222,13 @@ function installFetchMock() {
 
 function buildRequest(token = "test-secret") {
   return new Request(`http://localhost:3000/api/editorial/push-approved?token=${token}`);
+}
+
+/** Auth via the preferred x-editorial-push-secret header, with NO query token. */
+function buildHeaderRequest(secret = "test-secret") {
+  return new Request("http://localhost:3000/api/editorial/push-approved", {
+    headers: { "x-editorial-push-secret": secret },
+  });
 }
 
 describe("/api/editorial/push-approved", () => {
@@ -228,6 +241,7 @@ describe("/api/editorial/push-approved", () => {
     delete process.env.EDITORIAL_DRAFTER_MODEL_ID;
     installFetchMock();
     notionQueryResponse = { results: [] };
+    notionPatchStatus = 200;
   });
 
   afterEach(() => {
@@ -660,6 +674,149 @@ describe("/api/editorial/push-approved", () => {
         expect.objectContaining({ property: "Pushed to Supabase", checkbox: { equals: false } }),
       ]),
     );
+  });
+
+  // R-1: the Supabase write commits BEFORE the Notion writeback. If the
+  // writeback fails, the row must report *_writeback_pending (NOT "failed") and
+  // KEEP its real committed supabase id — never null. A later run re-syncs it.
+  it("reports inserted_writeback_pending (with the real committed id) when the Notion writeback fails after an insert", async () => {
+    const supabase = buildSupabaseStub({ rows: [], nextId: 1 });
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
+    notionPatchStatus = 409; // writeback fails fast (non-retryable)
+
+    notionQueryResponse = {
+      results: [
+        buildNotionPage({
+          pageId: "notion-wb-1",
+          headline: "Writeback fails but row is committed",
+          sourceUrl: "https://reuters.com/wb-1",
+          sourceName: "Reuters",
+          slot: "Core",
+          signalAi: "Signal.",
+          editorialSource: "AI",
+        }),
+      ],
+    };
+
+    const { GET } = await import("@/app/api/editorial/push-approved/route");
+    const response = await GET(buildRequest());
+    const body = await response.json();
+
+    // The route still returns 200 — a writeback failure is a degrade, not a 500.
+    expect(response.status).toBe(200);
+    expect(body.counts.inserted_writeback_pending).toBe(1);
+    expect(body.counts.inserted).toBe(0);
+    expect(body.counts.failed).toBe(0);
+
+    // The Supabase row IS committed and the response carries its REAL id (not null).
+    expect(supabase._state.rows).toHaveLength(1);
+    const committedId = supabase._state.rows[0].id;
+    expect(committedId).toBeTruthy();
+    expect(body.rows[0].status).toBe("inserted_writeback_pending");
+    expect(body.rows[0].supabase_id).toBe(committedId);
+  });
+
+  it("reports overwrote_writeback_pending when the Notion writeback fails after a template overwrite", async () => {
+    const briefingDate = todayTaipei();
+    const sourceUrl = "https://example.com/wb-overwrite";
+    const templateRow: FakeSignalRow = {
+      id: "legacy-wb",
+      briefing_date: briefingDate,
+      rank: 4,
+      final_slate_rank: 2,
+      final_slate_tier: "core",
+      witm_draft_generated_by: "deterministic_template",
+      is_live: false,
+      source_url: sourceUrl,
+      title: "Templated placeholder",
+      ai_why_it_matters: "(Signal: Weak) Templated boilerplate.",
+      witm_draft_model: "heuristic_template_v1",
+      editorial_content_source: "ai",
+      editorial_status: "needs_review",
+    };
+    const supabase = buildSupabaseStub({ rows: [templateRow], nextId: 100 });
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
+    notionPatchStatus = 409;
+
+    notionQueryResponse = {
+      results: [
+        buildNotionPage({
+          pageId: "notion-wb-2",
+          headline: "Real headline",
+          sourceUrl,
+          sourceName: "Reuters",
+          slot: "Core",
+          signalAi: "Real LLM Signal.",
+          editorialSource: "AI",
+        }),
+      ],
+    };
+
+    const { GET } = await import("@/app/api/editorial/push-approved/route");
+    const response = await GET(buildRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.counts.overwrote_writeback_pending).toBe(1);
+    expect(body.counts.overwrote_template).toBe(0);
+    // The overwrite DID commit (content is the real LLM draft), id preserved.
+    expect(supabase._state.rows[0].id).toBe("legacy-wb");
+    expect(supabase._state.rows[0].ai_why_it_matters).toBe("Real LLM Signal.");
+    expect(body.rows[0].supabase_id).toBe("legacy-wb");
+  });
+
+  it("degrades-and-continues: a writeback failure on one row does not abort the batch", async () => {
+    const supabase = buildSupabaseStub({ rows: [], nextId: 1 });
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
+    notionPatchStatus = 409; // every writeback fails
+
+    notionQueryResponse = {
+      results: [
+        buildNotionPage({
+          pageId: "notion-batch-1",
+          headline: "First story",
+          sourceUrl: "https://reuters.com/batch-1",
+          sourceName: "Reuters",
+          slot: "Core",
+          signalAi: "Signal one.",
+          editorialSource: "AI",
+        }),
+        buildNotionPage({
+          pageId: "notion-batch-2",
+          headline: "Second story",
+          sourceUrl: "https://reuters.com/batch-2",
+          sourceName: "Reuters",
+          slot: "Core",
+          signalAi: "Signal two.",
+          editorialSource: "AI",
+        }),
+      ],
+    };
+
+    const { GET } = await import("@/app/api/editorial/push-approved/route");
+    const response = await GET(buildRequest());
+    const body = await response.json();
+
+    // BOTH rows processed + committed despite the first's writeback failing.
+    expect(response.status).toBe(200);
+    expect(body.counts.inserted_writeback_pending).toBe(2);
+    expect(supabase._state.rows).toHaveLength(2);
+    expect(body.rows.every((r: { supabase_id: string | null }) => r.supabase_id)).toBe(true);
+  });
+
+  it("authenticates via the x-editorial-push-secret header with no query token", async () => {
+    const supabase = buildSupabaseStub({ rows: [], nextId: 1 });
+    createSupabaseServiceRoleClient.mockReturnValue(supabase);
+
+    const { GET } = await import("@/app/api/editorial/push-approved/route");
+
+    // Correct secret in the header (no ?token=) → authorized.
+    const ok = await GET(buildHeaderRequest("test-secret"));
+    expect(ok.status).toBe(200);
+
+    // Wrong secret in the header → 401.
+    const bad = await GET(buildHeaderRequest("wrong-secret"));
+    expect(bad.status).toBe(401);
   });
 
   it("uses EDITORIAL_DRAFTER_MODEL_ID env override when set", async () => {

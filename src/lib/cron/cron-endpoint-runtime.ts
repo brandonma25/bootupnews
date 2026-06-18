@@ -15,6 +15,7 @@
 import * as Sentry from "@sentry/nextjs";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
+import { secretsMatch } from "@/lib/security/secret-compare";
 import {
   runEditorialIngestionPipeline,
   type EditorialPipelineResults,
@@ -37,13 +38,13 @@ export function isCronAuthorized(request: Request): boolean {
   if (!cronSecret) return false;
 
   const headerSecret = request.headers.get("x-cron-secret")?.trim() ?? "";
-  if (headerSecret === cronSecret) return true;
+  if (secretsMatch(headerSecret, cronSecret)) return true;
 
   // Rollback escape hatch: honor the legacy Vercel Cron `Authorization: Bearer`
   // header only when ALLOW_VERCEL_CRON_FALLBACK is explicitly enabled.
   if (process.env.ALLOW_VERCEL_CRON_FALLBACK === "true") {
     const authHeader = request.headers.get("authorization")?.trim() ?? "";
-    if (authHeader === `Bearer ${cronSecret}`) return true;
+    if (secretsMatch(authHeader, `Bearer ${cronSecret}`)) return true;
   }
 
   return false;
@@ -157,8 +158,9 @@ export async function runEditorialStagesWithTiming(input: {
   const runStage = createTimedStageRunner({ stageRef, timer, routeName: input.routeName });
   // When the internal budget expires, abort the in-flight pipeline so the
   // newsletter stage hard-stops BEFORE its atomic candidate write (zero partial
-  // rows). The signal is forwarded only to the newsletter stage; rss/staging
-  // ignore it. The Promise.race rejection still drives the timeout finalize.
+  // rows) AND the editorial_staging stage breaks its Notion write loop at the
+  // deadline (stops dispatching new writes). Only the rss stage ignores the
+  // signal. The Promise.race rejection still drives the timeout finalize.
   const abortController = new AbortController();
 
   try {

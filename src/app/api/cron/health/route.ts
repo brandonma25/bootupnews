@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { notionFetch } from "@/lib/notion-fetch";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
 import { writePipelineLogEntry, type PipelineLogStatus } from "@/lib/observability/pipeline-log";
+import { secretsMatch } from "@/lib/security/secret-compare";
 import { getRequiredSourcesForPublicSurface } from "@/lib/source-manifest";
 
 export const dynamic = "force-dynamic";
@@ -43,12 +45,12 @@ function isAuthorized(request: Request) {
   if (!cronSecret) return false;
 
   const headerSecret = request.headers.get("x-cron-secret")?.trim() ?? "";
-  if (headerSecret === cronSecret) return true;
+  if (secretsMatch(headerSecret, cronSecret)) return true;
 
   // Rollback escape hatch — matches the ingestion endpoint's contract.
   if (process.env.ALLOW_VERCEL_CRON_FALLBACK === "true") {
     const authHeader = request.headers.get("authorization")?.trim() ?? "";
-    if (authHeader === `Bearer ${cronSecret}`) return true;
+    if (secretsMatch(authHeader, `Bearer ${cronSecret}`)) return true;
   }
 
   return false;
@@ -102,7 +104,7 @@ async function queryQueueRowsForBriefingDate(
   token: string,
   briefingDate: string,
 ): Promise<QueueRowSnapshot[]> {
-  const response = await fetch(
+  const response = await notionFetch(
     `https://api.notion.com/v1/databases/${notionDbId}/query`,
     {
       method: "POST",
@@ -121,6 +123,9 @@ async function queryQueueRowsForBriefingDate(
         page_size: 50,
       }),
     },
+    // Read-only query: safe to retry a transient 5xx instead of failing the
+    // health check (HTTP 500 here is the operator-paging trigger).
+    { idempotent: true },
   );
 
   if (!response.ok) {

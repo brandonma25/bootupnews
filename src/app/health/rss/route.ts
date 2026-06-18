@@ -5,6 +5,7 @@ import {
   captureRssHealthFailureIfNeeded,
   getRssHealthSnapshot,
 } from "@/lib/observability/rss";
+import { isCronAuthorized } from "@/lib/cron/cron-endpoint-runtime";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ type SignalPostHealthRow = {
   published_at: string | null;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   const persisted = await loadPersistedRssFreshness();
   const snapshot = getRssHealthSnapshot({
     persistedLastSuccessfulFetchAt: persisted.lastSuccessfulFetchAt,
@@ -24,15 +25,26 @@ export async function GET() {
 
   captureRssHealthFailureIfNeeded(snapshot);
 
+  // Public probes get only the coarse status (enough for uptime checks).
+  // The internal freshness detail (stale/failed feed counts, fetch time, failure
+  // list) is gated behind the cron secret so an anon caller can't fingerprint
+  // pipeline state.
+  const authorized = isCronAuthorized(request);
+  const detail = authorized
+    ? {
+        rssBootOk: snapshot.rssBootOk,
+        lastSuccessfulFetchAt: snapshot.lastSuccessfulFetchAt,
+        staleFeedsCount: snapshot.staleFeedsCount,
+        failedFeedsCount: snapshot.failedFeedsCount,
+        criticalFailure: snapshot.criticalFailure,
+        failures: snapshot.failures,
+      }
+    : {};
+
   return NextResponse.json(
     {
       status: snapshot.status,
-      rssBootOk: snapshot.rssBootOk,
-      lastSuccessfulFetchAt: snapshot.lastSuccessfulFetchAt,
-      staleFeedsCount: snapshot.staleFeedsCount,
-      failedFeedsCount: snapshot.failedFeedsCount,
-      criticalFailure: snapshot.criticalFailure,
-      failures: snapshot.failures,
+      ...detail,
     },
     {
       status: snapshot.status === "failed" ? 503 : 200,

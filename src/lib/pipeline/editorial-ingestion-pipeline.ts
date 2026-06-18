@@ -81,9 +81,13 @@ export async function runEditorialIngestionPipeline(options: {
   /** Stage subset to run, in prod order. Defaults to all three. */
   stages?: EditorialPipelineStageName[];
   /**
-   * Internal-timeout AbortSignal from the cron endpoint. Forwarded to the
-   * newsletter stage so its atomic candidate write is skipped on timeout
-   * (the slate is never left half-written). Ignored by rss/staging.
+   * Internal-timeout AbortSignal from the cron endpoint. Forwarded to:
+   *   - newsletter — skips its atomic candidate write on timeout (the slate is
+   *     never left half-written), and
+   *   - editorial_staging — breaks the Notion write loop at the deadline
+   *     (see runEditorialStaging), so staging stops dispatching new writes
+   *     instead of grinding to the 60s hard-kill.
+   * Only the rss stage ignores it.
    */
   signal?: AbortSignal;
 }): Promise<EditorialPipelineResults> {
@@ -107,7 +111,7 @@ export async function runEditorialIngestionPipeline(options: {
 
   if (stages.includes("editorial_staging")) {
     results.editorialStaging = await runStage("editorial_staging", () =>
-      runEditorialStaging({ dryRun, now }),
+      runEditorialStaging({ dryRun, now, signal: options.signal }),
     );
   }
 

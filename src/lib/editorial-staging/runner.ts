@@ -249,6 +249,13 @@ export async function runEditorialStaging(options: {
    * candidate reads + Notion dedup-lookup reads still happen. Zero writes.
    */
   dryRun?: boolean;
+  /**
+   * The cron's internal-timeout AbortSignal. When the 55s wall fires, the
+   * staging loop stops dispatching new Notion writes (instead of grinding
+   * through all candidates until Vercel's 60s hard-kill). Per-row writes stay
+   * idempotent (insert|update|skip), so a partial run self-heals on the next tick.
+   */
+  signal?: AbortSignal;
 } = {}): Promise<EditorialStagingRunResult> {
   const now = options.now ?? new Date();
   const dryRun = options.dryRun ?? false;
@@ -343,6 +350,22 @@ export async function runEditorialStaging(options: {
   const crossDateSkippedSample: Array<{ headline: string; existingBriefingDate?: string }> = [];
 
   for (const candidate of selected) {
+    // Stop dispatching new Notion writes once the run's deadline fires — the
+    // in-flight write is already bounded by notionFetch's per-call timeout, so
+    // the stage ends near the 55s wall instead of relying on the 60s hard-kill.
+    if (options.signal?.aborted) {
+      logServerEvent("warn", "Editorial staging: stopped at run deadline (abort signal)", {
+        briefingDate,
+        stagedSoFar: notionRowsInserted + notionRowsUpdated,
+        remaining:
+          selected.length -
+          (notionRowsInserted +
+            notionRowsUpdated +
+            notionRowsSkippedDuplicateAcrossDates +
+            notionRowsSkippedHumanEdited),
+      });
+      break;
+    }
     try {
       const result = await writeEditorialQueueRow({ candidate, briefingDate, notionDbId, dryRun });
       if (result.action === "inserted") notionRowsInserted += 1;

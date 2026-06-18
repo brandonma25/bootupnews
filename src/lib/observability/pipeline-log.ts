@@ -1,4 +1,5 @@
 import { captureExceptionSafe, captureMessageSafe } from "@/lib/sentry-config";
+import { notionFetch } from "@/lib/notion-fetch";
 
 import { errorContext, logServerEvent } from "@/lib/observability";
 
@@ -138,7 +139,7 @@ export async function writePipelineLogEntry(
   };
 
   try {
-    const response = await fetch(NOTION_PAGES_URL, {
+    const response = await notionFetch(NOTION_PAGES_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
