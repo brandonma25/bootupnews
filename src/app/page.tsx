@@ -33,6 +33,14 @@ export const metadata: Metadata = {
   },
 };
 
+// Always render the homepage from the live published signal set, like
+// `/signals`. Without this the homepage is cached/statically rendered and can
+// serve a stale slate — e.g. if a deploy lands moments before the day's slate
+// is published, the build-time render captures the pre-publish (empty) state
+// and the edge cache keeps serving it. force-dynamic keeps it always-fresh.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function Page({ searchParams }: PageProps) {
   // Keep homepage SSR on persisted read models only. Do not route this page
   // through the ingestion pipeline or feed parser import chain.

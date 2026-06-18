@@ -35,8 +35,9 @@ type PersonalizedDashboardProps = {
   isAiConfigured: boolean;
 };
 
-const MAX_DISPLAY_SIGNALS = 5;
-const CORE_SIGNAL_COUNT = 3;
+// PRD-36 (amended): 7 ranked signals — 5 Core ("Signal") + 2 Context.
+const MAX_DISPLAY_SIGNALS = 7;
+const CORE_SIGNAL_COUNT = 5;
 
 export default function PersonalizedDashboard({
   searchParams: params,
@@ -177,7 +178,7 @@ export default function PersonalizedDashboard({
             </h2>
             <p className="mt-2 text-base text-[var(--text-secondary)]">
               {isSignedIn
-                ? "The main dashboard now stays intentionally brief: a maximum of five ranked signals, with the top three framed as Core Signals and the next two framed as Context Signals."
+                ? "The main dashboard now stays intentionally brief: a maximum of seven ranked signals, with the top five framed as Core Signals and the next two framed as Context Signals."
                 : "Preview the ranked public briefing here, then sign in to unlock personalized topics, saved history, custom alerts, and the complete dashboard workflow."}
             </p>
           </Panel>
@@ -266,7 +267,7 @@ export default function PersonalizedDashboard({
                   Today&apos;s signal briefing
                 </h2>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  The dashboard renders at most five ranked signals. Core Signals come first, followed by up to two Context Signals.
+                  The dashboard renders at most seven ranked signals. Core Signals come first, followed by up to two Context Signals.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -292,7 +293,7 @@ export default function PersonalizedDashboard({
                   {coreSignals.length ? (
                     <SignalTierSection
                       title="Core Signals"
-                      description="The three highest-ranked signals on the dashboard right now."
+                      description="The five highest-ranked signals on the dashboard right now."
                       items={coreSignals}
                       tier="core"
                       personalizationProfile={personalizationProfile}

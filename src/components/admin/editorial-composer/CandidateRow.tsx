@@ -12,21 +12,31 @@ type CandidateRowProps = {
   candidate: EditorialSignalPost;
   openSlots: number[];
   storageReady: boolean;
-  onAssign: (postId: string, slotId: string) => Promise<void>;
+  onInclude: (postId: string) => Promise<void>;
+  onRemove: (postId: string) => Promise<void>;
 };
 
 export function CandidateRow({
   candidate,
   openSlots,
   storageReady,
-  onAssign,
+  onInclude,
+  onRemove,
 }: CandidateRowProps) {
   const [rewriteOpen, setRewriteOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const requiresRewrite = candidate.whyItMattersValidationStatus === "requires_human_rewrite";
-  const canAssign = isCandidateAssignable(candidate, storageReady) && !requiresRewrite;
+  const isIncluded = candidate.finalSlateRank !== null;
+  const slateFull = openSlots.length === 0;
+  // Pick → Publish: "Include" assigns the next open slot AND approves the card
+  // in one click. Disabled for rewrite-required / non-assignable cards and when
+  // the 7-slot slate is full.
+  const canInclude =
+    isCandidateAssignable(candidate, storageReady) && !requiresRewrite && !slateFull;
   const status = getCandidateStatus(candidate);
-  const witmBody = getCandidateWitmBody(candidate);
+  const signalBody = getCandidateSignalBody(candidate);
+  const beforeThisBody = getCandidateBeforeThisBody(candidate);
+  const rippleBody = getCandidateRippleBody(candidate);
 
   return (
     <article className="rounded-[var(--bu-radius-lg)] border border-[var(--bu-border-subtle)] bg-[var(--bu-bg-surface)] p-[var(--bu-space-4)]">
@@ -43,55 +53,83 @@ export function CandidateRow({
             {candidate.title}
           </h3>
 
-          <p
-            className={cn(
-              "mt-2 font-heading text-[var(--bu-size-meta)] leading-[1.5] text-[var(--bu-text-secondary)]",
-              requiresRewrite && "italic text-[var(--bu-text-tertiary)]",
-            )}
-          >
-            {requiresRewrite
-              ? "Template placeholder language detected. WITM requires editorial rewrite before this candidate is publishable."
-              : witmBody}
-          </p>
+          {/* Three-layer at-a-glance preview (read-only), mirroring the
+              editor and the Notion three-layer view in the fixed order
+              The Signal → Before This → The Ripple. Each layer sources from
+              the same fields the editor reads (edited_* → published_* →
+              ai_*). The Signal keeps the WITM rewrite-gate placeholder. */}
+          <div className="mt-3 space-y-[var(--bu-space-3)]">
+            <CardLayerPreview
+              label="The Signal"
+              body={requiresRewrite ? "" : signalBody}
+              emptyText={
+                requiresRewrite
+                  ? "Template placeholder language detected. WITM requires editorial rewrite before this candidate is publishable."
+                  : "No WITM draft available."
+              }
+            />
+            <CardLayerPreview
+              label="Before This"
+              body={beforeThisBody}
+              emptyText="No Before This draft yet."
+            />
+            <CardLayerPreview
+              label="The Ripple"
+              body={rippleBody}
+              emptyText="No Ripple draft yet."
+            />
+          </div>
         </div>
 
         <div className="space-y-[var(--bu-space-2)]">
-          <label htmlFor={`slot-${candidate.id}`} className="sr-only">
-            Assign {candidate.title} to a slot
-          </label>
-          <select
-            id={`slot-${candidate.id}`}
-            value=""
-            disabled={!canAssign || isPending}
-            className="w-full rounded-[var(--bu-radius-md)] border border-[var(--bu-border-default)] bg-[var(--bu-bg-surface)] px-2 py-2 text-[var(--bu-size-meta)] text-[var(--bu-text-primary)] disabled:text-[var(--bu-text-tertiary)]"
-            onChange={(event) => {
-              const slotId = event.target.value;
-              if (!slotId) {
-                return;
-              }
-
-              startTransition(() => {
-                void onAssign(candidate.id, slotId);
-              });
-            }}
-          >
-            <option value="">
-              {requiresRewrite ? "Blocked · rewrite first" : candidate.finalSlateRank ? "Assigned" : "Assign to slot…"}
-            </option>
-            {openSlots.map((slot) => (
-              <option key={slot} value={slot}>
-                {formatSlotLabel(slot).replace(" slot ", " ")}
-              </option>
-            ))}
-          </select>
+          {isIncluded ? (
+            <>
+              <p
+                className="rounded-[var(--bu-radius-md)] border border-[var(--bu-border-default)] bg-[var(--bu-bg-subtle)] px-2 py-2 text-center text-[var(--bu-size-meta)] font-medium text-[var(--bu-text-primary)]"
+                data-testid={`slot-assignment-${candidate.id}`}
+              >
+                {candidate.finalSlateRank
+                  ? formatSlotLabel(candidate.finalSlateRank).replace(" slot ", " ")
+                  : "Included"}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full px-3 text-[var(--bu-size-meta)]"
+                disabled={!storageReady || isPending}
+                aria-label={`Remove ${candidate.title} from the slate`}
+                onClick={() => {
+                  startTransition(() => {
+                    void onRemove(candidate.id);
+                  });
+                }}
+              >
+                Remove
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              className="w-full px-3 text-[var(--bu-size-meta)]"
+              disabled={!canInclude || isPending}
+              aria-label={`Include ${candidate.title} in the slate`}
+              onClick={() => {
+                startTransition(() => {
+                  void onInclude(candidate.id);
+                });
+              }}
+            >
+              {requiresRewrite ? "Rewrite first" : slateFull ? "Slate full" : "Include"}
+            </Button>
+          )}
 
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             className="w-full px-3 text-[var(--bu-size-meta)]"
             onClick={() => setRewriteOpen((value) => !value)}
           >
-            {requiresRewrite ? "Open rewrite" : "Rewrite WITM"}
+            {rewriteOpen ? "Close editor" : requiresRewrite ? "Open rewrite" : "Edit"}
           </Button>
         </div>
       </div>
@@ -132,12 +170,62 @@ function getCandidateStatus(candidate: EditorialSignalPost) {
   return "failed" as const;
 }
 
-function getCandidateWitmBody(candidate: EditorialSignalPost) {
+// At-a-glance layer bodies. Same precedence the card has always used for
+// WITM (edited_* → published_* → ai_*); returns "" when every source is
+// empty so CardLayerPreview can render the labeled empty state. NEVER reads
+// the human_* override — that is a bridge-only field, not an editorial layer.
+function getCandidateSignalBody(candidate: EditorialSignalPost) {
   return (
     candidate.editedWhyItMatters ||
     candidate.publishedWhyItMatters ||
     candidate.aiWhyItMatters ||
-    "No WITM draft available."
+    ""
+  );
+}
+
+function getCandidateBeforeThisBody(candidate: EditorialSignalPost) {
+  return (
+    candidate.editedWhatLedToIt ||
+    candidate.publishedWhatLedToIt ||
+    candidate.aiWhatLedToIt ||
+    ""
+  );
+}
+
+function getCandidateRippleBody(candidate: EditorialSignalPost) {
+  return (
+    candidate.editedWhatItConnectsTo ||
+    candidate.publishedWhatItConnectsTo ||
+    candidate.aiWhatItConnectsTo ||
+    ""
+  );
+}
+
+function CardLayerPreview({
+  label,
+  body,
+  emptyText,
+}: {
+  label: string;
+  body: string;
+  emptyText: string;
+}) {
+  const hasBody = body.trim().length > 0;
+
+  return (
+    <div className="min-w-0">
+      <p className="text-[var(--bu-size-micro)] font-medium uppercase tracking-[0.08em] text-[var(--bu-text-tertiary)]">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 font-heading text-[var(--bu-size-meta)] leading-[1.5] line-clamp-2",
+          hasBody ? "text-[var(--bu-text-secondary)]" : "italic text-[var(--bu-text-tertiary)]",
+        )}
+      >
+        {hasBody ? body : emptyText}
+      </p>
+    </div>
   );
 }
 

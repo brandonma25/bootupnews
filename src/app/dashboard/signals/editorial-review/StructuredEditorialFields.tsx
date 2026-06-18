@@ -1,26 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
-  CheckCircle2,
+  Check,
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Loader2,
   RefreshCw,
   RotateCcw,
-  Save,
 } from "lucide-react";
 
 import {
-  approveSignalPostAction,
+  autosaveSignalDraftAction,
   holdSignalPostAction,
   rejectSignalPostAction,
   republishLiveSignalPostAction,
   requestRewriteAction,
   resetSignalPostToAiDraftAction,
-  saveSignalDraftAction,
 } from "@/app/dashboard/signals/editorial-review/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +34,7 @@ import {
   normalizeEditorialWhyItMattersContent,
   type EditorialWhyItMattersContent,
 } from "@/lib/editorial-content";
+import { registerAutosaveFlusher } from "@/lib/editorial-autosave-coordinator";
 import type { EditorialSignalPost } from "@/lib/signals-editorial";
 
 type StructuredEditorialFieldsProps = {
@@ -63,6 +63,13 @@ type StructuredEditorialFieldsProps = {
    * break; the next scoped cleanup can drop it.
    */
   eligibleForApproveAll: boolean;
+  /**
+   * Whether autosave is allowed for this card (Pick → Publish workflow).
+   * False for non-persisted cards, when storage is unavailable, or for
+   * currently-live-published cards (those use the Re-publish path). When
+   * false the editor shows no autosave indicator and never writes.
+   */
+  canAutosave?: boolean;
 };
 
 type SignalPostEditorProps = {
@@ -200,33 +207,13 @@ export function SignalPostEditor({ post, storageReady, defaultExpanded = false }
             initialEditedWhatLedToIt={initialEditedWhatLedToIt}
             initialEditedWhatItConnectsTo={initialEditedWhatItConnectsTo}
             eligibleForApproveAll={eligibleForApproveAll}
+            canAutosave={!controlsDisabled && !isCurrentlyLivePublished}
           />
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="submit"
-              formAction={saveSignalDraftAction}
-              variant="secondary"
-              disabled={controlsDisabled}
-              className="gap-2"
-            >
-              <Save className="h-4 w-4" />
-              Save Edits
-            </Button>
-            {/* #282 Approve hidden on currently-live-published cards
-                — see isCurrentlyLivePublished comment. Re-publish is
-                the safe path. */}
-            {isCurrentlyLivePublished ? null : (
-              <Button
-                type="submit"
-                formAction={approveSignalPostAction}
-                disabled={controlsDisabled}
-                className="gap-2"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Approve
-              </Button>
-            )}
+            {/* Pick → Publish: approval now happens via the card's "Include"
+                toggle (assign slot + approve in one click), so the standalone
+                Approve button is gone. Live cards still use Re-publish. */}
             <Button
               type="submit"
               formAction={resetSignalPostToAiDraftAction}
@@ -326,6 +313,7 @@ export function StructuredEditorialFields({
   // Vestigial after the bulk-approve refactor; see prop docs above.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   eligibleForApproveAll: _eligibleForApproveAll,
+  canAutosave = false,
 }: StructuredEditorialFieldsProps) {
   const initialContent =
     structuredContent ?? createEditorialContentFromLegacyText(legacyText || aiWhyItMatters);
@@ -363,8 +351,88 @@ export function StructuredEditorialFields({
   );
   const structuredJson = JSON.stringify(content);
 
+  // Autosave (Pick → Publish): debounce edits to the three layers ~1.5s after
+  // typing stops, and flush when focus leaves the editor. Replaces the manual
+  // "Save Edits" button; writes via the quiet autosave action (no page
+  // refresh). No-op when canAutosave is false (live-published cards, etc.).
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const hasAutosaveMountedRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestEditsRef = useRef({ fullEditorialText, content, editedWhatLedToIt, editedWhatItConnectsTo });
+  useEffect(() => {
+    latestEditsRef.current = { fullEditorialText, content, editedWhatLedToIt, editedWhatItConnectsTo };
+  });
+
+  // Flush now: cancel any pending debounce and persist the latest edits
+  // immediately. Awaited by Include / Publish via the autosave coordinator so
+  // those actions never read stale edited_* (closes the type-then-Include race).
+  const flushAutosave = useCallback(async () => {
+    if (!canAutosave) {
+      return;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const snapshot = latestEditsRef.current;
+    setAutosaveStatus("saving");
+    try {
+      const result = await autosaveSignalDraftAction({
+        postId,
+        editedWhyItMatters: snapshot.fullEditorialText,
+        editedWhyItMattersStructured: snapshot.content,
+        editedWhatLedToIt: snapshot.editedWhatLedToIt,
+        editedWhatItConnectsTo: snapshot.editedWhatItConnectsTo,
+      });
+      setAutosaveStatus(result.ok ? "saved" : "error");
+    } catch {
+      setAutosaveStatus("error");
+    }
+  }, [canAutosave, postId]);
+
+  // Register this card's flush so Include / Publish can drain the pending
+  // autosave before they read persisted content. Self-unregisters on unmount.
+  useEffect(() => {
+    if (!canAutosave) {
+      return;
+    }
+    return registerAutosaveFlusher(postId, flushAutosave);
+  }, [canAutosave, postId, flushAutosave]);
+
+  useEffect(() => {
+    if (!canAutosave) {
+      return;
+    }
+    if (!hasAutosaveMountedRef.current) {
+      // Skip the initial render — only autosave actual edits.
+      hasAutosaveMountedRef.current = true;
+      return;
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      void flushAutosave();
+    }, 1500);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [canAutosave, flushAutosave, fullEditorialText, structuredJson, editedWhatLedToIt, editedWhatItConnectsTo]);
+
   return (
-    <div className="space-y-5">
+    <div
+      className="space-y-5"
+      onBlur={(event) => {
+        // Flush immediately when focus leaves the whole editor (not when
+        // tabbing between fields inside it).
+        if (!canAutosave || !hasAutosaveMountedRef.current) {
+          return;
+        }
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          return;
+        }
+        void flushAutosave();
+      }}
+    >
       <input
         type="hidden"
         name="editedWhyItMatters"
@@ -392,6 +460,37 @@ export function StructuredEditorialFields({
         readOnly
       />
 
+      {canAutosave ? (
+        <p
+          className="flex items-center gap-1.5 text-[var(--bu-size-micro)] text-[var(--text-secondary)]"
+          aria-live="polite"
+          data-testid={`autosave-status-${postId}`}
+        >
+          {autosaveStatus === "saving" ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+            </>
+          ) : autosaveStatus === "saved" ? (
+            <>
+              <Check className="h-3.5 w-3.5" /> Saved
+            </>
+          ) : autosaveStatus === "error" ? (
+            <span className="text-[var(--bu-status-danger-text)]">
+              Couldn’t save — keep editing to retry.
+            </span>
+          ) : (
+            "Edits save automatically."
+          )}
+        </p>
+      ) : null}
+
+      {/* The Signal — the lead editorial layer (why it matters). The rich
+          structured editor below composes the homepage teaser/expanded
+          payload; its hidden inputs (above) save to edited_why_it_matters. */}
+      <LayerHeading
+        title="The Signal"
+        help="Why it matters — the lead layer. Saves to edited_why_it_matters and is promoted to published_why_it_matters on publish. The homepage teaser and expanded view render from this layer."
+      />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
         <div className="space-y-4">
           <FieldBlock
@@ -529,12 +628,14 @@ export function StructuredEditorialFields({
       {/* #274 Before This + The Ripple. Simple textareas, no structured
           editor — the publish gate writes both the text and a
           legacy-text-derived payload to published_what_*. The editor can
-          clear either layer by emptying the textarea before saving. */}
-      <div className="grid gap-4 lg:grid-cols-2">
+          clear either layer by emptying the textarea before saving.
+          Presented as two labeled peer sections after The Signal, so the
+          three layers read in order: The Signal → Before This → The Ripple. */}
+      <div className="border-t border-[var(--border)] pt-5">
         <FieldBlock
           id={`editedWhatLedToIt-${postId}`}
-          label="Before This (what led to this)"
-          help="Causal / preceding context. Promoted to published_what_led_to_it on publish. Leave empty to suppress the layer from the public foldback."
+          label="Before This"
+          help="Causal / preceding context (what led to this). Saves to edited_what_led_to_it; promoted to published_what_led_to_it on publish. Leave empty to suppress the layer from the public foldback."
         >
           <textarea
             id={`editedWhatLedToIt-${postId}`}
@@ -544,10 +645,12 @@ export function StructuredEditorialFields({
             className="w-full resize-y rounded-card border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm leading-6 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
           />
         </FieldBlock>
+      </div>
+      <div className="border-t border-[var(--border)] pt-5">
         <FieldBlock
           id={`editedWhatItConnectsTo-${postId}`}
-          label="The Ripple (what it connects to)"
-          help="Trajectory / downstream implications. Promoted to published_what_it_connects_to on publish. Leave empty to suppress the layer from the public foldback."
+          label="The Ripple"
+          help="Trajectory / downstream implications (what it connects to). Saves to edited_what_it_connects_to; promoted to published_what_it_connects_to on publish. Leave empty to suppress the layer from the public foldback."
         >
           <textarea
             id={`editedWhatItConnectsTo-${postId}`}
@@ -580,6 +683,22 @@ function FieldBlock({
       </label>
       <span className="mt-1 block text-sm leading-6 text-[var(--text-secondary)]">{help}</span>
       <span className="mt-2 block">{children}</span>
+    </div>
+  );
+}
+
+/**
+ * Section heading for a top-level editorial layer. Mirrors FieldBlock's
+ * label + help typography so the three layers — The Signal, Before This,
+ * The Ripple — read as uniform peer sections. Used for The Signal, which
+ * wraps a composite editor rather than a single labelled input; Before
+ * This / The Ripple reuse FieldBlock directly.
+ */
+function LayerHeading({ title, help }: { title: string; help: string }) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
+      <span className="mt-1 block text-sm leading-6 text-[var(--text-secondary)]">{help}</span>
     </div>
   );
 }

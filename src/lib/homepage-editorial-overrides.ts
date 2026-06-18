@@ -146,10 +146,16 @@ export async function getPublishedHomepageEditorialOverrides(): Promise<
     .filter((row) => {
       const publicRank = getPublicSlateRank(row);
 
-      return Boolean(publicRank && publicRank <= 5 && (!row.final_slate_tier || row.final_slate_tier === "core"));
+      return Boolean(
+        publicRank &&
+          publicRank <= 7 &&
+          (!row.final_slate_tier ||
+            row.final_slate_tier === "core" ||
+            row.final_slate_tier === "context"),
+      );
     })
     .sort((left, right) => (getPublicSlateRank(left) ?? 99) - (getPublicSlateRank(right) ?? 99))
-    .slice(0, 5)
+    .slice(0, 7)
     .map((row) => ({
       title: normalizeEditorialText(row.title),
       sourceUrl: normalizeEditorialText(row.source_url),

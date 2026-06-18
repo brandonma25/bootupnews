@@ -129,7 +129,9 @@ export type HomepageViewModel = {
   debug: HomepageDebugModel;
 };
 
-export const HOMEPAGE_TOP_EVENTS_LIMIT = 5;
+// PRD-36 (amended): the public homepage shows the full final slate —
+// 5 core ("Signal", ranks 1-5) + 2 context ("Context", ranks 6-7) = 7.
+export const HOMEPAGE_TOP_EVENTS_LIMIT = 7;
 
 /**
  * Canonical selection of the homepage's top Signal Cards: featured first, then
@@ -882,7 +884,7 @@ function selectTopVisibleEvents(
   const baselineIds = new Set(candidates.slice(0, limit).map((event) => event.id));
   const featuredCoreCount = featured?.signalRole === "core" ? 1 : 0;
   const featuredContextCount = featured?.signalRole === "context" ? 1 : 0;
-  const targetCoreCount = Math.max(0, Math.min(limit, 3 - featuredCoreCount));
+  const targetCoreCount = Math.max(0, Math.min(limit, 5 - featuredCoreCount));
   const targetContextCount = Math.max(0, Math.min(limit - targetCoreCount, 2 - featuredContextCount));
 
   const coreSelection = selectDistinctEvents(

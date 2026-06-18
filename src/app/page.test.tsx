@@ -133,4 +133,10 @@ describe("homepage SSR auth snapshot", () => {
       }),
     );
   }, 10000);
+
+  it("renders the homepage dynamically so it never serves a stale published slate", async () => {
+    const pageModule = await import("@/app/page");
+    expect(pageModule.dynamic).toBe("force-dynamic");
+    expect(pageModule.revalidate).toBe(0);
+  });
 });

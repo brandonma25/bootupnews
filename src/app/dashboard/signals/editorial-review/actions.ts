@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import {
   normalizeEditorialWhyItMattersContent,
   parseEditorialWhyItMattersContent,
+  type EditorialWhyItMattersContent,
 } from "@/lib/editorial-content";
 import {
   PUBLIC_SIGNALS_ROUTE,
@@ -14,6 +15,7 @@ import {
   approveSignalPosts,
   assignSignalPostToFinalSlateSlot,
   holdSignalPost,
+  includeSignalPostInSlate,
   publishApprovedSignals,
   publishSignalPost,
   rejectSignalPost,
@@ -102,6 +104,31 @@ export async function saveSignalDraftAction(formData: FormData) {
   }
 
   redirectWithResult(result);
+}
+
+/**
+ * Quiet autosave for the three editorial layers (Pick → Publish workflow).
+ * Persists edited_* via saveSignalDraft but intentionally does NOT revalidate
+ * — autosave runs while the editor is typing, so a full-page refresh would
+ * steal focus and flicker. It returns the mutation result so the client can
+ * show a "Saving / Saved / Couldn't save" indicator. The composer reads fresh
+ * edited_* on its next natural navigation (Include / Publish), so skipping
+ * revalidation here is safe. Replaces the manual "Save Edits" button.
+ */
+export async function autosaveSignalDraftAction(input: {
+  postId: string;
+  editedWhyItMatters: string;
+  editedWhyItMattersStructured: EditorialWhyItMattersContent | null;
+  editedWhatLedToIt: string;
+  editedWhatItConnectsTo: string;
+}): Promise<EditorialMutationResult> {
+  return saveSignalDraft({
+    postId: input.postId,
+    editedWhyItMatters: input.editedWhyItMatters,
+    editedWhyItMattersStructured: input.editedWhyItMattersStructured,
+    editedWhatLedToIt: input.editedWhatLedToIt,
+    editedWhatItConnectsTo: input.editedWhatItConnectsTo,
+  });
 }
 
 export async function approveSignalPostAction(formData: FormData) {
@@ -289,6 +316,38 @@ export async function assignFinalSlateSlotInlineAction(postId: string, finalSlat
 
   if (result.ok) {
     revalidateEditorialReviewRoute();
+  }
+
+  return result;
+}
+
+/**
+ * Include a card in the slate (Pick → Publish): assign the given slot AND
+ * approve in one step. Called by the CandidateRow "Include" toggle, which
+ * picks the lowest open rank. Returns the result so the client can surface
+ * an inline error (e.g. WITM rewrite required) without a full navigation.
+ */
+export async function includeCardInSlateAction(postId: string, finalSlateRank: number) {
+  const result = await includeSignalPostInSlate({ postId, finalSlateRank });
+
+  if (result.ok) {
+    revalidateEditorialRoutes();
+  }
+
+  return result;
+}
+
+/**
+ * Remove a card from the slate (Pick → Publish "Remove"). Clears the slot
+ * assignment; the card stays `approved` but unassigned, so the publish gate
+ * (which only acts on slot-assigned rows) excludes it. Re-including re-approves
+ * idempotently.
+ */
+export async function removeCardFromSlateInlineAction(postId: string) {
+  const result = await removeSignalPostFromFinalSlate({ postId });
+
+  if (result.ok) {
+    revalidateEditorialRoutes();
   }
 
   return result;

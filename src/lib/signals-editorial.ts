@@ -173,7 +173,8 @@ const PUBLISHED_SLATE_ITEM_SELECT = PUBLISHED_SLATE_ITEM_REQUIRED_COLUMNS.join("
 
 const EDITORIAL_PAGE_SIZE = 20;
 const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
-const TOP_SIGNAL_SET_SIZE = 5;
+// The full public slate size (PRD-36 amended): 5 core + 2 context = 7.
+const TOP_SIGNAL_SET_SIZE = 7;
 // signal_posts.rank CHECK is `between 1 and 20`; append mode caps post-max ranks here.
 const SIGNAL_POST_RANK_MAX = 20;
 const CONTEXT_SIGNAL_SET_SIZE = 2;
@@ -2341,13 +2342,13 @@ export async function getEditorialReviewState(
 }
 
 function getEditorialStorageWarning(postCount: number, scope: EditorialScopeFilter) {
-  if (postCount < 5) {
+  if (postCount < FINAL_SLATE_MAX_PUBLIC_ROWS) {
     return scope === "historical"
       ? `Editorial archive currently has ${postCount} matching historical signal posts.`
       : `Editorial storage currently has ${postCount} matching signal posts. Publishing requires a validated ${FINAL_SLATE_MIN_PUBLIC_ROWS}-${FINAL_SLATE_MAX_PUBLIC_ROWS} row final slate.`;
   }
 
-  if (postCount > 5 && scope === "all") {
+  if (postCount > FINAL_SLATE_MAX_PUBLIC_ROWS && scope === "all") {
     return `Editorial storage has ${postCount} matching signal posts. This page is paginated; publishing still uses only the latest validated final slate.`;
   }
 
@@ -3088,6 +3089,141 @@ export async function holdSignalPost(input: {
     ok: true,
     code: "decision_updated",
     message: "Held row as editorial evidence and removed it from the draft final slate.",
+  };
+}
+
+/**
+ * Include a candidate in the public slate (Pick → Publish workflow): assign it
+ * to a final-slate slot AND approve it in one atomic update. Because edits now
+ * autosave to edited_* continuously, "approve" only flips the editorial status,
+ * stamps the audit fields, and sets the slot — it never re-writes content.
+ * This is the keystone of the one-click Include toggle that replaced the
+ * separate Assign + Approve + Bulk-approve controls. All gates run BEFORE the
+ * single write, so a rejected/WITM-failing/live row never lands a partial
+ * state. The publish gate and publish action are unchanged: included cards are
+ * `approved` + slot-assigned, exactly what readiness already requires.
+ */
+export async function includeSignalPostInSlate(input: {
+  postId: string;
+  finalSlateRank: number;
+  route?: string;
+}): Promise<EditorialMutationResult> {
+  const context = await getAdminEditorialContext(input.route ?? SIGNALS_EDITORIAL_ROUTE);
+
+  if (!context.ok) {
+    return { ok: false, code: context.code, message: context.message };
+  }
+
+  if (!isFinalSlateRank(input.finalSlateRank)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Choose a Core slot 1-5 or Context slot 6-7.",
+    };
+  }
+
+  const schemaPreflight = await getSignalPostsSchemaPreflight(context.client);
+
+  if (!schemaPreflight.ok) {
+    return { ok: false, code: "storage_unavailable", message: schemaPreflight.message };
+  }
+
+  const lookup = await context.client
+    .from("signal_posts")
+    .select(
+      "id, source_url, edited_why_it_matters, published_why_it_matters, ai_why_it_matters, editorial_status, editorial_decision, is_live, published_at",
+    )
+    .eq("id", input.postId)
+    .maybeSingle();
+
+  if (lookup.error || !lookup.data) {
+    return { ok: false, code: "not_found", message: "The signal post could not be found." };
+  }
+
+  const post = lookup.data as Pick<
+    StoredSignalPost,
+    | "id"
+    | "source_url"
+    | "edited_why_it_matters"
+    | "published_why_it_matters"
+    | "ai_why_it_matters"
+    | "editorial_status"
+    | "editorial_decision"
+    | "is_live"
+    | "published_at"
+  >;
+
+  if (post.is_live || post.editorial_status === "published" || post.published_at) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Live or already published rows cannot be included in the draft slate. Use Re-publish to update a live card.",
+    };
+  }
+
+  if (isBlockingEditorialDecision(post.editorial_decision)) {
+    return {
+      ok: false,
+      code: "publish_blocked",
+      message: "Rejected, held, rewrite-requested, or removed rows cannot be included in the slate.",
+    };
+  }
+
+  if (!isValidPublicSourceUrl(post.source_url)) {
+    return {
+      ok: false,
+      code: "missing_public_source_url",
+      message: buildMissingPublicSourceUrlMessage("final-slate assignment"),
+    };
+  }
+
+  const editorialText = normalizeEditorialText(
+    post.edited_why_it_matters ?? post.published_why_it_matters ?? post.ai_why_it_matters ?? "",
+  );
+
+  if (!editorialText) {
+    return {
+      ok: false,
+      code: "empty_editorial_text",
+      message: "Add editorial Why it matters text before including this card.",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const validation = validateWhyItMatters(editorialText);
+
+  if (!validation.passed) {
+    return { ok: false, code: "publish_blocked", message: getValidationFailureMessage(validation) };
+  }
+
+  const tier = getFinalSlateTierForRank(input.finalSlateRank);
+  const updateResult = await context.client
+    .from("signal_posts")
+    .update({
+      editorial_status: "approved",
+      editorial_decision: "approved",
+      decision_note: null,
+      rejected_reason: null,
+      held_reason: null,
+      ...buildWhyItMattersValidationFields(validation, now),
+      reviewed_by: context.user.email ?? null,
+      reviewed_at: now,
+      approved_by: context.user.email ?? null,
+      approved_at: now,
+      final_slate_rank: input.finalSlateRank,
+      final_slate_tier: tier,
+      updated_at: now,
+    })
+    .eq("id", input.postId);
+
+  if (updateResult.error) {
+    return { ok: false, code: "storage_error", message: "The card could not be included in the slate." };
+  }
+
+  return {
+    ok: true,
+    code: "approved",
+    message: `Included in ${tier === "context" ? "Context" : "Core"} slot ${input.finalSlateRank}.`,
   };
 }
 
