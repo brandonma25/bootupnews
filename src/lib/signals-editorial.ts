@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 
 import { isVerifiedAdminUser } from "@/lib/admin-auth";
+import { getTaipeiDateKey } from "@/lib/utils";
 import {
   buildEditorialWhyItMattersText,
   createEditorialContentFromLegacyText,
@@ -4400,7 +4401,9 @@ export async function getHomepageSignalSnapshot(input: { today?: Date } = {}): P
     };
   }
 
-  const todayKey = input.today?.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+  // Compare in Taipei (the zone briefing_date is keyed to), else a slate published
+  // today reads as "recent_published" (stale notice) during the 16:00–24:00 UTC window.
+  const todayKey = getTaipeiDateKey(input.today ?? new Date());
   const snapshot = await loadPublicHomepageSnapshotFast(supabase, PUBLIC_SIGNAL_SET_SIZE);
   const posts = snapshot.posts.slice(0, TOP_SIGNAL_SET_SIZE);
 
