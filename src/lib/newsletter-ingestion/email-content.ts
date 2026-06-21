@@ -51,12 +51,44 @@ function splitHeadersAndBody(raw: string): ParsedMimePart {
   return { headers, body };
 }
 
-function decodeQuotedPrintable(value: string) {
-  return value
-    .replace(/=\n/g, "")
-    .replace(/=([0-9a-f]{2})/gi, (_match, hex: string) =>
-      String.fromCharCode(Number.parseInt(hex, 16)),
-    );
+// Decode quoted-printable into RAW BYTES. The previous implementation decoded
+// each =XX escape with String.fromCharCode, treating every byte as its own Latin-1
+// code point — so multi-byte UTF-8 (smart quotes, em dashes, accents) came out as
+// mojibake ("Semaforâ€™s"). Buffering the bytes lets the caller re-decode them with
+// the part's declared charset.
+function decodeQuotedPrintableToBytes(value: string): Buffer {
+  const withoutSoftBreaks = value.replace(/=\r?\n/g, "");
+  const bytes: number[] = [];
+
+  for (let index = 0; index < withoutSoftBreaks.length; index += 1) {
+    const char = withoutSoftBreaks[index]!;
+
+    if (char === "=" && index + 2 < withoutSoftBreaks.length) {
+      const hex = withoutSoftBreaks.slice(index + 1, index + 3);
+      if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+        bytes.push(Number.parseInt(hex, 16));
+        index += 2;
+        continue;
+      }
+    }
+
+    // QP literal chars are printable ASCII; mask to a single byte defensively.
+    bytes.push(char.charCodeAt(0) & 0xff);
+  }
+
+  return Buffer.from(bytes);
+}
+
+// Decode raw bytes using a MIME charset label. Defaults to utf-8 and falls back to
+// utf-8 for an unknown/unsupported label rather than throwing. WHATWG maps
+// iso-8859-1 -> windows-1252, so both labels decode 0x92 -> U+2019, etc.
+function decodeBytesWithCharset(bytes: Buffer, charset: string | undefined): string {
+  const label = (charset ?? "").toLowerCase().trim() || "utf-8";
+  try {
+    return new TextDecoder(label).decode(bytes);
+  } catch {
+    return new TextDecoder("utf-8").decode(bytes);
+  }
 }
 
 function decodeMimeWord(value: string) {
@@ -70,10 +102,13 @@ function decodeMimeWord(value: string) {
       }
 
       if (encoding.toLowerCase() === "b") {
-        return Buffer.from(encoded, "base64").toString("utf8");
+        return decodeBytesWithCharset(Buffer.from(encoded, "base64"), normalizedCharset);
       }
 
-      return decodeQuotedPrintable(encoded.replace(/_/g, " "));
+      return decodeBytesWithCharset(
+        decodeQuotedPrintableToBytes(encoded.replace(/_/g, " ")),
+        normalizedCharset,
+      );
     },
   );
 }
@@ -97,17 +132,20 @@ function getHeaderParams(headerValue: string | undefined) {
   return { value, params };
 }
 
-function decodePartBody(body: string, transferEncoding: string | undefined) {
+export function decodePartBody(body: string, transferEncoding: string | undefined, charset?: string) {
   const encoding = (transferEncoding ?? "").toLowerCase();
 
   if (encoding === "base64") {
-    return Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8");
+    return decodeBytesWithCharset(Buffer.from(body.replace(/\s+/g, ""), "base64"), charset);
   }
 
   if (encoding === "quoted-printable") {
-    return decodeQuotedPrintable(body);
+    return decodeBytesWithCharset(decodeQuotedPrintableToBytes(body), charset);
   }
 
+  // 7bit / 8bit / none: the raw MIME was already read as utf-8 upstream
+  // (decodeGmailRawMessage), so the body is text. A non-utf-8 8bit part is a rare
+  // edge that would need re-reading the source bytes — out of scope here.
   return body;
 }
 
@@ -165,6 +203,7 @@ function normalizeContentText(value: string) {
 function collectTextParts(part: ParsedMimePart): string[] {
   const contentType = getHeaderParams(part.headers["content-type"]);
   const transferEncoding = part.headers["content-transfer-encoding"];
+  const charset = contentType.params.charset;
 
   if (contentType.value.startsWith("multipart/")) {
     const boundary = contentType.params.boundary;
@@ -179,11 +218,11 @@ function collectTextParts(part: ParsedMimePart): string[] {
   }
 
   if (contentType.value === "text/plain" || (!contentType.value && part.body.trim())) {
-    return [decodePartBody(part.body, transferEncoding)];
+    return [decodePartBody(part.body, transferEncoding, charset)];
   }
 
   if (contentType.value === "text/html") {
-    return [htmlToTextWithLinks(decodePartBody(part.body, transferEncoding))];
+    return [htmlToTextWithLinks(decodePartBody(part.body, transferEncoding, charset))];
   }
 
   return [];

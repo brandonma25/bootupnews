@@ -57,6 +57,9 @@ const TRACKING_HOST_PATTERNS = [
   "ctrk.klclick.com",
   ".rs6.net",                 // Constant Contact wrapper
   ".everestengagement.com",   // 1440 / Everest open-tracker (join1440.everestengagement.com)
+  "tracking.tldrnewsletter.com", // TLDR click-tracker
+  "refer.tldr.tech",          // TLDR referral wrapper
+  ".tldrnewsletter.com",      // TLDR tracker root
 ];
 
 /**

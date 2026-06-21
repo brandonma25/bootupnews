@@ -142,17 +142,39 @@ function normalizeLine(value: string) {
 }
 
 /**
+ * Strip leading list-marker / enumerator / badge-glyph noise that segmentation
+ * leaves glued to the front of a real Semafor/TLDR headline, e.g.
+ *   "▪ 2 2 Fed holds rates in Warsh's first meeting" → "Fed holds rates …"
+ * (the "▪"/decoded badge and Semafor's doubled item number "2 2").
+ *
+ * Conservative by construction — only strips:
+ *  - leading symbol/icon RUNS that are followed by whitespace (so a real leading
+ *    smart-quote like "'We Proved …'" or an accented first letter "Émigré …" is
+ *    NOT stripped — there is no space after it), and
+ *  - a leading DOUBLED number ("2 2 ") — Semafor's signature, never a lone "5
+ *    things to know".
+ */
+export function stripLeadingEnumeratorNoise(headline: string): string {
+  return headline
+    .replace(/^(?:[^\w\s]+\s+)+/u, "")
+    .replace(/^(\d{1,3})\s+\1\s+/u, "")
+    .trim();
+}
+
+/**
  * Strip URL / angle-bracket / parenthetical link wrappers out of a chosen
- * headline so a real title is never stored with a tracking link glued on.
+ * headline so a real title is never stored with a tracking link glued on, then
+ * remove leading enumerator/badge noise (see stripLeadingEnumeratorNoise).
  */
 function cleanHeadline(line: string): string {
-  return normalizeText(
+  const withoutLinkWrappers = normalizeText(
     line
       .replace(/\(\s*https?:\/\/[^\s)]+\s*\)/giu, " ")
       .replace(/<\s*https?:\/\/[^\s>]+\s*>/giu, " ")
       .replace(/https?:\/\/[^\s)<>"'\]]+/giu, " ")
       .replace(/\[\s*\]|\(\s*\)|<\s*>/gu, " "),
   ).trim();
+  return stripLeadingEnumeratorNoise(withoutLinkWrappers);
 }
 
 function detectNewsletterFormat(input: NewsletterStoryExtractionInput): NewsletterFormat {
@@ -202,6 +224,28 @@ function getSourceDomain(sourceUrl: string | null) {
   }
 }
 
+/**
+ * Tracking / PII query params to strip from a stored source URL. `?email=<user>`
+ * is the Semafor share-link's per-recipient tracker — storing it leaks a
+ * subscriber's email into source_url AND defeats cross-recipient dedupe. utm_*
+ * and the common ESP click params are removed for the same reasons.
+ */
+const TRACKING_QUERY_PARAMS = new Set([
+  "email",
+  "e",
+  "mc_eid",
+  "mc_cid",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "_hsenc",
+  "_hsmi",
+  "vgo_ee",
+]);
+
 function normalizeUrl(value: string | null | undefined) {
   const url = value?.trim().replace(/[.,;:!?]+$/u, "") ?? "";
 
@@ -211,7 +255,20 @@ function normalizeUrl(value: string | null | undefined) {
 
   try {
     const parsed = new URL(url);
-    return /^https?:$/i.test(parsed.protocol) ? parsed.toString() : null;
+    if (!/^https?:$/i.test(parsed.protocol)) {
+      return null;
+    }
+    // Strip PII/tracking params (no network call). NOTE: opaque redirect links
+    // like semafor.com/s/<id> still resolve to their real destination only via a
+    // live HEAD-follow, which is out of scope here (SSRF surface + 55s budget) —
+    // the chrome filter drops the chrome rows that carried these, and the deny-
+    // list in url-filtering rejects the pure trackers.
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (TRACKING_QUERY_PARAMS.has(key.toLowerCase())) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
   } catch {
     return null;
   }
