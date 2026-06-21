@@ -12,10 +12,14 @@ and chrome stored as headlines (subscribe CTAs, photo credits, mastheads, sectio
 
 **B1 — charset-aware MIME decode** (`email-content.ts`). `decodeQuotedPrintable` decoded each
 `=XX` byte with `String.fromCharCode`, mangling multi-byte UTF-8. Replaced with
-`decodeQuotedPrintableToBytes` (buffers raw bytes) + `decodeBytesWithCharset` (TextDecoder for
-the part's declared charset; utf-8/windows-1252/iso-8859-1; default + fallback utf-8). The
-part `Content-Type` charset is now threaded `collectTextParts → decodePartBody`. base64 + the
-MIME encoded-word (`=?charset?Q?…?=`) decoders fixed the same way.
+`decodeQuotedPrintableToBytes` (buffers raw bytes) + `decodeBytesWithCharset`, decoded by the
+part's declared charset. **ICU-independent** (CI/serverless Node may be small-ICU, where
+`new TextDecoder("windows-1252")` throws and a utf-8 fallback re-mangles smart quotes): utf-8
+uses `Buffer.toString("utf8")`; iso-8859-1/latin1/windows-1252 use a built-in
+`decodeWindows1252` (latin-1 + a static `0x80–0x9F` table); only exotic charsets try
+`TextDecoder` (utf-8 fallback). The part `Content-Type` charset is threaded
+`collectTextParts → decodePartBody`. base64 + the MIME encoded-word (`=?charset?Q?…?=`)
+decoders fixed the same way.
 
 **B2 — segmentation** (`parser.ts`). `stripLeadingEnumeratorNoise` (run in `cleanHeadline`)
 strips leading symbol/badge RUNS followed by whitespace and Semafor's DOUBLED item number
