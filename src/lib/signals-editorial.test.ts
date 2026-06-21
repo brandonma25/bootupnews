@@ -1821,6 +1821,90 @@ describe("signals editorial workflow", () => {
     expect(rssRows.map((row) => row.rank).sort((a, b) => Number(a) - Number(b))).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
+  // PR-A GATE (FK scope) — published_slate_items.signal_post_id is ON DELETE
+  // RESTRICT. A referenced row must NEVER be an eviction target; the next-lowest
+  // UNPROTECTED row is evicted instead. (The mock has no FKs, so this scope check
+  // is what protects prod — not the constraint.)
+  it("never evicts a published_slate_items-referenced row; drops the next-lowest unprotected instead", async () => {
+    // 14 movable rows → band capacity 13 → 1 overflow. rank 14 = lowest signal AND
+    // FK-protected; rank 13 = next-lowest, unprotected.
+    const rows = Array.from({ length: 14 }, (_, index) =>
+      createRow({
+        id: `newsletter-${index + 1}`,
+        briefing_date: "2026-06-19",
+        rank: index + 1,
+        title: `Newsletter Candidate ${index + 1}`,
+        selection_reason: "Newsletter discovery candidate; BM review required.",
+        editorial_status: "needs_review",
+        final_slate_rank: null,
+        final_slate_tier: null,
+        editorial_decision: "pending_review",
+        is_live: false,
+        published_at: null,
+        signal_score: index + 1 === 14 ? 10 : index + 1 === 13 ? 20 : 90,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock(rows, {
+        publishedSlateItems: [createPublishedSlateItemRow({ signal_post_id: "newsletter-14" })],
+      }),
+    );
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-06-19",
+      items: Array.from({ length: 7 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    expect(result.ok).toBe(true);
+    const survivingIds = new Set(rows.map((row) => row.id));
+    // Protected lowest-signal row survives; next-lowest UNPROTECTED row was evicted.
+    expect(survivingIds.has("newsletter-14")).toBe(true);
+    expect(survivingIds.has("newsletter-13")).toBe(false);
+  });
+
+  // PR-A GATE (graceful degrade) — if a delete still throws (23503) the run must
+  // COMPLETE, leave the row in place, and never return ok:false-with-no-change.
+  it("degrades when an eviction delete throws (FK 23503): completes, leaves the row, never bails", async () => {
+    const rows = Array.from({ length: 14 }, (_, index) =>
+      createRow({
+        id: `newsletter-${index + 1}`,
+        briefing_date: "2026-06-19",
+        rank: index + 1,
+        title: `Newsletter Candidate ${index + 1}`,
+        selection_reason: "Newsletter discovery candidate; BM review required.",
+        editorial_status: "needs_review",
+        final_slate_rank: null,
+        final_slate_tier: null,
+        editorial_decision: "pending_review",
+        is_live: false,
+        published_at: null,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(
+      createSupabaseMock(rows, {
+        deleteErrors: {
+          signal_posts:
+            'update or delete on table "signal_posts" violates foreign key constraint "published_slate_items_signal_post_id_fkey" (SQLSTATE 23503)',
+        },
+      }),
+    );
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-06-19",
+      items: Array.from({ length: 7 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    // Run completes; the old ok:false-with-no-change bug must NOT resurface.
+    expect(result.ok).toBe(true);
+    expect(result.message ?? "").not.toContain("could not evict");
+    expect(result.message ?? "").not.toContain("No rows were changed");
+    // The eviction target's delete failed, so the row is LEFT in place (not lost).
+    const newsletterRows = rows.filter((row) => row.title.startsWith("Newsletter Candidate"));
+    expect(newsletterRows).toHaveLength(14);
+  });
+
   it("append mode adds only new-URL items at POST-MAX ranks without churning existing rows (CRON-2)", async () => {
     // Today's existing slate from the 12:00 main run: ranks 1-2 (one already approved).
     const rows = [

@@ -31,5 +31,36 @@ Code-only; **no migration**.
 ## Known behavior to confirm in verification
 When RSS provides **more than 7** items AND newsletter is **sparse** (< 13 rows), RSS fills the band slots newsletter didn't use (e.g. 5 newsletter → ranks 8–12, RSS → 1–7 and 13–20). The **public slate (top 7) is still entirely RSS**; newsletter stays below the cut. This retains more RSS discovery candidates than capping RSS at 7. If strict "RSS owns only 1–7, newsletter owns all of 8–20" is preferred, that is a small follow-up (cap RSS candidates at `RSS_RESERVED_TOP_RANKS`) — deferred per the locked PR2 scope (two changes only).
 
+## PR-A — harden the eviction against the RESTRICT FK (added to this branch)
+**Problem:** the relocation-side degrade DELETEs excess newsletter rows, but
+`published_slate_items.signal_post_id → signal_posts(id)` is **ON DELETE RESTRICT**.
+A delete targeting a referenced row throws **23503**; the test harness uses a mock
+db with no FKs, so the green suite cannot catch it. (Today's blast radius is low —
+`published_slate_items` references only briefing_dates ≤ June 9 — but re-restaging
+any published date would throw and could abort the reservation.)
+
+**Fix (two layers in `reserveNewsletterCandidateRanksForRssSnapshot`):**
+1. **FK-safe scope** — `fetchFkProtectedSignalPostIds` queries `published_slate_items`
+   for the movable candidate ids; a referenced row is **never** an eviction target.
+   Only the lowest-signal **unprotected** rows are dropped to make room; protected
+   rows are always kept (relocated, never deleted). Fails **safe**: if the reference
+   check itself errors, every candidate is treated as protected (evict none).
+2. **Belt-and-suspenders** — each delete is guarded; a 23503 / any error is caught,
+   the row is **left in place + logged**, and the reservation **continues** (never
+   `ok:false`-with-no-change). Free band ranks are recomputed **after** eviction, so
+   a skipped delete can never become a relocation target (no 23505).
+
+**Tests (use the harness's `publishedSlateItems` + `deleteErrors` hooks):**
+- FK scope: a `published_slate_items`-referenced row is excluded from eviction; the
+  next-lowest unprotected row is evicted instead.
+- Graceful degrade: inject a 23503 on the delete → run completes, the row remains,
+  never `ok:false`-no-change.
+- All 7 original #327 gates still green.
+
+Full suite **1142 passing** (was 1140 at #327); typecheck 0; lint clean. No migration.
+
+**Did NOT touch:** the publish path / cockpit / render / `published_*`/`edited_*`
+columns / `final_slate_rank` assignment / validation logic. Ingestion-staging only.
+
 ## Scope
-Stacked fix, PR2 of the newsletter-quality stack. PR3 (newsletter content quality: charset decode + chrome filter) is hygiene layered on top and is **not** in this PR.
+Stacked fix, PR2 of the newsletter-quality stack + its FK safety guard (PR-A). PR3 (newsletter content quality: charset decode + chrome filter) is hygiene layered on top and is **not** in this PR.
