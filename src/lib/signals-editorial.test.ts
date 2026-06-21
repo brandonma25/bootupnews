@@ -1703,8 +1703,122 @@ describe("signals editorial workflow", () => {
     const rssRows = rows.filter((row) => row.title.startsWith("Generated Signal"));
     const newsletterRows = rows.filter((row) => row.title.startsWith("Newsletter Candidate"));
     expect(rssRows).toHaveLength(15);
-    expect(rssRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
-    expect(newsletterRows.map((row) => row.rank)).toEqual([16, 17, 18, 19, 20]);
+    // PR2: the 5 newsletter rows (originally ranks 1-5, inside the RSS-reserved
+    // top) are relocated DOWN into the discovery band, floor-first (8..12). RSS
+    // takes the reserved top (1-7) plus the band slots newsletter didn't use (13-20).
+    expect(rssRows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 13, 14, 15, 16, 17, 18, 19, 20]);
+    expect(newsletterRows.map((row) => row.rank)).toEqual([8, 9, 10, 11, 12]);
+  });
+
+  // PR2 GATE — the 06-18/19 failure: a 20-row newsletter flood. The OLD reserve
+  // fn could not fit 20 movable rows and returned ok:false / "No rows were
+  // changed", leaving newsletter in ranks 1-20 and starving RSS. It must now
+  // DEGRADE: confine newsletter to the 13-slot band (8..20), DELETE the excess,
+  // and free ranks 1-7 for RSS.
+  it("degrades a 20-row newsletter flood: confines to ranks 8-20, deletes the excess, frees 1-7 for RSS", async () => {
+    const rows = Array.from({ length: 20 }, (_, index) =>
+      createRow({
+        id: `newsletter-${index + 1}`,
+        briefing_date: "2026-06-19",
+        rank: index + 1,
+        title: `Newsletter Candidate ${index + 1}`,
+        selection_reason: "Newsletter discovery candidate; BM review required.",
+        editorial_status: "needs_review",
+        final_slate_rank: null,
+        final_slate_tier: null,
+        editorial_decision: "pending_review",
+        is_live: false,
+        published_at: null,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-06-19",
+      items: Array.from({ length: 7 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    // Degrades, never the old ok:false-with-no-change.
+    expect(result.ok).toBe(true);
+    expect(result.message).not.toContain("No rows were changed");
+
+    const rssRows = rows.filter((row) => row.title.startsWith("Generated Signal"));
+    const newsletterRows = rows.filter((row) => row.title.startsWith("Newsletter Candidate"));
+    // 7 newsletter rows evicted (20 - 13-slot band); 13 remain, confined to 8..20.
+    expect(newsletterRows).toHaveLength(13);
+    expect(newsletterRows.map((row) => row.rank).sort((a, b) => Number(a) - Number(b)))
+      .toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    // RSS takes the reserved top.
+    expect(rssRows.map((row) => row.rank).sort((a, b) => Number(a) - Number(b))).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(rssRows.every((row) => row.rank <= 7)).toBe(true);
+  });
+
+  // PR2 GATE — RSS shortfall must NOT be backfilled by newsletter. Reserved top
+  // ranks left empty by RSS stay empty; newsletter stays in the band.
+  it("leaves reserved ranks empty when RSS is short: 3 RSS at 1-3, ranks 4-7 empty, newsletter in the band", async () => {
+    const rows = Array.from({ length: 20 }, (_, index) =>
+      createRow({
+        id: `newsletter-${index + 1}`,
+        briefing_date: "2026-06-19",
+        rank: index + 1,
+        title: `Newsletter Candidate ${index + 1}`,
+        selection_reason: "Newsletter discovery candidate; BM review required.",
+        editorial_status: "needs_review",
+        final_slate_rank: null,
+        final_slate_tier: null,
+        editorial_decision: "pending_review",
+        is_live: false,
+        published_at: null,
+      }),
+    );
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-06-19",
+      items: Array.from({ length: 3 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    expect(result.ok).toBe(true);
+    const rssRows = rows.filter((row) => row.title.startsWith("Generated Signal"));
+    const newsletterRows = rows.filter((row) => row.title.startsWith("Newsletter Candidate"));
+    expect(rssRows.map((row) => row.rank).sort((a, b) => Number(a) - Number(b))).toEqual([1, 2, 3]);
+    // Ranks 4-7 are reserved and stay EMPTY — newsletter never backfills them.
+    expect(rows.some((row) => typeof row.rank === "number" && row.rank >= 4 && row.rank <= 7)).toBe(false);
+    expect(newsletterRows.every((row) => typeof row.rank === "number" && (row.rank as number) >= 8)).toBe(true);
+  });
+
+  // PR2 GATE — a single newsletter row lands at the band floor (8), RSS owns 1-7.
+  it("places a single newsletter row at the band floor (rank 8) with RSS at 1-7", async () => {
+    const rows = [
+      createRow({
+        id: "newsletter-1",
+        briefing_date: "2026-06-20",
+        rank: 8,
+        title: "Newsletter Candidate 1",
+        selection_reason: "Newsletter discovery candidate; BM review required.",
+        editorial_status: "needs_review",
+        final_slate_rank: null,
+        final_slate_tier: null,
+        editorial_decision: "pending_review",
+        is_live: false,
+        published_at: null,
+      }),
+    ];
+    createSupabaseServiceRoleClient.mockReturnValue(createSupabaseMock(rows));
+
+    const { persistSignalPostsForBriefing } = await loadEditorialModule();
+    const result = await persistSignalPostsForBriefing({
+      briefingDate: "2026-06-20",
+      items: Array.from({ length: 7 }, (_, index) => createBriefingItem(index + 1)),
+    });
+
+    expect(result.ok).toBe(true);
+    const rssRows = rows.filter((row) => row.title.startsWith("Generated Signal"));
+    const newsletterRows = rows.filter((row) => row.title.startsWith("Newsletter Candidate"));
+    expect(newsletterRows.map((row) => row.rank)).toEqual([8]);
+    expect(rssRows.map((row) => row.rank).sort((a, b) => Number(a) - Number(b))).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
   it("append mode adds only new-URL items at POST-MAX ranks without churning existing rows (CRON-2)", async () => {

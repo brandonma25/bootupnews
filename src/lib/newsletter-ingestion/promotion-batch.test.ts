@@ -146,7 +146,7 @@ function story(overrides: Partial<NewsletterStoryExtractionRow> & { id: string }
 const BRIEFING_DATE = "2026-06-17";
 
 describe("promoteNewsletterStoryBatch — atomic bulk insert", () => {
-  it("performs EXACTLY ONE bulk insert for the whole run, with descending unique ranks, and links each extraction", async () => {
+  it("performs EXACTLY ONE bulk insert for the whole run, with unique band ranks (8..20), and links each extraction", async () => {
     const { db, tables, signalPostsInserts } = createCountingDb({
       newsletter_story_extractions: [story({ id: "a" }), story({ id: "b" }), story({ id: "c" })],
     });
@@ -163,12 +163,61 @@ describe("promoteNewsletterStoryBatch — atomic bulk insert", () => {
     expect(signalPostsInserts.sizes).toEqual([3]);
 
     expect(tables.signal_posts).toHaveLength(3);
-    expect(tables.signal_posts.map((row) => row.rank).sort((x, y) => Number(y) - Number(x))).toEqual([20, 19, 18]);
+    // PR2: newsletter fills the discovery band from the floor up (8, 9, 10);
+    // ranks 1..7 are reserved for RSS.
+    expect(tables.signal_posts.map((row) => row.rank).sort((x, y) => Number(y) - Number(x))).toEqual([10, 9, 8]);
     expect(new Set(tables.signal_posts.map((row) => row.rank)).size).toBe(3);
 
     expect(results.every((result) => result.status === "created")).toBe(true);
     // insert -> link seam: every extraction is linked to its committed row.
     expect(tables.newsletter_story_extractions.every((row) => Boolean(row.signal_post_id))).toBe(true);
+  });
+
+  // PR2 GATE (write-side) — the newsletter band holds 13 slots (8..20). A flood of
+  // 20 stories must fill the band with the 13 HIGHEST-confidence stories and DROP
+  // the 7 lowest; ranks 1..7 are never touched.
+  it("confines a 20-story flood to the band (8..20) and drops the 7 lowest-confidence stories", async () => {
+    // Distinct ascending confidence: s0=0.01 (lowest) .. s19=0.20 (highest).
+    const stories = Array.from({ length: 20 }, (_, index) =>
+      story({
+        id: `s${index}`,
+        source_url: `https://example.com/${index}`,
+        extraction_confidence: (index + 1) / 100,
+      }),
+    );
+    const { db, tables, signalPostsInserts } = createCountingDb({ newsletter_story_extractions: stories });
+
+    const results = await promoteNewsletterStoryBatch({
+      db,
+      briefingDate: BRIEFING_DATE,
+      stories,
+      now: new Date("2026-06-17T08:00:00.000Z"),
+    });
+
+    // Still ONE bulk insert (#324), carrying exactly the 13 band rows.
+    expect(signalPostsInserts.count).toBe(1);
+    expect(tables.signal_posts).toHaveLength(13);
+    expect(tables.signal_posts.every((row) => Number(row.rank) >= 8 && Number(row.rank) <= 20)).toBe(true);
+    expect(tables.signal_posts.map((row) => Number(row.rank)).sort((a, b) => a - b))
+      .toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+
+    // The 7 dropped are the LOWEST confidence (s0..s6), via no_available_candidate_rank.
+    const dropped = results.filter(
+      (result) => result.status === "skipped" && result.reason === "no_available_candidate_rank",
+    );
+    expect(dropped).toHaveLength(7);
+
+    // Highest-confidence story (s19) sits at the band floor (rank 8); the dropped
+    // ids are exactly the 7 lowest-confidence stories.
+    const rankFloorRow = tables.signal_posts.find((row) => Number(row.rank) === 8);
+    expect(rankFloorRow?.title).toBe("Headline s19");
+    const insertedTitles = new Set(tables.signal_posts.map((row) => row.title));
+    for (let i = 0; i <= 6; i += 1) {
+      expect(insertedTitles.has(`Headline s${i}`)).toBe(false);
+    }
+    for (let i = 7; i <= 19; i += 1) {
+      expect(insertedTitles.has(`Headline s${i}`)).toBe(true);
+    }
   });
 
   it("writes ZERO rows when the run signal is already aborted (timeout leaves an empty slate)", async () => {
@@ -286,7 +335,8 @@ describe("planNewsletterStoryPromotions — pure planner", () => {
     const byAction = (action: NewsletterCandidatePlan["action"]) => plans.filter((plan) => plan.action === action);
     expect(byAction("skip")).toHaveLength(2);
     const inserts = byAction("insert") as Extract<NewsletterCandidatePlan, { action: "insert" }>[];
-    expect(inserts.map((plan) => plan.rank)).toEqual([20, 19]);
+    // PR2: newsletter band fills floor-up (8, 9); ranks 1..7 reserved for RSS.
+    expect(inserts.map((plan) => plan.rank)).toEqual([8, 9]);
   });
 });
 

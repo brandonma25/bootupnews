@@ -274,7 +274,9 @@ describe("newsletter candidate promotion", () => {
     expect(result).toMatchObject({
       status: "created",
       signalPostId: expect.any(String),
-      rank: 20,
+      // PR2: newsletter discovery candidates fill the band floor-up (8..20);
+      // ranks 1..7 are reserved for RSS. A lone story lands at the floor, 8.
+      rank: 8,
     });
     expect(tables.signal_posts[0]).toMatchObject({
       editorial_status: "needs_review",
@@ -380,7 +382,8 @@ describe("newsletter candidate promotion", () => {
       sourceUrl: "https://example.com/cloud",
       sourceDomain: "example.com",
       category: "Tech",
-      rank: 20,
+      // PR2: band floor-up — a lone preview candidate lands at rank 8 (1..7 = RSS).
+      rank: 8,
       existingSignalPostId: null,
       matchedBy: null,
       reason: "Newsletter story would create a non-live needs_review candidate.",
