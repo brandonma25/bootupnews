@@ -18,7 +18,11 @@ export type ChromeRejectionReason =
   | "boilerplate_phrase"
   | "postal_address"
   | "tracking_or_shortener_domain"
-  | "below_min_prose";
+  | "below_min_prose"
+  | "subscribe_cta"
+  | "masthead"
+  | "photo_credit"
+  | "section_header";
 
 export type ChromeRejection = {
   headline: string;
@@ -90,6 +94,68 @@ const TRACKING_URL_MARKERS = [
 const ZIP_STATE_PATTERN = /\b[A-Z]{2},?\s+\d{5}(?:-\d{4})?\b/;
 const STREET_NUMBER_PATTERN = /\b\d{1,6}\s+[A-Za-z]/;
 
+/**
+ * Subscribe / sign-up call-to-action phrases (distinct from the "unsubscribe"
+ * boilerplate). Real headlines do not say "subscribe to" / "sign up for"; these
+ * are Semafor/Brew cross-promo lines. Matched as a phrase (not a bare "subscribe"
+ * substring, which would wrongly hit "subscribers").
+ */
+const SUBSCRIBE_CTA_PHRASES = [
+  "subscribe to",
+  "subscribe now",
+  "subscribe at",
+  "sign up for",
+  "sign up to",
+] as const;
+
+/**
+ * Masthead delimiter: newsletters render their name/section banner as
+ * "Daily Brew // Morning Brew // Update". A spaced "//" in a title (URLs already
+ * stripped) is a masthead, not a story.
+ */
+const MASTHEAD_PATTERN = /\s\/\/\s/;
+
+/**
+ * Bare photo credit at the end of a title: "First Last/Agency" where Agency is a
+ * known wire/photo service. Catches "Eric Lee/Reuters" and
+ * "Billboard in Islamabad. Akhtar Soomro/Reuters".
+ */
+const PHOTO_CREDIT_AGENCIES =
+  "Reuters|AP|AFP|Getty(?:\\s+Images)?|Bloomberg|EPA(?:-EFE)?|Shutterstock|Anadolu(?:\\s+Agency)?|Xinhua|NurPhoto|Pool|AAP|dpa|Sipa|Zuma|The\\s+New\\s+York\\s+Times";
+const PHOTO_CREDIT_PATTERN = new RegExp(
+  `[A-Z][\\p{L}.'-]+(?:\\s+[A-Z][\\p{L}.'-]+)+\\s*/\\s*(?:${PHOTO_CREDIT_AGENCIES})\\b\\.?\\s*$`,
+  "u",
+);
+
+/**
+ * Known newsletter section dividers (TLDR/Brew rubric labels). Scoped to an exact
+ * (normalized) match list rather than a generic "short Title-Case noun phrase"
+ * heuristic — that would risk rejecting real short headlines, and precision matters
+ * more than recall here. NEW labels should be added explicitly.
+ */
+const SECTION_HEADER_LABELS = new Set(
+  [
+    "big tech & startups",
+    "science & futuristic technology",
+    "programming, design & data science",
+    "miscellaneous",
+    "quick links",
+    "around the web",
+    "in the news",
+    "today's top stories",
+    "the gist",
+    "what's happening",
+  ].map((label) => label.toLowerCase()),
+);
+
+function normalizeForLabelMatch(headline: string): string {
+  return headline
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[.:;!?]+$/u, "")
+    .trim();
+}
+
 function stripLinks(value: string): string {
   return value
     .replace(/<[^>]*>/g, " ") // angle-bracket links/markup
@@ -136,6 +202,24 @@ export function classifyNewsletterChrome(candidate: ChromeCandidate):
     }
   }
 
+  for (const phrase of SUBSCRIBE_CTA_PHRASES) {
+    if (lower.includes(phrase)) {
+      return { rejected: true, reason: "subscribe_cta", detail: phrase };
+    }
+  }
+
+  if (SECTION_HEADER_LABELS.has(normalizeForLabelMatch(headline))) {
+    return { rejected: true, reason: "section_header", detail: headline.slice(0, 80) };
+  }
+
+  if (MASTHEAD_PATTERN.test(stripLinks(headline))) {
+    return { rejected: true, reason: "masthead", detail: headline.slice(0, 80) };
+  }
+
+  if (PHOTO_CREDIT_PATTERN.test(headline)) {
+    return { rejected: true, reason: "photo_credit", detail: headline.slice(0, 80) };
+  }
+
   if (looksLikePostalAddress(headline)) {
     return { rejected: true, reason: "postal_address", detail: headline.slice(0, 80) };
   }
@@ -167,6 +251,10 @@ export function summarizeChromeRejections(rejections: ChromeRejection[]): {
     postal_address: 0,
     tracking_or_shortener_domain: 0,
     below_min_prose: 0,
+    subscribe_cta: 0,
+    masthead: 0,
+    photo_credit: 0,
+    section_header: 0,
   };
   for (const rejection of rejections) {
     byReason[rejection.reason] += 1;

@@ -51,12 +51,84 @@ function splitHeadersAndBody(raw: string): ParsedMimePart {
   return { headers, body };
 }
 
-function decodeQuotedPrintable(value: string) {
-  return value
-    .replace(/=\n/g, "")
-    .replace(/=([0-9a-f]{2})/gi, (_match, hex: string) =>
-      String.fromCharCode(Number.parseInt(hex, 16)),
-    );
+// Decode quoted-printable into RAW BYTES. The previous implementation decoded
+// each =XX escape with String.fromCharCode, treating every byte as its own Latin-1
+// code point — so multi-byte UTF-8 (smart quotes, em dashes, accents) came out as
+// mojibake ("Semaforâ€™s"). Buffering the bytes lets the caller re-decode them with
+// the part's declared charset.
+function decodeQuotedPrintableToBytes(value: string): Buffer {
+  const withoutSoftBreaks = value.replace(/=\r?\n/g, "");
+  const bytes: number[] = [];
+
+  for (let index = 0; index < withoutSoftBreaks.length; index += 1) {
+    const char = withoutSoftBreaks[index]!;
+
+    if (char === "=" && index + 2 < withoutSoftBreaks.length) {
+      const hex = withoutSoftBreaks.slice(index + 1, index + 3);
+      if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+        bytes.push(Number.parseInt(hex, 16));
+        index += 2;
+        continue;
+      }
+    }
+
+    // QP literal chars are printable ASCII; mask to a single byte defensively.
+    bytes.push(char.charCodeAt(0) & 0xff);
+  }
+
+  return Buffer.from(bytes);
+}
+
+// windows-1252 0x80–0x9F → Unicode (the bytes where it differs from latin-1).
+// Undefined slots (0x81/0x8D/0x8F/0x90/0x9D) fall through to the raw byte value.
+const WINDOWS_1252_C1: Record<number, number> = {
+  0x80: 0x20ac, 0x82: 0x201a, 0x83: 0x0192, 0x84: 0x201e, 0x85: 0x2026,
+  0x86: 0x2020, 0x87: 0x2021, 0x88: 0x02c6, 0x89: 0x2030, 0x8a: 0x0160,
+  0x8b: 0x2039, 0x8c: 0x0152, 0x8e: 0x017d, 0x91: 0x2018, 0x92: 0x2019,
+  0x93: 0x201c, 0x94: 0x201d, 0x95: 0x2022, 0x96: 0x2013, 0x97: 0x2014,
+  0x98: 0x02dc, 0x99: 0x2122, 0x9a: 0x0161, 0x9b: 0x203a, 0x9c: 0x0153,
+  0x9e: 0x017e, 0x9f: 0x0178,
+};
+
+// ICU-INDEPENDENT windows-1252 decoder: latin-1 for 0x00–0x7F + 0xA0–0xFF, the
+// table above for 0x80–0x9F. (Node's `new TextDecoder("windows-1252")` needs a
+// full-ICU build, which CI/serverless Node may NOT have — there it throws and a
+// utf-8 fallback re-mangles the smart quotes. This works everywhere.)
+function decodeWindows1252(bytes: Buffer): string {
+  let out = "";
+  for (const byte of bytes) {
+    const codePoint = byte >= 0x80 && byte <= 0x9f ? (WINDOWS_1252_C1[byte] ?? byte) : byte;
+    out += String.fromCodePoint(codePoint);
+  }
+  return out;
+}
+
+// Decode raw bytes using a MIME charset label, ICU-independent for the charsets
+// newsletters actually use. utf-8 and latin-1/windows-1252 are handled with
+// built-in Buffer/table decoders (no full-ICU dependency); anything exotic tries
+// TextDecoder and falls back to utf-8. WHATWG maps the iso-8859-1/latin1 LABELS to
+// the windows-1252 decoder (so a labelled-latin1 smart quote 0x92 → U+2019, as
+// mail clients render it), which is what we do here.
+function decodeBytesWithCharset(bytes: Buffer, charset: string | undefined): string {
+  const label = (charset ?? "").toLowerCase().trim().replace(/[_\s]+/g, "-") || "utf-8";
+
+  if (label === "utf-8" || label === "utf8" || label === "us-ascii" || label === "ascii") {
+    return bytes.toString("utf8");
+  }
+
+  if (
+    label === "windows-1252" || label === "cp1252" || label === "windows1252" ||
+    label === "iso-8859-1" || label === "latin1" || label === "latin-1" ||
+    label === "iso8859-1" || label === "8859-1"
+  ) {
+    return decodeWindows1252(bytes);
+  }
+
+  try {
+    return new TextDecoder(label).decode(bytes);
+  } catch {
+    return bytes.toString("utf8");
+  }
 }
 
 function decodeMimeWord(value: string) {
@@ -70,10 +142,13 @@ function decodeMimeWord(value: string) {
       }
 
       if (encoding.toLowerCase() === "b") {
-        return Buffer.from(encoded, "base64").toString("utf8");
+        return decodeBytesWithCharset(Buffer.from(encoded, "base64"), normalizedCharset);
       }
 
-      return decodeQuotedPrintable(encoded.replace(/_/g, " "));
+      return decodeBytesWithCharset(
+        decodeQuotedPrintableToBytes(encoded.replace(/_/g, " ")),
+        normalizedCharset,
+      );
     },
   );
 }
@@ -97,17 +172,20 @@ function getHeaderParams(headerValue: string | undefined) {
   return { value, params };
 }
 
-function decodePartBody(body: string, transferEncoding: string | undefined) {
+export function decodePartBody(body: string, transferEncoding: string | undefined, charset?: string) {
   const encoding = (transferEncoding ?? "").toLowerCase();
 
   if (encoding === "base64") {
-    return Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8");
+    return decodeBytesWithCharset(Buffer.from(body.replace(/\s+/g, ""), "base64"), charset);
   }
 
   if (encoding === "quoted-printable") {
-    return decodeQuotedPrintable(body);
+    return decodeBytesWithCharset(decodeQuotedPrintableToBytes(body), charset);
   }
 
+  // 7bit / 8bit / none: the raw MIME was already read as utf-8 upstream
+  // (decodeGmailRawMessage), so the body is text. A non-utf-8 8bit part is a rare
+  // edge that would need re-reading the source bytes — out of scope here.
   return body;
 }
 
@@ -165,6 +243,7 @@ function normalizeContentText(value: string) {
 function collectTextParts(part: ParsedMimePart): string[] {
   const contentType = getHeaderParams(part.headers["content-type"]);
   const transferEncoding = part.headers["content-transfer-encoding"];
+  const charset = contentType.params.charset;
 
   if (contentType.value.startsWith("multipart/")) {
     const boundary = contentType.params.boundary;
@@ -179,11 +258,11 @@ function collectTextParts(part: ParsedMimePart): string[] {
   }
 
   if (contentType.value === "text/plain" || (!contentType.value && part.body.trim())) {
-    return [decodePartBody(part.body, transferEncoding)];
+    return [decodePartBody(part.body, transferEncoding, charset)];
   }
 
   if (contentType.value === "text/html") {
-    return [htmlToTextWithLinks(decodePartBody(part.body, transferEncoding))];
+    return [htmlToTextWithLinks(decodePartBody(part.body, transferEncoding, charset))];
   }
 
   return [];
