@@ -4,6 +4,17 @@ export const FINAL_SLATE_MIN_PUBLIC_ROWS = 1;
 // PRD-36 (amended): the public slate holds the full final-slate set —
 // 5 core ("Signal") + 2 context ("Context") = 7 rows.
 export const FINAL_SLATE_MAX_PUBLIC_ROWS = 7;
+
+// Candidate `rank` space: signal_posts.rank is NOT NULL, CHECK(1..20),
+// UNIQUE(briefing_date, rank). At most this many candidate rows per briefing day.
+export const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
+
+// RSS rank-band reservation (PR2): ranks 1..RSS_RESERVED_TOP_RANKS are reserved
+// for the RSS/article path (the public slate). Newsletter discovery candidates
+// are confined to the band BELOW it (RSS_RESERVED_TOP_RANKS+1 .. depth limit), so
+// a flood of newsletter rows can never crowd real news out of the public cut.
+// Keyed to the public-slate size so the two move together — never hardcode 7.
+export const RSS_RESERVED_TOP_RANKS = FINAL_SLATE_MAX_PUBLIC_ROWS;
 export const FINAL_SLATE_CORE_RANKS = [1, 2, 3, 4, 5] as const;
 export const FINAL_SLATE_CONTEXT_RANKS = [6, 7] as const;
 export const FINAL_SLATE_RANKS = [

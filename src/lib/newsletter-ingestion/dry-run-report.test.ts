@@ -156,7 +156,8 @@ describe("newsletter dry-run report", () => {
       title: "Microsoft expands data center capacity",
       sourceUrl: "https://example.com/cloud",
       previewAction: "create_candidate",
-      rank: 20,
+      // PR2: newsletter discovery band fills floor-up from 8 (ranks 1..7 = RSS).
+      rank: 8,
     });
     expect(report.privacy).toEqual({
       rawContentIncluded: false,

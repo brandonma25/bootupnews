@@ -13,7 +13,7 @@ import {
   computeCrossDateWindow,
   partitionByCrossDateRecurrence,
 } from "@/lib/editorial/cross-date-url-dedup";
-import { logServerEvent } from "@/lib/observability";
+import { errorContext, logServerEvent } from "@/lib/observability";
 import {
   createSupabaseServiceRoleClient,
   safeGetUser,
@@ -26,6 +26,8 @@ import {
   isFinalSlateRank,
   isValidPublicSourceUrl,
   MISSING_PUBLIC_SOURCE_URL_REASON,
+  RSS_RESERVED_TOP_RANKS,
+  SIGNAL_POST_CANDIDATE_DEPTH_LIMIT,
   validateFinalSlateReadiness,
   type FinalSlateTier,
   type FinalSlateValidationFailure,
@@ -173,7 +175,8 @@ const PUBLISHED_SLATE_SELECT = PUBLISHED_SLATE_REQUIRED_COLUMNS.join(", ");
 const PUBLISHED_SLATE_ITEM_SELECT = PUBLISHED_SLATE_ITEM_REQUIRED_COLUMNS.join(", ");
 
 const EDITORIAL_PAGE_SIZE = 20;
-const SIGNAL_POST_CANDIDATE_DEPTH_LIMIT = 20;
+// SIGNAL_POST_CANDIDATE_DEPTH_LIMIT + RSS_RESERVED_TOP_RANKS are imported from
+// final-slate-readiness (single source of truth for the candidate rank geometry).
 // The full public slate size (PRD-36 amended): 5 core + 2 context = 7.
 const TOP_SIGNAL_SET_SIZE = 7;
 // signal_posts.rank CHECK is `between 1 and 20`; append mode caps post-max ranks here.
@@ -1377,7 +1380,7 @@ async function persistSignalPostCandidates(
 
   const existingResult = await client
     .from("signal_posts")
-    .select("id, rank, selection_reason, editorial_status, final_slate_rank, is_live, published_at")
+    .select("id, rank, selection_reason, editorial_status, final_slate_rank, is_live, published_at, signal_score")
     .eq("briefing_date", briefingDate);
 
   if (existingResult.error) {
@@ -1707,6 +1710,7 @@ type ExistingSignalSnapshotRow = {
   final_slate_rank: number | null;
   is_live: boolean | null;
   published_at: string | null;
+  signal_score: number | null;
 };
 
 type NewsletterRankReservationResult =
@@ -1731,13 +1735,84 @@ function isMovableNewsletterDiscoveryRow(row: ExistingSignalSnapshotRow) {
   );
 }
 
+/**
+ * Eviction/relocation priority for newsletter discovery rows: highest signal_score
+ * first (nulls last), tiebroken by current rank ascending for determinism. Newsletter
+ * co-occurrence and source-trust tier are not carried on the snapshot row, so
+ * signal_score is the available signal — consistent with the write-side overflow drop.
+ */
+function compareNewsletterRowImportanceDesc(
+  left: ExistingSignalSnapshotRow,
+  right: ExistingSignalSnapshotRow,
+): number {
+  const scoreDelta = (right.signal_score ?? -1) - (left.signal_score ?? -1);
+  if (scoreDelta !== 0) return scoreDelta;
+  return (left.rank ?? Number.MAX_SAFE_INTEGER) - (right.rank ?? Number.MAX_SAFE_INTEGER);
+}
+
+/**
+ * PR-A — which of these candidate signal_posts are referenced by
+ * published_slate_items (FK is ON DELETE RESTRICT). Such a row must NEVER be an
+ * eviction target — a DELETE against it throws 23503 and would abort the
+ * reservation. Fails SAFE: if the reference check itself errors, every candidate
+ * is treated as protected (evict none), so we never risk a RESTRICT abort.
+ */
+async function fetchFkProtectedSignalPostIds(
+  client: EditorialClient,
+  candidateIds: string[],
+): Promise<Set<string>> {
+  if (candidateIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const result = await client
+    .from("published_slate_items")
+    .select("signal_post_id")
+    .in("signal_post_id", candidateIds);
+
+  if (result.error) {
+    logServerEvent("warn", "Could not check published_slate_items references; treating all eviction candidates as protected", {
+      candidateCount: candidateIds.length,
+      ...errorContext(result.error),
+    });
+    return new Set<string>(candidateIds);
+  }
+
+  return new Set<string>(
+    ((result.data ?? []) as Array<{ signal_post_id: string | null }>)
+      .map((row) => row.signal_post_id)
+      .filter((id): id is string => typeof id === "string"),
+  );
+}
+
+/**
+ * PR2 — reserve ranks 1..RSS_RESERVED_TOP_RANKS for the RSS/article path by
+ * confining newsletter discovery candidates to the band BELOW it
+ * (RSS_RESERVED_TOP_RANKS+1 .. depth limit). Newsletter rows currently sitting in
+ * the reserved top are relocated DOWN into free band ranks; when the band cannot
+ * hold them all, the lowest-signal excess is DELETED (a candidate row cannot exist
+ * without a 1..20 rank), so the reserved top is always freed for RSS.
+ *
+ * This DEGRADES on a flood instead of the old behavior — returning ok:false and
+ * changing nothing — which let a 20-row newsletter day occupy the entire space and
+ * starve RSS. With the write-side band cap in promotion.ts, new rows already land
+ * in the band, so this is mostly defense-in-depth for pre-existing rows.
+ *
+ * PR-A — eviction is FK-safe against published_slate_items (ON DELETE RESTRICT):
+ * a referenced row is never an eviction target (scope check via
+ * fetchFkProtectedSignalPostIds), and any delete that still throws (23503) is
+ * caught and skipped so the run never aborts. Free band ranks are recomputed after
+ * eviction so a skipped delete can never become a relocation target.
+ *
+ * Collision-safe by construction: the only relocations move newsletter rows OUT of
+ * the reserved top (1..N) INTO free band ranks (N+1..depth); sources and targets
+ * never overlap, so in-place rank UPDATEs never trip UNIQUE(briefing_date, rank).
+ */
 async function reserveNewsletterCandidateRanksForRssSnapshot(
   client: EditorialClient,
   existingRows: ExistingSignalSnapshotRow[],
 ): Promise<NewsletterRankReservationResult> {
-  const movableNewsletterRows = existingRows
-    .filter(isMovableNewsletterDiscoveryRow)
-    .sort((left, right) => (left.rank ?? 0) - (right.rank ?? 0));
+  const movableNewsletterRows = existingRows.filter(isMovableNewsletterDiscoveryRow);
 
   if (movableNewsletterRows.length === 0) {
     return {
@@ -1754,44 +1829,108 @@ async function reserveNewsletterCandidateRanksForRssSnapshot(
       .map((row) => row.rank)
       .filter((rank): rank is number => typeof rank === "number"),
   );
-  const targetRanks: number[] = [];
 
-  for (let rank = SIGNAL_POST_CANDIDATE_DEPTH_LIMIT; rank >= 1; rank -= 1) {
+  // Discovery band available to newsletter: ranks RSS_RESERVED_TOP_RANKS+1..depth
+  // not held by a fixed (non-movable) row, ascending. Its size is the capacity.
+  const bandFloor = RSS_RESERVED_TOP_RANKS + 1;
+  const availableBandRanks: number[] = [];
+  for (let rank = bandFloor; rank <= SIGNAL_POST_CANDIDATE_DEPTH_LIMIT; rank += 1) {
     if (!fixedRanks.has(rank)) {
-      targetRanks.push(rank);
-    }
-
-    if (targetRanks.length === movableNewsletterRows.length) {
-      break;
+      availableBandRanks.push(rank);
     }
   }
+  const capacity = availableBandRanks.length;
 
-  if (targetRanks.length < movableNewsletterRows.length) {
-    return {
-      ok: false,
-      message:
-        "RSS signal snapshot could not reserve rank space for existing newsletter candidates. No rows were changed.",
-    };
+  const availableBandSet = new Set(availableBandRanks);
+  const byImportance = [...movableNewsletterRows].sort(compareNewsletterRowImportanceDesc);
+
+  // Only rows that overflow the band need to be removed, and only UNPROTECTED rows
+  // (PR-A: not referenced by published_slate_items, whose FK is ON DELETE RESTRICT)
+  // may be deleted. Protected rows are always kept (relocated, never deleted); the
+  // lowest-signal UNPROTECTED rows are evicted to make room.
+  const overflowCount = Math.max(0, movableNewsletterRows.length - capacity);
+  let droppedRows: ExistingSignalSnapshotRow[] = [];
+  if (overflowCount > 0) {
+    const protectedIds = await fetchFkProtectedSignalPostIds(
+      client,
+      movableNewsletterRows.map((row) => row.id),
+    );
+    // byImportance is highest-signal first; reverse the unprotected rows so the
+    // lowest-signal ones are evicted first.
+    const evictableLowestFirst = byImportance.filter((row) => !protectedIds.has(row.id)).reverse();
+    droppedRows = evictableLowestFirst.slice(0, overflowCount);
+
+    if (droppedRows.length < overflowCount) {
+      logServerEvent("warn", "Newsletter band overflow exceeds evictable (unprotected) rows; some rows remain above the band", {
+        overflowCount,
+        evictableCount: evictableLowestFirst.length,
+        protectedCount: movableNewsletterRows.length - evictableLowestFirst.length,
+      });
+    }
+  }
+  const droppedIds = new Set(droppedRows.map((row) => row.id));
+  const keptRows = movableNewsletterRows.filter((row) => !droppedIds.has(row.id));
+
+  // Evict band overflow FIRST so their ranks free up before relocation.
+  // Belt-and-suspenders (PR-A): a delete that throws — e.g. an unexpected FK
+  // reference (23503) the scope check above didn't catch — is caught; that row is
+  // left in place and the reservation CONTINUES. It never aborts / returns
+  // ok:false-with-no-change (the old bug it replaced).
+  const evictedIds = new Set<string>();
+  for (const dropped of droppedRows) {
+    const deleteResult = await client
+      .from("signal_posts")
+      .delete()
+      .eq("id", dropped.id);
+
+    if (deleteResult.error) {
+      logServerEvent("warn", "Newsletter overflow eviction skipped (delete failed; row left in place)", {
+        signalPostId: dropped.id,
+        rank: dropped.rank,
+        ...errorContext(deleteResult.error),
+      });
+      continue;
+    }
+    evictedIds.add(dropped.id);
   }
 
-  targetRanks.sort((left, right) => left - right);
-  const updatedRows = existingRows.map((row) => ({ ...row }));
+  const updatedRows = existingRows
+    .filter((row) => !evictedIds.has(row.id))
+    .map((row) => ({ ...row }));
   const rowsById = new Map(updatedRows.map((row) => [row.id, row]));
 
-  const rankAssignments = movableNewsletterRows
-    .map((newsletterRow, index) => ({
-      newsletterRow,
-      targetRank: targetRanks[index],
-    }))
-    .filter((assignment): assignment is { newsletterRow: ExistingSignalSnapshotRow; targetRank: number } =>
-      typeof assignment.targetRank === "number"
-    )
-    .sort((left, right) => right.targetRank - left.targetRank);
+  // Movers = kept rows still sitting in the reserved top (1..N), not yet in the band.
+  const movingRows = keptRows.filter(
+    (row) => !(typeof row.rank === "number" && availableBandSet.has(row.rank)),
+  );
+  const moverIds = new Set(movingRows.map((row) => row.id));
 
-  for (const { newsletterRow, targetRank } of rankAssignments) {
-    const mutableRow = rowsById.get(newsletterRow.id);
+  // Free band ranks = band ranks not held by any SURVIVING non-mover row (stayers
+  // PLUS any row whose eviction failed). Recomputed AFTER eviction so a failed
+  // delete can never become a relocation target — relocations stay collision-safe
+  // against UNIQUE(briefing_date, rank). Sources (1..N) and targets (band) are
+  // disjoint by construction.
+  const occupiedBandRanks = new Set<number>();
+  for (const row of updatedRows) {
+    if (moverIds.has(row.id)) continue;
+    if (typeof row.rank === "number" && availableBandSet.has(row.rank)) {
+      occupiedBandRanks.add(row.rank);
+    }
+  }
+  const freeBandRanks = availableBandRanks.filter((rank) => !occupiedBandRanks.has(rank));
 
-    if (!mutableRow || mutableRow.rank === targetRank) {
+  for (let index = 0; index < movingRows.length; index += 1) {
+    const newsletterRow = movingRows[index]!;
+    const targetRank = freeBandRanks[index];
+
+    if (typeof targetRank !== "number") {
+      // No free band slot (an eviction failed / over-capacity). Leave the row in
+      // the reserved top — RSS gets one fewer reserved rank this run, but the run
+      // never aborts.
+      logServerEvent("warn", "No free band rank for newsletter row; left in the reserved top this run", {
+        signalPostId: newsletterRow.id,
+        rank: newsletterRow.rank,
+      });
       continue;
     }
 
@@ -1807,13 +1946,22 @@ async function reserveNewsletterCandidateRanksForRssSnapshot(
       };
     }
 
-    mutableRow.rank = targetRank;
+    const mutableRow = rowsById.get(newsletterRow.id);
+    if (mutableRow) {
+      mutableRow.rank = targetRank;
+    }
   }
+
+  const reservedRanks = new Set<number>(
+    keptRows
+      .map((row) => rowsById.get(row.id)?.rank)
+      .filter((rank): rank is number => typeof rank === "number"),
+  );
 
   return {
     ok: true,
     rows: updatedRows,
-    reservedRanks: new Set(targetRanks),
+    reservedRanks,
   };
 }
 

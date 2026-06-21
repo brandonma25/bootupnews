@@ -61,3 +61,4 @@ project.md
 # controlled pipeline run artifacts
 /.pipeline-runs/
 .env*.local
+.gstack/

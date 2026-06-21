@@ -1,4 +1,8 @@
-import { isValidPublicSourceUrl } from "@/lib/final-slate-readiness";
+import {
+  isValidPublicSourceUrl,
+  RSS_RESERVED_TOP_RANKS,
+  SIGNAL_POST_CANDIDATE_DEPTH_LIMIT,
+} from "@/lib/final-slate-readiness";
 import type { NewsletterDbClient, NewsletterStoryExtractionRow } from "@/lib/newsletter-ingestion/storage";
 import { errorContext, logServerEvent } from "@/lib/observability";
 
@@ -153,7 +157,15 @@ function nextAvailablePreviewRank(
     usedRanks.add(rank);
   }
 
-  for (let rank = 20; rank >= 1; rank -= 1) {
+  // PR2 — RSS rank-band reservation. Newsletter discovery candidates may only
+  // claim ranks in the band BELOW the RSS-reserved top: RSS_RESERVED_TOP_RANKS+1
+  // .. depth limit (8..20). Ranks 1..RSS_RESERVED_TOP_RANKS stay free for the
+  // RSS/article path so a flood of newsletter rows can never occupy the public
+  // slate. The band fills from the FLOOR up (8, then 9, ...) so the most
+  // important story (callers plan in importance order — see
+  // sortStoriesByImportanceDesc) sits directly below the RSS slate, and band
+  // overflow returns null → the caller drops the lowest-signal candidate.
+  for (let rank = RSS_RESERVED_TOP_RANKS + 1; rank <= SIGNAL_POST_CANDIDATE_DEPTH_LIMIT; rank += 1) {
     if (!usedRanks.has(rank)) {
       allocatedRanks.add(rank);
       return rank;
@@ -161,6 +173,26 @@ function nextAvailablePreviewRank(
   }
 
   return null;
+}
+
+/**
+ * Order stories most-important-first so that when the newsletter band (8..20)
+ * overflows, the rows that get dropped are the LOWEST signal. The only
+ * importance signal a story carries at promotion time is `extraction_confidence`
+ * (newsletter co-occurrence and source-trust tier are computed downstream, not
+ * here), so that is the sort key; nulls sort last. Stable on ties (preserves the
+ * original within-batch order, which keeps dedup ownership deterministic).
+ */
+function sortStoriesByImportanceDesc(
+  stories: NewsletterStoryExtractionRow[],
+): NewsletterStoryExtractionRow[] {
+  return stories
+    .map((story, index) => ({ story, index }))
+    .sort((a, b) => {
+      const confDelta = (b.story.extraction_confidence ?? -1) - (a.story.extraction_confidence ?? -1);
+      return confDelta !== 0 ? confDelta : a.index - b.index;
+    })
+    .map((entry) => entry.story);
 }
 
 /**
@@ -252,9 +284,11 @@ export type NewsletterCandidatePlan =
  * pre-fetched `existingRows` snapshot, with NO database calls. Replaces the old
  * per-story round-trips (dup-by-url / dup-by-title / next-rank) that each hit the
  * DB; everything is now resolved in memory against one read. Ranks are allocated
- * descending (20→1) exactly as before, deduped within the batch via
+ * descending within the newsletter discovery band (depth limit → RSS_RESERVED_TOP_RANKS+1,
+ * i.e. 20→8 — PR2 reserves 1..7 for RSS), deduped within the batch via
  * `nextAvailablePreviewRank`'s `allocatedRanks` accumulator, so the resulting
- * bulk insert respects CHECK(rank 1..20) and UNIQUE(briefing_date, rank).
+ * bulk insert respects CHECK(rank 1..20) and UNIQUE(briefing_date, rank). Stories
+ * are planned in importance order so band overflow drops the lowest signal.
  */
 export function planNewsletterStoryPromotions(input: {
   stories: NewsletterStoryExtractionRow[];
@@ -267,7 +301,9 @@ export function planNewsletterStoryPromotions(input: {
   const plannedInsertSourceUrls = new Set<string>();
   const plannedInsertTitleToUrl = new Map<string, string>();
 
-  return stories.map((extraction): NewsletterCandidatePlan => {
+  // Plan in importance order so that when the newsletter band (8..20) overflows,
+  // the lowest-signal stories are the ones dropped (no available rank).
+  return sortStoriesByImportanceDesc(stories).map((extraction): NewsletterCandidatePlan => {
     if (extraction.signal_post_id) {
       return {
         action: "skip",
@@ -334,7 +370,7 @@ export function planNewsletterStoryPromotions(input: {
         action: "skip",
         extractionId: extraction.id,
         reason: "no_available_candidate_rank",
-        message: "Newsletter story extraction was not promoted because all 20 candidate ranks are already occupied.",
+        message: `Newsletter story extraction was not promoted because the newsletter discovery band (ranks ${RSS_RESERVED_TOP_RANKS + 1}..${SIGNAL_POST_CANDIDATE_DEPTH_LIMIT}) is full; ranks 1..${RSS_RESERVED_TOP_RANKS} are reserved for RSS.`,
       };
     }
 
@@ -556,7 +592,7 @@ export async function previewNewsletterStoryPromotions(input: {
         rank: null,
         existingSignalPostId: null,
         matchedBy: null,
-        reason: "All 20 candidate ranks are already occupied for the briefing date.",
+        reason: `The newsletter discovery band (ranks ${RSS_RESERVED_TOP_RANKS + 1}..${SIGNAL_POST_CANDIDATE_DEPTH_LIMIT}) is full for the briefing date; ranks 1..${RSS_RESERVED_TOP_RANKS} are reserved for RSS.`,
       };
     }
 
