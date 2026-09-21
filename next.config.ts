@@ -4,7 +4,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
 const sentryBuildPluginEnabled = Boolean(sentryAuthToken);
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  typescript: {
+    // Next 16.3 type-checks the full tsconfig `include` set at build time.
+    // Point it at the build config so the *.test.* fixture backlog stays
+    // excluded, matching the `typecheck` production gate.
+    tsconfigPath: "tsconfig.build.json",
+  },
+};
 
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,

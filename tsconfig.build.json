@@ -1,0 +1,5 @@
+{
+  "//": "Build-time type-check scope for `next build`. Next 16.3 type-checks every file in the tsconfig `include` set, which surfaces the *.test.* fixture type backlog that tsconfig.typecheck.json deliberately excludes (see docs/engineering/bug-fixes/security-reliability-hardening-2026-06-18.md). This keeps `next build` aligned with the production type gate; `typecheck:all` still sees the backlog.",
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx"]
+}
